@@ -1,0 +1,15 @@
+{
+  "name": "softomedia",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "client-app",
+    "ad-server"
+  ],
+  "scripts": {
+    "start:client": "npm run dev --workspace=client-app",
+    "start:server": "npm run dev --workspace=ad-server",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces"
+  }
+}

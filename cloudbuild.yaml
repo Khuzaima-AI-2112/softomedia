@@ -1,0 +1,168 @@
+# Full Stack Cloud Build Configuration
+# Deploys both backend and frontend to Cloud Run
+# Backend must be deployed first so frontend can use its URL
+
+steps:
+  # =============================================================================
+  # BACKEND DEPLOYMENT (Ad Server)
+  # =============================================================================
+  
+  # Step 1: Build backend Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/ad-server:$BUILD_ID'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/ad-server:latest'
+      - './ad-server'
+    id: 'build-backend'
+
+  # Step 2: Push backend image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/ad-server:$BUILD_ID'
+    id: 'push-backend'
+    waitFor: ['build-backend']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/ad-server:latest'
+    waitFor: ['build-backend']
+
+  # Step 3: Deploy backend to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'ad-server'
+      - '--image=gcr.io/$PROJECT_ID/ad-server:$BUILD_ID'
+      - '--region=us-central1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars=PROJECT_ID=$PROJECT_ID,GCS_BUCKET=$PROJECT_ID.appspot.com'
+      - '--set-secrets=JWT_SECRET=jwt-secret:latest'
+      - '--memory=512Mi'
+      - '--cpu=1'
+      - '--max-instances=10'
+    id: 'deploy-backend'
+    waitFor: ['push-backend']
+
+  # Step 4: Get backend URL for frontend
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        BACKEND_URL=$$(gcloud run services describe ad-server --region=us-central1 --format='value(status.url)')
+        echo "Backend deployed at: $$BACKEND_URL"
+        echo "$$BACKEND_URL" > /workspace/backend_url.txt
+    id: 'get-backend-url'
+    waitFor: ['deploy-backend']
+
+  # =============================================================================
+  # FRONTEND DEPLOYMENT (Client App)
+  # =============================================================================
+
+  # Step 5: Create frontend environment file
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        BACKEND_URL=$$(cat /workspace/backend_url.txt)
+        echo "Configuring frontend with backend: $$BACKEND_URL"
+        echo "VITE_API_URL=$$BACKEND_URL" > ./client-app/.env.production
+        cat ./client-app/.env.production
+    id: 'configure-frontend'
+    waitFor: ['get-backend-url']
+
+  # Step 6: Build frontend Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/client-app:$BUILD_ID'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/client-app:latest'
+      - './client-app'
+    id: 'build-frontend'
+    waitFor: ['configure-frontend']
+
+  # Step 7: Push frontend image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/client-app:$BUILD_ID'
+    id: 'push-frontend'
+    waitFor: ['build-frontend']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/client-app:latest'
+    waitFor: ['build-frontend']
+
+  # Step 8: Deploy frontend to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'client-app'
+      - '--image=gcr.io/$PROJECT_ID/client-app:$BUILD_ID'
+      - '--region=us-central1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--memory=256Mi'
+      - '--cpu=1'
+      - '--max-instances=10'
+      - '--port=8080'
+    id: 'deploy-frontend'
+    waitFor: ['push-frontend']
+
+  # =============================================================================
+  # DEPLOYMENT SUMMARY
+  # =============================================================================
+
+  # Step 9: Display deployment summary
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo ""
+        echo "=========================================="
+        echo "🚀 FULL STACK DEPLOYMENT COMPLETE!"
+        echo "=========================================="
+        BACKEND_URL=$$(cat /workspace/backend_url.txt)
+        FRONTEND_URL=$$(gcloud run services describe client-app --region=us-central1 --format='value(status.url)')
+        echo "📱 Frontend: $$FRONTEND_URL"
+        echo "🔧 Backend:  $$BACKEND_URL"
+        echo "📊 Project:  $$PROJECT_ID"
+        echo "🌎 Region:   us-central1"
+        echo "=========================================="
+        echo "Next Steps:"
+        echo "1. Test backend: curl $$BACKEND_URL/health"
+        echo "2. Open frontend: $$FRONTEND_URL"
+        echo "3. Login with: sokallel@gmail.com / thisisbusiness"
+        echo "=========================================="
+    id: 'display-summary'
+    waitFor: ['deploy-frontend']
+
+# Store all built images
+images:
+  - 'gcr.io/$PROJECT_ID/ad-server:$BUILD_ID'
+  - 'gcr.io/$PROJECT_ID/ad-server:latest'
+  - 'gcr.io/$PROJECT_ID/client-app:$BUILD_ID'
+  - 'gcr.io/$PROJECT_ID/client-app:latest'
+
+# Build configuration
+options:
+  machineType: 'N1_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: '2400s'  # 40 minutes for full stack

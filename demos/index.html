@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoftoMedia - Demo Index</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-bg-main: #f9fafb;
+            --color-bg-card: #ffffff;
+            --color-primary: #6366f1;
+            --color-primary-hover: #4f46e5;
+            --color-success: #10b981;
+            --color-text-primary: #111827;
+            --color-text-secondary: #6b7280;
+            --color-border: #e5e7eb;
+            --font-body: 'Inter', sans-serif;
+            --space-4: 1rem;
+            --space-6: 1.5rem;
+            --space-8: 2rem;
+            --radius-lg: 0.75rem;
+            --shadow-md: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: var(--space-8);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: var(--space-8);
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: var(--space-4);
+        }
+
+        .header p {
+            font-size: 1.25rem;
+            opacity: 0.9;
+        }
+
+        .projects-grid {
+            display: grid;
+            gap: var(--space-8);
+        }
+
+        .project-section {
+            background-color: var(--color-bg-card);
+            padding: var(--space-8);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+        }
+
+        .project-header {
+            display: flex;
+            align-items: center;
+            gap: var(--space-4);
+            margin-bottom: var(--space-6);
+            padding-bottom: var(--space-4);
+            border-bottom: 2px solid var(--color-border);
+        }
+
+        .project-number {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .project-title h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--color-text-primary);
+        }
+
+        .project-title p {
+            color: var(--color-text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .demos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: var(--space-4);
+        }
+
+        .demo-card {
+            background-color: var(--color-bg-main);
+            padding: var(--space-6);
+            border-radius: var(--radius-lg);
+            border: 2px solid var(--color-border);
+            transition: all 0.25s;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .demo-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+            border-color: var(--color-primary);
+        }
+
+        .demo-card .state-number {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background-color: var(--color-primary);
+            color: white;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: var(--space-4);
+        }
+
+        .demo-card h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--color-text-primary);
+        }
+
+        .demo-card p {
+            font-size: 0.875rem;
+            color: var(--color-text-secondary);
+            line-height: 1.5;
+        }
+
+        .completed-badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background-color: var(--color-success);
+            color: white;
+            border-radius: 999px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-left: var(--space-4);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎛️ SoftoMedia Demo</h1>
+            <p>Industrial Premium Design System - User Journey States</p>
+        </div>
+
+        <div class="projects-grid">
+            <!-- Project 1 -->
+            <div class="project-section">
+                <div class="project-header">
+                    <div class="project-number">1</div>
+                    <div class="project-title">
+                        <h2>Core Dashboard Views <span class="completed-badge">✓ Complete</span></h2>
+                        <p>Foundation components and main dashboards</p>
+                    </div>
+                </div>
+                <div class="demos-grid">
+                    <a href="state_6_admin_dashboard.html" class="demo-card">
+                        <span class="state-number">State 6</span>
+                        <h3>God View (Admin Dashboard)</h3>
+                        <p>Complete network overview with metrics, campaigns, and screen performance table</p>
+                    </a>
+                    <a href="state_5_brand_dashboard.html" class="demo-card">
+                        <span class="state-number">State 5</span>
+                        <h3>Trust Dashboard (Brand View)</h3>
+                        <p>Brand reporting with physical proof map and pulsing location pins</p>
+                    </a>
+                    <a href="state_14_empty_state.html" class="demo-card">
+                        <span class="state-number">State 14</span>
+                        <h3>Day Zero (Empty State)</h3>
+                        <p>First-time user experience with encouraging messaging</p>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Project 2 -->
+            <div class="project-section">
+                <div class="project-header">
+                    <div class="project-number">2</div>
+                    <div class="project-title">
+                        <h2>Screen & Campaign Management <span class="completed-badge">✓ Complete</span></h2>
+                        <p>Operational tools for managing hardware and content</p>
+                    </div>
+                </div>
+                <div class="demos-grid">
+                    <a href="state_7_screen_management.html" class="demo-card">
+                        <span class="state-number">State 7</span>
+                        <h3>Screen Management List</h3>
+                        <p>Dense data table with search, filtering, and real-time status</p>
+                    </a>
+                    <a href="state_8_campaign_drawer.html" class="demo-card">
+                        <span class="state-number">State 8</span>
+                        <h3>Campaign Upload Drawer</h3>
+                        <p>Slide-out drawer with drag-and-drop video upload</p>
+                    </a>
+                    <a href="state_9_alert_system.html" class="demo-card">
+                        <span class="state-number">State 9</span>
+                        <h3>Red Dot Alert System</h3>
+                        <p>Toast notifications for offline screens and system alerts</p>
+                    </a>
+                    <a href="state_12_campaign_report.html" class="demo-card">
+                        <span class="state-number">State 12</span>
+                        <h3>Final Campaign Report</h3>
+                        <p>Printable performance report with metrics and heatmap</p>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Project 3 -->
+            <div class="project-section">
+                <div class="project-header">
+                    <div class="project-number">3</div>
+                    <div class="project-title">
+                        <h2>Retailer Experience & User Management <span class="completed-badge">✓ Complete</span></h2>
+                        <p>Simplified retailer views and admin CRM tools</p>
+                    </div>
+                </div>
+                <div class="demos-grid">
+                    <a href="state_10_retailer_dashboard.html" class="demo-card">
+                        <span class="state-number">State 10 & 18</span>
+                        <h3>Retailer Concierge View</h3>
+                        <p>Simplified dashboard with massive status card and mobile troubleshoot buttons</p>
+                    </a>
+                    <a href="state_17_user_management.html" class="demo-card">
+                        <span class="state-number">State 17</span>
+                        <h3>User Management Tables</h3>
+                        <p>Admin CRM with tabbed interface and email invitation flow</p>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

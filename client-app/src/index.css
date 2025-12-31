@@ -1,0 +1,8 @@
+/* Import Industrial Premium Design System */
+@import './design-tokens.css';
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}

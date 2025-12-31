@@ -1,0 +1,95 @@
+# Frontend (Client App) Cloud Build Configuration
+# Builds Docker image with backend URL and deploys to Cloud Run
+
+steps:
+  # Step 1: Get backend URL from previous deployment
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Fetching backend URL..."
+        BACKEND_URL=$$(gcloud run services describe ad-server --region=us-central1 --format='value(status.url)')
+        echo "Backend URL: $$BACKEND_URL"
+        echo "VITE_API_URL=$$BACKEND_URL" > .env.production
+        cat .env.production
+    dir: 'client-app'
+    id: 'get-backend-url'
+
+  # Step 2: Build the Docker image with build arg
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/client-app:$BUILD_ID'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/client-app:latest'
+      - '.'
+    dir: 'client-app'
+    id: 'build-image'
+    waitFor: ['get-backend-url']
+
+  # Step 3: Push the Docker image to GCR
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/client-app:$BUILD_ID'
+    id: 'push-image'
+    waitFor: ['build-image']
+
+  # Step 4: Push latest tag
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/client-app:latest'
+    id: 'push-latest'
+    waitFor: ['build-image']
+
+  # Step 5: Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'client-app'
+      - '--image=gcr.io/$PROJECT_ID/client-app:$BUILD_ID'
+      - '--region=us-central1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--memory=256Mi'
+      - '--cpu=1'
+      - '--max-instances=10'
+      - '--min-instances=0'
+      - '--timeout=60s'
+      - '--port=8080'
+    id: 'deploy-to-cloud-run'
+    waitFor: ['push-image']
+
+  # Step 6: Display deployment info
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Frontend deployed successfully!"
+        FRONTEND_URL=$$(gcloud run services describe client-app --region=us-central1 --format='value(status.url)')
+        echo "=========================================" 
+        echo "🎉 DEPLOYMENT COMPLETE!"
+        echo "=========================================" 
+        echo "Frontend URL: $$FRONTEND_URL"
+        echo "Backend URL: $$(cat /workspace/backend_url.txt 2>/dev/null || gcloud run services describe ad-server --region=us-central1 --format='value(status.url)')"
+        echo "========================================="
+    id: 'display-urls'
+    waitFor: ['deploy-to-cloud-run']
+
+# Store the built images
+images:
+  - 'gcr.io/$PROJECT_ID/client-app:$BUILD_ID'
+  - 'gcr.io/$PROJECT_ID/client-app:latest'
+
+# Configuration
+options:
+  machineType: 'N1_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: '1200s'  # 20 minutes
