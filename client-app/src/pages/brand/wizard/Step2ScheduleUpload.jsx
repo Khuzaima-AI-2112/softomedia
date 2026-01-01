@@ -98,10 +98,10 @@ const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
                                     disabled={isSoldOut}
                                     onClick={() => toggleSlot(slot.time)}
                                     className={`relative flex flex-col gap-2 p-3 text-left rounded-lg border-2 transition-all ${isSelected
-                                            ? 'border-primary bg-primary/5'
-                                            : isSoldOut
-                                                ? 'border-slate-100 dark:border-slate-800 opacity-50 cursor-not-allowed'
-                                                : 'border-slate-200 dark:border-slate-700 hover:border-primary/50'
+                                        ? 'border-primary bg-primary/5'
+                                        : isSoldOut
+                                            ? 'border-slate-100 dark:border-slate-800 opacity-50 cursor-not-allowed'
+                                            : 'border-slate-200 dark:border-slate-700 hover:border-primary/50'
                                         }`}
                                 >
                                     <span className="text-sm font-bold">{slot.time}</span>
@@ -134,6 +134,7 @@ const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
                         onDragLeave={handleDrag}
                         onDragOver={handleDrag}
                         onDrop={handleDrop}
+                        onClick={() => updateData({ creativeFile: 'demo-ad.mp4' })}
                         className={`relative group h-48 border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer ${dragActive ? 'border-primary bg-primary/5' : 'border-slate-200 dark:border-slate-800 hover:border-primary/50'
                             } ${data.creativeFile ? 'border-emerald-500 bg-emerald-500/5' : ''}`}
                     >
@@ -176,6 +177,7 @@ const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
                     <button
                         onClick={onNext}
                         disabled={!data.creativeFile || data.selectedSlots.length === 0}
+                        data-testid="proceed-to-review"
                         className="w-full py-4 rounded-lg bg-primary hover:bg-primary/90 text-white font-bold transition-all flex items-center justify-center gap-2 group shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed mt-4"
                     >
                         <span>Proceed to Review</span>

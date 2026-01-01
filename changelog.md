@@ -2,6 +2,22 @@
 
 Objectives: Document changes and progress milestones throughout the project lifecycle.
 
+## [2026-01-01] - SRE-Grade UI Integration & Reliability
+
+### Added
+- **ErrorBoundary**: Created `ErrorBoundary.jsx` component for module-level fault isolation.
+- **Health Dashboard**: Implemented `/dashboard/health` route to verify backend, storage, and auth connectivity.
+- **Gold Path Test**: Created `integration_gold_path.spec.js` for cross-persona journey verification.
+- **Visual Regression**: Configured Playwright for baseline screenshot comparisons.
+
+### Changed
+- **Code Splitting**: Refactored `App.jsx` to use `React.lazy` and `Suspense` for improved TTI.
+- **SPA Navigation**: Removed `window.location.href` from `HamburgerMenu.jsx` for smoother persona switching.
+- **DashboardLayout**: Simplified role-based routing to only redirect on exact `/dashboard` path.
+- **Selector Standardization**: Unified all persona switching buttons to use `data-testid="persona-{role}"`.
+
+---
+
 ## [2026-01-01] - Persona Management & Campaign Wizard
 
 ### Added
@@ -12,6 +28,13 @@ Objectives: Document changes and progress milestones throughout the project life
     - Step 2: Schedule & Creative Upload (based on `2.html`).
     - Step 3: Loop Distribution Review (based on `3.html`).
 - **Testing**: Added comprehensive Playwright test suite (`tests/personas.spec.js`) covering persona persistence and E2E wizard flow.
+- **Testing Stability**: Improved E2E reliability by implementing `aria-label` targeting and explicit `localStorage` initialization in test hooks.
+- **Zero-Flake Architecture**: Implemented Senior SRE testing standards:
+    - Standardized on `data-test` attributes for core components.
+    - Implemented **Synthetic Authentication** via `storageState` and `globalSetup.js`.
+    - Created `base.fixtures.js` for authenticated multi-persona page contexts.
+    - Integrated self-healing `npx kill-port` into the dev server lifecycle.
+- **Infrastructure Tooling**: Optimized `playwright.config.js` with increased timeouts and port-reusage handling for Windows developer environments.
 
 ### Changed
 - **Auth Architecture**: Refactored `AuthContext.jsx` to `PersonaContext` logic (persisting `active_persona` in `localStorage`).

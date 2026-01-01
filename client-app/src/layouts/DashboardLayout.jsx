@@ -1,17 +1,24 @@
 import React from 'react';
-import { Outlet, useLocation, Navigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import HamburgerMenu from '../components/HamburgerMenu';
 import PersonaSwitcher from '../components/PersonaSwitcher';
 import { useAuth } from '../contexts/AuthContext';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 function DashboardLayout() {
     const { persona, loading } = useAuth();
     const location = useLocation();
+    const navigate = useNavigate();
+
+    // Role-based routing: Ensure the URL matches the persona
+    React.useEffect(() => {
+        if (!loading && persona && location.pathname === '/dashboard') {
+            // Default landing redirect
+            navigate(`/dashboard/${persona}`, { replace: true });
+        }
+    }, [persona, loading, location.pathname, navigate]);
 
     if (loading) return null;
-
-    // Optional: Redirect to the correct persona's dashboard if they try to access another
-    // For now, let's keep it flexible as requested (buttons switch the view)
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-background-dark text-slate-900 dark:text-white relative">
@@ -41,7 +48,9 @@ function DashboardLayout() {
             </header>
 
             <main className="p-4 lg:p-10 max-w-[1440px] mx-auto">
-                <Outlet />
+                <ErrorBoundary>
+                    <Outlet />
+                </ErrorBoundary>
             </main>
         </div>
     );

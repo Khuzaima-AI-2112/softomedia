@@ -1,30 +1,35 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
-import Player from './pages/Player';
-import DashboardLayout from './layouts/DashboardLayout';
-import AdminOverview from './pages/admin/Overview';
-import BrandDashboard from './pages/brand/BrandDashboard';
-import BrandCampaignWizard from './pages/brand/BrandCampaignWizard';
-import RetailerDashboard from './pages/retailer/RetailerDashboard';
+
+const Player = React.lazy(() => import('./pages/Player'));
+const DashboardLayout = React.lazy(() => import('./layouts/DashboardLayout'));
+const AdminOverview = React.lazy(() => import('./pages/admin/Overview'));
+const BrandDashboard = React.lazy(() => import('./pages/brand/BrandDashboard'));
+const BrandCampaignWizard = React.lazy(() => import('./pages/brand/BrandCampaignWizard'));
+const RetailerDashboard = React.lazy(() => import('./pages/retailer/RetailerDashboard'));
+const Health = React.lazy(() => import('./pages/Health'));
+
+import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
     return (
         <Router>
             <AuthProvider>
-                <Routes>
-                    <Route path="/player" element={<Player />} />
-
-                    <Route path="/dashboard" element={<DashboardLayout />}>
-                        <Route index element={<Navigate to="admin" replace />} />
-                        <Route path="admin" element={<AdminOverview />} />
-                        <Route path="brand" element={<BrandDashboard />} />
-                        <Route path="brand/campaign/new" element={<BrandCampaignWizard />} />
-                        <Route path="retailer" element={<RetailerDashboard />} />
-                    </Route>
-
-                    <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                </Routes>
+                <React.Suspense fallback={<div className="h-screen w-screen flex items-center justify-center bg-slate-50 dark:bg-background-dark"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>}>
+                    <Routes>
+                        <Route path="/player" element={<Player />} />
+                        <Route path="/dashboard" element={<DashboardLayout />}>
+                            <Route index element={<Navigate to="admin" replace />} />
+                            <Route path="admin" element={<AdminOverview />} />
+                            <Route path="brand" element={<BrandDashboard />} />
+                            <Route path="brand/campaign/new" element={<BrandCampaignWizard />} />
+                            <Route path="retailer" element={<RetailerDashboard />} />
+                            <Route path="health" element={<Health />} />
+                        </Route>
+                        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                    </Routes>
+                </React.Suspense>
             </AuthProvider>
         </Router>
     );

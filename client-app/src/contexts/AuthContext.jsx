@@ -3,19 +3,35 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
+    const [user, setUser] = useState(null);
     const [persona, setPersonaState] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const savedPersona = localStorage.getItem('active_persona');
+        const savedUser = localStorage.getItem('auth_user');
+
+        if (savedUser) {
+            setUser(JSON.parse(savedUser));
+        }
+
         if (savedPersona) {
             setPersonaState(savedPersona);
+        } else if (savedUser) {
+            setPersonaState(JSON.parse(savedUser).role);
         } else {
-            // Default to brand for demo purposes if nothing is set
             setPersonaState('brand');
         }
         setLoading(false);
     }, []);
+
+    const login = (userData, token) => {
+        localStorage.setItem('auth_user', JSON.stringify(userData));
+        localStorage.setItem('auth_token', token);
+        localStorage.setItem('active_persona', userData.role);
+        setUser(userData);
+        setPersonaState(userData.role);
+    };
 
     const setPersona = (type) => {
         localStorage.setItem('active_persona', type);
@@ -23,12 +39,15 @@ export const AuthProvider = ({ children }) => {
     };
 
     const logout = () => {
+        localStorage.removeItem('auth_user');
+        localStorage.removeItem('auth_token');
         localStorage.removeItem('active_persona');
-        setPersonaState(null);
+        setUser(null);
+        setPersonaState('brand');
     };
 
     return (
-        <AuthContext.Provider value={{ persona, loading, setPersona, logout }}>
+        <AuthContext.Provider value={{ user, persona, loading, login, setPersona, logout }}>
             {children}
         </AuthContext.Provider>
     );

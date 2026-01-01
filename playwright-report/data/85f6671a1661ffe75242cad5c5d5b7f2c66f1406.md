@@ -1,0 +1,96 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - button [ref=e4] [cursor=pointer]:
+    - generic [ref=e5]: menu
+  - generic [ref=e6]:
+    - heading "SoftoMedia" [level=3] [ref=e7]
+    - navigation [ref=e8]:
+      - link "Dashboard" [ref=e9] [cursor=pointer]:
+        - /url: /dashboard/admin
+        - generic [ref=e10]: dashboard
+        - text: Dashboard
+      - link "Ad Player" [ref=e11] [cursor=pointer]:
+        - /url: /player
+        - generic [ref=e12]: play_circle
+        - text: Ad Player
+      - link "System Health" [ref=e13] [cursor=pointer]:
+        - /url: /dashboard/health
+        - generic [ref=e14]: health_metrics
+        - text: System Health
+      - link "Settings" [ref=e15] [cursor=pointer]:
+        - /url: /dashboard/admin
+        - generic [ref=e16]: settings
+        - text: Settings
+    - generic [ref=e17]:
+      - paragraph [ref=e18]: Persona Switch
+      - generic [ref=e19]:
+        - button "🔐 Admin View" [ref=e20] [cursor=pointer]
+        - button "📺 Brand View" [ref=e21] [cursor=pointer]
+        - button "🏪 Retailer View" [ref=e22] [cursor=pointer]
+  - banner [ref=e23]:
+    - generic [ref=e24]:
+      - generic [ref=e26]: campaign
+      - heading "AdManager" [level=2] [ref=e27]
+      - generic [ref=e29]:
+        - button "Admin View" [ref=e30]:
+          - generic [ref=e31]: shield_person
+          - generic [ref=e32]: Admin
+        - button "Brand View" [ref=e33]:
+          - generic [ref=e34]: campaign
+          - generic [ref=e35]: Brand
+        - button "Retailer View" [ref=e36]:
+          - generic [ref=e37]: storefront
+          - generic [ref=e38]: Retailer
+    - generic [ref=e40]:
+      - generic [ref=e41]: BRAND MODE
+      - generic [ref=e42]: Live Infrastructure
+  - main [ref=e44]:
+    - generic [ref=e45]:
+      - generic [ref=e46]:
+        - heading "Global Grocery Control" [level=1] [ref=e47]
+        - paragraph [ref=e48]: Infrastructure overview across all retail locations
+      - generic [ref=e49]:
+        - generic [ref=e50]:
+          - paragraph [ref=e51]: Total Active Screens
+          - paragraph [ref=e52]: 1,240
+        - generic [ref=e53]:
+          - paragraph [ref=e54]: Network Latency
+          - paragraph [ref=e55]: 24ms
+        - generic [ref=e56]:
+          - paragraph [ref=e57]: Active Ad Campaigns
+          - paragraph [ref=e58]: "452"
+      - generic [ref=e59]:
+        - heading "Screen Infrastructure" [level=3] [ref=e60]
+        - table [ref=e62]:
+          - rowgroup [ref=e63]:
+            - row "Screen ID Location Status Health Last Sync" [ref=e64]:
+              - columnheader "Screen ID" [ref=e65]
+              - columnheader "Location" [ref=e66]
+              - columnheader "Status" [ref=e67]
+              - columnheader "Health" [ref=e68]
+              - columnheader "Last Sync" [ref=e69]
+          - rowgroup [ref=e70]:
+            - row "demo-screen-01 Aisle 4 (Beverages) Online 100% 2m ago" [ref=e71]:
+              - cell "demo-screen-01" [ref=e72]
+              - cell "Aisle 4 (Beverages)" [ref=e73]
+              - cell "Online" [ref=e74]:
+                - generic [ref=e75]: Online
+              - cell "100%" [ref=e77]
+              - cell "2m ago" [ref=e78]
+            - row "demo-screen-02 Aisle 12 (Frozen) Online 98% 5m ago" [ref=e79]:
+              - cell "demo-screen-02" [ref=e80]
+              - cell "Aisle 12 (Frozen)" [ref=e81]
+              - cell "Online" [ref=e82]:
+                - generic [ref=e83]: Online
+              - cell "98%" [ref=e85]
+              - cell "5m ago" [ref=e86]
+            - row "demo-screen-03 Produce Endcap Warning 45% 1h ago" [ref=e87]:
+              - cell "demo-screen-03" [ref=e88]
+              - cell "Produce Endcap" [ref=e89]
+              - cell "Warning" [ref=e90]:
+                - generic [ref=e91]: Warning
+              - cell "45%" [ref=e93]
+              - cell "1h ago" [ref=e94]
+```

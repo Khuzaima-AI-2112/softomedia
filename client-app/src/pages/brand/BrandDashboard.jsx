@@ -1,5 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import KPICard from '../../components/KPICard';
+import DataTable from '../../components/DataTable';
 
 const BrandDashboard = () => {
     const navigate = useNavigate();
@@ -43,6 +45,82 @@ const BrandDashboard = () => {
         { label: 'Daily Impressions', value: '1.2M', trend: '+5%', icon: 'visibility', color: 'text-indigo-400' },
     ];
 
+    const columns = [
+        {
+            header: 'Campaign Name',
+            render: (cmp) => (
+                <div className="flex flex-col">
+                    <span className="text-base font-semibold">{cmp.name}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">ID: {cmp.id}</span>
+                </div>
+            )
+        },
+        {
+            header: 'Preview',
+            render: (cmp) => (
+                <div className="relative w-16 h-10 rounded-md overflow-hidden bg-slate-200 dark:bg-slate-700 ring-1 ring-slate-200 dark:ring-slate-700">
+                    <div
+                        className="absolute inset-0 bg-cover bg-center"
+                        style={{ backgroundImage: `url("${cmp.image}")` }}
+                    />
+                </div>
+            )
+        },
+        {
+            header: 'Status',
+            render: (cmp) => (
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${cmp.status === 'Live' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' :
+                    cmp.status === 'Scheduled' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800' :
+                        'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                    }`}>
+                    {cmp.status === 'Live' && <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>}
+                    {cmp.status}
+                </span>
+            )
+        },
+        { header: 'Duration', accessor: 'duration' },
+        {
+            header: 'Locations',
+            render: (cmp) => (
+                <div className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-slate-400 text-[18px]">storefront</span>
+                    {cmp.locations}
+                </div>
+            )
+        },
+        {
+            header: 'Performance',
+            render: (cmp) => (
+                <div className="flex flex-col gap-1 w-24">
+                    <span className="text-slate-900 dark:text-white font-medium">{cmp.impressions} <span className="text-xs font-normal text-slate-500">Impr.</span></span>
+                    <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5">
+                        <div
+                            className={`h-1.5 rounded-full ${cmp.status === 'Ended' ? 'bg-slate-400' : 'bg-primary'}`}
+                            style={{ width: cmp.performance }}
+                        />
+                    </div>
+                </div>
+            )
+        },
+        {
+            header: 'Actions',
+            className: 'text-right',
+            render: () => (
+                <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button className="p-1.5 text-slate-400 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors" title="Edit">
+                        <span className="material-symbols-outlined text-[20px]" aria-hidden="true">edit</span>
+                    </button>
+                    <button className="p-1.5 text-slate-400 hover:text-orange-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors" title="Pause">
+                        <span className="material-symbols-outlined text-[20px]" aria-hidden="true">pause_circle</span>
+                    </button>
+                    <button className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors" title="Settings">
+                        <span className="material-symbols-outlined text-[20px]" aria-hidden="true">more_vert</span>
+                    </button>
+                </div>
+            )
+        }
+    ];
+
     return (
         <div className="flex flex-col gap-8">
             <div className="flex justify-between items-center">
@@ -59,102 +137,23 @@ const BrandDashboard = () => {
             {/* KPI Stats Row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {kpis.map((kpi, i) => (
-                    <div key={i} className="p-6 rounded-xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700/50 shadow-sm relative overflow-hidden group">
-                        <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <span className={`material-symbols-outlined text-6xl ${kpi.color}`}>{kpi.icon}</span>
-                        </div>
-                        <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">{kpi.label}</p>
-                        <div className="flex items-baseline gap-2">
-                            <p className="text-3xl font-bold text-slate-900 dark:text-white">{kpi.value}</p>
-                            <span className="text-xs font-medium text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded flex items-center">
-                                <span className="material-symbols-outlined text-[14px] mr-0.5">trending_up</span>{kpi.trend}
-                            </span>
-                        </div>
-                        <p className="text-slate-400 text-xs mt-2">Running across network</p>
-                    </div>
+                    <KPICard
+                        key={i}
+                        label={kpi.label}
+                        value={kpi.value}
+                        trend={kpi.trend}
+                        icon={kpi.icon}
+                        color={kpi.color}
+                        description="Running across network"
+                    />
                 ))}
             </div>
 
             {/* Main Table */}
-            <div className="bg-white dark:bg-surface-dark rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                        <thead className="text-xs text-slate-500 dark:text-slate-400 uppercase bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
-                            <tr>
-                                <th className="px-6 py-4 font-semibold">Campaign Name</th>
-                                <th className="px-6 py-4 font-semibold w-24">Preview</th>
-                                <th className="px-6 py-4 font-semibold">Status</th>
-                                <th className="px-6 py-4 font-semibold">Duration</th>
-                                <th className="px-6 py-4 font-semibold">Locations</th>
-                                <th className="px-6 py-4 font-semibold">Performance</th>
-                                <th className="px-6 py-4 font-semibold text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                            {campaigns.map((cmp, i) => (
-                                <tr key={i} className="bg-white dark:bg-surface-dark hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
-                                    <td className="px-6 py-4 font-medium text-slate-900 dark:text-white whitespace-nowrap">
-                                        <div className="flex flex-col">
-                                            <span className="text-base font-semibold">{cmp.name}</span>
-                                            <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">ID: {cmp.id}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="relative w-16 h-10 rounded-md overflow-hidden bg-slate-200 dark:bg-slate-700 ring-1 ring-slate-200 dark:ring-slate-700">
-                                            <div
-                                                className="absolute inset-0 bg-cover bg-center"
-                                                style={{ backgroundImage: `url("${cmp.image}")` }}
-                                            />
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${cmp.status === 'Live' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' :
-                                                cmp.status === 'Scheduled' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800' :
-                                                    'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
-                                            }`}>
-                                            {cmp.status === 'Live' && <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>}
-                                            {cmp.status}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
-                                        {cmp.duration}
-                                    </td>
-                                    <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="material-symbols-outlined text-slate-400 text-[18px]">storefront</span>
-                                            {cmp.locations}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex flex-col gap-1 w-24">
-                                            <span className="text-slate-900 dark:text-white font-medium">{cmp.impressions} <span className="text-xs font-normal text-slate-500">Impr.</span></span>
-                                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5">
-                                                <div
-                                                    className={`h-1.5 rounded-full ${cmp.status === 'Ended' ? 'bg-slate-400' : 'bg-primary'}`}
-                                                    style={{ width: cmp.performance }}
-                                                />
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button className="p-1.5 text-slate-400 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors">
-                                                <span className="material-symbols-outlined text-[20px]">edit</span>
-                                            </button>
-                                            <button className="p-1.5 text-slate-400 hover:text-orange-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors">
-                                                <span className="material-symbols-outlined text-[20px]">pause_circle</span>
-                                            </button>
-                                            <button className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors">
-                                                <span className="material-symbols-outlined text-[20px]">more_vert</span>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            <DataTable
+                columns={columns}
+                data={campaigns}
+            />
         </div>
     );
 };

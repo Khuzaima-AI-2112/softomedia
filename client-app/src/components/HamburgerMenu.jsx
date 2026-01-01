@@ -10,6 +10,7 @@ function HamburgerMenu() {
     const menuItems = [
         { label: 'Dashboard', path: `/dashboard/${user?.role || 'admin'}`, icon: 'dashboard' },
         { label: 'Ad Player', path: '/player', icon: 'play_circle' },
+        { label: 'System Health', path: '/dashboard/health', icon: 'health_metrics' },
         { label: 'Settings', path: '#', icon: 'settings' },
     ];
 
@@ -29,8 +30,6 @@ function HamburgerMenu() {
         login(mockUser, 'demo-token');
         setIsOpen(false);
         navigate(swatch.path);
-        // Direct reload to ensure context clean state (legacy behavior)
-        window.location.href = swatch.path;
     };
 
     return (
@@ -38,6 +37,7 @@ function HamburgerMenu() {
             {/* Toggle Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
+                data-testid="menu-toggle"
                 style={{
                     position: 'fixed',
                     top: '1rem',
@@ -54,7 +54,7 @@ function HamburgerMenu() {
                     justifyContent: 'center'
                 }}
             >
-                <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>{isOpen ? 'close' : 'menu'}</span>
+                <span className="material-symbols-outlined" style={{ fontSize: '20px' }} aria-hidden="true">{isOpen ? 'close' : 'menu'}</span>
             </button>
 
             {/* Backdrop */}
@@ -103,7 +103,7 @@ function HamburgerMenu() {
                             onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
                             onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                         >
-                            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>{item.icon}</span>
+                            <span className="material-symbols-outlined" style={{ fontSize: '20px' }} aria-hidden="true">{item.icon}</span>
                             {item.label}
                         </Link>
                     ))}
@@ -116,6 +116,7 @@ function HamburgerMenu() {
                             <button
                                 key={swatch.role}
                                 onClick={() => handlePersonaSwitch(swatch)}
+                                data-testid={`persona-${swatch.role}`}
                                 style={{
                                     display: 'flex',
                                     alignItems: 'center',
