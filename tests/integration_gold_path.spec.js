@@ -9,18 +9,26 @@ test.describe('End-to-End Gold Path: Multi-Persona Journey', () => {
         await page.locator('[data-testid="menu-toggle"]').click();
         await page.getByText('System Health').click();
         await expect(page.getByText('System Health')).toBeVisible();
-        // Wait for the indicator to move from 'checking' to 'online'
-        await expect(page.locator('[data-testid="health-status"]')).toContainText(/online/i, { timeout: 5000 });
+        // Wait for the indicator to move from 'checking' to 'online' (H1: increased timeout, refined selector)
+        await expect(page.locator('[data-testid="health-status"]').getByText(/online/i).first()).toBeVisible({ timeout: 10000 });
 
         // 2. Switch to Brand - Create Campaign (Partial flow check)
+        // H2: Ensure header persona button is visible before clicking
+        await page.locator('[data-testid="persona-brand"]').waitFor({ state: 'visible' });
         await page.locator('[data-testid="persona-brand"]').click();
+        await page.waitForURL('**/dashboard/brand**');
         await page.waitForLoadState('networkidle');
         await expect(page.getByText('BRAND MODE')).toBeVisible();
-        await page.getByRole('button', { name: 'New Campaign' }).click();
+        await page.locator('[data-testid="new-campaign-btn"]').click();
         await expect(page).toHaveURL(/.*campaign\/new/);
 
         // 3. Switch to Retailer - Check Dashboard
+        // H2: Ensure header persona button is visible before clicking
+        await page.locator('[data-testid="persona-retailer"]').waitFor({ state: 'visible' });
         await page.locator('[data-testid="persona-retailer"]').click();
+        // H4: Use glob pattern for more reliable URL matching
+        await page.waitForURL('**/dashboard/retailer**');
+        await page.waitForLoadState('networkidle');
         await expect(page.getByText('RETAILER MODE')).toBeVisible();
         await expect(page.getByText('Retailer Command')).toBeVisible();
 

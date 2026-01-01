@@ -1,0 +1,123 @@
+# Cloud Build configuration for softomedia-live2026
+# Builds and deploys both client-app and ad-server to Cloud Run
+
+steps:
+  # Step 1: Verify pre-deployment requirements
+  - name: 'node:20'
+    entrypoint: 'node'
+    args: ['verify_predeploy.js']
+    id: 'verify-predeploy'
+
+  # Step 2: Build client-app
+  - name: 'node:20'
+    entrypoint: 'npm'
+    args: ['ci']
+    dir: 'client-app'
+    id: 'install-client'
+
+  - name: 'node:20'
+    entrypoint: 'npm'
+    args: ['run', 'build']
+    dir: 'client-app'
+    id: 'build-client'
+    waitFor: ['install-client']
+
+  # Step 3: Build ad-server
+  - name: 'node:20'
+    entrypoint: 'npm'
+    args: ['ci']
+    dir: 'ad-server'
+    id: 'install-adserver'
+
+  # Step 4: Build and push client-app container
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/softomedia/client-app:$COMMIT_SHA'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/softomedia/client-app:latest'
+      - '-f'
+      - 'client-app/Dockerfile'
+      - 'client-app'
+    id: 'build-client-image'
+    waitFor: ['build-client']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/softomedia/client-app:$COMMIT_SHA'
+    id: 'push-client-image'
+    waitFor: ['build-client-image']
+
+  # Step 5: Build and push ad-server container
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/softomedia/ad-server:$COMMIT_SHA'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/softomedia/ad-server:latest'
+      - '-f'
+      - 'ad-server/Dockerfile'
+      - 'ad-server'
+    id: 'build-adserver-image'
+    waitFor: ['install-adserver']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/softomedia/ad-server:$COMMIT_SHA'
+    id: 'push-adserver-image'
+    waitFor: ['build-adserver-image']
+
+
+  # Step 7: Deploy ad-server to Cloud Run
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'ad-server'
+      - '--image'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/softomedia/ad-server:$COMMIT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'NODE_ENV=production,CORS_ORIGINS=https://client-app-$PROJECT_ID.run.app'
+      - '--set-secrets'
+      - 'JWT_SECRET=JWT_SECRET:latest'
+    id: 'deploy-adserver'
+    waitFor: ['push-adserver-image']
+
+  # Step 8: Deploy client-app to Cloud Run with backend URL
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        # Get the ad-server URL
+        AD_SERVER_URL=$(gcloud run services describe ad-server --region=us-central1 --format='value(status.url)')
+        
+        # Deploy client-app with API URL
+        gcloud run deploy client-app \
+          --image us-central1-docker.pkg.dev/$PROJECT_ID/softomedia/client-app:$COMMIT_SHA \
+          --region us-central1 \
+          --platform managed \
+          --allow-unauthenticated \
+          --set-env-vars "VITE_API_URL=$AD_SERVER_URL"
+    id: 'deploy-client'
+    waitFor: ['deploy-adserver']
+
+# Store built images in Artifact Registry
+images:
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/softomedia/client-app:$COMMIT_SHA'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/softomedia/ad-server:$COMMIT_SHA'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  
+# Timeout for entire build (15 minutes)
+timeout: 900s

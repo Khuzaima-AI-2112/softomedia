@@ -1,5 +1,20 @@
 # TODO
 
+## 🚫 Deployment Blockers (Must Fix Before Deploy)
+
+### ESLint Configuration
+- [ ] Create `.eslintrc.cjs` in `client-app/` directory
+- [ ] Ensure `npm run lint` passes with zero errors
+
+### Deployment Infrastructure
+- [ ] Create `cloudbuild.yaml` for GCP Cloud Build
+- [ ] Create `verify_predeploy.js` script (referenced in Deployment_Guide.md)
+
+### Critical Test Failures
+- [ ] Fix 6 failing Playwright tests (personas.spec.js, integration_gold_path.spec.js)
+
+---
+
 ## High Priority
 
 ### Fix Gold Path Integration Test

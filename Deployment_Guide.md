@@ -9,3 +9,59 @@
 >
 > **RULE: Atomic Deployments Only.**
 > Every `gcloud builds submit --config cloudbuild.yaml .` rebuilds and redeploys BOTH `client-app` AND `ad-server` services. NEVER manually delete Cloud Run services using `gcloud run services delete`. The build system is the only source of service updates.
+
+---
+
+## Pre-Deployment Checklist
+
+Before deploying, run the verification script:
+
+```bash
+node verify_predeploy.js
+```
+
+This checks:
+- ✅ Client build exists (`client-app/dist/`)
+- ✅ Ad-server entry point exists
+- ✅ No hardcoded localhost without env fallback
+- ✅ ESLint config in place
+- ⚠️ Dockerfiles present (warning if missing)
+
+---
+
+## Deployment Commands
+
+### Deploy to Production
+
+```bash
+# From project root
+gcloud builds submit --config cloudbuild.yaml --project=softomedia-live2026 .
+```
+
+### View Build Logs
+
+```bash
+gcloud builds list --project=softomedia-live2026 --limit=5
+```
+
+### Rollback (if needed)
+
+```bash
+# Get previous revision
+gcloud run revisions list --service=client-app --region=us-central1 --project=softomedia-live2026
+
+# Route traffic to previous revision
+gcloud run services update-traffic client-app --to-revisions=REVISION_NAME=100 --region=us-central1 --project=softomedia-live2026
+```
+
+---
+
+## Required Setup (One-Time)
+
+1. **Create Artifact Registry repository**:
+   ```bash
+   gcloud artifacts repositories create softomedia --repository-format=docker --location=us-central1 --project=softomedia-live2026
+   ```
+
+2. **Create Dockerfiles** for both services (see `client-app/Dockerfile` and `ad-server/Dockerfile`)
+

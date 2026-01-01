@@ -116,7 +116,7 @@ function HamburgerMenu() {
                             <button
                                 key={swatch.role}
                                 onClick={() => handlePersonaSwitch(swatch)}
-                                data-testid={`persona-${swatch.role}`}
+                                data-testid={`menu-persona-${swatch.role}`}
                                 style={{
                                     display: 'flex',
                                     alignItems: 'center',

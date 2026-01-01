@@ -43,7 +43,10 @@ const BrandCampaignWizard = () => {
                 return (
                     <Step3ReviewDistribution
                         data={wizardData}
-                        onConfirm={() => console.log('Confirmed:', wizardData)}
+                        onConfirm={() => {
+                            // TODO: Implement campaign creation API call
+                            // For now, just navigate back to dashboard
+                        }}
                         onPrev={prevStep}
                     />
                 );

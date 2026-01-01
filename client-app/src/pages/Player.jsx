@@ -106,7 +106,7 @@ function Player() {
                         duration: ad.duration
                     })
                 });
-                console.log(`Recorded impression for ${ad.title}`);
+                // Record impression (silent - no console.log in production)
             } catch (e) {
                 console.error('Failed to record impression', e);
             }

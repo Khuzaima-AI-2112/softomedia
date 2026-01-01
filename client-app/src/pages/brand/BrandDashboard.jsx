@@ -127,9 +127,10 @@ const BrandDashboard = () => {
                 <h1 className="text-2xl font-bold tracking-tight">Active Campaigns</h1>
                 <button
                     onClick={() => navigate('campaign/new')}
+                    data-testid="new-campaign-btn"
                     className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white font-medium rounded-lg text-sm px-5 py-2.5 transition-colors shadow-lg shadow-primary/25"
                 >
-                    <span className="material-symbols-outlined text-[20px]">add</span>
+                    <span className="material-symbols-outlined text-[20px]" aria-hidden="true">add</span>
                     <span>New Campaign</span>
                 </button>
             </div>

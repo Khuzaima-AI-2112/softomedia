@@ -1,94 +1,126 @@
+// Load environment variables from .env.development (parent directory)
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+dotenv.config({ path: join(__dirname, '..', '.env.development') });
+
 import express from 'express';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
+import compression from 'compression';
+import logger, { requestLogger } from './src/utils/logger.js';
 
 const app = express();
-app.use(cors());
-app.use(express.json());
 
-const PORT = 8080;
-const JWT_SECRET = 'demo-secret';
+// Environment-based CORS configuration
+const CORS_ORIGINS = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
+    : ['http://localhost:5173', 'http://localhost:3000'];
 
-// --- IN-MEMORY DATABASE ---
-const db = {
-    users: [
-        { id: 'admin_001', email: 'admin@demo.com', role: 'admin', name: 'Admin User' },
-        { id: 'brand_001', email: 'brand@demo.com', role: 'brand', name: 'Demo Brand', linked_entity_id: 'demo_corp' },
-        { id: 'retailer_001', email: 'retailer@demo.com', role: 'retailer', name: 'Demo Retailer', linked_entity_id: 'demo-screen-01' },
-    ],
-    ads: [
-        { id: 'ad_001', title: 'Demo Coffee', file_path: 'demo_ad_1.png', duration: 5, status: 'approved' },
-        { id: 'ad_002', title: 'Demo Tech', file_path: 'demo_ad_2.png', duration: 5, status: 'approved' },
-        { id: 'ad_003', title: 'Demo Travel', file_path: 'demo_ad_3.png', duration: 5, status: 'approved' },
-        { id: 'ad_004', title: 'Costco Savings', file_path: 'demo_ad_costco.png', duration: 5, status: 'approved' },
-        { id: 'ad_005', title: 'Fresh Pizza', file_path: 'demo_ad_pizza.png', duration: 5, status: 'approved' },
-        { id: 'ad_006', title: 'Seasonal Sale', file_path: 'seasonal_sale.png', duration: 5, status: 'approved' },
-        { id: 'ad_007', title: 'Bakery Fresh', file_path: 'bakery_fresh.png', duration: 5, status: 'approved' },
-    ],
-    screens: [
-        { screen_id: 'demo-screen-01', status: 'active', last_seen: new Date().toISOString() }
-    ],
-    impressions: []
+const corsOptions = {
+    origin: function (origin, callback) {
+        // Allow requests with no origin (mobile apps, Postman, etc.)
+        if (!origin) return callback(null, true);
+
+        if (CORS_ORIGINS.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            console.warn(`[CORS] Blocked request from origin: ${origin}`);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true
 };
 
-// --- AUTH LOGIC ---
-const generateToken = (user) => {
-    return jwt.sign(
-        { uid: user.id, email: user.email, role: user.role },
-        JWT_SECRET,
-        { expiresIn: '24h' }
-    );
-};
+app.use(cors(corsOptions));
+app.use(compression()); // Enable gzip compression
+app.use(express.json({ limit: '10mb' })); // Limit request body size
+
+// Security headers
+import { securityHeaders } from './src/middleware/security.js';
+app.use(securityHeaders);
+
+// Request logging
+app.use(requestLogger);
+
+const PORT = process.env.PORT || 8080;
+const JWT_SECRET = process.env.JWT_SECRET;
+
+// Validate required environment variables
+if (!JWT_SECRET) {
+    console.error('FATAL ERROR: JWT_SECRET environment variable is not set.');
+    process.exit(1);
+}
+
+console.log('[Server] Environment configured successfully');
+console.log('[Server] Using Firestore for data persistence');
 
 // --- ROUTES ---
 
-app.post('/api/auth/login', (req, res) => {
-    const { email } = req.body;
-    const user = db.users.find(u => u.email === email);
-    if (!user) return res.status(401).json({ error: 'User not found' });
 
-    const token = generateToken(user);
-    res.json({ token, user });
-});
+import { userRepository, adRepository, screenRepository, impressionRepository } from './src/repositories/index.js';
+import { authService, playlistService } from './src/services/index.js';
+import { validateLogin, validateScreenRegistration, validateImpression, validatePlaylistRequest } from './src/middleware/validation.js';
+import { playlistETag, cacheControl } from './src/middleware/performance.js';
 
-app.get('/api/playlist/:screenId', (req, res) => {
-    const loop = db.ads.map((ad, i) => ({
-        slot_number: i,
-        id: ad.id,
-        url: `http://localhost:8080/assets/${ad.file_path}`,
-        title: ad.title,
-        duration: ad.duration
-    }));
-    // Repeat to make 12 slots if needed
-    const fullLoop = [...loop, ...loop, ...loop].slice(0, 12);
-    res.json({ playlist: fullLoop });
-});
-
-app.post('/api/screens/register', (req, res) => {
-    const { screen_id } = req.body;
-    let screen = db.screens.find(s => s.screen_id === screen_id);
-    if (!screen) {
-        screen = { screen_id, status: 'active', last_seen: new Date().toISOString() };
-        db.screens.push(screen);
-    } else {
-        screen.last_seen = new Date().toISOString();
+app.post('/api/auth/login', validateLogin, async (req, res) => {
+    try {
+        const { email } = req.body;
+        const result = await authService.login(email);
+        res.json(result);
+    } catch (error) {
+        logger.error('Login error', { error: error.message, email: req.body.email });
+        const status = error.message === 'User not found' ? 401 : 500;
+        res.status(status).json({ error: error.message });
     }
-    res.json({ status: 'registered', data: screen });
 });
 
-app.post('/api/screens/:screenId/impressions', (req, res) => {
-    const { screenId } = req.params;
-    const { ad_id } = req.body;
-    db.impressions.push({ screenId, ad_id, timestamp: new Date().toISOString() });
-    res.status(200).json({ status: 'ok' });
+app.get('/api/playlist/:screenId', validatePlaylistRequest, playlistETag, async (req, res) => {
+    try {
+        const { screenId } = req.params;
+        const playlist = await playlistService.generatePlaylist(screenId);
+        res.json(playlist);
+    } catch (error) {
+        logger.error('Playlist error', { error: error.message, screenId: req.params.screenId });
+        res.status(500).json({ error: error.message });
+    }
 });
 
-// Serve assets
-app.use('/assets', express.static('assets'));
+app.post('/api/screens/register', validateScreenRegistration, async (req, res) => {
+    try {
+        const { screen_id } = req.body;
+        const screen = await screenRepository.updateLastSeen(screen_id);
+        res.json({ status: 'registered', data: screen });
+    } catch (error) {
+        logger.error('Screen registration error', { error: error.message, screen_id: req.body.screen_id });
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.post('/api/screens/:screenId/impressions', validateImpression, async (req, res) => {
+    try {
+        const { screenId } = req.params;
+        const { ad_id } = req.body;
+        await impressionRepository.record(screenId, ad_id);
+        res.status(200).json({ status: 'ok' });
+    } catch (error) {
+        logger.error('Impression recording error', { error: error.message, screenId: req.params.screenId, ad_id: req.body.ad_id });
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Serve assets with caching (1 hour)
+app.use('/assets', cacheControl(3600), express.static('assets'));
 
 app.get('/api/debug/seed', (req, res) => {
     res.json({ status: 'seeded', message: 'In-memory database is ready.' });
 });
+
+// Health check endpoint for Docker/Cloud Run
+app.get('/health', (req, res) => res.status(200).json({ status: 'healthy' }));
 
 app.get('/', (req, res) => res.send('SoftoMedia Ad Server (Mock) Online'));
 

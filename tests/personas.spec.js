@@ -6,31 +6,31 @@ test.describe('Persona Switching & Persistence', () => {
     });
 
     test('should default to Brand persona', async ({ page }) => {
-        const brandButton = page.locator('[data-test="persona-brand"]');
+        const brandButton = page.locator('[data-testid="persona-brand"]');
         await expect(brandButton).toHaveClass(/bg-primary/);
         await expect(page.getByText('BRAND MODE')).toBeVisible();
     });
 
     test('should switch to Admin persona', async ({ page }) => {
-        const adminButton = page.locator('[data-test="persona-admin"]');
+        const adminButton = page.locator('[data-testid="persona-admin"]');
         await adminButton.click();
         await expect(adminButton).toHaveClass(/bg-red-500/);
         await expect(page.getByText('ADMIN MODE')).toBeVisible();
     });
 
     test('should switch to Retailer persona', async ({ page }) => {
-        const retailerButton = page.locator('[data-test="persona-retailer"]');
+        const retailerButton = page.locator('[data-testid="persona-retailer"]');
         await retailerButton.click();
         await expect(retailerButton).toHaveClass(/bg-emerald-500/);
         await expect(page.getByText('RETAILER MODE')).toBeVisible();
     });
 
     test('should persist persona across reloads', async ({ page }) => {
-        await page.locator('[data-test="persona-admin"]').click();
+        await page.locator('[data-testid="persona-admin"]').click();
         await expect(page.getByText('ADMIN MODE')).toBeVisible();
         await page.reload();
         await expect(page.getByText('ADMIN MODE')).toBeVisible();
-        await expect(page.locator('[data-test="persona-admin"]')).toHaveClass(/bg-red-500/);
+        await expect(page.locator('[data-testid="persona-admin"]')).toHaveClass(/bg-red-500/);
     });
 });
 

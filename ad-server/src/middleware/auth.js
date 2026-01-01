@@ -1,6 +1,14 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-change-in-prod';
+// CRITICAL: JWT_SECRET must be set in environment variables
+// This prevents using default secrets in production
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+    console.error('FATAL ERROR: JWT_SECRET environment variable is not set.');
+    console.error('Generate a secure secret with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
+    process.exit(1);
+}
 
 /**
  * Authentication Middleware
