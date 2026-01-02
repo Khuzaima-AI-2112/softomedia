@@ -1,13 +1,47 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_URL } from '../../../config';
+import useAsyncAction from '../../../hooks/useAsyncAction';
 
 const Step3ReviewDistribution = ({ data, onConfirm, onPrev }) => {
     const navigate = useNavigate();
 
-    const handleConfirm = () => {
-        // Mocking confirmation success
-        navigate('/dashboard/brand');
-    };
+    // Campaign creation function wrapped by useAsyncAction
+    const createCampaign = useCallback(async () => {
+        console.log('[Wizard] Confirming distribution...');
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`${API_URL}/api/campaigns`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                title: `Campaign - ${new Date().toLocaleDateString()}`,
+                retailer_id: 'ent_costco',
+                location_ids: data.selectedScreens,
+                media_id: data.media_id,
+                start_date: data.dateRange.start,
+                end_date: data.dateRange.end
+            })
+        });
+
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.message || 'Campaign creation failed');
+        }
+
+        return res.json();
+    }, [data]);
+
+    // Use hook for automatic loading state
+    const { execute: handleConfirm, isLoading: isSubmitting, error } = useAsyncAction(createCampaign, {
+        onSuccess: () => {
+            if (onConfirm) onConfirm();
+            navigate('/dashboard/brand');
+        },
+        onError: (err) => console.error('Failed to create campaign:', err)
+    });
 
     const metrics = [
         { label: 'Frequency / Hour', value: '12x', sub: 'Every 5 mins', color: 'text-primary' },
@@ -119,10 +153,17 @@ const Step3ReviewDistribution = ({ data, onConfirm, onPrev }) => {
                     </div>
                     <button
                         onClick={handleConfirm}
-                        className="px-10 py-4 rounded-xl bg-primary hover:bg-primary/90 text-white font-black shadow-xl shadow-primary/30 transition-all active:scale-95 flex items-center gap-2"
+                        disabled={isSubmitting}
+                        data-testid="confirm-distribution-btn"
+                        className={`px-10 py-4 rounded-xl text-white font-black shadow-xl transition-all flex items-center gap-2 ${isSubmitting
+                                ? 'bg-slate-400 cursor-not-allowed'
+                                : 'bg-primary hover:bg-primary/90 shadow-primary/30 active:scale-95'
+                            }`}
                     >
-                        <span>Confirm Distribution</span>
-                        <span className="material-symbols-outlined text-[20px]">task_alt</span>
+                        <span>{isSubmitting ? 'Submitting...' : 'Confirm Distribution'}</span>
+                        <span className="material-symbols-outlined text-[20px]">
+                            {isSubmitting ? 'sync' : 'task_alt'}
+                        </span>
                     </button>
                 </div>
             </div>

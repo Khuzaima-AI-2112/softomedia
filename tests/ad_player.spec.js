@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 test('Ad Player transitions images every 5 seconds', async ({ page }) => {
     // 1. Navigate to the ad player
-    await page.goto('http://localhost:5173/player');
+    await page.goto('/player');
 
     // 2. Wait for the player to initialize and load the first ad
     // The player shows "Connecting..." or "Loading Content..." initially

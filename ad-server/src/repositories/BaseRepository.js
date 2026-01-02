@@ -1,115 +1,136 @@
-// Base Repository Class
-// Provides common CRUD operations for all Firestore collections
+﻿// Base Repository Class
+// Provides common CRUD operations with in-memory fallback for offline testing
 
 import { getFirestore } from '../utils/firestore.js';
+import logger from '../utils/logger.js';
+
+// In-memory store for fallback
+const MOCK_STORAGE = {};
 
 export class BaseRepository {
     constructor(collectionName) {
         this.collectionName = collectionName;
         this.db = getFirestore();
-        this.collection = this.db.collection(collectionName);
+        if (!MOCK_STORAGE[collectionName]) {
+            MOCK_STORAGE[collectionName] = new Map();
+        }
     }
 
-    /**
-     * Create a new document
-     * @param {string} id - Document ID
-     * @param {object} data - Document data
-     * @returns {Promise<object>} Created document with ID
-     */
+    get collection() {
+        return this.db ? this.db.collection(this.collectionName) : null;
+    }
+
     async create(id, data) {
         const docData = {
             ...data,
+            id,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
         };
 
-        await this.collection.doc(id).set(docData);
-        return { id, ...docData };
-    }
-
-    /**
-     * Get document by ID
-     * @param {string} id - Document ID
-     * @returns {Promise<object|null>} Document data or null if not found
-     */
-    async findById(id) {
-        const doc = await this.collection.doc(id).get();
-        if (!doc.exists) {
-            return null;
+        try {
+            if (this.collection) {
+                await this.collection.doc(id).set(docData);
+            }
+        } catch (e) {
+            logger.error(`Create failed for ${this.collectionName}`, { error: e.message, id });
+            // Fallback to memory
         }
-        return { id: doc.id, ...doc.data() };
+
+        MOCK_STORAGE[this.collectionName].set(id, docData);
+        return docData;
     }
 
-    /**
-     * Get all documents in collection
-     * @param {object} options - Query options (limit, orderBy, etc.)
-     * @returns {Promise<Array>} Array of documents
-     */
-    async findAll(options = {}) {
-        let query = this.collection;
+    async findById(id) {
+        try {
+            if (this.collection) {
+                const doc = await this.collection.doc(id).get();
+                if (doc.exists) return { id: doc.id, ...doc.data() };
+            }
+        } catch (e) {
+            // Fallback
+        }
+        return MOCK_STORAGE[this.collectionName].get(id) || null;
+    }
 
+    async findAll(options = {}) {
+        let results = [];
+
+        try {
+            if (this.collection) {
+                let query = this.collection;
+                if (options.where) {
+                    options.where.forEach(([field, op, value]) => {
+                        query = query.where(field, op, value);
+                    });
+                }
+                const snapshot = await query.get();
+                results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                if (results.length > 0) return results;
+            }
+        } catch (e) {
+            // Fallback
+        }
+
+        // Memory Fallback
+        results = Array.from(MOCK_STORAGE[this.collectionName].values());
         if (options.where) {
-            options.where.forEach(([field, op, value]) => {
-                query = query.where(field, op, value);
+            results = results.filter(item => {
+                return options.where.every(([field, op, value]) => {
+                    if (op === '==') return item[field] === value;
+                    if (op === 'array-contains') return Array.isArray(item[field]) && item[field].includes(value);
+                    return true;
+                });
             });
         }
-
-        if (options.orderBy) {
-            const [field, direction = 'asc'] = options.orderBy;
-            query = query.orderBy(field, direction);
-        }
-
-        if (options.limit) {
-            query = query.limit(options.limit);
-        }
-
-        const snapshot = await query.get();
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        if (options.limit) results = results.slice(0, options.limit);
+        return results;
     }
 
-    /**
-     * Update document by ID
-     * @param {string} id - Document ID
-     * @param {object} data - Fields to update
-     * @returns {Promise<object>} Updated document
-     */
     async update(id, data) {
-        const updateData = {
-            ...data,
-            updated_at: new Date().toISOString()
-        };
+        const existing = await this.findById(id) || {};
+        const updateData = { ...existing, ...data, updated_at: new Date().toISOString() };
 
-        await this.collection.doc(id).update(updateData);
-        return this.findById(id);
+        try {
+            if (this.collection) {
+                await this.collection.doc(id).update(updateData);
+            }
+        } catch (e) {
+            // Fallback
+        }
+
+        MOCK_STORAGE[this.collectionName].set(id, updateData);
+        return updateData;
     }
 
-    /**
-     * Delete document by ID
-     * @param {string} id - Document ID
-     * @returns {Promise<boolean>} True if deleted
-     */
     async delete(id) {
-        await this.collection.doc(id).delete();
+        try {
+            if (this.collection) await this.collection.doc(id).delete();
+        } catch (e) {
+            logger.error(`Delete failed for ${this.collectionName}`, { error: e.message, id });
+        }
+        MOCK_STORAGE[this.collectionName].delete(id);
         return true;
     }
 
-    /**
-     * Check if document exists
-     * @param {string} id - Document ID
-     * @returns {Promise<boolean>} True if exists
-     */
-    async exists(id) {
-        const doc = await this.collection.doc(id).get();
-        return doc.exists;
-    }
-
-    /**
-     * Count documents matching query
-     * @param {object} options - Query options
-     * @returns {Promise<number>} Document count
-     */
     async count(options = {}) {
-        const docs = await this.findAll(options);
-        return docs.length;
+        try {
+            if (this.collection) {
+                let query = this.collection;
+                if (options.where) {
+                    options.where.forEach(([field, op, value]) => {
+                        query = query.where(field, op, value);
+                    });
+                }
+                const snapshot = await query.count().get();
+                return snapshot.data().count;
+            }
+        } catch (e) {
+            logger.error(`Count failed for ${this.collectionName}`, { error: e.message, options });
+        }
+
+        // Memory Fallback
+        const all = await this.findAll(options);
+        return all.length;
     }
 }

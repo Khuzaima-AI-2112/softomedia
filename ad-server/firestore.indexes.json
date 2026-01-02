@@ -1,0 +1,33 @@
+{
+    "indexes": [
+        {
+            "collectionGroup": "ads",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "status",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "scheduled_slot",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "campaigns",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "retailer_id",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "status",
+                    "order": "ASCENDING"
+                }
+            ]
+        }
+    ],
+    "fieldOverrides": []
+}

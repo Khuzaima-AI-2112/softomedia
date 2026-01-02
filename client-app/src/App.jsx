@@ -8,6 +8,8 @@ const AdminOverview = React.lazy(() => import('./pages/admin/Overview'));
 const BrandDashboard = React.lazy(() => import('./pages/brand/BrandDashboard'));
 const BrandCampaignWizard = React.lazy(() => import('./pages/brand/BrandCampaignWizard'));
 const RetailerDashboard = React.lazy(() => import('./pages/retailer/RetailerDashboard'));
+const ScheduleManager = React.lazy(() => import('./pages/retailer/ScheduleManager'));
+const TechOpsDashboard = React.lazy(() => import('./pages/tech/TechOpsDashboard'));
 const Health = React.lazy(() => import('./pages/Health'));
 
 import ErrorBoundary from './components/ErrorBoundary';
@@ -25,6 +27,8 @@ function App() {
                             <Route path="brand" element={<BrandDashboard />} />
                             <Route path="brand/campaign/new" element={<BrandCampaignWizard />} />
                             <Route path="retailer" element={<RetailerDashboard />} />
+                            <Route path="retailer/schedule" element={<ScheduleManager />} />
+                            <Route path="tech" element={<TechOpsDashboard />} />
                             <Route path="health" element={<Health />} />
                         </Route>
                         <Route path="/" element={<Navigate to="/dashboard" replace />} />

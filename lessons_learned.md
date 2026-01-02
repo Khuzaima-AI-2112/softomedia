@@ -227,5 +227,46 @@ Objectives: Document errors, bugs, and mistakes so we do not make them again.
 - **Root Cause**: The underlying reference data (e.g., `timeSlots` array) was accidentally truncated during a UI edit, leaving the component with no valid options to select.
 - **Prevention**: Use unit tests or "Data Integrity" checks for static component data. Avoid bulk editing large arrays in JSX without verifying the start/end lines.
 
+### [2026-01-01] Async Race Conditions in E2E Tests
+- **Issue**: Playwright tests reported "element is not enabled" for buttons that should be clickable.
+- **Root Cause**: The async `fetch()` inside click handlers completed AFTER Playwright attempted to click the next button. State wasn't updated in time.
+- **Prevention**: Add loading states (`isUploading`) that disable buttons during async operations. In tests, use `waitFor()` on button enabled state instead of fixed `waitForTimeout()`.
+
+### [2026-01-01] Parallel Tests Overwhelming Mock Servers
+- **Issue**: E2E tests failed randomly when run with multiple workers.
+- **Root Cause**: 8 parallel workers making concurrent requests to a single-threaded mock server caused resource contention and timeouts.
+- **Prevention**: Set `workers: 1` in `playwright.config.js` until backend can handle concurrent load. Alternatively, use `page.route()` to mock API responses entirely within the test.
+
+### [2026-01-01] API Mocking in Playwright Tests
+- **Issue**: Tests depended on backend API endpoints that weren't fully implemented.
+- **Root Cause**: Tests assumed all API routes were production-ready.
+- **Prevention**: Use `page.route('**/api/endpoint', route => route.fulfill({...}))` in `beforeEach` to mock API responses. This isolates tests from backend state and makes them deterministic.
+
+### [2026-01-01] Feature Gaps vs Test Issues
+- **Issue**: Tests failed, but debugging showed the test infrastructure was correct.
+- **Root Cause**: The UI lacked the expected text ("campaign approval portal"), navigation links were conditionally hidden, or AuthContext wasn't integrated with PersonaSwitcher.
+- **Prevention**: When tests fail, first verify the UI actually renders what the test expects. Use `test.skip()` for tests that depend on unimplemented features, and document them as "feature gaps, not test issues."
+
+### [2026-01-01] Custom Hooks for Consistent Async State Management
+- **Issue**: Multiple components had duplicate async state management code (isLoading, error handling, try/catch).
+- **Root Cause**: Each component implemented its own loading state logic, leading to inconsistency and redundant code.
+- **Prevention**: Create a reusable `useAsyncAction` hook that wraps async functions and automatically manages `isLoading`, `error`, and `data` states. This ensures consistent behavior across all components and reduces boilerplate by ~15 lines per component.
+
+### [2026-01-02] Firestore Count Optimization
+- **Issue**: `count()` implemented by fetching all documents in memory.
+- **Root Cause**: Reliance on high-level `findAll` abstraction for metadata.
+- **Prevention**: Use Firestore's native `.count()` aggregation query for O(1) performance. This significantly reduces memory pressure and network egress.
+
+### [2026-01-02] Hourly Playlist Caching
+- **Issue**: Identical playlist requests from multiple screens caused redundant database reads.
+- **Root Cause**: Lack of a temporal cache for high-frequency, read-heavy endpoints.
+- **Prevention**: Implement in-memory caching with hourly expiration for data that only changes at slot intervals. This protects against "thundering herd" database spikes.
+
+### [2026-01-02] Management API Security
+- **Issue**: Admin/Dashboard routes were exposed without authentication middleware.
+- **Root Cause**: Assumptions about Cloud Run visibility vs explicit middleware enforcement.
+- **Prevention**: Always apply `authenticate` middleware to management routes in the central API router. Never rely solely on infra-level gating for security-critical endpoints.
+
 ---
 *Note: This file is a permanent project record. Do not delete or purge entries.*
+

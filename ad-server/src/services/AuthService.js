@@ -1,63 +1,40 @@
-// Auth Service
-// Business logic for authentication
-
+﻿import jwt from 'jsonwebtoken';
 import { userRepository } from '../repositories/index.js';
-import jwt from 'jsonwebtoken';
+import logger from '../utils/logger.js';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
 export class AuthService {
     /**
      * Authenticate user by email
-     * @param {string} email - User email
-     * @returns {Promise<{token: string, user: object}>}
+     * @param {string} email 
+     * @returns {Promise<object>} { user, token }
      */
     async login(email) {
-        if (!email || typeof email !== 'string') {
-            throw new Error('Valid email is required');
-        }
-
-        const user = await userRepository.findByEmail(email.toLowerCase().trim());
-
-        if (!user) {
-            throw new Error('User not found');
-        }
-
-        const token = this.generateToken(user);
-
-        return {
-            token,
-            user: {
-                id: user.id,
-                email: user.email,
-                role: user.role,
-                name: user.name,
-                linked_entity_id: user.linked_entity_id
+        try {
+            const user = await userRepository.findByEmail(email);
+            if (!user) {
+                throw new Error('User not found');
             }
-        };
-    }
 
-    /**
-     * Generate JWT token for user
-     * @param {object} user - User object
-     * @returns {string} JWT token
-     */
-    generateToken(user) {
-        return jwt.sign(
-            {
-                userId: user.id,
-                email: user.email,
-                role: user.role
-            },
-            JWT_SECRET,
-            { expiresIn: '24h' }
-        );
+            const token = jwt.sign(
+                { id: user.id, email: user.email, role: user.role, linked_entity_id: user.linked_entity_id },
+                JWT_SECRET,
+                { expiresIn: '24h' }
+            );
+
+            logger.info('User logged in successfully', { email: user.email, role: user.role });
+            return { user, token };
+        } catch (error) {
+            logger.error('Login failed', { email, error: error.message });
+            throw error;
+        }
     }
 
     /**
      * Verify JWT token
-     * @param {string} token - JWT token
-     * @returns {object} Decoded token payload
+     * @param {string} token 
+     * @returns {object} decoded token
      */
     verifyToken(token) {
         try {
@@ -68,5 +45,4 @@ export class AuthService {
     }
 }
 
-// Export singleton instance
 export const authService = new AuthService();

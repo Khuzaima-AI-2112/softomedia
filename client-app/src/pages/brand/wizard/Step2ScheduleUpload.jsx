@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { API_URL } from '../../../config';
+import useAsyncAction from '../../../hooks/useAsyncAction';
 
 const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
     const [dragActive, setDragActive] = useState(false);
@@ -26,45 +27,46 @@ const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
         { time: '03:00 PM', availability: 100, status: 'Available' }
     ];
 
-    const validateAndUpload = async (fileName) => {
+    // Async upload function that will be wrapped by useAsyncAction
+    const uploadAsset = useCallback(async (fileName) => {
         setValidationError('');
         // Mocking metadata extraction and validation
-        // In physical MVP, we'd check the blob/file properties
-        const mockDuration = 5; // Hardcoded for demo success, or 6 for failure test
+        const mockDuration = 5;
 
         if (mockDuration !== 5) {
-            setValidationError('Strict Validation Error: Ad must be exactly 5 seconds.');
-            return;
+            throw new Error('Strict Validation Error: Ad must be exactly 5 seconds.');
         }
 
-        try {
-            const token = localStorage.getItem('auth_token');
-            const res = await fetch(`${API_URL}/api/assets/upload`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    filename: fileName,
-                    duration: mockDuration,
-                    file_type: fileName.endsWith('.mp4') ? 'video/mp4' : 'image/jpeg'
-                })
-            });
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`${API_URL}/api/assets/upload`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                filename: fileName,
+                duration: mockDuration,
+                file_type: fileName.endsWith('.mp4') ? 'video/mp4' : 'image/jpeg'
+            })
+        });
 
-            if (res.ok) {
-                const asset = await res.json();
-                updateData({
-                    creativeFile: fileName,
-                    media_id: asset.id
-                });
-            } else {
-                setValidationError('Failed to register asset on server.');
-            }
-        } catch (error) {
-            setValidationError('Server connection error.');
+        if (!res.ok) {
+            throw new Error('Failed to register asset on server.');
         }
-    };
+
+        const asset = await res.json();
+        updateData({
+            creativeFile: fileName,
+            media_id: asset.id
+        });
+        return asset;
+    }, [updateData]);
+
+    // Use the hook for automatic loading state management
+    const { execute: validateAndUpload, isLoading: isUploading } = useAsyncAction(uploadAsset, {
+        onError: (err) => setValidationError(err.message || 'Server connection error.')
+    });
 
     const handleDrop = (e) => {
         e.preventDefault();
@@ -220,7 +222,7 @@ const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
 
                     <button
                         onClick={onNext}
-                        disabled={!data.creativeFile || data.selectedSlots.length === 0}
+                        disabled={isUploading || !data.creativeFile || data.selectedSlots.length === 0}
                         data-testid="proceed-to-review"
                         className="w-full py-4 rounded-lg bg-primary hover:bg-primary/90 text-white font-bold transition-all flex items-center justify-center gap-2 group shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed mt-4"
                     >

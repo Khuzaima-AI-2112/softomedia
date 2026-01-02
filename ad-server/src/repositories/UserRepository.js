@@ -1,7 +1,4 @@
-// User Repository
-// Handles all user-related database operations
-
-import { BaseRepository } from './BaseRepository.js';
+﻿import { BaseRepository } from './BaseRepository.js';
 
 export class UserRepository extends BaseRepository {
     constructor() {
@@ -10,8 +7,8 @@ export class UserRepository extends BaseRepository {
 
     /**
      * Find user by email
-     * @param {string} email - User email
-     * @returns {Promise<object|null>} User document or null
+     * @param {string} email 
+     * @returns {Promise<object|null>}
      */
     async findByEmail(email) {
         const users = await this.findAll({
@@ -23,25 +20,14 @@ export class UserRepository extends BaseRepository {
 
     /**
      * Find users by role
-     * @param {string} role - User role (admin, brand, retailer)
-     * @returns {Promise<Array>} Array of users
+     * @param {string} role 
+     * @returns {Promise<Array>}
      */
     async findByRole(role) {
         return this.findAll({
             where: [['role', '==', role]]
         });
     }
-
-    /**
-     * Find user by linked entity ID
-     * @param {string} entityId - Linked entity ID (brand or screen)
-     * @returns {Promise<object|null>} User document or null
-     */
-    async findByLinkedEntity(entityId) {
-        const users = await this.findAll({
-            where: [['linked_entity_id', '==', entityId]],
-            limit: 1
-        });
-        return users.length > 0 ? users[0] : null;
-    }
 }
+
+export const userRepository = new UserRepository();

@@ -1,21 +1,10 @@
-// Repository Index
-// Exports all repository instances as singletons
-
-import { UserRepository } from './UserRepository.js';
-import { AdRepository } from './AdRepository.js';
-import { ScreenRepository } from './ScreenRepository.js';
-import { ImpressionRepository } from './ImpressionRepository.js';
-
-// Create singleton instances
-export const userRepository = new UserRepository();
-export const adRepository = new AdRepository();
-export const screenRepository = new ScreenRepository();
-export const impressionRepository = new ImpressionRepository();
-
-// Export classes for testing
-export {
-    UserRepository,
-    AdRepository,
-    ScreenRepository,
-    ImpressionRepository
-};
+﻿export * from './UserRepository.js';
+export * from './AdRepository.js';
+export * from './ScreenRepository.js';
+export * from './RetailerRepository.js';
+export * from './AdvertiserRepository.js';
+export * from './LocationRepository.js';
+export * from './CampaignRepository.js';
+export * from './MediaRepository.js';
+export * from './ImpressionRepository.js';
+export * from './SchedulingAuditRepository.js';

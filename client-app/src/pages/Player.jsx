@@ -87,26 +87,46 @@ function Player() {
         }
     }, [searchParams])
 
+    // Heartbeat (Every 30 seconds)
+    useEffect(() => {
+        if (!screenId) return;
+
+        const sendHeartbeat = async () => {
+            try {
+                await fetch(`${API_URL}/api/monitoring/heartbeat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ screenId })
+                });
+            } catch (e) {
+                console.error('Heartbeat failed', e);
+            }
+        };
+
+        sendHeartbeat();
+        const interval = setInterval(sendHeartbeat, 30000);
+        return () => clearInterval(interval);
+    }, [screenId]);
+
     // Playback Loop
     useEffect(() => {
         if (status !== 'playing' || !playlist || playlist.length === 0) return;
 
         const currentAd = playlist[currentAdIndex];
-        // FORCE 5s rotation if requested, otherwise use ad duration
         const duration = (currentAd.duration || 5) * 1000;
 
         const recordImpression = async (ad) => {
             try {
-                await fetch(`${API_URL}/api/screens/${screenId}/impressions`, {
+                await fetch(`${API_URL}/api/monitoring/impression`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        ad_id: ad.id,
-                        timestamp: new Date().toISOString(),
+                        screenId,
+                        campaignId: ad.campaign_id || ad.id,
+                        mediaId: ad.media_id || ad.id,
                         duration: ad.duration
                     })
                 });
-                // Record impression (silent - no console.log in production)
             } catch (e) {
                 console.error('Failed to record impression', e);
             }
@@ -128,12 +148,16 @@ function Player() {
         return (
             <div style={{ width: '100vw', height: '100vh', backgroundColor: 'black', overflow: 'hidden' }}>
                 <img
+                    data-testid="ad-image"
                     src={activeAd.url}
                     alt={activeAd.title}
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
                 {/* Debug overlay */}
-                <div style={{ position: 'absolute', bottom: 10, right: 10, background: 'rgba(0,0,0,0.5)', color: 'white', padding: 5, fontSize: 10 }}>
+                <div
+                    data-testid="ad-debug-overlay"
+                    style={{ position: 'absolute', bottom: 10, right: 10, background: 'rgba(0,0,0,0.5)', color: 'white', padding: 5, fontSize: 10 }}
+                >
                     {activeAd.title} | {activeAd.duration}s
                 </div>
             </div>

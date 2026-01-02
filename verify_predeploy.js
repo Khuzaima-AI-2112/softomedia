@@ -21,13 +21,19 @@ function check(name, condition, errorMessage) {
 
 console.log('\n🔍 Running Pre-Deployment Verification...\n');
 
-// Check 1: Client app build output exists
+// Check 1: Client app build output exists (skip in CI/Cloud Build)
+const isCI = process.env.PROJECT_ID || process.env.BUILD_ID || process.env.CI || process.env.GCP_PROJECT;
 const clientDistPath = path.join(__dirname, 'client-app', 'dist');
-check(
-    'Client Build',
-    fs.existsSync(clientDistPath),
-    'client-app/dist not found. Run: cd client-app && npm run build'
-);
+
+if (!isCI) {
+    check(
+        'Client Build',
+        fs.existsSync(clientDistPath),
+        'client-app/dist not found. Run: cd client-app && npm run build'
+    );
+} else {
+    console.log('⏭️  Skipping local build check in CI environment');
+}
 
 // Check 2: Ad-server entry point exists
 const adServerIndex = path.join(__dirname, 'ad-server', 'index.js');

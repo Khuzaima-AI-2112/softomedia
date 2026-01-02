@@ -35,23 +35,23 @@ This checks:
 
 ```bash
 # From project root
-gcloud builds submit --config cloudbuild.yaml --project=softomedia-live2026 .
+gcloud builds submit --config cloudbuild.yaml --project=softomedia-live-2026 .
 ```
 
 ### View Build Logs
 
 ```bash
-gcloud builds list --project=softomedia-live2026 --limit=5
+gcloud builds list --project=softomedia-live-2026 --limit=5
 ```
 
 ### Rollback (if needed)
 
 ```bash
 # Get previous revision
-gcloud run revisions list --service=client-app --region=us-central1 --project=softomedia-live2026
+gcloud run revisions list --service=client-app --region=us-central1 --project=softomedia-live-2026
 
 # Route traffic to previous revision
-gcloud run services update-traffic client-app --to-revisions=REVISION_NAME=100 --region=us-central1 --project=softomedia-live2026
+gcloud run services update-traffic client-app --to-revisions=REVISION_NAME=100 --region=us-central1 --project=softomedia-live-2026
 ```
 
 ---
@@ -60,7 +60,7 @@ gcloud run services update-traffic client-app --to-revisions=REVISION_NAME=100 -
 
 1. **Create Artifact Registry repository**:
    ```bash
-   gcloud artifacts repositories create softomedia --repository-format=docker --location=us-central1 --project=softomedia-live2026
+   gcloud artifacts repositories create softomedia --repository-format=docker --location=us-central1 --project=softomedia-live-2026
    ```
 
 2. **Create Dockerfiles** for both services (see `client-app/Dockerfile` and `ad-server/Dockerfile`)

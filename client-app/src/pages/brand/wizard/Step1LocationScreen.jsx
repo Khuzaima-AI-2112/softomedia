@@ -60,8 +60,8 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
                             key={f}
                             onClick={() => setSelectedFilter(f)}
                             className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${selectedFilter === f
-                                    ? 'bg-primary text-white shadow-md'
-                                    : 'bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 text-slate-600'
+                                ? 'bg-primary text-white shadow-md'
+                                : 'bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 text-slate-600'
                                 }`}
                         >
                             {f}
@@ -76,9 +76,10 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
                             <div
                                 key={store.id}
                                 onClick={() => handleStoreSelect(store.id)}
+                                data-testid={`store-${store.name.toLowerCase().replace(/\s+/g, '-')}`}
                                 className={`p-4 rounded-lg cursor-pointer border-2 transition-all ${data.selectedStore === store.id
-                                        ? 'bg-white dark:bg-surface-dark border-primary shadow-md'
-                                        : 'bg-white dark:bg-surface-dark border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                                    ? 'bg-white dark:bg-surface-dark border-primary shadow-md'
+                                    : 'bg-white dark:bg-surface-dark border-slate-200 dark:border-slate-700 hover:border-slate-300'
                                     }`}
                             >
                                 <div className="flex justify-between items-start mb-1">
@@ -115,9 +116,10 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
                         <div
                             key={scr.id}
                             onClick={() => toggleScreen(scr.id)}
+                            data-testid={`screen-${scr.name.toLowerCase().replace(/\s+/g, '-')}`}
                             className={`relative group flex flex-col rounded-lg overflow-hidden border-2 cursor-pointer transition-all ${data.selectedScreens.includes(scr.id)
-                                    ? 'border-primary shadow-lg scale-[1.02]'
-                                    : 'border-slate-200 dark:border-slate-700 hover:border-primary/50'
+                                ? 'border-primary shadow-lg scale-[1.02]'
+                                : 'border-slate-200 dark:border-slate-700 hover:border-primary/50'
                                 }`}
                         >
                             {data.selectedScreens.includes(scr.id) && (
@@ -172,6 +174,7 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
                     <button
                         onClick={onNext}
                         disabled={data.selectedScreens.length === 0}
+                        data-testid="wizard-next-step"
                         className="px-8 py-3 rounded-lg bg-primary hover:bg-primary/90 text-white font-bold shadow-lg shadow-primary/30 transition-all flex items-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <span>Next Step</span>

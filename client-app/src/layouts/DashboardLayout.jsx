@@ -21,7 +21,7 @@ function DashboardLayout() {
     if (loading) return null;
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-background-dark text-slate-900 dark:text-white relative">
+        <div className={`min-h-screen bg-slate-50 dark:bg-background-dark text-slate-900 dark:text-white relative ${!loading ? 'main-content-loaded' : ''}`}>
             <HamburgerMenu />
 
             <header className="sticky top-0 z-50 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-background-dark/90 backdrop-blur-md px-6 py-3 lg:px-10">

@@ -12,8 +12,8 @@ export default defineConfig({
     forbidOnly: !!process.env.CI,
     /* Retry on CI only */
     retries: process.env.CI ? 2 : 0,
-    /* Opt out of parallel tests on CI. */
-    workers: process.env.CI ? 1 : undefined,
+    /* Opt out of parallel tests to prevent server overload. */
+    workers: 1,
     /* Reporter to use. See https://playwright.dev/docs/test-reporters */
     reporter: 'html',
     use: {
@@ -21,7 +21,7 @@ export default defineConfig({
         baseURL: 'http://localhost:5173',
 
         /* Maximum time each action such as `click()` can take. Defaults to 0 (no limit). */
-        actionTimeout: 15000,
+        actionTimeout: 30000,
 
         /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
         trace: 'on',
@@ -32,7 +32,7 @@ export default defineConfig({
 
     /* Maximum time expect() should wait for the condition to be met. */
     expect: {
-        timeout: 10000,
+        timeout: 20000,
     },
 
     /* Configure projects for major browsers */
@@ -74,11 +74,18 @@ export default defineConfig({
     ],
 
     /* Run your local dev server before starting the tests */
-    webServer: {
-        // Self-healing: try to kill any process on 5173 before starting
-        command: 'npx kill-port 5173 && npm run dev --prefix client-app',
-        url: 'http://localhost:5173',
-        reuseExistingServer: true,
-        timeout: 180000,
-    },
+    webServer: [
+        {
+            command: 'npx kill-port 8080 && npm start --prefix ad-server',
+            url: 'http://localhost:8080/health',
+            reuseExistingServer: true,
+            timeout: 180000,
+        },
+        {
+            command: 'npx kill-port 5173 && npm run dev --prefix client-app',
+            url: 'http://localhost:5173',
+            reuseExistingServer: true,
+            timeout: 180000,
+        }
+    ],
 });

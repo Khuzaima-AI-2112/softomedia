@@ -77,19 +77,19 @@ This guide documents the environment configuration changes made in Sprint 1 to f
    
    # Create secret in Secret Manager
    echo -n "YOUR_GENERATED_SECRET" | gcloud secrets create JWT_SECRET \
-     --project softomedia-live2026 \
+     --project softomedia-live-2026 \
      --data-file=-
    ```
 
 2. **Grant Cloud Run access to the secret:**
    ```bash
    gcloud secrets add-iam-policy-binding JWT_SECRET \
-     --project softomedia-live2026 \
+     --project softomedia-live-2026 \
      --member="serviceAccount:PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
      --role="roles/secretmanager.secretAccessor"
    ```
    
-   Replace `PROJECT_NUMBER` with your project number (find with `gcloud projects describe softomedia-live2026`).
+   Replace `PROJECT_NUMBER` with your project number (find with `gcloud projects describe softomedia-live-2026`).
 
 ### Deployment Process
 

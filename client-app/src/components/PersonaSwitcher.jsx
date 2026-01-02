@@ -7,9 +7,10 @@ const PersonaSwitcher = () => {
     const navigate = useNavigate();
 
     const personas = [
-        { id: 'admin', label: 'Admin', icon: 'shield_person', color: 'bg-red-500' },
+        { id: 'admin', label: 'Super Admin', icon: 'shield_person', color: 'bg-red-600' },
         { id: 'brand', label: 'Brand', icon: 'campaign', color: 'bg-primary' },
-        { id: 'retailer', label: 'Retailer', icon: 'storefront', color: 'bg-emerald-500' }
+        { id: 'retailer', label: 'Retailer', icon: 'storefront', color: 'bg-emerald-500' },
+        { id: 'tech', label: 'Tech Op', icon: 'build', color: 'bg-slate-600' }
     ];
 
     const handleSwitch = (p) => {

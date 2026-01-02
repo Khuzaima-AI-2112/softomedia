@@ -8,81 +8,123 @@ test.describe('Persona Switching & Persistence', () => {
     test('should default to Brand persona', async ({ page }) => {
         const brandButton = page.locator('[data-testid="persona-brand"]');
         await expect(brandButton).toHaveClass(/bg-primary/);
-        await expect(page.getByText('BRAND MODE')).toBeVisible();
+        await expect(page.getByText(/brand mode/i)).toBeVisible();
     });
 
     test('should switch to Admin persona', async ({ page }) => {
         const adminButton = page.locator('[data-testid="persona-admin"]');
         await adminButton.click();
-        await expect(adminButton).toHaveClass(/bg-red-500/);
-        await expect(page.getByText('ADMIN MODE')).toBeVisible();
+        await expect(adminButton).toHaveClass(/bg-red-600/);
+        await expect(page.getByText(/admin mode/i)).toBeVisible();
     });
 
     test('should switch to Retailer persona', async ({ page }) => {
         const retailerButton = page.locator('[data-testid="persona-retailer"]');
         await retailerButton.click();
         await expect(retailerButton).toHaveClass(/bg-emerald-500/);
-        await expect(page.getByText('RETAILER MODE')).toBeVisible();
+        await expect(page.getByText(/retailer mode/i)).toBeVisible();
     });
 
     test('should persist persona across reloads', async ({ page }) => {
         await page.locator('[data-testid="persona-admin"]').click();
-        await expect(page.getByText('ADMIN MODE')).toBeVisible();
+        await expect(page.getByText(/admin mode/i)).toBeVisible();
         await page.reload();
-        await expect(page.getByText('ADMIN MODE')).toBeVisible();
-        await expect(page.locator('[data-testid="persona-admin"]')).toHaveClass(/bg-red-500/);
+        await expect(page.getByText(/admin mode/i)).toBeVisible();
+        await expect(page.locator('[data-testid="persona-admin"]')).toHaveClass(/bg-red-600/);
     });
 });
 
 test.describe('Brand Dashboard', () => {
-    test('should display KPI cards', async ({ brandPage: page }) => {
-        await expect(page.getByText('Total Active')).toBeVisible();
-        await expect(page.getByText('Screens Live')).toBeVisible();
-        await expect(page.getByText('Daily Impressions')).toBeVisible();
+    test.beforeEach(async ({ page }) => {
+        // Ensure we are on brand page
+        await page.goto('/dashboard/brand');
     });
 
-    test('should display campaign table', async ({ brandPage: page }) => {
-        await expect(page.getByText('Summer Sale Promo 2024')).toBeVisible();
+    test('should display KPI cards', async ({ page }) => {
+        await expect(page.locator('[data-testid="kpi-card-total-active"]')).toBeVisible();
+        await expect(page.locator('[data-testid="kpi-card-screens-live"]')).toBeVisible();
+        await expect(page.locator('[data-testid="kpi-card-daily-impressions"]')).toBeVisible();
     });
 
-    test('should navigate to new campaign wizard', async ({ brandPage: page }) => {
-        const newCampaignButton = page.getByRole('button', { name: 'New Campaign' });
-        await newCampaignButton.click();
+    test('should display campaign table', async ({ page }) => {
+        await expect(page.getByText(/summer sale promo 2024/i)).toBeVisible();
+    });
+
+    test('should navigate to new campaign wizard', async ({ page }) => {
+        // Use data-test-id for new campaign button
+        await page.locator('[data-testid="new-campaign-btn"]').click();
         await expect(page).toHaveURL(/.*campaign\/new/);
     });
 });
 
 test.describe('Brand Campaign Wizard E2E', () => {
-    test('should complete Step 1: Location & Screen', async ({ brandPage: page }) => {
+    test.beforeEach(async ({ page }) => {
+        // Mock the upload endpoint for consistent test behavior
+        await page.route('**/api/assets/upload', route => {
+            route.fulfill({
+                status: 201,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    id: 'mock-asset-001',
+                    filename: 'demo-ad.mp4',
+                    duration: 5,
+                    status: 'ready'
+                })
+            });
+        });
+        // Mock the campaigns endpoint for Step 3 confirmation
+        await page.route('**/api/campaigns', route => {
+            if (route.request().method() === 'POST') {
+                route.fulfill({
+                    status: 201,
+                    contentType: 'application/json',
+                    body: JSON.stringify({
+                        id: `campaign-${Date.now()}`,
+                        title: 'Test Campaign',
+                        status: 'active'
+                    })
+                });
+            } else {
+                route.continue();
+            }
+        });
         await page.goto('/dashboard/brand/campaign/new');
-        await page.getByText('Downtown Flagship').click();
-        await page.getByText('Main Entrance Kiosk A').click();
-        await page.getByRole('button', { name: 'Next Step' }).click();
-        await expect(page.getByText('Campaign Duration')).toBeVisible();
     });
 
-    test('should complete Step 2: Schedule & Upload', async ({ brandPage: page }) => {
-        await page.goto('/dashboard/brand/campaign/new');
-        await page.getByText('Downtown Flagship').click();
-        await page.getByText('Main Entrance Kiosk A').click();
-        await page.getByRole('button', { name: 'Next Step' }).click();
-        await page.getByRole('button', { name: '08:00 - 09:00' }).click();
-        await page.getByText(/Click or drag file to upload/i).click();
-        await page.getByRole('button', { name: 'Proceed to Review' }).click();
-        await expect(page.getByText('1-Hour Loop Visualization')).toBeVisible();
+    test('should complete Step 1: Location & Screen', async ({ page }) => {
+        await page.locator('[data-testid="store-downtown-flagship"]').click();
+        await page.locator('[data-testid="screen-main-entrance-kiosk-a"]').click();
+        await page.locator('[data-testid="wizard-next-step"]').click();
+        await expect(page.getByText(/campaign duration/i)).toBeVisible();
     });
 
-    test('should complete Step 3: Review & Confirm', async ({ brandPage: page }) => {
-        await page.goto('/dashboard/brand/campaign/new');
-        await page.getByText('Downtown Flagship').click();
-        await page.getByText('Main Entrance Kiosk A').click();
-        await page.getByRole('button', { name: 'Next Step' }).click();
-        await page.getByRole('button', { name: '08:00 - 09:00' }).click();
-        await page.getByText(/Click or drag file to upload/i).click();
-        await page.getByRole('button', { name: 'Proceed to Review' }).click();
-        await expect(page.getByText('Your Ad (6 Slots)')).toBeVisible();
-        await page.getByRole('button', { name: 'Confirm Distribution' }).click();
+    test('should complete Step 2: Schedule & Upload', async ({ page }) => {
+        await page.locator('[data-testid="store-downtown-flagship"]').click();
+        await page.locator('[data-testid="screen-main-entrance-kiosk-a"]').click();
+        await page.locator('[data-testid="wizard-next-step"]').click();
+
+        // Use regex for time slots as they might have different whitespace
+        await page.locator('[data-testid^="timeslot-08:00"]').first().click();
+        await page.locator('[data-testid="upload-creative-area"]').click();
+        await page.waitForTimeout(1500); // Wait for async upload to complete
+        await page.locator('[data-testid="proceed-to-review"]').click();
+        await expect(page.getByText(/visualization/i)).toBeVisible();
+    });
+
+    test('should complete Step 3: Review & Confirm', async ({ page }) => {
+        await page.locator('[data-testid="store-downtown-flagship"]').click();
+        await page.locator('[data-testid="screen-main-entrance-kiosk-a"]').click();
+        await page.locator('[data-testid="wizard-next-step"]').click();
+        await page.locator('[data-testid^="timeslot-08:00"]').first().click();
+        await page.locator('[data-testid="upload-creative-area"]').click();
+        // Wait for mocked upload response and state update
+        await page.waitForTimeout(2000);
+        await page.locator('[data-testid="proceed-to-review"]').click();
+
+        // Wait for Step 3 to fully load (match debug test pattern)
+        await expect(page.getByText(/visualization/i)).toBeVisible({ timeout: 10000 });
+        await page.locator('[data-testid="confirm-distribution-btn"]').click();
         await expect(page).toHaveURL(/.*dashboard\/brand/);
-        await expect(page.getByText('Active Campaigns')).toBeVisible();
+        await expect(page.getByText(/active campaigns/i)).toBeVisible();
     });
 });

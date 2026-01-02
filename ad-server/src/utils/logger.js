@@ -1,67 +1,57 @@
-// Logger Utility
-// Structured logging with Winston
+﻿import winston from 'winston';
 
-import winston from 'winston';
+// Standardized log format for BigQuery/Cloud Logging compatibility (JSON)
+const logFormat = winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.errors({ stack: true }),
+    winston.format.json()
+);
 
-const isDevelopment = process.env.NODE_ENV !== 'production';
+const transports = [
+    new winston.transports.Console({
+        format: process.env.NODE_ENV === 'production'
+            ? winston.format.json()
+            : winston.format.combine(
+                winston.format.colorize(),
+                winston.format.simple()
+            )
+    })
+];
 
-// Create Winston logger
-const logger = winston.createLogger({
-    level: isDevelopment ? 'debug' : 'info',
-    format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.errors({ stack: true }),
-        winston.format.json()
-    ),
-    defaultMeta: { service: 'ad-server' },
-    transports: [
-        // Console transport for development
-        new winston.transports.Console({
-            format: isDevelopment
-                ? winston.format.combine(
-                    winston.format.colorize(),
-                    winston.format.simple()
-                )
-                : winston.format.json()
-        })
-    ]
-});
-
-// Add Cloud Logging transport in production
-if (!isDevelopment) {
-    // In production, logs go to stdout/stderr and are picked up by Cloud Logging
-    logger.info('Running in production mode - logs will be sent to Cloud Logging');
+// Only use file logging in local development if needed, otherwise skip for Cloud Run
+if (process.env.NODE_ENV !== 'production' && !process.env.K_SERVICE) {
+    transports.push(
+        new winston.transports.File({ filename: 'error.log', level: 'error' }),
+        new winston.transports.File({ filename: 'combined.log' })
+    );
 }
 
-/**
- * Log levels:
- * - error: Error messages
- * - warn: Warning messages
- * - info: Informational messages
- * - http: HTTP request logs
- * - debug: Debug messages (development only)
- */
+const logger = winston.createLogger({
+    level: process.env.LOG_LEVEL || 'info',
+    format: logFormat,
+    defaultMeta: {
+        service: 'ad-server',
+        environment: process.env.NODE_ENV || 'development',
+        project_id: 'softomedia-live-2026'
+    },
+    transports
+});
 
-export default logger;
-
-/**
- * Request logging middleware
- */
+// Middleware for request logging
 export const requestLogger = (req, res, next) => {
     const start = Date.now();
-
-    // Log when response finishes
     res.on('finish', () => {
         const duration = Date.now() - start;
-        logger.http('HTTP Request', {
+        logger.info('HTTP Request', {
             method: req.method,
-            url: req.url,
+            path: req.path,
             status: res.statusCode,
             duration: `${duration}ms`,
             ip: req.ip,
-            userAgent: req.get('user-agent')
+            user_agent: req.get('user-agent')
         });
     });
-
     next();
 };
+
+export default logger;

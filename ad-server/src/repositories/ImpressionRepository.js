@@ -1,7 +1,4 @@
-// Impression Repository
-// Handles all impression tracking operations
-
-import { BaseRepository } from './BaseRepository.js';
+﻿import { BaseRepository } from './BaseRepository.js';
 
 export class ImpressionRepository extends BaseRepository {
     constructor() {
@@ -9,66 +6,38 @@ export class ImpressionRepository extends BaseRepository {
     }
 
     /**
-     * Record a new impression
-     * @param {string} screenId - Screen ID
-     * @param {string} adId - Ad ID
-     * @returns {Promise<object>} Created impression document
+     * Log a new impression
+     * @param {object} data 
      */
-    async record(screenId, adId) {
-        const impressionId = `${screenId}_${adId}_${Date.now()}`;
-        return this.create(impressionId, {
-            screen_id: screenId,
-            ad_id: adId,
+    async logImpression(data) {
+        const id = `imp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        return this.create(id, {
+            ...data,
             timestamp: new Date().toISOString()
         });
     }
 
     /**
-     * Get impressions for a specific screen
-     * @param {string} screenId - Screen ID
-     * @param {object} options - Query options (limit, date range)
-     * @returns {Promise<Array>} Array of impressions
+     * Find impressions by campaign
+     * @param {string} campaignId 
      */
-    async findByScreen(screenId, options = {}) {
-        const queryOptions = {
-            where: [['screen_id', '==', screenId]],
+    async findByCampaign(campaignId) {
+        return this.findAll({
+            where: [['campaign_id', '==', campaignId]],
             orderBy: ['timestamp', 'desc']
-        };
-
-        if (options.limit) {
-            queryOptions.limit = options.limit;
-        }
-
-        return this.findAll(queryOptions);
+        });
     }
 
     /**
-     * Get impressions for a specific ad
-     * @param {string} adId - Ad ID
-     * @param {object} options - Query options (limit, date range)
-     * @returns {Promise<Array>} Array of impressions
+     * Find impressions by location
+     * @param {string} locationId 
      */
-    async findByAd(adId, options = {}) {
-        const queryOptions = {
-            where: [['ad_id', '==', adId]],
+    async findByLocation(locationId) {
+        return this.findAll({
+            where: [['location_id', '==', locationId]],
             orderBy: ['timestamp', 'desc']
-        };
-
-        if (options.limit) {
-            queryOptions.limit = options.limit;
-        }
-
-        return this.findAll(queryOptions);
-    }
-
-    /**
-     * Count impressions for an ad
-     * @param {string} adId - Ad ID
-     * @returns {Promise<number>} Impression count
-     */
-    async countByAd(adId) {
-        return this.count({
-            where: [['ad_id', '==', adId]]
         });
     }
 }
+
+export const impressionRepository = new ImpressionRepository();

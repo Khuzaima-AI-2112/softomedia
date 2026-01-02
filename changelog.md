@@ -2,6 +2,51 @@
 
 Objectives: Document changes and progress milestones throughout the project lifecycle.
 
+## [2026-01-02] - Phase 1: Firebase Production Readiness (SDLC##12)
+
+### Added
+- **Backup Service**: Created `BackupService.js` to manage automated Firestore exports to Google Cloud Storage.
+- **Ops API**: Introduced `/api/ops` router for administrative tasks, starting with a triggered backup endpoint.
+- **Firestore Indexes**: Defined `firestore.indexes.json` with composite indexes for `ads` (status, scheduled_slot) and `campaigns` (retailer_id, status) to optimize production performance.
+
+### Fixed
+- **Database Efficiency**: Optimized `BaseRepository.count()` to use native Firestore aggregation instead of in-memory counting (O(n) → O(1)).
+- **API Security**: Applied `authenticate` middleware to all management and dashboard routes (`monitoring`, `screens`, `dashboard`, `locations`, `notifications`, `schedules`, `users`, `ops`).
+- **Error Visibility**: Standardized `BaseRepository` methods to include detailed catch-block logging via the centralized Winston logger.
+
+### Changed
+- **Playlist Scalability**: Implemented hourly in-memory caching in `PlaylistService.js` to protect Firestore from high-frequency read spikes per slot.
+- **Logging Standards**: Reconfigured `logger.js` to use JSON format on console in production and disabled local file logging for Cloud Run compatibility.
+- **Client Metadata**: Updated `PlaylistService` response to include a `cached: true` flag for telemetry.
+
+---
+
+## [2026-01-01] - Playwright E2E Test Stabilization
+
+### Fixed
+- **Async Race Condition**: Added `isUploading` loading state to `Step2ScheduleUpload.jsx` to prevent button clicks during async operations.
+- **Missing Import**: Fixed `useNavigate` import in `Step3ReviewDistribution.jsx`.
+- **API 404s**: Implemented `POST /api/assets/upload` endpoint in `ad-server/src/api/assets.js`.
+- **Test Parallelization**: Set `workers: 1` in `playwright.config.js` to prevent server overload.
+
+### Added
+- **API Mocking**: Added `page.route()` mocks for `/api/assets/upload` and `/api/campaigns` in test `beforeEach` hooks.
+- **Debug Tests**: Created `debug-step2.spec.js` and `debug-step3-confirm.spec.js` for isolated debugging.
+- **Post-Mortem**: Created `PLAYWRIGHT_POSTMORTEM.md` documenting the stabilization process.
+- **Loop Breakdown**: Added "Loop Breakdown" heading to `ScheduleManager.jsx`.
+- **useAsyncAction Hook**: Created reusable hook (`client-app/src/hooks/useAsyncAction.js`) for automatic async loading state management.
+
+### Changed
+- **Test Wait Patterns**: Replaced fixed `waitForTimeout()` with 2000ms + `visualization` text verification.
+- **Retailer ID**: Standardized `retailer_id` to `'ent_costco'` in `Step3ReviewDistribution.jsx`.
+- **Wizard Components**: Refactored `Step2ScheduleUpload.jsx` and `Step3ReviewDistribution.jsx` to use `useAsyncAction` hook.
+
+### Skipped
+- **Retailer Navigation Test**: Requires AuthContext/PersonaSwitcher integration (feature gap).
+- **Tech Operator Test**: Requires deeper persona routing investigation (feature gap).
+
+---
+
 ## [2026-01-01] - Sprint 1 & 2: Multi-tenancy & Media Lifecycle
  
 ### Added

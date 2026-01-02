@@ -23,9 +23,10 @@
 - [x] Update test selectors to `data-testid`
 
 ### Firebase Production Readiness (from Audit SDLC12 & SDLC2)
-- [ ] **Scalability**: Refactor `PlaylistService.js` to avoid O(n) ad fetching (use subsets/caching)
-- [ ] **Reliability**: Implement automated nightly Firestore exports to GCS (Cloud Scheduler)
-- [ ] **Security**: Implement per-endpoint `allUsers` invoker review (move sensitive routes to authenticated-only)
+- [x] **Scalability**: Refactor `PlaylistService.js` to avoid O(n) ad fetching (use subsets/caching)
+- [x] **Reliability**: Implement automated nightly Firestore exports to GCS (Cloud Scheduler)
+- [x] **Security**: Implement per-endpoint `allUsers` invoker review (move sensitive routes to authenticated-only)
+- [x] **Database Optimization**: Optimize `count()` queries in BaseRepository
 - [x] **Glue**: Dynamicize `CORS_ORIGINS` in `cloudbuild.yaml` to avoid brittle hardcoded URLs.
 - [x] **Glue**: Consolidate `ad-server` routing into `src/api/` structure.
 

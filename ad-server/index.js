@@ -1,4 +1,4 @@
-// Load environment variables from .env.development (parent directory)
+﻿// Load environment variables from .env.development (parent directory)
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -61,56 +61,18 @@ console.log('[Server] Using Firestore for data persistence');
 // --- ROUTES ---
 
 
-import { userRepository, adRepository, screenRepository, impressionRepository } from './src/repositories/index.js';
-import { authService, playlistService } from './src/services/index.js';
-import { validateLogin, validateScreenRegistration, validateImpression, validatePlaylistRequest } from './src/middleware/validation.js';
-import { playlistETag, cacheControl } from './src/middleware/performance.js';
+import { cacheControl } from './src/middleware/performance.js';
+import apiRouter from './src/api/index.js';
+import { seedDatabase } from './src/services/SeedService.js';
 
-app.post('/api/auth/login', validateLogin, async (req, res) => {
-    try {
-        const { email } = req.body;
-        const result = await authService.login(email);
-        res.json(result);
-    } catch (error) {
-        logger.error('Login error', { error: error.message, email: req.body.email });
-        const status = error.message === 'User not found' ? 401 : 500;
-        res.status(status).json({ error: error.message });
-    }
-});
+// Auto-seed for development/test
+seedDatabase();
 
-app.get('/api/playlist/:screenId', validatePlaylistRequest, playlistETag, async (req, res) => {
-    try {
-        const { screenId } = req.params;
-        const playlist = await playlistService.generatePlaylist(screenId);
-        res.json(playlist);
-    } catch (error) {
-        logger.error('Playlist error', { error: error.message, screenId: req.params.screenId });
-        res.status(500).json({ error: error.message });
-    }
-});
+// --- ROUTES ---
 
-app.post('/api/screens/register', validateScreenRegistration, async (req, res) => {
-    try {
-        const { screen_id } = req.body;
-        const screen = await screenRepository.updateLastSeen(screen_id);
-        res.json({ status: 'registered', data: screen });
-    } catch (error) {
-        logger.error('Screen registration error', { error: error.message, screen_id: req.body.screen_id });
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
+// Domain API Routes
+app.use('/api', apiRouter);
 
-app.post('/api/screens/:screenId/impressions', validateImpression, async (req, res) => {
-    try {
-        const { screenId } = req.params;
-        const { ad_id } = req.body;
-        await impressionRepository.record(screenId, ad_id);
-        res.status(200).json({ status: 'ok' });
-    } catch (error) {
-        logger.error('Impression recording error', { error: error.message, screenId: req.params.screenId, ad_id: req.body.ad_id });
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
 
 // Serve assets with caching (1 hour)
 app.use('/assets', cacheControl(3600), express.static('assets'));

@@ -83,11 +83,36 @@ export async function seedDatabase() {
             scheduled_slot: '07:00 PM'
         });
 
+        // ALL_DAY Slot Ads (P0 Fix: Always available regardless of time)
+        await adRepository.create('ad_allday_001', {
+            title: 'softomedia-brand.mp4',
+            campaign_id: 'cmp_demo_001',
+            status: 'approved',
+            content_url: 'https://placehold.co/1920x1080?text=Always%20On%20-%20Softomedia%20Corporate',
+            scheduled_slot: 'ALL_DAY'
+        });
+
+        await adRepository.create('ad_allday_002', {
+            title: 'nike-brand-showcase.mp4',
+            campaign_id: 'cmp_demo_001',
+            status: 'approved',
+            content_url: 'https://placehold.co/1920x1080?text=Always%20On%20-%20Nike%20Brand%20Showcase',
+            scheduled_slot: 'ALL_DAY'
+        });
+
+        await adRepository.create('ad_allday_003', {
+            title: 'seasonal-retail-promo.mp4',
+            campaign_id: 'cmp_demo_001',
+            status: 'approved',
+            content_url: 'https://placehold.co/1920x1080?text=Always%20On%20-%20Retail%20Seasonal',
+            scheduled_slot: 'ALL_DAY'
+        });
+
         logger.info('Database seeding complete.', {
             users: users.length,
             locations: 1,
             screens: 2,
-            ads: 5
+            ads: 7
         });
 
     } catch (error) {

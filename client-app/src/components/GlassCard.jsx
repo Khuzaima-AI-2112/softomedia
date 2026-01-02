@@ -1,18 +1,10 @@
 import React from 'react';
 
-const GlassCard = ({ children, style = {}, className = '' }) => {
+const GlassCard = ({ children, className = '', ...props }) => {
     return (
         <div
-            className={className}
-            style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                backdropFilter: 'blur(12px)',
-                borderRadius: '1rem',
-                border: '1px solid rgba(255, 255, 255, 0.4)',
-                boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
-                padding: '1.5rem',
-                ...style
-            }}
+            className={`backdrop-blur-xl bg-white/70 dark:bg-slate-900/40 border border-white/40 dark:border-slate-700/50 rounded-2xl p-5 shadow-xl shadow-slate-200/50 dark:shadow-none ${className}`}
+            {...props}
         >
             {children}
         </div>
