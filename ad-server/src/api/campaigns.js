@@ -1,4 +1,5 @@
-﻿import { campaignRepository } from '../repositories/index.js';
+﻿import express from 'express';
+import { campaignRepository } from '../repositories/index.js';
 import { campaignService } from '../services/CampaignService.js';
 
 const router = express.Router();

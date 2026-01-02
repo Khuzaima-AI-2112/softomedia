@@ -11,6 +11,8 @@ import notificationsRouter from './notifications.js';
 import schedulesRouter from './schedules.js';
 import usersRouter from './users.js';
 import opsRouter from './ops.js';
+import telemetryRouter from './telemetry.js';
+import playlistsRouter from './playlists.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -19,7 +21,10 @@ const router = express.Router();
 router.use('/auth', authRouter);
 router.use('/health', healthRouter);
 router.use('/assets', assetsRouter);
-router.use('/playlist', playlistRouter); // Ad Player access
+// Note: 'playlist' (singular) is the Player endpoint, 'playlists' (plural) is the Admin CRUD
+router.use('/playlist', playlistRouter);
+router.use('/playlists', playlistsRouter);
+router.use('/telemetry', telemetryRouter);
 
 // --- Protected Routes ---
 router.use('/monitoring', authenticate, monitoringRouter);

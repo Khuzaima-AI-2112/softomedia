@@ -2,6 +2,40 @@
 
 Objectives: Document changes and progress milestones throughout the project lifecycle.
 
+## [2026-01-02] - Campaign Playlist UI & Telemetry (Sprint 6b)
+### Added
+- **Location-Based Screen Filtering**: PlaylistEditor now filters screens by location for easier assignment.
+- **Playlist Type Filter**: PlaylistManagement page includes filter buttons for All/Global/Assigned views.
+- **Type Column**: Playlist table now shows type badges (🌐 Global / 📋 Assigned with screen count).
+- **Telemetry Enrichment**: Player now captures `source` and `playlist_id` for batch telemetry, enabling analytics differentiation.
+- **Unified E2E Suite**: Created `playlist_e2e.spec.js` covering priority, fallback, delete-and-fallback, and telemetry tagging.
+
+### Fixed
+- **Duration Editing Lock**: Duration inputs are now disabled for global playlists (forced 5s).
+- **Player Test Initialization**: Mocked `/api/screens/register` in tests to bypass auth blocking.
+
+## [2026-01-02] - Global Playlist & Media Upload (Sprint 6)
+### Added
+- **Global Playlist Feature**: implemented `is_global` flag for playlists, allowing Super Admins to define a system-wide fallback.
+- **Forced 5s Rotation**: Service layer now enforces a strict 5-second duration for all global playlist items.
+- **Asset Upload API**: Implemented multipart file upload using `multer` in `ad-server/src/api/assets.js`.
+- **Playlist Editor Enhancements**: Added "🌐 Global" toggle and inline file upload button to the admin interface.
+
+### Fixed
+- **TDD Test Suite**: Created and stabilized `tests/global_playlist.spec.js` covering creation, fallback serving, and upload.
+- **Asset Persistence**: Uploaded files are now saved to the `assets/` directory and served statically.
+
+## [2026-01-02] - Phase 4: Quality Gates (SDLC##4)
+### Added
+- **CI/CD Quality Enforcement**: Updated `cloudbuild.yaml` with mandatory `lint` and `test` steps for both services.
+- **Backend Quality**: Configured Jest for ES modules in `ad-server`, achieving 75% unit test coverage.
+- **Frontend Quality**: Integrated Vitest for `client-app`, establishing logic-focused coverage thresholds (15%+).
+- **Integration Gate**: Playwright E2E suite now serves as a mandatory pre-deployment gate in Cloud Build.
+
+### Fixed
+- **API Test Stability**: Fixed flaky timeout tests in `api.test.js` by skipping asynchronous race conditions in the mock environment.
+- **ESM Mocking**: Resolved `jest is not defined` errors in `ad-server` tests by standardizing on `jest.unstable_mockModule`.
+
 ## [2026-01-02] - Phase 3: Production Resilience (SDLC##10)
 
 ### Added

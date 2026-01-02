@@ -1,7 +1,39 @@
 ﻿import express from 'express';
-import { adRepository, mediaRepository } from '../repositories/index.js';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { mediaRepository } from '../repositories/index.js';
 
 const router = express.Router();
+
+// Ensure assets directory exists
+const ASSETS_DIR = 'assets';
+if (!fs.existsSync(ASSETS_DIR)) {
+    fs.mkdirSync(ASSETS_DIR);
+}
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, ASSETS_DIR);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    fileFilter: (req, file, cb) => {
+        const allowed = ['.png', '.jpg', '.jpeg', '.gif', '.mp4'];
+        const ext = path.extname(file.originalname).toLowerCase();
+        if (allowed.includes(ext)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid file type. Allowed: .png, .jpg, .jpeg, .gif, .mp4'));
+        }
+    }
+});
 
 /**
  * GET /api/assets
@@ -20,16 +52,23 @@ router.get('/', async (req, res) => {
  * POST /api/assets/upload
  * Register a new creative asset
  */
-router.post('/upload', async (req, res) => {
+router.post('/upload', upload.single('file'), async (req, res) => {
     try {
-        const { filename, duration, file_type } = req.body;
+        const { duration, file_type } = req.body;
+        const file = req.file;
+
+        if (!file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+
         const id = `ast_${Date.now()}`;
         const asset = await mediaRepository.create(id, {
             id,
-            filename,
-            duration: duration || 5,
-            file_type,
-            storage_path: `mock/${filename}`,
+            filename: file.originalname,
+            duration: parseInt(duration) || 5,
+            file_type: file_type || file.mimetype,
+            storage_path: file.path,
+            url: `http://localhost:8080/assets/${file.filename}`, // Local URL for testing
             status: 'ready',
             created_at: new Date().toISOString()
         });

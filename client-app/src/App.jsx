@@ -5,6 +5,9 @@ import { AuthProvider } from './contexts/AuthContext';
 const Player = React.lazy(() => import('./pages/Player'));
 const DashboardLayout = React.lazy(() => import('./layouts/DashboardLayout'));
 const AdminOverview = React.lazy(() => import('./pages/admin/Overview'));
+const ScreenManagement = React.lazy(() => import('./pages/admin/ScreenManagement'));
+const PlaylistManagement = React.lazy(() => import('./pages/admin/PlaylistManagement'));
+const PlaylistEditor = React.lazy(() => import('./pages/admin/PlaylistEditor')); // We'll create this next
 const BrandDashboard = React.lazy(() => import('./pages/brand/BrandDashboard'));
 const BrandCampaignWizard = React.lazy(() => import('./pages/brand/BrandCampaignWizard'));
 const RetailerDashboard = React.lazy(() => import('./pages/retailer/RetailerDashboard'));
@@ -24,6 +27,10 @@ function App() {
                         <Route path="/dashboard" element={<DashboardLayout />}>
                             <Route index element={<Navigate to="admin" replace />} />
                             <Route path="admin" element={<AdminOverview />} />
+                            <Route path="admin/screens" element={<ScreenManagement />} />
+                            <Route path="admin/playlists" element={<PlaylistManagement />} />
+                            <Route path="admin/playlists/new" element={<PlaylistEditor />} />
+                            <Route path="admin/playlists/:id" element={<PlaylistEditor />} />
                             <Route path="brand" element={<BrandDashboard />} />
                             <Route path="brand/campaign/new" element={<BrandCampaignWizard />} />
                             <Route path="retailer" element={<RetailerDashboard />} />

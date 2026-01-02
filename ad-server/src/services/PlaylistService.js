@@ -1,4 +1,4 @@
-﻿import { adRepository, mediaRepository } from '../repositories/index.js';
+﻿import { adRepository, playlistRepository, mediaRepository } from '../repositories/index.js';
 import logger from '../utils/logger.js';
 
 const PLAYLIST_CACHE = new Map();
@@ -11,6 +11,111 @@ export class PlaylistService {
      * @returns {Promise<object>} { playlist }
      */
     async getPlaylistForScreen(screenId) {
+        // --- PHASE 3: PLAYLIST ORCHESTRATION ---
+
+        // 1. Check for explicitly assigned active playlists
+        const activePlaylists = await playlistRepository.findActiveByScreen(screenId);
+
+        // For MVP, just take the first one. Future: Merge/Schedule logic.
+        const assigned = activePlaylists[0];
+
+        if (assigned && assigned.items?.length > 0) {
+            try {
+                // Hydrate items with Media URLs
+                const playlist = await Promise.all(assigned.items.map(async (item) => {
+                    const media = await mediaRepository.findById(item.media_id);
+
+                    // Resolution Strategy for Content URL:
+                    // 1. Explicit URL on media object
+                    // 2. Local Asset serve path
+                    // 3. Fallback Placeholder
+                    let url = media?.url || media?.content_url;
+                    if (!url && media?.filename) {
+                        // Assuming local serve for Phase 3 MVP
+                        url = `http://localhost:8080/assets/${media.filename}`;
+                    }
+                    if (!url) {
+                        url = `https://placehold.co/1920x1080?text=${encodeURIComponent(media?.filename || 'Missing Asset')}`;
+                    }
+
+                    return {
+                        id: item.media_id,
+                        title: media?.filename || item.filename || 'Untitled Media',
+                        url,
+                        duration: parseInt(item.duration) || parseInt(media?.duration) || 10,
+                        campaign_id: assigned.id, // Track Playlist ID as Campaign for telemetry
+                        type: media?.file_type || 'image/jpeg'
+                    };
+                }));
+
+                // Sort by order
+                playlist.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+                logger.info('Served Scheduled Playlist', { screenId, playlistId: assigned.id });
+
+                return {
+                    screen_id: screenId,
+                    source: 'playlist',
+                    playlist_id: assigned.id,
+                    playlist_name: assigned.name,
+                    playlist
+                };
+            } catch (err) {
+                logger.error('Failed to hydrate playlist', { error: err.message });
+                // Fallthrough to legacy on error
+            }
+        }
+
+        // --- GLOBAL PLAYLIST FALLBACK ---
+        const globalPlaylist = await playlistRepository.findGlobalPlaylist();
+        logger.info('Global Fallback Check', {
+            screenId,
+            found: !!globalPlaylist,
+            itemCount: globalPlaylist?.items?.length || 0
+        });
+
+        if (globalPlaylist && globalPlaylist.items?.length > 0) {
+            try {
+                const playlist = await Promise.all(globalPlaylist.items.map(async (item) => {
+                    const media = await mediaRepository.findById(item.media_id);
+                    let url = media?.url || media?.content_url;
+                    if (!url && media?.filename) {
+                        url = `http://localhost:8080/assets/${media.filename}`;
+                    }
+                    if (!url) {
+                        url = `https://placehold.co/1920x1080?text=${encodeURIComponent(media?.filename || 'Global Asset')}`;
+                    }
+
+                    return {
+                        id: item.media_id,
+                        title: media?.filename || 'Global Media',
+                        url,
+                        duration: 5, // Forced 5-second rotation for Global Playlist
+                        campaign_id: globalPlaylist.id,
+                        type: media?.file_type || 'image/jpeg'
+                    };
+                }));
+
+                logger.info('Served Global Playlist', { screenId, playlistId: globalPlaylist.id });
+
+                return {
+                    screen_id: screenId,
+                    source: 'global_playlist',
+                    playlist_id: globalPlaylist.id,
+                    playlist_name: globalPlaylist.name,
+                    playlist
+                };
+            } catch (err) {
+                logger.error('Failed to hydrate global playlist', {
+                    error: err.message,
+                    playlistId: globalPlaylist.id,
+                    stack: err.stack
+                });
+            }
+        }
+
+        // --- LEGACY LOGIC (Random Ad Rotation) ---
+
         // Calculate current 1hr slot (e.g., "08:00 AM")
         const now = new Date();
         const hour = now.getHours();

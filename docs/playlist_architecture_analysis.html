@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playlist Architecture Analysis | SoftoMedia</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --accent-blue: #3b82f6;
+            --accent-green: #22c55e;
+            --accent-amber: #f59e0b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border: #334155;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            color: var(--accent-blue);
+            margin: 2rem 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        h2::before {
+            content: '▶';
+            font-size: 0.8rem;
+        }
+
+        h3 {
+            font-size: 1.1rem;
+            margin: 1.5rem 0 0.75rem;
+            color: var(--accent-green);
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid var(--border);
+        }
+
+        .card-header {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card.global .card-header {
+            color: var(--accent-amber);
+        }
+
+        .card.campaign .card-header {
+            color: var(--accent-blue);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+
+        th,
+        td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: var(--bg-card);
+            color: var(--accent-blue);
+            font-weight: 600;
+        }
+
+        tr:hover td {
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        code {
+            background: #0d1117;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9em;
+            color: var(--accent-green);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .badge-global {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--accent-amber);
+        }
+
+        .badge-campaign {
+            background: rgba(59, 130, 246, 0.2);
+            color: var(--accent-blue);
+        }
+
+        .badge-shared {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--accent-green);
+        }
+
+        .flow-diagram {
+            background: #0d1117;
+            border-radius: 8px;
+            padding: 1.5rem;
+            font-family: monospace;
+            white-space: pre;
+            overflow-x: auto;
+            font-size: 0.85rem;
+            line-height: 1.8;
+        }
+
+        ul {
+            padding-left: 1.5rem;
+            margin: 0.5rem 0;
+        }
+
+        li {
+            margin: 0.4rem 0;
+            color: var(--text-secondary);
+        }
+
+        li strong {
+            color: var(--text-primary);
+        }
+
+        .overlap-section {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(245, 158, 11, 0.1));
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border: 1px solid var(--border);
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Playlist Architecture Analysis</h1>
+            <p class="subtitle">Global Playlist vs. Campaign Playlist: Technical Comparison</p>
+            <p class="subtitle" style="margin-top: 0.5rem; font-size: 0.9rem;">Generated: January 2, 2026</p>
+        </header>
+
+        <section>
+            <h2>Executive Summary</h2>
+            <p>This document compares two playlist orchestration modes in the SoftoMedia ad-server: <span
+                    class="badge badge-global">Global Playlist</span> (system-wide fallback) and <span
+                    class="badge badge-campaign">Campaign Playlist</span> (screen-specific assignment). While they share
+                a common data model and API surface, they differ in scope, rotation behavior, and telemetry tagging.</p>
+        </section>
+
+        <section>
+            <h2>Data Model Comparison</h2>
+            <div class="comparison-grid">
+                <div class="card global">
+                    <div class="card-header">🌐 Global Playlist</div>
+                    <table>
+                        <tr>
+                            <td><code>id</code></td>
+                            <td>Playlist UUID</td>
+                        </tr>
+                        <tr>
+                            <td><code>name</code></td>
+                            <td>Human-readable title</td>
+                        </tr>
+                        <tr>
+                            <td><code>status</code></td>
+                            <td><code>'ACTIVE'</code> required</td>
+                        </tr>
+                        <tr>
+                            <td><code>is_global</code></td>
+                            <td><strong><code>true</code></strong></td>
+                        </tr>
+                        <tr>
+                            <td><code>items[]</code></td>
+                            <td>Array of media refs</td>
+                        </tr>
+                        <tr>
+                            <td><code>assignments</code></td>
+                            <td>Empty or <code>['ALL']</code></td>
+                        </tr>
+                    </table>
+                    <h3>Key Characteristics</h3>
+                    <ul>
+                        <li><strong>Forced 5-second rotation</strong> for all items</li>
+                        <li>Serves as <strong>system fallback</strong> for unassigned screens</li>
+                        <li>Only <strong>one active</strong> global playlist at a time</li>
+                        <li>Super Admin access only</li>
+                    </ul>
+                </div>
+                <div class="card campaign">
+                    <div class="card-header">📋 Campaign Playlist</div>
+                    <table>
+                        <tr>
+                            <td><code>id</code></td>
+                            <td>Playlist UUID</td>
+                        </tr>
+                        <tr>
+                            <td><code>name</code></td>
+                            <td>Human-readable title</td>
+                        </tr>
+                        <tr>
+                            <td><code>status</code></td>
+                            <td><code>'ACTIVE'</code> or <code>'DRAFT'</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>is_global</code></td>
+                            <td><strong><code>false</code></strong></td>
+                        </tr>
+                        <tr>
+                            <td><code>items[]</code></td>
+                            <td>Array of media refs</td>
+                        </tr>
+                        <tr>
+                            <td><code>assignments</code></td>
+                            <td>Screen IDs or Group IDs</td>
+                        </tr>
+                    </table>
+                    <h3>Key Characteristics</h3>
+                    <ul>
+                        <li><strong>Configurable duration</strong> per item</li>
+                        <li>Explicitly <strong>assigned to screens</strong></li>
+                        <li><strong>Multiple playlists</strong> can be active</li>
+                        <li>Brand/Retailer can manage</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>Playlist Item Schema</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Field</th>
+                        <th>Global Playlist</th>
+                        <th>Campaign Playlist</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>media_id</code></td>
+                        <td class="badge badge-shared">Shared</td>
+                        <td class="badge badge-shared">Shared</td>
+                        <td>Reference to <code>media</code> collection</td>
+                    </tr>
+                    <tr>
+                        <td><code>duration</code></td>
+                        <td><strong>Ignored</strong> (Forced 5s)</td>
+                        <td><strong>Respected</strong></td>
+                        <td>Global enforces 5s in service layer</td>
+                    </tr>
+                    <tr>
+                        <td><code>order</code></td>
+                        <td class="badge badge-shared">Shared</td>
+                        <td class="badge badge-shared">Shared</td>
+                        <td>Playback sequence</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>API Endpoints</h2>
+            <h3>CRUD Operations (Admin)</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Method</th>
+                        <th>Endpoint</th>
+                        <th>Global</th>
+                        <th>Campaign</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>POST</code></td>
+                        <td><code>/api/playlists</code></td>
+                        <td>✅ <code>is_global: true</code></td>
+                        <td>✅ <code>is_global: false</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>GET</code></td>
+                        <td><code>/api/playlists</code></td>
+                        <td>✅ Included</td>
+                        <td>✅ Included</td>
+                    </tr>
+                    <tr>
+                        <td><code>PUT</code></td>
+                        <td><code>/api/playlists/:id</code></td>
+                        <td>✅</td>
+                        <td>✅</td>
+                    </tr>
+                    <tr>
+                        <td><code>DELETE</code></td>
+                        <td><code>/api/playlists/:id</code></td>
+                        <td>✅</td>
+                        <td>✅</td>
+                    </tr>
+                </tbody>
+            </table>
+            <h3>Player Endpoint</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Method</th>
+                        <th>Endpoint</th>
+                        <th>Source Logic</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>GET</code></td>
+                        <td><code>/api/playlist/:screenId</code></td>
+                        <td>1️⃣ Check assigned playlists → 2️⃣ Fall back to global → 3️⃣ Legacy slot logic</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>Service Layer Logic</h2>
+            <div class="flow-diagram">
+                ┌─────────────────────────────────────────────────────────────────────────┐
+                │ PlaylistService.getPlaylistForScreen(screenId) │
+                ├─────────────────────────────────────────────────────────────────────────┤
+                │ │
+                │ 1. Query PlaylistRepository.findActiveByScreen(screenId) │
+                │ └── Returns playlists where assignments[] contains screenId │
+                │ │
+                │ 2. IF assigned playlist found: │
+                │ ├── Hydrate items with MediaRepository.findById() │
+                │ ├── Return { source: <span style="color:#3b82f6">'playlist'</span>, playlist_id, playlist } │
+                │ └── <span style="color:#94a3b8">Duration: Respected from item.duration</span> │
+                │ │
+                │ 3. ELSE Query PlaylistRepository.findGlobalPlaylist() │
+                │ └── Returns playlist where is_global === true && status === ACTIVE │
+                │ │
+                │ 4. IF global playlist found: │
+                │ ├── Hydrate items with MediaRepository.findById() │
+                │ ├── Return { source: <span style="color:#f59e0b">'global_playlist'</span>, playlist_id, playlist } │
+                │ └── <span style="color:#f59e0b">Duration: FORCED to 5 seconds for all items</span> │
+                │ │
+                │ 5. ELSE Fall back to legacy hourly slot logic (adRepository) │
+                │ │
+                └─────────────────────────────────────────────────────────────────────────┘
+            </div>
+        </section>
+
+        <section>
+            <h2>Telemetry & Tracking</h2>
+            <div class="comparison-grid">
+                <div class="card global">
+                    <div class="card-header">🌐 Global Playlist Telemetry</div>
+                    <table>
+                        <tr>
+                            <td><code>source</code></td>
+                            <td><code>'global_playlist'</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>playlist_id</code></td>
+                            <td>Global playlist UUID</td>
+                        </tr>
+                        <tr>
+                            <td><code>campaign_id</code></td>
+                            <td>Same as playlist_id</td>
+                        </tr>
+                        <tr>
+                            <td><code>duration</code></td>
+                            <td><strong>Always 5</strong></td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="card campaign">
+                    <div class="card-header">📋 Campaign Playlist Telemetry</div>
+                    <table>
+                        <tr>
+                            <td><code>source</code></td>
+                            <td><code>'playlist'</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>playlist_id</code></td>
+                            <td>Assigned playlist UUID</td>
+                        </tr>
+                        <tr>
+                            <td><code>campaign_id</code></td>
+                            <td>Same as playlist_id</td>
+                        </tr>
+                        <tr>
+                            <td><code>duration</code></td>
+                            <td>Variable per item</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <h3>Telemetry Architecture (Batch Model)</h3>
+            <div class="flow-diagram">
+                ┌────────────────────┐ ┌─────────────────────────┐ ┌─────────────────┐
+                │ Player.jsx │ ───► │ TelemetryService.js │ ───► │ Telemetry Sink │
+                │ │ │ (LocalStorage Buffer) │ │ (GCS / API) │
+                ├────────────────────┤ ├─────────────────────────┤ ├─────────────────┤
+                │ trackImpression({ │ │ buffer.push({ │ │ Batch Upload │
+                │ screenId, │ │ ...impression, │ │ (50 items OR │
+                │ mediaId, │ │ timestamp, │ │ 1 hour) │
+                │ <span style="color:#f59e0b">source</span>, │ │ uuid │ │ │
+                │ <span style="color:#f59e0b">playlistId</span> │ │ }); │ │ │
+                │ }) │ │ localStorage.setItem() │ │ │
+                └────────────────────┘ └─────────────────────────┘ └─────────────────┘
+            </div>
+            <p style="margin-top: 1rem; color: var(--text-secondary);">
+                <strong>Key Insight:</strong> The <code>source</code> field enables downstream analytics to
+                differentiate between global fallback impressions and targeted campaign impressions, allowing for
+                accurate attribution and ROI calculation.
+            </p>
+        </section>
+
+        <section class="overlap-section">
+            <h2 style="margin-top: 0;">🔗 Technical Overlaps</h2>
+            <ul>
+                <li><strong>Same Data Model:</strong> Both use the <code>playlists</code> Firestore collection with
+                    identical schema.</li>
+                <li><strong>Same Hydration Logic:</strong> Both resolved via <code>MediaRepository.findById()</code> for
+                    asset URLs.</li>
+                <li><strong>Same API Surface:</strong> Created/updated via <code>/api/playlists</code> endpoints.</li>
+                <li><strong>Same Player Consumer:</strong> Both served to <code>Player.jsx</code> via
+                    <code>/api/playlist/:screenId</code>.</li>
+                <li><strong>Same Telemetry Buffer:</strong> Both use <code>TelemetryService</code> batch architecture.
+                </li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>Key Differences Summary</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>Global Playlist</th>
+                        <th>Campaign Playlist</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Scope</strong></td>
+                        <td>System-wide fallback</td>
+                        <td>Screen-specific assignment</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Rotation Speed</strong></td>
+                        <td>Fixed 5 seconds</td>
+                        <td>Configurable per item</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Priority</strong></td>
+                        <td>Lower (fallback only)</td>
+                        <td>Higher (takes precedence)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Access Control</strong></td>
+                        <td>Super Admin only</td>
+                        <td>Role-based (Brand, Retailer)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Telemetry Source</strong></td>
+                        <td><code>global_playlist</code></td>
+                        <td><code>playlist</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Cardinality</strong></td>
+                        <td>Single active instance</td>
+                        <td>Multiple concurrent</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>📁 Related Files</h2>
+            <div class="card">
+                <h3>Frontend</h3>
+                <ul>
+                    <li><a href="file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/client-app/src/pages/admin/PlaylistEditor.jsx"
+                            style="color: var(--accent-blue);">PlaylistEditor.jsx</a> - Location filter, global toggle,
+                        duration editing</li>
+                    <li><a href="file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/client-app/src/pages/admin/PlaylistManagement.jsx"
+                            style="color: var(--accent-blue);">PlaylistManagement.jsx</a> - Type filter, type badges
+                    </li>
+                    <li><a href="file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/client-app/src/pages/Player.jsx"
+                            style="color: var(--accent-blue);">Player.jsx</a> - Playlist metadata capture for telemetry
+                    </li>
+                    <li><a href="file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/client-app/src/services/TelemetryService.js"
+                            style="color: var(--accent-blue);">TelemetryService.js</a> - Batch buffer implementation
+                    </li>
+                </ul>
+                <h3>Backend</h3>
+                <ul>
+                    <li><a href="file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/ad-server/src/services/PlaylistService.js"
+                            style="color: var(--accent-green);">PlaylistService.js</a> - Priority chain, hydration logic
+                    </li>
+                    <li><a href="file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/ad-server/src/repositories/PlaylistRepository.js"
+                            style="color: var(--accent-green);">PlaylistRepository.js</a> - findGlobalPlaylist()</li>
+                    <li><a href="file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/ad-server/src/api/playlists.js"
+                            style="color: var(--accent-green);">playlists.js</a> - CRUD API endpoints</li>
+                </ul>
+                <h3>Tests</h3>
+                <ul>
+                    <li><a href="file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/tests/playlist_e2e.spec.js"
+                            style="color: var(--accent-amber);">playlist_e2e.spec.js</a> - Unified E2E tests</li>
+                    <li><a href="file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/tests/telemetry_global.spec.js"
+                            style="color: var(--accent-amber);">telemetry_global.spec.js</a> - Telemetry verification
+                    </li>
+                </ul>
+                <h3>Documentation</h3>
+                <ul>
+                    <li><a href="file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/lessons_learned.md"
+                            style="color: var(--text-secondary);">lessons_learned.md</a></li>
+                    <li><a href="file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/changelog.md"
+                            style="color: var(--text-secondary);">changelog.md</a></li>
+                </ul>
+            </div>
+        </section>
+
+        <footer>
+            <p>SoftoMedia Digital Signage Platform | Technical Architecture Documentation</p>
+            <p style="margin-top: 0.5rem;">Report generated from codebase analysis on 2026-01-02</p>
+        </footer>
+    </div>
+</body>
+
+</html>

@@ -287,6 +287,33 @@ Objectives: Document errors, bugs, and mistakes so we do not make them again.
 - **Root Cause**: Fixed-interval retries creating "spikes" of traffic.
 - **Prevention**: Always use exponential backoff with random jitter. This spreads out the retry load over time, increasing the chance of successful recovery for the target system.
 
+### [2026-01-02] Global Playlist Implementation & Forced Rotation
+- **Issue**: System required a fallback for screens without specific assignments, with a fixed 5s ad rotation for such a "global" pool.
+- **Root Cause**: Missing "Global" state in the playlist domain model and lack of fallback logic in the service layer.
+- **Prevention**: 
+  1. **Flag-based Fallback**: Added `is_global` boolean to the Playlist model.
+  2. **Service Orchestration**: Modified `PlaylistService` to query for a global playlist if no specific assignment exists.
+  3. **Forced Domain Constraints**: Hardcoded `duration: 5` in the service hydrant logic for global playlists to enforce the business rule regardless of user input.
+
+### [2026-01-02] Multipart Upload with Multer in ES Modules
+- **Issue**: Implementing file uploads in an ESM-based Node.js project required careful handling of paths and middleware.
+- **Root Cause**: Standard `multer` configurations often assume CommonJS `__dirname`.
+- **Prevention**: Use the existing `assets/` directory for static serving and ensure `multer.diskStorage` points to a relative path that Express serves. Always validate file extensions (`.png`, `.jpg`, `.mp4`) at the middleware level to prevent malicious uploads.
+
+### [2026-01-02] Auth-Protected Endpoints in Playwright Tests
+- **Issue**: Player E2E tests timed out because `/api/screens/register` was protected by auth middleware.
+- **Root Cause**: Player initialization required a successful registration call, which failed without auth headers in the test context.
+- **Prevention**: Use `page.route()` to mock protected endpoints in Playwright tests. This decouples the test from auth dependencies and allows isolated verification of UI behavior.
+
+### [2026-01-02] Playlist Priority Chain (Assigned → Global → Legacy)
+- **Issue**: Needed clear precedence when multiple content sources exist (assigned playlists, global fallback, legacy slot-based ads).
+- **Root Cause**: Missing explicit priority logic in `PlaylistService`.
+- **Prevention**: Implement a cascading priority chain:
+  1. Assigned playlist (screen-specific)
+  2. Global playlist (system fallback)
+  3. Legacy hourly slot logic (backward compatibility)
+  Include `source` and `playlist_id` in the response for telemetry differentiation.
+
 ---
 *Note: This file is a permanent project record. Do not delete or purge entries.*
 

@@ -28,7 +28,7 @@ router.post('/heartbeat', async (req, res) => {
  */
 router.post('/impression', async (req, res) => {
     try {
-        const { screenId, campaignId, mediaId, duration } = req.body;
+        const { screenId, campaignId, mediaId, duration, source, playlistId } = req.body;
 
         if (!screenId || !campaignId) {
             return res.status(400).json({ error: 'screenId and campaignId required' });
@@ -45,7 +45,9 @@ router.post('/impression', async (req, res) => {
             campaign_id: campaignId,
             media_id: mediaId,
             location_id: locationId,
-            duration: duration || 5
+            duration: duration || 5,
+            source,
+            playlistId
         });
 
         res.status(201).json({ status: 'logged' });

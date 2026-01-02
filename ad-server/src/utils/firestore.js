@@ -29,3 +29,10 @@ export const getFirestore = () => {
 };
 
 export const isMockMode = () => useMock;
+
+export const closeFirestore = async () => {
+    if (db) {
+        await db.terminate();
+        db = null;
+    }
+};

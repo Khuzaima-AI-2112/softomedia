@@ -13,6 +13,9 @@ export class ImpressionRepository extends BaseRepository {
         const id = `imp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         return this.create(id, {
             ...data,
+            // Capture source metadata for analytics
+            playlist_source: data.source || 'assigned',
+            playlist_id: data.playlistId || data.campaign_id,
             timestamp: new Date().toISOString()
         });
     }

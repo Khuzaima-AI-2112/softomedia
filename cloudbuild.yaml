@@ -19,10 +19,26 @@ steps:
 
   - name: 'node:20'
     entrypoint: 'npm'
+    args: ['run', 'lint']
+    dir: 'client-app'
+    id: 'lint-client'
+    waitFor: ['install-client']
+
+  - name: 'node:20'
+    entrypoint: 'npm'
+    args: ['run', 'test:coverage']
+    dir: 'client-app'
+    id: 'test-client'
+    waitFor: ['install-client']
+    env:
+      - 'CI=true'
+
+  - name: 'node:20'
+    entrypoint: 'npm'
     args: ['run', 'build']
     dir: 'client-app'
     id: 'build-client'
-    waitFor: ['install-client']
+    waitFor: ['lint-client', 'test-client']
 
   # Step 3: Build ad-server
   - name: 'node:20'
@@ -30,6 +46,22 @@ steps:
     args: ['ci']
     dir: 'ad-server'
     id: 'install-adserver'
+
+  - name: 'node:20'
+    entrypoint: 'npm'
+    args: ['run', 'lint']
+    dir: 'ad-server'
+    id: 'lint-adserver'
+    waitFor: ['install-adserver']
+
+  - name: 'node:20'
+    entrypoint: 'npm'
+    args: ['run', 'test:coverage']
+    dir: 'ad-server'
+    id: 'test-adserver'
+    waitFor: ['install-adserver']
+    env:
+      - 'CI=true'
 
   # Step 4: Build and push client-app container
   - name: 'gcr.io/cloud-builders/docker'
@@ -60,7 +92,7 @@ steps:
       - 'ad-server/Dockerfile'
       - 'ad-server'
     id: 'build-adserver-image'
-    waitFor: ['install-adserver']
+    waitFor: ['lint-adserver', 'test-adserver']
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
@@ -69,6 +101,14 @@ steps:
     id: 'push-adserver-image'
     waitFor: ['build-adserver-image']
 
+  # Step 6: Quality Gate: E2E Integration Gold Path
+  - name: 'mcr.microsoft.com/playwright:v1.45.0-jammy'
+    entrypoint: 'npm'
+    args: ['run', 'test:e2e']
+    id: 'test-e2e'
+    waitFor: ['install-client', 'install-adserver']
+    env:
+      - 'CI=true'
 
   # Step 8: Deploy ad-server to Cloud Run
   - name: 'gcr.io/cloud-builders/gcloud'
@@ -89,7 +129,7 @@ steps:
           --set-env-vars "NODE_ENV=production,CORS_ORIGINS=$$CLIENT_URL" \
           --set-secrets "JWT_SECRET=JWT_SECRET:latest"
     id: 'deploy-adserver'
-    waitFor: ['push-adserver-image']
+    waitFor: ['push-adserver-image', 'test-e2e']
 
   # Step 9: Deploy Firestore and Storage Security Rules
   - name: 'gcr.io/cloud-builders/gcloud'

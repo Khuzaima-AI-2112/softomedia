@@ -15,7 +15,7 @@ export class BackupService {
         }
 
         try {
-            const databasePath = `projects/softomedia-live-2026/databases/(default)`;
+            const databasePath = 'projects/softomedia-live-2026/databases/(default)';
             logger.info('Starting Firestore backup', { bucket, databasePath });
 
             // Using withRetry to handle transient initiation failures

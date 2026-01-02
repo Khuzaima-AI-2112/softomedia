@@ -10,7 +10,15 @@ import {
     advertiserRepository,
     locationRepository
 } from './src/repositories/index.js';
-import { ROLES } from './src/utils/constants.js';
+import { PERSONAS } from './src/utils/constants.js';
+
+const ROLES = {
+    SUPER_ADMIN: PERSONAS.ADMIN,
+    RETAILER_ADMIN: PERSONAS.RETAILER,
+    ADVERTISER: PERSONAS.BRAND,
+    SOFTOMEDIA_MANAGER: 'manager',
+    TECH_OPERATOR: PERSONAS.TECH
+};
 
 const seedData = {
     retailers: [
@@ -30,8 +38,8 @@ const seedData = {
         { id: 'tech_001', email: 'tech@demo.com', role: ROLES.TECH_OPERATOR, name: 'Technical Support' },
     ],
     ads: [
-        { id: 'ad_001', title: 'Demo Coffee', file_path: 'demo_ad_1.png', duration: 5, status: 'approved', advertiser_id: 'adv_001' },
-        { id: 'ad_002', title: 'Demo Tech', file_path: 'demo_ad_2.png', duration: 5, status: 'approved', advertiser_id: 'adv_001' },
+        { id: 'ad_001', title: 'Demo Coffee', file_path: 'demo_ad_1.png', duration: 5, status: 'approved', advertiser_id: 'adv_001', scheduled_slot: 'ALL_DAY' },
+        { id: 'ad_002', title: 'Demo Tech', file_path: 'demo_ad_2.png', duration: 5, status: 'approved', advertiser_id: 'adv_001', scheduled_slot: 'ALL_DAY' },
     ],
     screens: [
         { id: 'demo-screen-01', screen_id: 'demo-screen-01', status: 'active', location_id: 'loc_001', last_seen: new Date().toISOString() }

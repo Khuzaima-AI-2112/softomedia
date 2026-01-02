@@ -10,7 +10,11 @@ function HamburgerMenu() {
     const menuItems = [
         { label: 'Dashboard', path: `/dashboard/${user?.role || 'admin'}`, icon: 'dashboard' },
         { label: 'Ad Player', path: '/player', icon: 'play_circle' },
-        ...(user?.role === 'admin' ? [{ label: 'System Health', path: '/dashboard/health', icon: 'health_metrics' }] : []),
+        ...(user?.role === 'admin' ? [
+            { label: 'System Health', path: '/admin/health', icon: 'health_metrics' },
+            { label: 'Screens', path: '/admin/screens', icon: 'monitor' },
+            { label: 'Playlists', path: '/admin/playlists', icon: 'playlist_play' }
+        ] : []),
         ...(user?.role === 'retailer' ? [{ label: 'Schedule Manager', path: '/dashboard/retailer/schedule', icon: 'calendar_today' }] : []),
         { label: 'Settings', path: '#', icon: 'settings' },
     ];

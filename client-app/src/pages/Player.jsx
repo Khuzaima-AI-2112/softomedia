@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { API_URL } from '../config.js'
+import { telemetryService } from '../services/TelemetryService.js'
 
 function Player() {
     const [searchParams] = useSearchParams()
@@ -8,6 +9,7 @@ function Player() {
     const [status, setStatus] = useState('initializing')
     const [screenData, setScreenData] = useState(null) // This state is no longer used in the final render, but kept for consistency with the original code's declaration.
     const [playlist, setPlaylist] = useState([])
+    const [playlistMeta, setPlaylistMeta] = useState({ source: 'unknown', id: null })
     const [currentAdIndex, setCurrentAdIndex] = useState(0)
 
     // Playlist Polling (Every 60 seconds)
@@ -20,6 +22,7 @@ function Player() {
                 const data = await res.json();
                 if (data.playlist && data.playlist.length > 0) {
                     setPlaylist(data.playlist);
+                    setPlaylistMeta({ source: data.source || 'assigned', id: data.playlist_id || data.id });
                     // Don't reset currentAdIndex to avoid visual jumps on refresh
                     if (status !== 'playing') setStatus('playing');
                 } else if (status !== 'no_content') {
@@ -47,6 +50,7 @@ function Player() {
                 const data = await res.json();
                 if (data.playlist && data.playlist.length > 0) {
                     setPlaylist(data.playlist);
+                    setPlaylistMeta({ source: data.source || 'assigned', id: data.playlist_id || data.id });
                     setCurrentAdIndex(0);
                     setStatus('playing');
                 } else {
@@ -87,20 +91,46 @@ function Player() {
         }
     }, [searchParams])
 
+    // --- SRE: White-Box Observability & Transport ---
+    const logTelemetryEvent = (type, payload) => {
+        // Enable logging if in Test Mode OR if URL has ?debug=true
+        const isDebug = new URLSearchParams(window.location.search).get('debug') === 'true';
+
+        if (import.meta.env.MODE === 'test' || isDebug || window.__FORCE_TEST_LOGGING__) {
+            if (!window.__TELEMETRY_LOG__) window.__TELEMETRY_LOG__ = [];
+            window.__TELEMETRY_LOG__.push({ type, timestamp: Date.now(), payload });
+            // Keep buffer small (Circular Buffer Pattern)
+            if (window.__TELEMETRY_LOG__.length > 50) window.__TELEMETRY_LOG__.shift();
+        }
+    };
+
+    const sendTelemetry = (endpoint, data) => {
+        const url = `${API_URL}${endpoint}`;
+
+        // Log intent (Synchronous, Deterministic)
+        logTelemetryEvent(endpoint.includes('heartbeat') ? 'HEARTBEAT' : 'IMPRESSION', data);
+
+        // Send via Beacon (Reliable Transport)
+        if (navigator.sendBeacon) {
+            const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+            navigator.sendBeacon(url, blob);
+        } else {
+            // Fallback for older browsers
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+                keepalive: true
+            }).catch(e => console.error('Telemetry fallback failed', e));
+        }
+    };
+
     // Heartbeat (Every 30 seconds)
     useEffect(() => {
         if (!screenId) return;
 
-        const sendHeartbeat = async () => {
-            try {
-                await fetch(`${API_URL}/api/monitoring/heartbeat`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ screenId })
-                });
-            } catch (e) {
-                console.error('Heartbeat failed', e);
-            }
+        const sendHeartbeat = () => {
+            sendTelemetry('/api/monitoring/heartbeat', { screenId });
         };
 
         sendHeartbeat();
@@ -115,21 +145,19 @@ function Player() {
         const currentAd = playlist[currentAdIndex];
         const duration = (currentAd.duration || 5) * 1000;
 
-        const recordImpression = async (ad) => {
-            try {
-                await fetch(`${API_URL}/api/monitoring/impression`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        screenId,
-                        campaignId: ad.campaign_id || ad.id,
-                        mediaId: ad.media_id || ad.id,
-                        duration: ad.duration
-                    })
-                });
-            } catch (e) {
-                console.error('Failed to record impression', e);
-            }
+        const recordImpression = (ad) => {
+            // Batch Audit Trail (High Reliability)
+            telemetryService.trackImpression({
+                screenId,
+                campaignId: ad.campaign_id || ad.id,
+                mediaId: ad.media_id || ad.id,
+                duration: ad.duration,
+                source: playlistMeta.source,
+                playlistId: playlistMeta.id
+            });
+
+            // Note: We removed the direct 'sendTelemetry' call for impressions 
+            // to avoid "Chatty API" per architectural decision 2026-01-02.
         };
 
         recordImpression(currentAd);
