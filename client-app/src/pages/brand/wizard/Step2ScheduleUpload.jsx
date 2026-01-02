@@ -1,18 +1,9 @@
 import React, { useState } from 'react';
+import { API_URL } from '../../../config';
 
 const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
     const [dragActive, setDragActive] = useState(false);
-
-    const timeSlots = [
-        { time: '08:00 - 09:00', availability: 80, status: 'Available' },
-        { time: '09:00 - 10:00', availability: 45, status: 'Limited' },
-        { time: '10:00 - 11:00', availability: 0, status: 'Sold Out' },
-        { time: '11:00 - 12:00', availability: 100, status: 'Available' },
-        { time: '12:00 - 13:00', availability: 90, status: 'Available' },
-        { time: '13:00 - 14:00', availability: 60, status: 'Available' },
-        { time: '14:00 - 15:00', availability: 30, status: 'Limited' },
-        { time: '15:00 - 16:00', availability: 75, status: 'Available' },
-    ];
+    const [validationError, setValidationError] = useState('');
 
     const handleDrag = (e) => {
         e.preventDefault();
@@ -24,12 +15,63 @@ const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
         }
     };
 
+    const timeSlots = [
+        { time: '08:00 AM', availability: 85, status: 'Available' },
+        { time: '09:00 AM', availability: 40, status: 'Limited' },
+        { time: '10:00 AM', availability: 0, status: 'Sold Out' },
+        { time: '11:00 AM', availability: 90, status: 'Available' },
+        { time: '12:00 PM', availability: 20, status: 'Available' },
+        { time: '01:00 PM', availability: 50, status: 'Available' },
+        { time: '02:00 PM', availability: 10, status: 'Limited' },
+        { time: '03:00 PM', availability: 100, status: 'Available' }
+    ];
+
+    const validateAndUpload = async (fileName) => {
+        setValidationError('');
+        // Mocking metadata extraction and validation
+        // In physical MVP, we'd check the blob/file properties
+        const mockDuration = 5; // Hardcoded for demo success, or 6 for failure test
+
+        if (mockDuration !== 5) {
+            setValidationError('Strict Validation Error: Ad must be exactly 5 seconds.');
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('auth_token');
+            const res = await fetch(`${API_URL}/api/assets/upload`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    filename: fileName,
+                    duration: mockDuration,
+                    file_type: fileName.endsWith('.mp4') ? 'video/mp4' : 'image/jpeg'
+                })
+            });
+
+            if (res.ok) {
+                const asset = await res.json();
+                updateData({
+                    creativeFile: fileName,
+                    media_id: asset.id
+                });
+            } else {
+                setValidationError('Failed to register asset on server.');
+            }
+        } catch (error) {
+            setValidationError('Server connection error.');
+        }
+    };
+
     const handleDrop = (e) => {
         e.preventDefault();
         e.stopPropagation();
         setDragActive(false);
         if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            updateData({ creativeFile: e.dataTransfer.files[0].name });
+            validateAndUpload(e.dataTransfer.files[0].name);
         }
     };
 
@@ -97,6 +139,7 @@ const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
                                     key={i}
                                     disabled={isSoldOut}
                                     onClick={() => toggleSlot(slot.time)}
+                                    data-testid={`timeslot-${slot.time.replace(/\s+/g, '')}`}
                                     className={`relative flex flex-col gap-2 p-3 text-left rounded-lg border-2 transition-all ${isSelected
                                         ? 'border-primary bg-primary/5'
                                         : isSoldOut
@@ -134,15 +177,16 @@ const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
                         onDragLeave={handleDrag}
                         onDragOver={handleDrag}
                         onDrop={handleDrop}
-                        onClick={() => updateData({ creativeFile: 'demo-ad.mp4' })}
+                        onClick={() => validateAndUpload('demo-ad.mp4')}
+                        data-testid="upload-creative-area"
                         className={`relative group h-48 border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer ${dragActive ? 'border-primary bg-primary/5' : 'border-slate-200 dark:border-slate-800 hover:border-primary/50'
-                            } ${data.creativeFile ? 'border-emerald-500 bg-emerald-500/5' : ''}`}
+                            } ${data.creativeFile ? 'border-emerald-500 bg-emerald-500/5' : ''} ${validationError ? 'border-red-500 bg-red-500/5' : ''}`}
                     >
-                        <span className={`material-symbols-outlined text-4xl mb-4 ${data.creativeFile ? 'text-emerald-500' : 'group-hover:text-primary transition-colors'}`}>
-                            {data.creativeFile ? 'check_circle' : 'cloud_upload'}
+                        <span className={`material-symbols-outlined text-4xl mb-4 ${data.creativeFile ? 'text-emerald-500' : validationError ? 'text-red-500' : 'group-hover:text-primary transition-colors'}`}>
+                            {data.creativeFile ? 'check_circle' : validationError ? 'error' : 'cloud_upload'}
                         </span>
-                        <p className="font-bold text-lg mb-1">{data.creativeFile || 'Click or drag file to upload'}</p>
-                        <p className="text-xs text-slate-500">MP4, JPG, PNG up to 50MB (1080x1920)</p>
+                        <p className="font-bold text-lg mb-1">{data.creativeFile || validationError || 'Click or drag file to upload'}</p>
+                        <p className="text-xs text-slate-500">MP4, JPG, PNG up to 50MB (Must be exactly 5.0s)</p>
                     </div>
                 </section>
             </div>

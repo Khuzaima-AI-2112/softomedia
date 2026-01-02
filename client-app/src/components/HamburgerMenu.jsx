@@ -10,7 +10,8 @@ function HamburgerMenu() {
     const menuItems = [
         { label: 'Dashboard', path: `/dashboard/${user?.role || 'admin'}`, icon: 'dashboard' },
         { label: 'Ad Player', path: '/player', icon: 'play_circle' },
-        { label: 'System Health', path: '/dashboard/health', icon: 'health_metrics' },
+        ...(user?.role === 'admin' ? [{ label: 'System Health', path: '/dashboard/health', icon: 'health_metrics' }] : []),
+        ...(user?.role === 'retailer' ? [{ label: 'Schedule Manager', path: '/dashboard/retailer/schedule', icon: 'calendar_today' }] : []),
         { label: 'Settings', path: '#', icon: 'settings' },
     ];
 
@@ -90,6 +91,7 @@ function HamburgerMenu() {
                             key={item.label}
                             to={item.path}
                             onClick={() => setIsOpen(false)}
+                            data-testid={`nav-link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',

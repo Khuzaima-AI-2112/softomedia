@@ -147,5 +147,85 @@ Objectives: Document errors, bugs, and mistakes so we do not make them again.
   3. **Prefer `data-testid` over role+name** in tests for buttons containing icons
   4. **Audit before deploy**: Run `grep_search` for Material Icons inside `<button>` without `aria-hidden`
 
+### [2026-01-01] CI-Aware Pre-deployment Scripts
+- **Issue**: `verify_predeploy.js` failed in Cloud Build because it checked for a `dist/` folder that hadn't been built yet.
+- **Root Cause**: Scripts designed for local pre-commit or pre-push checks often assume a local build state that doesn't exist in early CI steps.
+- **Prevention**: Use environment variables (like `CI`, `PROJECT_ID`, or `BUILD_ID`) to detect the environment and skip local-only checks. Ensure `cloudbuild.yaml` passes these variables explicitly if they aren't available by default.
+
+### [2026-01-01] Cloud Run Public Access (IAM)
+- **Issue**: Deployment succeeded but the app returned "403 Forbidden" (error: 403 Forbidden - Access is forbidden to the requested page).
+- **Root Cause**: New Cloud Run services default to authenticated-only access if "Allow unauthenticated" isn't properly applied or if IAM policies are missing.
+- **Prevention**: Explicitly grant `roles/run.invoker` to `allUsers` for public-facing services using `gcloud run services add-iam-policy-binding`.
+
+### [2026-01-01] The "Admin SDK" False Sense of Security
+- **Issue**: Missing Firestore security rules because the server uses Admin SDK.
+- **Root Cause**: Assumption that server-side bypass makes rules unnecessary.
+- **Prevention**: Even with Admin SDK, define global "deny all" rules (`allow read, write: if false;`) to protect against direct client access or leaks.
+
+### [2026-01-01] Inefficient Counting in Firestore
+- **Issue**: `count()` implemented using `docs.length` after fetching all docs.
+- **Root Cause**: Using high-level abstraction (`findAll`) for a metadata query.
+- **Prevention**: Always use the native `.count()` aggregation query in Firestore Admin SDK for O(1)/O(log n) efficiency instead of O(n) client-side counting.
+
+### [2026-01-01] Pipeline "Glue" and Dynamic Configuration
+- **Issue**: Hardcoded service URLs in `cloudbuild.yaml` caused a brittle dependency between front-end and back-end deployments.
+- **Root Cause**: Manual inclusion of a specific URL for CORS whitelist.
+- **Prevention**: Use `gcloud` commands within build steps to dynamically retrieve service URLs (e.g., `gcloud run services describe ... --format='value(status.url)'`). This ensures the "glue" between components survives service renames or project migrations.
+
+### [2026-01-01] Domain-Driven Routing Consistency
+- **Issue**: Unused but existing API files in `src/api/` led to developer confusion and "dead code" risk.
+- **Root Cause**: Routes were being defined directly in `index.js` while "work-in-progress" files sat unmounted in the API directory.
+- **Prevention**: Always isolate route definitions into domain routers and mount them via a central index. Delete any API files that are not active in the production `index.js` to ensure the file system reflects the active application state.
+
+### [2026-01-01] Metadata-First Validation
+- **Issue**: Deep physical file validation (ffprobe) can be slow and add infrastructure complexity for early MVP.
+- **Root Cause**: Desire for strict compliance vs development speed.
+- **Prevention**: Use metadata-based validation for early iterations. Store duration, dimensions, and type in a JSON metadata field. This allows the UI and API to enforce strict rules (like the 5-second rule) instantly without waiting for expensive transcoding or inspection processes.
+
+### [2026-01-01] Multi-tenant Data Isolation in Repositories
+- **Issue**: Risk of "leaking" data between tenants if queries aren't scoped.
+- **Root Cause**: Generic `findAll` queries without entity filters.
+- **Prevention**: Standardize filter methods in repositories (e.g., `findByRetailer(id)`, `findByAdvertiser(id)`). In middleware, always extract the `linked_entity_id` from the auth token and pass it as a mandatory filter to these repo methods. Never trust a `tenant_id` passed via request body if it hasn't been validated against the user's allowed scope.
+
+### [2026-01-01] JSX Parsing Ambiguity with Operators
+- **Issue**: Using the less-than symbol `<` directly in JSX text (e.g., `< 2m`) can cause parser errors or linting warnings as it's mistaken for the start of a tag.
+- **Root Cause**: Ambiguity between character literals and tag delimiters.
+- **Prevention**: Always wrap comparison strings in curly braces as string literals: `{ '< 2m' }`.
+
+### [2026-01-01] Telemetry Enrichment at the Edge
+- **Issue**: Frontend dashboards struggle with performance when doing cross-tenant data joins for analytics.
+- **Root Cause**: Storing raw telemetry (Screen ID only) without environmental context.
+- **Prevention**: Enrich telemetry (heartbeats/impressions) at the API layer with `location_id` and `retailer_id` before saving. This enables O(1) clustering by location/retailer in the database, significantly speeding up both Tech Ops and Retailer analytics views.
+
+### [2026-01-01] Case-Insensitive UI Testing
+- **Issue**: Playwright tests fail when UI styling changes casing (e.g., "ADMIN" vs "Admin") even if text content is correct.
+- **Root Cause**: Reliance on exact string matching in `getByText`.
+- **Prevention**: Always use case-insensitive regex for text assertions: `getByText(/admin mode/i)`. This makes tests resilient to CSS-driven casing changes.
+
+### [2026-01-01] UI Handler Completeness
+- **Issue**: Instrumentalizing components with `data-testid` can reveal underlying bugs (e.g., missing `handleDrag` causing ReferenceError).
+- **Root Cause**: Incomplete implementation of UI event handlers.
+- **Prevention**: Ensure all bound handlers in JSX (onClick, onDrag, etc.) are at least defined as empty functions before adding test hooks or running E2E suites.
+
+### [2026-01-01] Refactoring Import Integrity
+- **Issue**: Bulk find/replace in test files can accidentally delete critical CJS/ESM imports (e.g., `test` from `@playwright/test`).
+- **Root Cause**: Over-aggressive pattern matching during bulk updates.
+- **Prevention**: Always verify the top of the file after bulk replacements. Tests will fail with `ReferenceError: test is not defined` if imports are lost.
+
+### [2026-01-01] Async Event-Loop Blockage (Firestore)
+- **Issue**: Backend server hung indefinitely during initialization in local/test environments.
+- **Root Cause**: Firestore Admin SDK connection attempts (even within try/catch) proved to be blocking the Node.js event loop when credentials were missing, causing cascading timeouts in Playwright tests.
+- **Prevention**: Explicitly gate cloud resource initialization. If `GOOGLE_APPLICATION_CREDENTIALS` is missing in non-production, return `null` immediately and fail-over to in-memory mocks to keep the event loop responsive.
+
+### [2026-01-01] Import Integrity in Seeding Services
+- **Issue**: Bulk database seeding intermittently failed with `ReferenceError`.
+- **Root Cause**: Missing imports for specific repositories (e.g., `screenRepository`) in `SeedService.js` after refactoring.
+- **Prevention**: Always verify the import block when adding new entity-types to a seeding service. Ensure the index export in `repositories/index.js` matches the usage in the service.
+
+### [2026-01-01] Data Truncation and Validation Locks
+- **Issue**: "Proceed" buttons in wizard flows remained disabled despite "correct" user input.
+- **Root Cause**: The underlying reference data (e.g., `timeSlots` array) was accidentally truncated during a UI edit, leaving the component with no valid options to select.
+- **Prevention**: Use unit tests or "Data Integrity" checks for static component data. Avoid bulk editing large arrays in JSX without verifying the start/end lines.
+
 ---
 *Note: This file is a permanent project record. Do not delete or purge entries.*

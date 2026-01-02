@@ -1,42 +1,31 @@
-// Firestore Database Initialization
-// Singleton pattern for Firestore instance
+﻿import { Firestore } from '@google-cloud/firestore';
+import logger from './logger.js';
 
-import { Firestore } from '@google-cloud/firestore';
+let db = null;
+let useMock = false;
 
-let firestoreInstance = null;
+export const getFirestore = () => {
+    if (db) return db;
 
-/**
- * Initialize and return Firestore instance
- * Uses singleton pattern to ensure only one connection
- */
-export function getFirestore() {
-    if (!firestoreInstance) {
-        const projectId = process.env.PROJECT_ID || 'softomedia-live2026';
+    try {
+        if (!process.env.GOOGLE_APPLICATION_CREDENTIALS && process.env.NODE_ENV !== 'production') {
+            logger.warn('No GOOGLE_APPLICATION_CREDENTIALS found. Using in-memory mock mode.');
+            useMock = true;
+            return null;
+        }
 
-        firestoreInstance = new Firestore({
-            projectId,
-            // In development, use emulator if FIRESTORE_EMULATOR_HOST is set
-            // In production, uses Application Default Credentials
+        db = new Firestore({
+            projectId: 'softomedia-live-2026',
+            keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+            retry: { retries: 1 }
         });
 
-        console.log(`[Firestore] Initialized for project: ${projectId}`);
-
-        // Log emulator usage in development
-        if (process.env.FIRESTORE_EMULATOR_HOST) {
-            console.log(`[Firestore] Using emulator at ${process.env.FIRESTORE_EMULATOR_HOST}`);
-        }
+        return db;
+    } catch (error) {
+        logger.error('Firestore initialization failed, switching to mock mode', { error: error.message });
+        useMock = true;
+        return null;
     }
+};
 
-    return firestoreInstance;
-}
-
-/**
- * Close Firestore connection (for graceful shutdown)
- */
-export async function closeFirestore() {
-    if (firestoreInstance) {
-        await firestoreInstance.terminate();
-        firestoreInstance = null;
-        console.log('[Firestore] Connection closed');
-    }
-}
+export const isMockMode = () => useMock;

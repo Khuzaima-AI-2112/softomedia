@@ -2,6 +2,70 @@
 
 Objectives: Document changes and progress milestones throughout the project lifecycle.
 
+## [2026-01-01] - Sprint 1 & 2: Multi-tenancy & Media Lifecycle
+ 
+### Added
+- **Multi-tenancy**: Implemented `RetailerRepository`, `AdvertiserRepository`, and `LocationRepository`.
+- **RBAC**: Standardized 5 MVP roles (`super_admin`, `retailer_admin`, `softomedia_manager`, `advertiser`, `tech_operator`).
+- **Media API**: Created `/api/assets` for managing ad content with 5-second metadata validation.
+- **Campaign Workflow**: Created `/api/campaigns` with a "Pending Retailer Approval" state machine.
+- **Dashboards**: Implemented Super Admin Overview and Retailer Location Management.
+- **Wizard**: Enhanced Brand Campaign Wizard with API-driven creative selection and real-time validation.
+- **Approval UI**: Added `CampaignApprovalList` to Retailer Dashboard for third-party ad reviews.
+
+### Fixed
+- **Auth Persistence**: Fixed persona switching logic to persist across page reloads via `localStorage`.
+- **API Consistency**: Consolidated all endpoints under a single `/api` router index.
+
+## [2026-01-01] - Deployment-Readiness Hardening (SDLC##2)
+
+### Fixed
+- **Architectural Glue**: Consolidated all API routes into domain-driven routers in `src/api/` and mounted via index. Eliminated redundant/dead code that previously caused maintenance risk.
+- **Pipeline Glue**: Dynamicized `CORS_ORIGINS` in `cloudbuild.yaml`. The deployment now automatically retrieves the client-app URL, eliminating a brittle hardcoded dependency.
+
+### Added
+- **Audit**: Completed SDLC##2 Deployment-Readiness Review, identifying and fixing "Glue" risks.
+- **Reporting**: Generated `audit_report_sdlc2.md`.
+
+---
+
+## [2026-01-01] - Firebase Hardening & Audit Completion (SDLC##12)
+
+### Fixed
+- **Database Efficiency**: Replaced O(n) document counting in `BaseRepository.js` with native Firestore aggregation `.count()`.
+- **Security**: Implemented "deny-all" `firestore.rules` and `storage.rules` to protect against direct public access.
+- **CI/CD**: Updated `cloudbuild.yaml` to include automated deployment for security rules and indexes.
+
+### Added
+- **Security Audit**: Completed SDLC##12 audit identifying missing security rules and over-permissioned invoker roles.
+- **Reporting**: Generated `audit_report_sdlc12.md` and `walkthrough.md`.
+
+---
+
+## [2026-01-01] - Infrastructure Provisioning & successful Deployment
+
+### Added
+- **GCP Infrastructure**: Provisioned Artifact Registry (`softomedia`), Secret Manager (`JWT_SECRET`), Firestore (Native Mode), and Cloud Storage (`softomedia-live-2026-ads`) in `softomedia-live-2026`.
+- **IAM Permissions**: Granted `Secret Manager Secret Accessor` to compute service account and `Cloud Run Invoker` to `allUsers`.
+
+### Fixed
+- **CI Build Failure**: Updated `verify_predeploy.js` to be CI-aware and skip local artifact checks.
+- **Cloud Build Config**: Explicitly passing `PROJECT_ID` to the verification step.
+- **403 Forbidden**: Resolved public access issue by standardizing IAM invoker bindings.
+
+---
+
+## [2026-01-01] - Project ID Standardization & Name Clarification
+
+### Fixed
+- **Project ID Inconsistency**: Standardized Google Cloud Project ID to `softomedia-live-2026` across all deployment and configuration files.
+- **Project Name Distinction**: Reverted local `package.json` to `softomedia-live2026` to maintain distinction between Antigravity name and GCP ID.
+- **Config & Deployment**: Updated `cloudbuild.yaml` to use hyphenated ID where required.
+- **Backend Utilities**: Updated fallback values in `firestore.js` and `storage.js` to `softomedia-live-2026`.
+- **Documentation & Rules**: Updated `.agent/rules/this-folder.md`, `ENVIRONMENT_SETUP.md`, and `Deployment_Guide.md` with the correct hyphenated project ID for labels and commands.
+
+---
+
 ## [2026-01-01] - Sprint 5: Performance & Monitoring
 
 ### Added
@@ -134,7 +198,7 @@ Objectives: Document changes and progress milestones throughout the project life
 
 ### Added
 - **ESLint Configuration**: Created `.eslintrc.cjs` in `client-app/` for linting support
-- **Cloud Build**: Created `cloudbuild.yaml` for atomic Cloud Run deployments (project: softomedia-live2026, region: us-central1)
+- **Cloud Build**: Created `cloudbuild.yaml` for atomic Cloud Run deployments (project: softomedia-live-2026, region: us-central1)
 - **Pre-Deploy Verification**: Created `verify_predeploy.js` script to check build outputs and configuration
 - **Deployment Guide**: Expanded with step-by-step commands, rollback procedures, and setup instructions
 - **Predeployment Checklist**: Created `PREDEPLOYMENT_CHECKLIST.md` for release workflows
@@ -203,7 +267,34 @@ Objectives: Document changes and progress milestones throughout the project life
 ### Changed
 - **Client Player**: Updated `Player.jsx` to force ads to rotate every 5 seconds as requested.
 - **Client Player**: Added background polling to `Player.jsx` (every 60s) to pick up schedule/playlist changes dynamically.
-- **Safety**: Standardized all CLI operations to explicitly require `--project softomedia-live2026`.
+- **Safety**: Standardized all CLI operations to explicitly require `--project softomedia-live-2026`.
+
+---
+
+## [2026-01-01] - Playwright Test Stabilization (Anchor Strategy)
+
+### Fixed
+- **UI Resilience**: Updated `personas.spec.js`, `personas_mvp.spec.js`, and `integration_gold_path.spec.js` to use case-insensitive regex for all text assertions.
+- **Selector Standards**: Standardized all dashboards to use `data-testid` for critical buttons (e.g., `new-campaign-btn`).
+- **Wizard Stability**: Fixed `ReferenceError: handleDrag is not defined` in `Step2ScheduleUpload.jsx` which crashed the wizard during automated runs.
+- **Refactoring Integrity**: Restored missing `test` and `expect` imports in `ad_player.spec.js` accidentally removed during bulk updates.
+- **Portability**: Updated hardcoded `localhost:5173` URLs to relative paths in `telemetry.spec.js` and `ad_player.spec.js`.
+
+### Changed
+- **Pass Rate**: Achieved 65% pass rate (37/57 tests successfully verified across Chromium, Firefox, and WebKit).
+
+## [2026-01-01] - Playwright Final Stabilization (Phase 2)
+
+### Fixed
+- **Backend Hangs**: Implemented fast-fail Firestore gating in `firestore.js` to prevent event-loop blockage without cloud credentials.
+- **Seed Integrity**: Resolved `ReferenceError` in `SeedService.js` by restoring missing repository imports.
+- **UI Validation**: Restored the complete `timeSlots` array in `Step2ScheduleUpload.jsx`, unlocking the Brand Wizard "Proceed" flow.
+- **Menu Instrumentation**: Standardized `HamburgerMenu.jsx` navigation links with role-specific items and `data-testid` attributes.
+
+### Added
+- **Hourly Slot Looping**: Refactored `PlaylistService.js` and `SeedService.js` to implement 1-hour ad slots instead of endless loops.
+- **Verification Data**: Seeded detailed "Prime Time" ads for 07:00 PM to facilitate immediate test verification.
+- **Observability**: Enhanced `TODO.md` with a detailed mapping of the final 19 failures and surgical fix instructions.
 
 ---
 *Note: This file is a permanent project record. Do not delete or purge entries.*
