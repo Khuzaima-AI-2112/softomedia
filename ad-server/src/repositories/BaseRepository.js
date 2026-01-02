@@ -3,6 +3,7 @@
 
 import { getFirestore } from '../utils/firestore.js';
 import logger from '../utils/logger.js';
+import { CircuitBreaker } from '../utils/ResilienceUtility.js';
 
 // In-memory store for fallback
 const MOCK_STORAGE = {};
@@ -11,6 +12,11 @@ export class BaseRepository {
     constructor(collectionName) {
         this.collectionName = collectionName;
         this.db = getFirestore();
+        this.breaker = new CircuitBreaker(`Firestore:${collectionName}`, {
+            failureThreshold: 3,
+            resetTimeoutMs: 60000 // 1 minute
+        });
+
         if (!MOCK_STORAGE[collectionName]) {
             MOCK_STORAGE[collectionName] = new Map();
         }
@@ -30,11 +36,15 @@ export class BaseRepository {
 
         try {
             if (this.collection) {
-                await this.collection.doc(id).set(docData);
+                await this.breaker.execute(() => this.collection.doc(id).set(docData));
             }
         } catch (e) {
-            logger.error(`Create failed for ${this.collectionName}`, { error: e.message, id });
-            // Fallback to memory
+            logger.error(`Create failed for ${this.collectionName}`, {
+                error: e.message,
+                id,
+                breaker_state: this.breaker.state
+            });
+            // Fallback to memory is handled outside the catch or by continuing
         }
 
         MOCK_STORAGE[this.collectionName].set(id, docData);
@@ -44,11 +54,11 @@ export class BaseRepository {
     async findById(id) {
         try {
             if (this.collection) {
-                const doc = await this.collection.doc(id).get();
+                const doc = await this.breaker.execute(() => this.collection.doc(id).get());
                 if (doc.exists) return { id: doc.id, ...doc.data() };
             }
         } catch (e) {
-            // Fallback
+            // Fallback to memory
         }
         return MOCK_STORAGE[this.collectionName].get(id) || null;
     }
@@ -64,12 +74,12 @@ export class BaseRepository {
                         query = query.where(field, op, value);
                     });
                 }
-                const snapshot = await query.get();
+                const snapshot = await this.breaker.execute(() => query.get());
                 results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 if (results.length > 0) return results;
             }
         } catch (e) {
-            // Fallback
+            // Fallback to memory
         }
 
         // Memory Fallback
@@ -93,10 +103,10 @@ export class BaseRepository {
 
         try {
             if (this.collection) {
-                await this.collection.doc(id).update(updateData);
+                await this.breaker.execute(() => this.collection.doc(id).update(updateData));
             }
         } catch (e) {
-            // Fallback
+            // Fallback to memory
         }
 
         MOCK_STORAGE[this.collectionName].set(id, updateData);
@@ -105,9 +115,15 @@ export class BaseRepository {
 
     async delete(id) {
         try {
-            if (this.collection) await this.collection.doc(id).delete();
+            if (this.collection) {
+                await this.breaker.execute(() => this.collection.doc(id).delete());
+            }
         } catch (e) {
-            logger.error(`Delete failed for ${this.collectionName}`, { error: e.message, id });
+            logger.error(`Delete failed for ${this.collectionName}`, {
+                error: e.message,
+                id,
+                breaker_state: this.breaker.state
+            });
         }
         MOCK_STORAGE[this.collectionName].delete(id);
         return true;
@@ -122,11 +138,15 @@ export class BaseRepository {
                         query = query.where(field, op, value);
                     });
                 }
-                const snapshot = await query.count().get();
+                const snapshot = await this.breaker.execute(() => query.count().get());
                 return snapshot.data().count;
             }
         } catch (e) {
-            logger.error(`Count failed for ${this.collectionName}`, { error: e.message, options });
+            logger.error(`Count failed for ${this.collectionName}`, {
+                error: e.message,
+                options,
+                breaker_state: this.breaker.state
+            });
         }
 
         // Memory Fallback

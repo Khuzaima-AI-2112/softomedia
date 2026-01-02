@@ -277,6 +277,16 @@ Objectives: Document errors, bugs, and mistakes so we do not make them again.
 - **Root Cause**: Mixing business logic (state transitions) with data access (CRUD).
 - **Prevention**: Use a dedicated `Service` layer (e.g., `CampaignService`) to orchestrate multi-step processes like status transitions and secondary document generation. This keeps repositories lean and focused on I/O.
 
+### [2026-01-02] Circuit Breaker Calibration
+- **Issue**: Transient Firestore timeouts can block the entire event loop if many requests wait for the same failing resource.
+- **Root Cause**: Lack of fail-fast mechanisms for external dependencies.
+- **Prevention**: Implement a Circuit Breaker for every external resource. This prevents resource exhaustion by failing fast after a threshold (e.g., 3 failures) and allows the system to recover during the "HALF_OPEN" window.
+
+### [2026-01-02] Retry with Jitter
+- **Issue**: Simultaneous retries from multiple clients/services can overload a recovering database.
+- **Root Cause**: Fixed-interval retries creating "spikes" of traffic.
+- **Prevention**: Always use exponential backoff with random jitter. This spreads out the retry load over time, increasing the chance of successful recovery for the target system.
+
 ---
 *Note: This file is a permanent project record. Do not delete or purge entries.*
 

@@ -2,6 +2,16 @@
 
 Objectives: Document changes and progress milestones throughout the project lifecycle.
 
+## [2026-01-02] - Phase 3: Production Resilience (SDLC##10)
+
+### Added
+- **Resilience Engine**: Created `ResilienceUtility.js` with Exponential Retry (with jitter) and Circuit Breaker patterns.
+- **Fault-Tolerant Repositories**: Integrated Circuit Breakers into `BaseRepository` to isolate Firestore failures and force graceful fallback to memory.
+- **Deep Health Diagnostics**: Extended `/api/health/v2` to report on circuit breaker states and dependency connectivity.
+
+### Changed
+- **Hardened Background Jobs**: Added retry logic to `BackupService` to handle transient GCS/Firestore initiation errors.
+
 ## [2026-01-02] - Phase 2: API Contract & Integration (SDLC##7)
 
 ### Added

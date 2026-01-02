@@ -13,21 +13,24 @@ router.get('/v2', async (req, res) => {
     try {
         const uptime = Math.floor((new Date() - START_TIME) / 1000);
 
-        // Simple integrity check: ensure we have data in key collections
-        const screenCount = await screenRepository.count();
-        const adCount = await adRepository.count();
+        // Gather breaker stats from primary repositories
+        const breakers = [
+            screenRepository.breaker.getHealth(),
+            adRepository.breaker.getHealth()
+        ];
+
+        const isAnyBreakerOpen = breakers.some(b => b.state === 'OPEN');
 
         res.json({
-            status: 'healthy',
-            version: '1.1.0-mvp',
+            status: isAnyBreakerOpen ? 'degraded' : 'healthy',
+            version: '1.2.0-resilient',
             uptime: `${uptime}s`,
             timestamp: new Date().toISOString(),
             diagnostics: {
                 memory: process.memoryUsage(),
                 persistence: {
-                    mode: screenRepository.db ? 'firestore' : 'in-memory-fallback',
-                    screens_detected: screenCount,
-                    ads_active: adCount
+                    mode: screenRepository.db ? 'firestore' : 'mock',
+                    breakers
                 }
             },
             environment: process.env.NODE_ENV || 'development'

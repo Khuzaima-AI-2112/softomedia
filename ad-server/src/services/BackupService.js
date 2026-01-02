@@ -1,5 +1,6 @@
 import { getFirestore } from '../utils/firestore.js';
 import logger from '../utils/logger.js';
+import { withRetry } from '../utils/ResilienceUtility.js';
 
 export class BackupService {
     /**
@@ -14,17 +15,14 @@ export class BackupService {
         }
 
         try {
-            const client = db._firestoreClient || db.client; // Handle different SDK versions
             const databasePath = `projects/softomedia-live-2026/databases/(default)`;
-
             logger.info('Starting Firestore backup', { bucket, databasePath });
 
-            // Using the admin client to trigger export
-            // Note: This requires roles/datastore.importExportAdmin
-            const [operation] = await db.exportDocuments({
+            // Using withRetry to handle transient initiation failures
+            const [operation] = await withRetry(() => db.exportDocuments({
                 outputUriPrefix: `gs://${bucket}`,
                 collectionIds: [] // Export all
-            });
+            }), { maxRetries: 2, baseDelayMs: 500 });
 
             logger.info('Firestore backup operation started', { operationId: operation.name });
             return {
