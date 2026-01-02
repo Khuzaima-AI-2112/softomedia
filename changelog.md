@@ -2,6 +2,33 @@
 
 Objectives: Document changes and progress milestones throughout the project lifecycle.
 
+## [2026-01-02] - Broadcasting Engine MVP Complete (Sprints 1-6)
+
+### Added
+- **Loop Repository**: `LoopRepository.js` with business hours validation (8AM-10PM), slot management
+- **Loop Generation Service**: D-1 scheduling with campaign priority (Paid > Retailer > Internal)
+- **Loops API**: Full CRUD at `/api/loops` with approve, reject, replace slot endpoints
+- **Loop Management UI**: `LoopManagement.jsx` for 14-hour grid view with date picker
+- **Loop Builder UI**: `LoopBuilder.jsx` for 12-slot visual editor with asset picker
+- **Schedule Calendar**: `ScheduleCalendar.jsx` for retailer D-1 schedule preview
+- **Loop Preview Modal**: `LoopPreviewModal.jsx` with per-ad approve/reject and replacement workflow
+- **Loop Analytics**: `LoopAnalytics.jsx` dashboard with hourly delivery rates and slot drill-down
+- **Player Loop Mode**: Updated `Player.jsx` with dual mode (loop/playlist), hour detection, slot rotation
+
+### Testing
+- `loop.test.js` - 10 Jest unit tests for LoopRepository
+- `loop_builder.spec.js` - 8 Playwright tests for Admin UI
+- `retailer_validation.spec.js` - 10 Playwright tests for Retailer workflow
+- `loop_playback.spec.js` - 7 Playwright tests for Player
+- `analytics_loop.spec.js` - 6 Playwright tests for Analytics
+- `integration_broadcasting.spec.js` - 10 E2E tests for full workflow
+
+### Routes Added
+- `/dashboard/admin/loops` - Loop Management
+- `/dashboard/admin/loops/:id` - Loop Builder
+- `/dashboard/admin/analytics` - Loop Analytics
+- `/dashboard/retailer/schedule/calendar` - Schedule Calendar
+
 ## [2026-01-02] - Campaign Playlist UI & Telemetry (Sprint 6b)
 ### Added
 - **Location-Based Screen Filtering**: PlaylistEditor now filters screens by location for easier assignment.

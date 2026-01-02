@@ -1,46 +1,105 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { API_URL } from '../config.js'
 import { telemetryService } from '../services/TelemetryService.js'
+
+// Business hours configuration for loop playback
+const BUSINESS_HOURS = { START: 8, END: 22 };
+
+// Get current hour in business hours context
+const getCurrentHour = () => new Date().getHours();
+
+// Check if current time is within business hours
+const isBusinessHours = () => {
+    const hour = getCurrentHour();
+    return hour >= BUSINESS_HOURS.START && hour < BUSINESS_HOURS.END;
+};
+
+// Get today's date in YYYY-MM-DD format
+const getTodayDate = () => new Date().toISOString().split('T')[0];
 
 function Player() {
     const [searchParams] = useSearchParams()
     const [screenId, setScreenId] = useState(null)
     const [status, setStatus] = useState('initializing')
-    const [screenData, setScreenData] = useState(null) // This state is no longer used in the final render, but kept for consistency with the original code's declaration.
+    const [screenData, setScreenData] = useState(null)
+
+    // Loop-based playback state
+    const [playbackMode, setPlaybackMode] = useState('playlist') // 'loop' | 'playlist'
+    const [currentLoop, setCurrentLoop] = useState(null)
+    const [currentHour, setCurrentHour] = useState(getCurrentHour())
+
+    // Playlist fallback state
     const [playlist, setPlaylist] = useState([])
     const [playlistMeta, setPlaylistMeta] = useState({ source: 'unknown', id: null })
     const [currentAdIndex, setCurrentAdIndex] = useState(0)
+    const [currentSlotIndex, setCurrentSlotIndex] = useState(0)
 
-    // Playlist Polling (Every 60 seconds)
+    // Fetch loop for current hour
+    const fetchCurrentLoop = useCallback(async (screenId) => {
+        if (!isBusinessHours()) {
+            console.log('[Player] Outside business hours, using playlist fallback');
+            return null;
+        }
+
+        try {
+            const date = getTodayDate();
+            const hour = getCurrentHour();
+            const res = await fetch(`${API_URL}/api/loops?date=${date}`);
+            const data = await res.json();
+
+            // Find approved loop for current hour
+            const loop = (data.loops || []).find(l =>
+                l.hour === hour && l.status === 'APPROVED'
+            );
+
+            if (loop && loop.slots && loop.slots.length > 0) {
+                console.log(`[Player] Found approved loop for ${hour}:00`, loop.id);
+                return loop;
+            }
+        } catch (e) {
+            console.error('[Player] Loop fetch failed', e);
+        }
+        return null;
+    }, []);
+
+    // Hour change detection
     useEffect(() => {
-        if (!screenId) return;
-
-        const fetchPlaylist = async (id) => {
-            try {
-                const res = await fetch(`${API_URL}/api/playlist/${id}`);
-                const data = await res.json();
-                if (data.playlist && data.playlist.length > 0) {
-                    setPlaylist(data.playlist);
-                    setPlaylistMeta({ source: data.source || 'assigned', id: data.playlist_id || data.id });
-                    // Don't reset currentAdIndex to avoid visual jumps on refresh
-                    if (status !== 'playing') setStatus('playing');
-                } else if (status !== 'no_content') {
-                    setStatus('no_content');
-                }
-            } catch (e) {
-                console.error('Playlist poll failed', e);
+        const checkHourChange = () => {
+            const newHour = getCurrentHour();
+            if (newHour !== currentHour) {
+                console.log(`[Player] Hour changed: ${currentHour} → ${newHour}`);
+                setCurrentHour(newHour);
+                setCurrentSlotIndex(0); // Reset to first slot
             }
         };
 
-        const pollInterval = setInterval(() => {
-            fetchPlaylist(screenId);
-        }, 60000); // 60s background refresh
+        const interval = setInterval(checkHourChange, 10000); // Check every 10s
+        return () => clearInterval(interval);
+    }, [currentHour]);
 
-        return () => clearInterval(pollInterval);
-    }, [screenId, status]);
-
+    // Fetch loop when hour changes
     useEffect(() => {
+        if (!screenId) return;
+
+        const loadLoop = async () => {
+            const loop = await fetchCurrentLoop(screenId);
+            if (loop) {
+                setCurrentLoop(loop);
+                setPlaybackMode('loop');
+                setStatus('playing');
+            } else {
+                // Fallback to playlist
+                setPlaybackMode('playlist');
+            }
+        };
+
+        loadLoop();
+    }, [screenId, currentHour, fetchCurrentLoop]);
+
+    // Playlist Polling Fallback (Every 60 seconds)
+    useEffect(() => {
+        if (!screenId || playbackMode === 'loop') return;
         const id = searchParams.get('screen_id') || 'demo-screen-01'
         setScreenId(id)
 
@@ -138,15 +197,14 @@ function Player() {
         return () => clearInterval(interval);
     }, [screenId]);
 
-    // Playback Loop
+    // Playback Loop (Playlist Mode)
     useEffect(() => {
-        if (status !== 'playing' || !playlist || playlist.length === 0) return;
+        if (status !== 'playing' || playbackMode !== 'playlist' || !playlist || playlist.length === 0) return;
 
         const currentAd = playlist[currentAdIndex];
         const duration = (currentAd.duration || 5) * 1000;
 
         const recordImpression = (ad) => {
-            // Batch Audit Trail (High Reliability)
             telemetryService.trackImpression({
                 screenId,
                 campaignId: ad.campaign_id || ad.id,
@@ -155,9 +213,6 @@ function Player() {
                 source: playlistMeta.source,
                 playlistId: playlistMeta.id
             });
-
-            // Note: We removed the direct 'sendTelemetry' call for impressions 
-            // to avoid "Chatty API" per architectural decision 2026-01-02.
         };
 
         recordImpression(currentAd);
@@ -167,18 +222,81 @@ function Player() {
         }, duration);
 
         return () => clearTimeout(timer);
-    }, [status, playlist, currentAdIndex, screenId]);
+    }, [status, playbackMode, playlist, currentAdIndex, screenId, playlistMeta]);
 
-    // Current Ad Render
-    const activeAd = playlist ? playlist[currentAdIndex] : null;
+    // Loop Slot Playback (Loop Mode - Sprint 4)
+    useEffect(() => {
+        if (status !== 'playing' || playbackMode !== 'loop' || !currentLoop) return;
 
-    if (status === 'playing' && activeAd) {
+        const slots = currentLoop.slots || [];
+        if (slots.length === 0) return;
+
+        const currentSlot = slots[currentSlotIndex];
+        const duration = (currentSlot?.duration || 5) * 1000;
+
+        // Record proof-of-play telemetry with loop context
+        telemetryService.trackImpression({
+            screenId,
+            campaignId: currentSlot?.campaign_id,
+            mediaId: currentSlot?.asset_id,
+            duration: currentSlot?.duration || 5,
+            source: 'loop',
+            playlistId: currentLoop.id,
+            // Loop-specific telemetry fields
+            loopId: currentLoop.id,
+            loopHour: currentLoop.hour,
+            slotPosition: currentSlotIndex
+        });
+
+        logTelemetryEvent('LOOP_SLOT_PLAY', {
+            loopId: currentLoop.id,
+            hour: currentLoop.hour,
+            slotPosition: currentSlotIndex,
+            assetId: currentSlot?.asset_id
+        });
+
+        const timer = setTimeout(() => {
+            setCurrentSlotIndex((prev) => (prev + 1) % slots.length);
+        }, duration);
+
+        return () => clearTimeout(timer);
+    }, [status, playbackMode, currentLoop, currentSlotIndex, screenId]);
+
+    // Current content to display
+    const getActiveContent = () => {
+        if (playbackMode === 'loop' && currentLoop) {
+            const slot = currentLoop.slots?.[currentSlotIndex];
+            if (slot?.asset_id) {
+                return {
+                    url: slot.url || `${API_URL}/api/assets/${slot.asset_id}`,
+                    title: slot.asset_name || `Slot ${currentSlotIndex + 1}`,
+                    duration: slot.duration || 5,
+                    isLoop: true,
+                    loopHour: currentLoop.hour,
+                    slotPosition: currentSlotIndex
+                };
+            }
+        }
+
+        if (playlist && playlist[currentAdIndex]) {
+            return {
+                ...playlist[currentAdIndex],
+                isLoop: false
+            };
+        }
+
+        return null;
+    };
+
+    const activeContent = getActiveContent();
+
+    if (status === 'playing' && activeContent) {
         return (
             <div style={{ width: '100vw', height: '100vh', backgroundColor: 'black', overflow: 'hidden' }}>
                 <img
                     data-testid="ad-image"
-                    src={activeAd.url}
-                    alt={activeAd.title}
+                    src={activeContent.url}
+                    alt={activeContent.title}
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
                 {/* Debug overlay */}
@@ -186,8 +304,31 @@ function Player() {
                     data-testid="ad-debug-overlay"
                     style={{ position: 'absolute', bottom: 10, right: 10, background: 'rgba(0,0,0,0.5)', color: 'white', padding: 5, fontSize: 10 }}
                 >
-                    {activeAd.title} | {activeAd.duration}s
+                    {activeContent.isLoop ? (
+                        <span>🔄 Loop {activeContent.loopHour}:00 | Slot {activeContent.slotPosition + 1}/12 | {activeContent.duration}s</span>
+                    ) : (
+                        <span>{activeContent.title} | {activeContent.duration}s</span>
+                    )}
                 </div>
+                {/* Loop indicator */}
+                {activeContent.isLoop && (
+                    <div
+                        data-testid="loop-indicator"
+                        style={{
+                            position: 'absolute',
+                            top: 10,
+                            left: 10,
+                            background: 'rgba(59,130,246,0.8)',
+                            color: 'white',
+                            padding: '4px 12px',
+                            borderRadius: 20,
+                            fontSize: 12,
+                            fontWeight: 'bold'
+                        }}
+                    >
+                        LOOP MODE • {currentLoop?.hour}:00
+                    </div>
+                )}
             </div>
         );
     }

@@ -13,6 +13,12 @@
 
 ### Critical Test Failures
 - [x] Fix failing Playwright tests (standardized on `data-testid`)
+- [ ] **Broadcasting Engine Baseline**: Stabilize the 10 failing tests identified in the full integration run (`loop_playback.spec.js` timeouts).
+
+### Broadcasting Engine MVP Maintenance
+- [ ] **Real Analytics API**: Replace mock data in `LoopAnalytics.jsx` with actual Firestore aggregation.
+- [ ] **Replacement Automation**: Implement the "2-hour auto-placeholder" logic for rejected ads.
+- [ ] **Campaign Prioritization Audit**: Verify `LoopGenerationService` correctly handles edge cases where zero Paid ads exist.
 
 ---
 

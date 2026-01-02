@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Architectural Overview | SoftoMedia</title>
+    <!-- Tufte CSS via CDN for reliability and high-quality typography -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tufte-css/1.8.0/tufte.min.css" />
+    <style>
+        body {
+            width: 90%;
+            max-width: 1200px;
+            padding-left: 5%;
+        }
+
+        section {
+            padding: 2rem 0;
+            border-bottom: 1px solid #efefef;
+        }
+
+        .epigraph {
+            font-style: italic;
+            margin-bottom: 2rem;
+        }
+
+        .epigraph blockquote {
+            border: none;
+            font-size: 1.1rem;
+        }
+
+        .epigraph footer {
+            font-style: normal;
+            text-align: right;
+        }
+
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        figure {
+            margin: 2rem 0;
+        }
+
+        .fullwidth {
+            width: 140%;
+            max-width: 140%;
+            margin-left: -20%;
+        }
+
+        @media (max-width: 760px) {
+            .fullwidth {
+                width: 100%;
+                margin-left: 0;
+            }
+        }
+
+        .gcp-service {
+            color: #4285F4;
+            font-weight: 500;
+        }
+
+        .component {
+            color: #34A853;
+            font-weight: 500;
+        }
+
+        table {
+            font-size: 0.9rem;
+        }
+
+        code {
+            background: #f4f4f4;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+
+<body>
+    <article>
+        <h1>Architectural Overview</h1>
+        <p class="subtitle">SoftoMedia Digital Signage Platform MVP</p>
+
+        <section>
+            <h2>Executive Summary</h2>
+            <p>
+                The SoftoMedia platform is a hybrid retail-media ecosystem designed to manage and monetize digital
+                screens across retail locations.
+                Built on a scalable, cloud-native architecture, the system orchestrates content delivery via an <span
+                    class="component">hourly loop scheduling logic</span>,
+                ensuring predictable ad rotation while maintaining retailer control through a mandatory validation
+                workflow.
+                <span class="marginnote">
+                    The platform is co-owned by SoftoMedia (Platform Operator) and its retail partners (Real-estate
+                    Hosts).
+                </span>
+            </p>
+            <p>
+                Key technical goals include high availability for screen playback, automated quality gates for
+                deployments,
+                and granular telemetry for proof-of-play attribution.
+            </p>
+        </section>
+
+        <section>
+            <h2>User Personas & Governance</h2>
+            <p>
+                The platform supports five core roles, each with distinct access levels and responsibilities:
+            </p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Role</th>
+                        <th>Responsibility</th>
+                        <th>Key Capabilities</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Super Admin</td>
+                        <td>Platform Governance</td>
+                        <td>Account management, global config, prioritization rules.</td>
+                    </tr>
+                    <tr>
+                        <td>Retailer Admin</td>
+                        <td>Host Management</td>
+                        <td>Content validation, store profiles, local campaign execution.</td>
+                    </tr>
+                    <tr>
+                        <td>Campaign Manager</td>
+                        <td>Operations</td>
+                        <td>Playlist building, asset management, scheduling orchestration.</td>
+                    </tr>
+                    <tr>
+                        <td>Advertiser</td>
+                        <td>Monetization</td>
+                        <td>Creative upload, targeting request, performance tracking.</td>
+                    </tr>
+                    <tr>
+                        <td>Technical Operator</td>
+                        <td>SRE / Ops</td>
+                        <td>Device provisioning, health monitoring, remote diagnostics.</td>
+                    </tr>
+                </tbody>
+            </table>
+            <span class="marginnote">
+                Role-Based Access Control (RBAC) is enforced at the API layer via JWT tokens and Firestore security
+                rules.
+            </span>
+        </section>
+
+        <section>
+            <h2>Google Cloud Ecosystem</h2>
+            <p>
+                The infrastructure leverages Google Cloud Project <code class="gcp-service">softomedia-live-2026</code>
+                for all managed services,
+                minimizing operational overhead while maximizing scalability.
+            </p>
+            <figure class="fullwidth">
+                <svg viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Layer: Delivery -->
+                    <rect x="50" y="50" width="700" height="80" rx="10" fill="#f8f9fa" stroke="#dee2e6" />
+                    <text x="400" y="35" text-anchor="middle" font-size="14" font-weight="bold">Deployment & CI/CD
+                        Layer</text>
+                    <text x="400" y="100" text-anchor="middle" font-size="12">Cloud Build + Artifact Registry + Cloud
+                        Run</text>
+
+                    <!-- Layer: Compute & Storage -->
+                    <rect x="50" y="150" width="340" height="200" rx="10" fill="#e8f0fe" stroke="#4285F4" />
+                    <text x="220" y="140" text-anchor="middle" font-size="14" font-weight="bold">Compute & API</text>
+                    <text x="220" y="200" text-anchor="middle" font-size="12">Cloud Run (Ad Server)</text>
+                    <text x="220" y="230" text-anchor="middle" font-size="12">Cloud Run (Client App)</text>
+
+                    <rect x="410" y="150" width="340" height="200" rx="10" fill="#e6f4ea" stroke="#34A853" />
+                    <text x="580" y="140" text-anchor="middle" font-size="14" font-weight="bold">Data & Assets</text>
+                    <text x="580" y="200" text-anchor="middle" font-size="12">Cloud Firestore (State)</text>
+                    <text x="580" y="230" text-anchor="middle" font-size="12">Cloud Storage (Media)</text>
+                </svg>
+                <figcaption>Simplified Cloud Infrastructure Diagram</figcaption>
+            </figure>
+            <p>
+                The <code class="gcp-service">Cloud Build</code> pipeline enforces custom quality gates, including:
+            <ul>
+                <li>Linting and Unit Testing (Vitest/Jest)</li>
+                <li>Coverage Threshold Enforcement</li>
+                <li>Playwright E2E "Gold Path" Verification</li>
+            </ul>
+            <span class="marginnote">
+                All deployments are immutable container images hosted in Artifact Registry.
+            </span>
+            </p>
+        </section>
+
+        <section>
+            <h2>Component Deep Dive</h2>
+            <h3>Ad Server (Backend)</h3>
+            <p>
+                A Node.js/Express service responsible for business logic, security, and scheduling.
+                It implements a <span class="component">Repository Pattern</span> for data access and a dedicated
+                <span class="component">Loop Generation Service</span> for D-1 scheduling.
+            </p>
+            <span class="marginnote">
+                Key Dependencies: <code>@google-cloud/firestore</code>, <code>jsonwebtoken</code>, <code>multer</code>
+                (for asset uploads).
+            </span>
+
+            <h3>Client App (Frontend)</h3>
+            <p>
+                A Vite-powered React application with a dual-persona design:
+            <ol>
+                <li><strong>Dashboard:</strong> Admin/Retailer interface using Tailwind CSS and Lucide icons.</li>
+                <li><strong>Player:</strong> Lightweight, robust playback engine with offline fallback and real-time
+                    telemetry buffering.</li>
+            </ol>
+            </p>
+        </section>
+
+        <section>
+            <h2>The "Golden Circle" of Operations</h2>
+            <p>
+                Broadcast reliability is ensured through a three-step cycle:
+            </p>
+            <ol>
+                <li><strong>Generation:</strong> Loops are generated daily at 00:00 for the following day (D+1).</li>
+                <li><strong>Validation:</strong> Retailers preview and approve schedules via the dashboard.</li>
+                <li><strong>Orchestration:</strong> Screens poll the API, download assets to local storage, and execute
+                    the loop.</li>
+            </ol>
+            <span class="marginnote">
+                Playback telemetry is buffered in <code>localStorage</code> and uploaded in batches to prevent data loss
+                during connectivity drops.
+            </span>
+        </section>
+
+        <footer>
+            <p>Confidential Architectural Document | SoftoMedia Live 2026</p>
+            <p>Revision: 1.0.0 | Date: 2026-01-02</p>
+        </footer>
+    </article>
+</body>
+
+</html>

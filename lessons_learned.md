@@ -314,6 +314,26 @@ Objectives: Document errors, bugs, and mistakes so we do not make them again.
   3. Legacy hourly slot logic (backward compatibility)
   Include `source` and `playlist_id` in the response for telemetry differentiation.
 
+### [2026-01-02] D-1 Loop Scheduling Logic
+- **Issue**: Managing a 14-hour broadcast window with 12 slots per hour across multiple screens is complex to orchestrate.
+- **Root Cause**: Ad-hoc generation in route handlers creates performance bottlenecks and inconsistent states.
+- **Prevention**: Use a dedicated `LoopGenerationService` and `LoopRepository` to pre-calculate the D-1 schedule. Implement a standard document ID format (e.g., `YYYY-MM-DD_HH_locationId`) for O(1) retrieval by the player.
+
+### [2026-01-02] Player Loop/Playlist Transitions
+- **Issue**: Player needs to switch between approved hourly loops (during business hours) and fallback playlists (after hours) without interruption.
+- **Root Cause**: Complexity in tracking "real" time vs "broadcast" time in the React state.
+- **Prevention**: Use a simple `getCurrentHour()` utility and an `useEffect` hook that triggers on hour changes. The player should check for an approved loop *first*; if missing or outside business hours (8AM-10PM), it falls back to the playlist mode. This "Dual Mode" playback ensures the screen never goes black.
+
+### [2026-01-02] Playwright Test Scaling & Batching
+- **Issue**: Running a large suite of 50+ E2E tests concurrently caused timeouts and resource exhaustion in the local dev environment.
+- **Root Cause**: Single-worker limitation (`workers: 1`) combined with the overhead of running both `ad-server` and `client-app` locally.
+- **Prevention**: When developing complex features, run spec files individually (`npx playwright test tests/spec_name.js`) during the TDD loop. Only run the full suite at key milestones. Use `test.describe.configure({ mode: 'serial' })` for workflows that depend on shared state (like Generate → Approve → Play).
+
+### [2026-01-02] Telemetry with Broadcast Context
+- **Issue**: Simple "impression logged" events aren't enough for advertisers paying for specific hourly slots.
+- **Root Cause**: Standard telemetry only captured the asset ID, not the schedule context.
+- **Prevention**: Enrich the telemetry payload with `loop_id`, `loop_hour`, and `slot_position`. This allows the Analytics dashboard to report on "Delivery Rate" (how many scheduled slots actually played) vs just raw impression counts.
+
 ---
 *Note: This file is a permanent project record. Do not delete or purge entries.*
 

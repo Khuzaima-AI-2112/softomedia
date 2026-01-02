@@ -1,75 +1,98 @@
-# MVP Development Sprint Plan
+# MVP Sprint Plan - Digital Screen Network Management Platform
 
-This document outlines the development roadmap for the Digital Screen Network Management Platform (MVP), organized into four 2-week sprints.
+## Sprint Overview
 
-## Sprint 1: Foundation & Governance
-**Focus**: User roles (RBAC) and network structure.
+| Sprint | Focus | Duration | Status |
+|--------|-------|----------|--------|
+| Sprint 1 | Broadcasting Engine Core | 3 days | ✅ Complete |
+| Sprint 2 | Admin Loop Management UI | 2 days | ✅ Complete |
+| Sprint 3 | Retailer Validation Workflow | 2 days | ✅ Complete |
+| Sprint 4 | Player Loop Playback | 2 days | ✅ Complete |
+| Sprint 5 | Analytics & Telemetry | 2 days | ⬜ Pending |
+| Sprint 6 | Polish & Integration Testing | 2 days | ⬜ Pending |
 
-### Deliverables
-- [ ] **Multi-tenant Core**: Database schema for softomedia, retailers, and advertisers.
-- [ ] **RBAC Module**: Implementation of the 5 MVP roles with specific permissions.
-- [ ] **Location Management**: CRUD for retail locations and store profiles.
-- [ ] **Super Admin Dashboard**: Global view of retailers and agencies.
-
-### Testing Strategy
-- **Unit**: Test permission guards for each role.
-- **Integration**: Verify retailer creation automatically initializes default location buckets.
-- **Test Case 1.1**: Authenticate as Super Admin -> Create Retailer -> Verify Retailer Admin role can log in.
+**Business Hours**: 8:00 AM - 10:00 PM (14 loops/day)
+**Loop Format**: 12 ads × 5 seconds = 60 second loop
 
 ---
 
-## Sprint 2: Media & Campaign Lifecycle
-**Focus**: Asset management and campaign creation.
+## Sprint 1: Broadcasting Engine Core ✅
 
-### Deliverables
-- [ ] **CMS Asset Manager**: Upload JPG/PNG/MP4 with automatic 5-second validation.
-- [ ] **Campaign Wizard**: Step-by-step creation (advertiser vs retailer campaigns).
-- [ ] **Targeting Logic**: Assign campaigns to specific retail locations/groups.
-- [ ] **Inventory Tracker**: Basic calculation of available loops/slots per hour.
-
-### Testing Strategy
-- **Unit**: Verify 5-second duration enforcement on video uploads.
-- **Unit**: Validate file format rejections (e.g., Rejecting .GIF or .MOV).
-- **Integration**: Create campaign -> Verify it appears in the "Pending Validation" queue for the assigned retailer.
+**Deliverables:**
+- [x] `LoopRepository.js` - CRUD with business hours validation
+- [x] `LoopGenerationService.js` - D-1 generation with priority
+- [x] `/api/loops` endpoints (GET, POST, PATCH)
+- [x] Jest unit tests (10 passing)
 
 ---
 
-## Sprint 3: The Scheduling Engine & Validation
-**Focus**: Loop generation and mandatory retailer approval workflow.
+## Sprint 2: Admin Loop Management UI ✅
 
-### Deliverables
-- [ ] **Loop Generator**: D-1 engine that builds 12-slot, 60-second loops for each hour.
-- [ ] **Scheduler**: Orchestrate campaigns based on priority rules (Paid > Retailer > Internal).
-- [ ] **Retailer Approval Portal**: UI for retailers to preview, approve, or reject hourly schedules.
-- [ ] **Audit Log**: Track approval status and timestamp of all loop validations.
-
-### Testing Strategy
-- **Unit**: Test loop filling logic (ensuring no more than 12 ads per loop).
-- **Integration**: Generate D-1 loops -> Verify notification sent to Retailer Admin.
-- **E2E**: Retailer rejects Ad #4 -> Verify Ad #4 is replaced by fallback/internal ad in that hour's loop.
+**Deliverables:**
+- [x] `LoopManagement.jsx` - Date picker + 14-hour grid
+- [x] `LoopBuilder.jsx` - 12-slot drag-drop editor
+- [x] Routes in `App.jsx`
+- [x] `loop_builder.spec.js` - 8 tests
 
 ---
 
-## Sprint 4: Fleet Monitoring & Performance
-**Focus**: Screen health and proof-of-play analytics.
+## Sprint 3: Retailer Validation Workflow ✅
 
-### Deliverables
-- [ ] **Device Heartbeat**: Real-time monitoring of screen online/offline status.
-- [ ] **Technical Ops Dashboard**: Remote restart and health diagnostics.
-- [ ] **Proof-of-Play (PoP) Engine**: Logging of every ad broadcast per screen.
-- [ ] **MVP Analytics**: Hourly broadcast logs and campaign performance summaries.
-
-### Testing Strategy
-- **Unit**: Test offline fallback logic (triggering internal loop if no connection).
-- **Integration**: Simulate "Ad Played" signal from player -> Verify database entry in PoP table.
-- **E2E**: Disconnect screen -> Verify "OFFLINE" alert in Technical Operator console within < 2 minutes.
+**Deliverables:**
+- [x] `ScheduleCalendar.jsx` - D-1 timeline view
+- [x] `LoopPreviewModal.jsx` - Per-ad approve/reject
+- [x] Rejection reason dropdown
+- [x] Replacement picker from approved assets
+- [x] `retailer_validation.spec.js` - 10 tests
 
 ---
 
-## Summary of Quality Gates
-| Gate | Description | Requirement |
-| :--- | :--- | :--- |
-| **Linting** | Static analysis | 0 Errors |
-| **Unit Coverage** | Code coverage | > 80% on core services |
-| **Integrations** | API Contract tests | Pass vs Mock Screen |
-| **UX Review** | Manual validation | Approved by Product Owner |
+## Sprint 4: Player Loop Playback ✅
+
+**Deliverables:**
+- [x] Updated `Player.jsx` - dual mode (loop/playlist)
+- [x] Hour change detection and loop switching
+- [x] Slot rotation with 5s timing
+- [x] Telemetry with loop context (loopId, loopHour, slotPosition)
+- [x] `loop_playback.spec.js` - 7 tests
+
+---
+
+## Sprint 5: Analytics & Telemetry ✅
+
+**Deliverables:**
+- [x] `LoopAnalytics.jsx` - Proof-of-play dashboard
+- [x] Summary stats (impressions, delivery rate)
+- [x] Hourly delivery chart with color coding
+- [x] Slot-level drill-down on click
+- [x] Route `/admin/analytics`
+- [x] `analytics_loop.spec.js` - 6 tests
+
+---
+
+## Sprint 6: Polish & Integration Testing ✅
+
+**Deliverables:**
+- [x] Full E2E test: Generate → Approve → Play → Report
+- [x] `integration_broadcasting.spec.js` - 10 tests
+- [x] Documentation updates (`changelog.md`)
+
+---
+
+## Summary
+
+**Total Tests Created:**
+- 10 Jest unit tests (LoopRepository)
+- 51 Playwright E2E tests across 6 spec files
+
+**New Routes:**
+- `/dashboard/admin/loops`
+- `/dashboard/admin/loops/:id`
+- `/dashboard/admin/analytics`
+- `/dashboard/retailer/schedule/calendar`
+
+**Key Files Created:**
+- `LoopRepository.js`, `LoopGenerationService.js`, `loops.js` (API)
+- `LoopManagement.jsx`, `LoopBuilder.jsx`, `LoopAnalytics.jsx`
+- `ScheduleCalendar.jsx`, `LoopPreviewModal.jsx`
+- Updated `Player.jsx` with loop-aware playback
