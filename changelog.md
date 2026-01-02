@@ -2,6 +2,20 @@
 
 Objectives: Document changes and progress milestones throughout the project lifecycle.
 
+## [2026-01-02] - Phase 2: API Contract & Integration (SDLC##7)
+
+### Added
+- **Campaign State Engine**: Implemented `CampaignService.js` to manage status transitions and automated ad generation.
+- **Deep Health Monitoring**: Refactored `/api/monitoring/status` to return real-time screen metrics and inventory health for Tech Ops.
+
+### Fixed
+- **API Handler Depth**: Implemented missing `PATCH /api/campaigns/:id/status` endpoint to support approval flows.
+- **Wizard Data Integrity**: Fixed bug in `Step3ReviewDistribution.jsx` where `selectedSlots` was missing from the creation payload.
+
+### Changed
+- **Management API Hardening**: Extended status filtering to `GET /api/campaigns` to support role-based task lists.
+- **Network Metadata**: Cleaned up `schedules` API stubs to reflect actual loop durations and slot priorities.
+
 ## [2026-01-02] - Phase 1: Firebase Production Readiness (SDLC##12)
 
 ### Added

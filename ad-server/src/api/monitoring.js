@@ -57,10 +57,29 @@ router.post('/impression', async (req, res) => {
 
 /**
  * GET /api/monitoring/status
- * Health check for the monitoring service pipeline
+ * Aggregate metrics for Tech Ops dashboard
  */
-router.get('/status', (req, res) => {
-    res.json({ service: 'monitoring', active: true });
+router.get('/status', async (req, res) => {
+    try {
+        const { screenRepository } = await import('../repositories/index.js');
+        const screens = await screenRepository.findAll();
+
+        const stats = {
+            total: screens.length,
+            online: screens.filter(s => s.status === 'ONLINE').length,
+            offline: screens.filter(s => s.status === 'OFFLINE').length,
+            screens: screens.map(s => ({
+                id: s.id,
+                status: s.status,
+                last_seen: s.last_seen
+            }))
+        };
+
+        res.json(stats);
+    } catch (error) {
+        logger.error('Status API error', { error: error.message });
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 export default router;

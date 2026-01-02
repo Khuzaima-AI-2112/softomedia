@@ -18,11 +18,12 @@ const Step3ReviewDistribution = ({ data, onConfirm, onPrev }) => {
             },
             body: JSON.stringify({
                 title: `Campaign - ${new Date().toLocaleDateString()}`,
-                retailer_id: 'ent_costco',
+                retailer_id: data.selectedStore?.id || 'ent_costco',
                 location_ids: data.selectedScreens,
                 media_id: data.media_id,
                 start_date: data.dateRange.start,
-                end_date: data.dateRange.end
+                end_date: data.dateRange.end,
+                selectedSlots: data.selectedSlots
             })
         });
 
@@ -156,8 +157,8 @@ const Step3ReviewDistribution = ({ data, onConfirm, onPrev }) => {
                         disabled={isSubmitting}
                         data-testid="confirm-distribution-btn"
                         className={`px-10 py-4 rounded-xl text-white font-black shadow-xl transition-all flex items-center gap-2 ${isSubmitting
-                                ? 'bg-slate-400 cursor-not-allowed'
-                                : 'bg-primary hover:bg-primary/90 shadow-primary/30 active:scale-95'
+                            ? 'bg-slate-400 cursor-not-allowed'
+                            : 'bg-primary hover:bg-primary/90 shadow-primary/30 active:scale-95'
                             }`}
                     >
                         <span>{isSubmitting ? 'Submitting...' : 'Confirm Distribution'}</span>

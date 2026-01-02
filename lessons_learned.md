@@ -267,6 +267,16 @@ Objectives: Document errors, bugs, and mistakes so we do not make them again.
 - **Root Cause**: Assumptions about Cloud Run visibility vs explicit middleware enforcement.
 - **Prevention**: Always apply `authenticate` middleware to management routes in the central API router. Never rely solely on infra-level gating for security-critical endpoints.
 
+### [2026-01-02] API Contract Drift
+- **Issue**: Shallow API stubs caused "silent" frontend failures (missing fields in payloads).
+- **Root Cause**: Lack of automated contract testing and reliance on initial wireframe stubs during rapid UI development.
+- **Prevention**: Perform a formal API-Frontend "Contract Audit" before moving to integrated testing. Ensure all optional/mandatory fields in `fetch` calls are explicitly mirrored in backend handlers.
+
+### [2026-01-02] Scalable Side-Effects via Service Layer
+- **Issue**: Campaign-to-Ad conversion was initially overlooked in simple CRUD repositories.
+- **Root Cause**: Mixing business logic (state transitions) with data access (CRUD).
+- **Prevention**: Use a dedicated `Service` layer (e.g., `CampaignService`) to orchestrate multi-step processes like status transitions and secondary document generation. This keeps repositories lean and focused on I/O.
+
 ---
 *Note: This file is a permanent project record. Do not delete or purge entries.*
 
