@@ -1,6 +1,6 @@
-﻿import express from 'express';
-import { campaignRepository } from '../repositories/index.js';
-import logger from '../utils/logger.js';
+﻿```javascript
+import express from 'express';
+
 
 const router = express.Router();
 

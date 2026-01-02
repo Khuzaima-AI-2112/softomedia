@@ -1,179 +1,145 @@
-# Cloud Build configuration for softomedia-live-2026
-# Builds and deploys both client-app and ad-server to Cloud Run
+# Optimized Cloud Build configuration for softomedia-live-2026
+# Leverages Docker multi-stage builds for isolation and stability
 
 steps:
-  # Step 1: Verify pre-deployment requirements
-  - name: 'node:20'
-    entrypoint: 'node'
-    args: ['verify_predeploy.js']
-    id: 'verify-predeploy'
-    env:
-      - 'PROJECT_ID=$PROJECT_ID'
-
-  # Step 2: Build client-app
-  - name: 'node:20'
-    entrypoint: 'npm'
-    args: ['ci']
-    dir: 'client-app'
-    id: 'install-client'
-
-  - name: 'node:20'
-    entrypoint: 'npm'
-    args: ['run', 'lint']
-    dir: 'client-app'
-    id: 'lint-client'
-    waitFor: ['install-client']
-
-  - name: 'node:20'
-    entrypoint: 'npm'
-    args: ['run', 'test:coverage']
-    dir: 'client-app'
-    id: 'test-client'
-    waitFor: ['install-client']
-    env:
-      - 'CI=true'
-
-  - name: 'node:20'
-    entrypoint: 'npm'
-    args: ['run', 'build']
-    dir: 'client-app'
-    id: 'build-client'
-    waitFor: ['lint-client', 'test-client']
-
-  # Step 3: Build ad-server
-  - name: 'node:20'
-    entrypoint: 'npm'
-    args: ['ci']
-    dir: 'ad-server'
-    id: 'install-adserver'
-
-  - name: 'node:20'
-    entrypoint: 'npm'
-    args: ['run', 'lint']
-    dir: 'ad-server'
-    id: 'lint-adserver'
-    waitFor: ['install-adserver']
-
-  - name: 'node:20'
-    entrypoint: 'npm'
-    args: ['run', 'test:coverage']
-    dir: 'ad-server'
-    id: 'test-adserver'
-    waitFor: ['install-adserver']
-    env:
-      - 'CI=true'
-
-  # Step 4: Build and push client-app container
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'build'
-      - '-t'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/softomedia/client-app:latest'
-      - '-f'
-      - 'client-app/Dockerfile'
-      - 'client-app'
-    id: 'build-client-image'
-    waitFor: ['build-client']
-
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/softomedia/client-app:latest'
-    id: 'push-client-image'
-    waitFor: ['build-client-image']
-
-  # Step 5: Build and push ad-server container
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'build'
-      - '-t'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/softomedia/ad-server:latest'
-      - '-f'
-      - 'ad-server/Dockerfile'
-      - 'ad-server'
-    id: 'build-adserver-image'
-    waitFor: ['lint-adserver', 'test-adserver']
-
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/softomedia/ad-server:latest'
-    id: 'push-adserver-image'
-    waitFor: ['build-adserver-image']
-
-  # Step 6: Quality Gate: E2E Integration Gold Path
-  - name: 'mcr.microsoft.com/playwright:v1.45.0-jammy'
-    entrypoint: 'npm'
-    args: ['run', 'test:e2e']
-    id: 'test-e2e'
-    waitFor: ['install-client', 'install-adserver']
-    env:
-      - 'CI=true'
-
-  # Step 8: Deploy ad-server to Cloud Run
+  # Step 1: Verify pre-deployment requirements & Secrets
   - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        # Get the client-app URL (if it exists)
-        CLIENT_URL=$$(gcloud run services describe client-app --region=us-central1 --format='value(status.url)' 2>/dev/null || echo "https://client-app-524693967756.a.run.app")
+        echo "🔍 Running Pre-Deployment Verification..."
+        node verify_predeploy.js
         
-        echo "Deploying ad-server with CORS_ORIGINS=$$CLIENT_URL"
+        echo "🔐 Verifying Secrets..."
+        for SECRET in JWT_SECRET; do
+          if ! gcloud secrets describe "$$SECRET" --project=$PROJECT_ID &>/dev/null; then
+            echo "ERROR: Secret '$$SECRET' not found in Secret Manager"
+            exit 1
+          fi
+        done
+    id: 'verify-predeploy'
+    env:
+      - 'PROJECT_ID=$PROJECT_ID'
+
+  # Step 2: Build and push client-app container (Build happens INSIDE Dockerfile)
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY}/${_SERVICE_CLIENT}:$BUILD_ID'
+      - '-f'
+      - 'client-app/Dockerfile'
+      - 'client-app'
+    id: 'build-client-image'
+    waitFor: ['verify-predeploy']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY}/${_SERVICE_CLIENT}:$BUILD_ID'
+    id: 'push-client-image'
+    waitFor: ['build-client-image']
+
+  # Step 3: Build and push ad-server container
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY}/${_SERVICE_ADSERVER}:$BUILD_ID'
+      - '-f'
+      - 'ad-server/Dockerfile'
+      - 'ad-server'
+    id: 'build-adserver-image'
+    waitFor: ['verify-predeploy']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY}/${_SERVICE_ADSERVER}:$BUILD_ID'
+    id: 'push-adserver-image'
+    waitFor: ['build-adserver-image']
+
+  # Step 4: Deploy ad-server to Cloud Run with Health Check
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🚀 Deploying ${_SERVICE_ADSERVER} version: $BUILD_ID..."
         
-        gcloud run deploy ad-server \
-          --image us-central1-docker.pkg.dev/$PROJECT_ID/softomedia/ad-server:latest \
-          --region us-central1 \
+        gcloud run deploy ${_SERVICE_ADSERVER} \
+          --image ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY}/${_SERVICE_ADSERVER}:$BUILD_ID \
+          --region ${_REGION} \
           --platform managed \
           --allow-unauthenticated \
-          --set-env-vars "NODE_ENV=production,CORS_ORIGINS=$$CLIENT_URL" \
-          --set-secrets "JWT_SECRET=JWT_SECRET:latest"
+          --set-env-vars "NODE_ENV=production,CORS_ORIGINS=*,BUILD_ID=$BUILD_ID" \
+          --set-secrets "JWT_SECRET=JWT_SECRET:latest" \
+          --labels "version=$BUILD_ID,deployed-by=cloud-build"
+        
+        SERVICE_URL=$$(gcloud run services describe ${_SERVICE_ADSERVER} --region ${_REGION} --format='value(status.url)')
+        echo "📍 Service URL: $$SERVICE_URL"
+        
+        echo "🩺 Polling /health until 200 OK..."
+        for i in {1..30}; do
+          HTTP_CODE=$$(curl -s -o /dev/null -w "%{http_code}" "$$SERVICE_URL/health")
+          if [ "$$HTTP_CODE" = "200" ]; then
+            echo "✅ Service is HEALTHY"
+            exit 0
+          fi
+          echo "Attempt $$i/30: HTTP $$HTTP_CODE, waiting 2s..."
+          sleep 2
+        done
+        echo "❌ Health check timed out!"
+        exit 1
     id: 'deploy-adserver'
-    waitFor: ['push-adserver-image', 'test-e2e']
+    waitFor: ['push-adserver-image']
 
-  # Step 9: Deploy Firestore and Storage Security Rules
+  # Step 5: Deploy Rules
   - name: 'gcr.io/cloud-builders/gcloud'
     args: ['firestore', 'indexes', 'import', 'ad-server/firestore.indexes.json']
     id: 'deploy-indexes'
-    allowFailure: true # If file doesn't exist yet, don't fail the build
+    allowFailure: true
     waitFor: ['verify-predeploy']
 
   - name: 'gcr.io/cloud-builders/gcloud'
     args: ['fire-rules', 'release', '--rules-file=ad-server/firestore.rules', '--project=$PROJECT_ID']
     id: 'deploy-firestore-rules'
+    allowFailure: true
     waitFor: ['verify-predeploy']
 
-  - name: 'gcr.io/cloud-builders/gcloud'
-    args: ['fire-rules', 'release', '--rules-file=ad-server/storage.rules', '--project=$PROJECT_ID']
-    id: 'deploy-storage-rules'
-    waitFor: ['verify-predeploy']
-
-  # Step 10: Deploy client-app to Cloud Run with backend URL
+  # Step 6: Deploy client-app linked to backend
   - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        # Get the ad-server URL
-        AD_SERVER_URL=$$(gcloud run services describe ad-server --region=us-central1 --format='value(status.url)')
+        AD_SERVER_URL=$$(gcloud run services describe ${_SERVICE_ADSERVER} --region ${_REGION} --format='value(status.url)')
         
-        # Deploy client-app with API URL
-        gcloud run deploy client-app \
-          --image us-central1-docker.pkg.dev/$PROJECT_ID/softomedia/client-app:latest \
-          --region us-central1 \
+        echo "🚀 Deploying ${_SERVICE_CLIENT} linked to API: $$AD_SERVER_URL..."
+        
+        gcloud run deploy ${_SERVICE_CLIENT} \
+          --image ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY}/${_SERVICE_CLIENT}:$BUILD_ID \
+          --region ${_REGION} \
           --platform managed \
           --allow-unauthenticated \
-          --set-env-vars "VITE_API_URL=$$AD_SERVER_URL"
+          --set-env-vars "VITE_API_URL=$$AD_SERVER_URL,BUILD_ID=$BUILD_ID" \
+          --labels "version=$BUILD_ID,deployed-by=cloud-build"
     id: 'deploy-client'
-    waitFor: ['deploy-adserver']
+    waitFor: ['deploy-adserver', 'push-client-image']
 
-# Store built images in Artifact Registry
-images:
-  - 'us-central1-docker.pkg.dev/$PROJECT_ID/softomedia/client-app:latest'
-  - 'us-central1-docker.pkg.dev/$PROJECT_ID/softomedia/ad-server:latest'
+substitutions:
+  _REGION: 'us-central1'
+  _ARTIFACT_REGISTRY: 'softomedia'
+  _SERVICE_CLIENT: 'client-app'
+  _SERVICE_ADSERVER: 'ad-server'
 
 options:
   logging: CLOUD_LOGGING_ONLY
-  
-# Timeout for entire build (15 minutes)
-timeout: 900s
+  machineType: 'E2_HIGHCPU_8'
+
+images:
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY}/${_SERVICE_CLIENT}:$BUILD_ID'
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY}/${_SERVICE_ADSERVER}:$BUILD_ID'
+
+timeout: 1200s

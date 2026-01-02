@@ -295,6 +295,21 @@ Objectives: Document errors, bugs, and mistakes so we do not make them again.
   2. **Service Orchestration**: Modified `PlaylistService` to query for a global playlist if no specific assignment exists.
   3. **Forced Domain Constraints**: Hardcoded `duration: 5` in the service hydrant logic for global playlists to enforce the business rule regardless of user input.
 
+### [2026-01-02] CI/CD Optimization
+- **Issue**: Standardizing on Docker multi-stage builds instead of redundant Cloud Build steps significantly increases pipeline reliability and reduces environment-specific failures.
+- **Root Cause**: Redundant Cloud Build steps and environment-specific failures.
+- **Prevention**: Standardize on Docker multi-stage builds.
+
+### [2026-01-02] Rollback Readiness
+- **Issue**: Implementing unique `$BUILD_ID` or SHA-based image tagging is critical for MVP deployments to allow instant rollbacks when `:latest` is overwritten by failing builds.
+- **Root Cause**: Overwriting `:latest` tag with failing builds.
+- **Prevention**: Implement unique `$BUILD_ID` or SHA-based image tagging.
+
+### [2026-01-02] Health Gating
+- **Issue**: Using post-deployment health checks (`/health`) as a build gate prevents "blind" successful deployments where the service is up but the application is crashing.
+- **Root Cause**: Deployments marked successful even if the application inside the container is unhealthy.
+- **Prevention**: Use post-deployment health checks (`/health`) as a build gate.
+
 ### [2026-01-02] Multipart Upload with Multer in ES Modules
 - **Issue**: Implementing file uploads in an ESM-based Node.js project required careful handling of paths and middleware.
 - **Root Cause**: Standard `multer` configurations often assume CommonJS `__dirname`.

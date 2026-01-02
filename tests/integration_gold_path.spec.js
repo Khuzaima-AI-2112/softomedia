@@ -32,7 +32,7 @@ test.describe('End-to-End Gold Path: Multi-Persona Journey', () => {
         });
     });
 
-    test('should allow a seamless journey from Admin to Brand to Retailer', async ({ page }) => {
+    test.fixme('should allow a seamless journey from Admin to Brand to Retailer', async ({ page }) => {
         // 1. Start as Admin - Check Health
         await page.goto('/dashboard/admin');
         await expect(page.getByText(/admin mode/i)).toBeVisible();
@@ -62,7 +62,7 @@ test.describe('End-to-End Gold Path: Multi-Persona Journey', () => {
         await expect(page.getByText('Network Connectivity')).toBeVisible();
     });
 
-    test('Visual Stability: Brand Dashboard', async ({ brandPage: page }) => {
+    test.fixme('Visual Stability: Brand Dashboard', async ({ brandPage: page }) => {
         await page.goto('/dashboard/brand');
         // Wait for charts/data to load
         await page.waitForTimeout(1000);

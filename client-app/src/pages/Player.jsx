@@ -78,53 +78,18 @@ function Player() {
         return () => clearInterval(interval);
     }, [currentHour]);
 
-    // Fetch loop when hour changes
+    // Orchestrated Initialization (SRE Fix #2)
     useEffect(() => {
-        if (!screenId) return;
+        const initializePlayer = async () => {
+            const id = searchParams.get('screen_id') || 'demo-screen-01';
+            setScreenId(id);
 
-        const loadLoop = async () => {
-            const loop = await fetchCurrentLoop(screenId);
-            if (loop) {
-                setCurrentLoop(loop);
-                setPlaybackMode('loop');
-                setStatus('playing');
-            } else {
-                // Fallback to playlist
-                setPlaybackMode('playlist');
-            }
-        };
-
-        loadLoop();
-    }, [screenId, currentHour, fetchCurrentLoop]);
-
-    // Playlist Polling Fallback (Every 60 seconds)
-    useEffect(() => {
-        if (!screenId || playbackMode === 'loop') return;
-        const id = searchParams.get('screen_id') || 'demo-screen-01'
-        setScreenId(id)
-
-        const fetchPlaylist = async (screenId) => {
             try {
-                const res = await fetch(`${API_URL}/api/playlist/${screenId}`);
-                const data = await res.json();
-                if (data.playlist && data.playlist.length > 0) {
-                    setPlaylist(data.playlist);
-                    setPlaylistMeta({ source: data.source || 'assigned', id: data.playlist_id || data.id });
-                    setCurrentAdIndex(0);
-                    setStatus('playing');
-                } else {
-                    setStatus('no_content');
-                }
-            } catch (e) {
-                console.error('Initial playlist fetch failed', e);
-                setStatus('error');
-            }
-        };
-
-        const registerScreen = async () => {
-            try {
+                // Step 1: Register Screen
                 setStatus('registering');
-                const res = await fetch(`${API_URL}/api/screens/register`, {
+                console.log('[Player] Status changed: registering');
+
+                const regRes = await fetch(`${API_URL}/api/screens/register`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -134,21 +99,55 @@ function Player() {
                     })
                 });
 
-                if (res.ok) {
-                    setStatus('loading_playlist');
-                    fetchPlaylist(id);
-                } else {
-                    setStatus('error');
+                if (!regRes.ok) throw new Error(`Registration failed: ${regRes.status}`);
+                console.log('[Player] Registration success');
+
+                // Step 2: Try to load loop for current hour (Business Hours)
+                if (isBusinessHours()) {
+                    console.log('[Player] Business hours active, fetching loop...');
+                    const date = getTodayDate();
+                    const hour = getCurrentHour();
+                    const loopRes = await fetch(`${API_URL}/api/loops?date=${date}`);
+                    const loopData = await loopRes.json();
+
+                    const loop = (loopData.loops || []).find(l =>
+                        l.hour === hour && l.status === 'APPROVED'
+                    );
+
+                    if (loop && loop.slots?.length > 0) {
+                        console.log('[Player] Found approved loop:', loop.id);
+                        setCurrentLoop(loop);
+                        setPlaybackMode('loop');
+                        setStatus('playing');
+                        console.log('[Player] Status changed: playing (loop mode)');
+                        return; // Successfully initialized with loop
+                    }
                 }
-            } catch (e) {
-                setStatus('offline');
+
+                // Step 3: Fallback to Playlist if no loop
+                console.log('[Player] No loop found or outside business hours, falling back to playlist');
+                const playRes = await fetch(`${API_URL}/api/playlist/${id}`);
+                const playData = await playRes.json();
+
+                if (playData.playlist?.length > 0) {
+                    setPlaylist(playData.playlist);
+                    setPlaylistMeta({ source: playData.source || 'assigned', id: playData.playlist_id || playData.id });
+                    setPlaybackMode('playlist');
+                    setStatus('playing');
+                    console.log('[Player] Status changed: playing (playlist mode)');
+                } else {
+                    setStatus('no_content');
+                    console.log('[Player] Status changed: no_content');
+                }
+
+            } catch (err) {
+                console.error('[Player] Initialization failed:', err.message);
+                setStatus('error');
             }
         };
 
-        if (id) {
-            registerScreen();
-        }
-    }, [searchParams])
+        initializePlayer();
+    }, [searchParams, fetchCurrentLoop, currentHour]); // Re-run if searchParams OR hour change
 
     // --- SRE: White-Box Observability & Transport ---
     const logTelemetryEvent = (type, payload) => {
@@ -292,7 +291,11 @@ function Player() {
 
     if (status === 'playing' && activeContent) {
         return (
-            <div style={{ width: '100vw', height: '100vh', backgroundColor: 'black', overflow: 'hidden' }}>
+            <div
+                data-testid="player-root"
+                data-status={status}
+                style={{ width: '100vw', height: '100vh', backgroundColor: 'black', overflow: 'hidden' }}
+            >
                 <img
                     data-testid="ad-image"
                     src={activeContent.url}
@@ -334,15 +337,19 @@ function Player() {
     }
 
     return (
-        <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            height: '100vh',
-            backgroundColor: '#000',
-            color: '#fff',
-            fontFamily: 'sans-serif'
-        }}>
+        <div
+            data-testid="player-root"
+            data-status={status}
+            style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '100vh',
+                backgroundColor: '#000',
+                color: '#fff',
+                fontFamily: 'sans-serif'
+            }}
+        >
             <div style={{ textAlign: 'center' }}>
                 <h1 style={{ fontSize: '3rem', margin: 0 }}>SoftoMedia Player</h1>
 

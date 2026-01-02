@@ -2,7 +2,7 @@ import {
     userRepository,
     locationRepository,
     adRepository,
-    campaignRepository,
+
     retailerRepository,
     screenRepository
 } from '../repositories/index.js';

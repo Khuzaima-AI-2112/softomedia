@@ -14,6 +14,7 @@
 ### Critical Test Failures
 - [x] Fix failing Playwright tests (standardized on `data-testid`)
 - [ ] **Broadcasting Engine Baseline**: Stabilize the 10 failing tests identified in the full integration run (`loop_playback.spec.js` timeouts).
+- [ ] **Post-Refactor E2E Stabilization**: Fix 9 regressions in `telemetry.spec.js`, `ad_player.spec.js`, `loop_builder.spec.js`, and `integration_gold_path.spec.js` following the Player state machine refactor.
 
 ### Broadcasting Engine MVP Maintenance
 - [ ] **Real Analytics API**: Replace mock data in `LoopAnalytics.jsx` with actual Firestore aggregation.

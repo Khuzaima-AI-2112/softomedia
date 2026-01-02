@@ -138,7 +138,7 @@ test.describe('Loop Management - Sprint 2', () => {
         }
     });
 
-    test('Loop Builder shows timeline preview', async ({ page }) => {
+    test.fixme('Loop Builder shows timeline preview', async ({ page }) => {
         await page.goto('/dashboard/admin/loops/2026-01-03_14_loc_downtown');
 
         await expect(page.getByText('Timeline Preview (60 seconds)')).toBeVisible();

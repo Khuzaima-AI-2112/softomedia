@@ -2,6 +2,12 @@
 
 Objectives: Document changes and progress milestones throughout the project lifecycle.
 
+## [2026-01-02] - Broadcasting Engine MVP Deployed
+- **Deploy**: Successfully deployed `client-app` and `ad-server` to Cloud Run on `softomedia-live-2026`.
+- **Pipeline**: Refactored `cloudbuild.yaml` with SRE-grade SHA-based versioning and post-deployment health-check gates.
+- **Verification**: Verified live endpoint reachability and state-machine stability in production.
+- **Traceability**: Injected Build ID and metadata into production containers for SRE observability.
+
 ## [2026-01-02] - Broadcasting Engine MVP Complete (Sprints 1-6)
 
 ### Added

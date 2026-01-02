@@ -9,16 +9,15 @@ dotenv.config({ path: join(__dirname, '..', '.env.development') });
 
 import express from 'express';
 import cors from 'cors';
-import jwt from 'jsonwebtoken';
 import compression from 'compression';
-import logger, { requestLogger } from './src/utils/logger.js';
+import { requestLogger } from './src/utils/logger.js';
 
 const app = express();
 
 // Environment-based CORS configuration
 const CORS_ORIGINS = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
-    : ['http://localhost:5173', 'http://localhost:3000'];
+    : []; // Fallback to empty in production, must be explicitly set via env
 
 const corsOptions = {
     origin: function (origin, callback) {
