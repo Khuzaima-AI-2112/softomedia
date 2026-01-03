@@ -4,6 +4,17 @@ Objectives: Document errors, bugs, and mistakes so we do not make them again.
 
 ## Development Lessons
 
+### [2026-01-03] Flexible Validation for Creative Assets
+- **Issue**: Strict 5-second validation blocked users from uploading potentially valid creatives (e.g., 4.9s or 5.1s).
+- **Root Cause**: Hard constraints in UI prevented valid business flows.
+- **Prevention**: Use "Soft Validation" (warnings) instead of "Hard Validation" (errors) for business rules that might have exceptions. Allow the user to override if they acknowledge the warning.
+
+### [2026-01-03] Robust URL Construction in Player
+- **Issue**: Player failed to load ads when API returned mixed URL formats (relative vs absolute).
+- **Root Cause**: Client assumed a specific URL structure.
+- **Prevention**: Always sanitize and normalize URLs on the client-side before rendering. Check for protocol prefixes (`http/https`) and append the API base URL if missing.
+
+
 ### [2026-01-01] ETags for API Caching
 - **Issue**: API responses can be cached but need invalidation when data changes.
 - **Root Cause**: Static cache headers don't know when data changes.

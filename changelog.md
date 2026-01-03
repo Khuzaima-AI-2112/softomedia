@@ -2,6 +2,28 @@
 
 Objectives: Document changes and progress milestones throughout the project lifecycle.
 
+## [2026-01-03] - UI & Orchestration Improvements (Sprint 7) - DEPLOYED
+- **Status**: Production Deployment Successful (Build ID: `321ae9ca`...)
+- **Services**: `client-app` and `ad-server` updated on Cloud Run.
+
+### Added
+- **Network Map**: Created `NetworkMap.jsx` (`/dashboard/admin/map`) for geospatial visualization of the retail network.
+- **Admin Orchestration**:
+    - Added "New Retailer" modal in `Overview.jsx` for quick partner onboarding.
+    - Added "Delete Screen" functionality in `ScreenManagement.jsx` with strict confirmation.
+- **Brand Campaign Flexibility**:
+    - Updated `Step2ScheduleUpload.jsx` (Brand Wizard) with Date Range pickers for custom campaign durations.
+    - Added "Frequency" selector (1x, 2x, 3x) to allow multiple ad instances per loop.
+- **Player Robustness**:
+    - Enhanced `Player.jsx` URL builder to handle both relative and absolute asset paths safely.
+    - Added error boundaries for failed asset loads to prevent player crashes.
+- **Documentation**:
+    - Created `docs/USER_TRAINING_GUIDE.md` and `.html` covering workflows for Admin, Brand, Retailer, and Tech Ops.
+
+### Changed
+- **Loop Management**: Clarified UI to explicitly show the target date for loop generation.
+- **Creative Validation**: Relaxed strict 5-second validation in Brand Wizard to a warning to support flexible ad lengths.
+
 ## [2026-01-02] - Broadcasting Engine MVP Deployed
 - **Deploy**: Successfully deployed `client-app` and `ad-server` to Cloud Run on `softomedia-live-2026`.
 - **Pipeline**: Refactored `cloudbuild.yaml` with SRE-grade SHA-based versioning and post-deployment health-check gates.

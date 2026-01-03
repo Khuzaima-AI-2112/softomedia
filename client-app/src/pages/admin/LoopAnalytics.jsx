@@ -4,7 +4,7 @@
  * Sprint 5: Analytics & Telemetry
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import { API_URL } from '../../config';
@@ -179,8 +179,8 @@ function LoopAnalytics() {
                                     key={item.hour}
                                     onClick={() => setSelectedHour(selectedHour === item.hour ? null : item.hour)}
                                     className={`w-full flex items-center gap-4 p-3 rounded-lg transition-all ${selectedHour === item.hour
-                                            ? 'bg-primary/10 border border-primary'
-                                            : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                                        ? 'bg-primary/10 border border-primary'
+                                        : 'hover:bg-slate-50 dark:hover:bg-slate-800'
                                         }`}
                                     data-testid={`analytics-hour-${item.hour}`}
                                 >
@@ -243,8 +243,8 @@ function LoopAnalytics() {
                                 <div
                                     key={i}
                                     className={`p-4 rounded-xl border ${played
-                                            ? 'border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20'
-                                            : 'border-red-200 bg-red-50 dark:bg-red-900/20'
+                                        ? 'border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20'
+                                        : 'border-red-200 bg-red-50 dark:bg-red-900/20'
                                         }`}
                                     data-testid={`slot-detail-${i}`}
                                 >

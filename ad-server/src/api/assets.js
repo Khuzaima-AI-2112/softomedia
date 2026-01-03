@@ -35,6 +35,8 @@ const upload = multer({
     }
 });
 
+import { uploadFile } from '../utils/storage.js';
+
 /**
  * GET /api/assets
  * List media assets available for campaigns
@@ -61,14 +63,17 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             return res.status(400).json({ error: 'No file uploaded' });
         }
 
+        // Upload to Cloud Storage (GCS)
+        const cloudStorage = await uploadFile(file.path, file.filename);
+
         const id = `ast_${Date.now()}`;
         const asset = await mediaRepository.create(id, {
             id,
             filename: file.originalname,
             duration: parseInt(duration) || 5,
             file_type: file_type || file.mimetype,
-            storage_path: file.path,
-            url: `http://localhost:8080/assets/${file.filename}`, // Local URL for testing
+            storage_path: cloudStorage.storage_path,
+            url: cloudStorage.url,
             status: 'ready',
             created_at: new Date().toISOString()
         });

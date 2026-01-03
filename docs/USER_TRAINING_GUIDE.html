@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Screen Network - User Training Guide</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --surface: #ffffff;
+            --surface-alt: #f8fafc;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --base-font: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            font-family: var(--base-font);
+            color: var(--text-main);
+            background-color: #f1f5f9;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            background: var(--surface);
+            padding: 48px;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        header {
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 24px;
+            margin-bottom: 32px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: var(--text-main);
+            margin: 0 0 8px 0;
+            letter-spacing: -0.025em;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-top: 48px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-top: 24px;
+            margin-bottom: 12px;
+        }
+
+        p,
+        li {
+            color: var(--text-muted);
+            font-size: 1rem;
+        }
+
+        ul {
+            padding-left: 20px;
+            margin-bottom: 24px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        code {
+            background: var(--surface-alt);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Menlo', 'Monaco', monospace;
+            font-size: 0.9em;
+            color: var(--primary-dark);
+            border: 1px solid var(--border);
+        }
+
+        .role-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-left: 12px;
+            vertical-align: middle;
+        }
+
+        .role-admin {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .role-brand {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .role-retailer {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .role-tech {
+            background: #f3e8ff;
+            color: #6b21a8;
+        }
+
+        .feature-box {
+            background: var(--surface-alt);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 16px 0;
+        }
+
+        .step-list {
+            counter-reset: step;
+            list-style: none;
+            padding: 0;
+        }
+
+        .step-list li {
+            position: relative;
+            padding-left: 40px;
+            margin-bottom: 16px;
+        }
+
+        .step-list li::before {
+            counter-increment: step;
+            content: counter(step);
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 28px;
+            height: 28px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 28px;
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+
+        .material-symbols-outlined {
+            vertical-align: sub;
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                padding: 24px;
+                margin: 20px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Softomedia Live</h1>
+            <p style="font-size: 1.25rem;">User Training Guide & Platform Documentation</p>
+        </header>
+
+        <p>Welcome to the Softomedia Digital Screen Network Management Platform. This guide tracks the core workflows
+            for Admins, Brands, Retailers, and Tech Ops.</p>
+
+        <div class="feature-box">
+            <h3 style="margin-top:0"><span class="material-symbols-outlined">lock</span> Accessing the Platform</h3>
+            <p>Use the <strong>Persona Switcher</strong> in the top-right corner of the dashboard to toggle between
+                roles for demonstration and training purposes:</p>
+            <ul style="list-style: none; padding: 0;">
+                <li><span class="role-badge role-admin">Admin</span> &nbsp; Full network control</li>
+                <li><span class="role-badge role-brand">Brand</span> &nbsp; Ad campaign creation</li>
+                <li><span class="role-badge role-retailer">Retailer</span> &nbsp; Store-level schedule view</li>
+                <li><span class="role-badge role-tech">Tech</span> &nbsp; System health monitoring</li>
+            </ul>
+        </div>
+
+        <h2><span class="material-symbols-outlined">admin_panel_settings</span> For Super Admins <span
+                class="role-badge role-admin">Admin</span></h2>
+        <p><strong>Goal:</strong> Manage the network fleet and orchestrate daily broadcasts.</p>
+
+        <h3>1. Network Overview & Map</h3>
+        <ul>
+            <li>Navigate to <strong>Dashboard > Overview</strong>.</li>
+            <li>Use the <strong>Network Map</strong> button to see a geospatial view of all active screens.</li>
+            <li>Use the <strong>New Retailer</strong> button to onboard a new retail partner (opens the registration
+                modal).</li>
+        </ul>
+
+        <h3>2. Managing Screens</h3>
+        <ul>
+            <li>Navigate to <strong>Dashboard > Screens</strong>.</li>
+            <li><strong>Add Screen</strong>: Click "Register Screen" to provision a new device.</li>
+            <li><strong>Delete Screen</strong>: Click the Trash Icon <span class="material-symbols-outlined"
+                    style="font-size: 16px;">delete</span> next to a screen to permanently remove it (requires
+                confirmation).</li>
+            <li><strong>Status</strong>: Monitor online/offline status in real-time.</li>
+        </ul>
+
+        <h3>3. Orchestration (Loop Generation)</h3>
+        <ul>
+            <li>Navigate to <strong>Dashboard > Loops</strong>.</li>
+            <li>Select a <strong>Target Date</strong> using the date picker.</li>
+            <li>Click <strong>"Generate Loops for [Date]"</strong> to create the D-1 broadcast schedule.</li>
+            <li>Once generated, you can click "View Builder" to manually adjust specific slots.</li>
+        </ul>
+
+        <hr style="border:0; border-top:1px solid var(--border); margin: 40px 0;">
+
+        <h2><span class="material-symbols-outlined">campaign</span> For Brands & Advertisers <span
+                class="role-badge role-brand">Brand</span></h2>
+        <p><strong>Goal:</strong> Create and launch advertising campaigns.</p>
+
+        <h3>Creating a New Campaign</h3>
+        <ol class="step-list">
+            <li><strong>Navigate</strong>: Go to <strong>Brand Dashboard</strong> and click <strong>"New
+                    Campaign"</strong>.</li>
+            <li><strong>Locations</strong>: Select the screens or regions where you want your ad to play.</li>
+            <li><strong>Schedule & Creative</strong>:
+                <ul>
+                    <li><strong>Dates</strong>: Pick your Start Date and End Date to define the campaign duration.</li>
+                    <li><strong>Upload</strong>: Drag & drop your creative asset (Image or MP4). <br><small><em>Note:
+                                Ideally 5 seconds. If longer/shorter, you will see a warning but can
+                                proceed.</em></small></li>
+                    <li><strong>Frequency</strong>: Choose how often your ad plays per loop (e.g., 1x, 2x, or 3x).</li>
+                </ul>
+            </li>
+            <li><strong>Review</strong>: Check the "Loop Distribution" preview to see exactly when your ad will air.
+            </li>
+            <li><strong>Launch</strong>: Click <strong>"Submit Campaign"</strong> to send it for approval.</li>
+        </ol>
+
+        <hr style="border:0; border-top:1px solid var(--border); margin: 40px 0;">
+
+        <h2><span class="material-symbols-outlined">storefront</span> For Retail Partners <span
+                class="role-badge role-retailer">Retailer</span></h2>
+        <p><strong>Goal:</strong> View what is playing in your store.</p>
+        <ul>
+            <li>Navigate to <strong>Retailer Dashboard</strong>.</li>
+            <li><strong>Calendar</strong>: View your monthly ad schedule.</li>
+            <li><strong>Approvals</strong>: If enabled, approve or reject third-party ads requested for your screens.
+            </li>
+        </ul>
+
+        <hr style="border:0; border-top:1px solid var(--border); margin: 40px 0;">
+
+        <h2><span class="material-symbols-outlined">settings_heart</span> For Tech Ops <span
+                class="role-badge role-tech">Tech</span></h2>
+        <p><strong>Goal:</strong> Ensure system reliability and uptime.</p>
+
+        <h3>Health & Diagnostics</h3>
+        <ul>
+            <li><strong>System Health</strong> (<code>/dashboard/health</code>): Check the status of the Ad Server API,
+                Cloud Storage, and Authentication services.</li>
+            <li><strong>Tech Ops Dashboard</strong> (<code>/dashboard/tech</code>): View a live inventory of all
+                screens, identifying connection lost devices.</li>
+        </ul>
+
+        <h3>Player Debugging</h3>
+        <p>Access the player directly at <code>/player</code>.</p>
+        <div class="feature-box">
+            <strong>Dual Mode Playback:</strong>
+            <ul style="margin-bottom:0">
+                <li><strong>Loop Mode</strong>: Plays the scheduled 12-slot loop during business hours (8 AM - 10 PM).
+                </li>
+                <li><strong>Playlist Mode</strong>: Falls back to a default playlist after hours or if no loop is
+                    generated.</li>
+            </ul>
+        </div>
+
+        <hr style="border:0; border-top:1px solid var(--border); margin: 40px 0;">
+
+        <h2><span class="material-symbols-outlined">help</span> Support</h2>
+        <p>For technical issues, please contact the Softomedia SRE Team or check the <strong>System Health</strong>
+            dashboard.</p>
+
+    </div>
+
+</body>
+
+</html>

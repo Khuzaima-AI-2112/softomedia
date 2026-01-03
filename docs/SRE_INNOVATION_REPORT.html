@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SRE Technical Report: SHA-Tagging & Health Gating</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --secondary: #6366f1;
+            --background: #0f172a;
+            --card-bg: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent: #10b981;
+            --danger: #ef4444;
+            --code-bg: #00000040;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background);
+            color: var(--text-primary);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+        }
+
+        header {
+            border-bottom: 1px solid #ffffff10;
+            margin-bottom: 4rem;
+            padding-bottom: 2rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+        }
+
+        .section {
+            margin-bottom: 4rem;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            border-left: 4px solid var(--primary);
+            padding-left: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 1rem;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            border: 1px solid #ffffff05;
+        }
+
+        .card h3 {
+            margin-top: 0;
+            color: var(--accent);
+        }
+
+        p {
+            color: var(--text-secondary);
+        }
+
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--code-bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.3rem;
+            color: var(--primary);
+        }
+
+        pre {
+            background: #000;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            overflow-x: auto;
+            border: 1px solid #ffffff10;
+        }
+
+        pre code {
+            color: #d1d5db;
+            background: none;
+            padding: 0;
+        }
+
+        .diagram {
+            background: #1e293b;
+            border-radius: 0.75rem;
+            padding: 2rem;
+            margin: 2rem 0;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            border: 1px dashed var(--text-secondary);
+        }
+
+        .node {
+            padding: 1rem;
+            background: var(--background);
+            border: 2px solid var(--primary);
+            border-radius: 0.5rem;
+            text-align: center;
+            font-size: 0.9rem;
+            min-width: 120px;
+        }
+
+        .arrow {
+            color: var(--text-secondary);
+            font-weight: bold;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .badge-primary {
+            background: #3b82f620;
+            color: #3b82f6;
+            border: 1px solid #3b82f640;
+        }
+
+        footer {
+            margin-top: 6rem;
+            padding-top: 2rem;
+            border-top: 1px solid #ffffff10;
+            text-align: center;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>SRE Innovation Report</h1>
+            <p class="subtitle">Architectural documentation for the softomedia-live-2026 deployment.</p>
+            <span class="badge badge-primary">Release: Broadcasting Engine MVP</span>
+        </header>
+
+        <div class="section">
+            <h2>1. SHA-Based Versioning</h2>
+            <div class="card">
+                <h3>The Concept: Binary Fingerprinting</h3>
+                <p>Instead of the generic <code>:latest</code> tag, every image is tagged with a unique
+                    <code>$BUILD_ID</code> (or Git SHA). This acts as a permanent fingerprint for a specific state of
+                    the code.</p>
+
+                <div class="diagram">
+                    <div class="node">Source Code</div>
+                    <div class="arrow">──►</div>
+                    <div class="node" style="border-color: var(--accent);">Build ID: e4ad5...</div>
+                    <div class="arrow">──►</div>
+                    <div class="node" style="border-color: var(--secondary);">Docker Registry</div>
+                </div>
+
+                <h3>Why It Matters</h3>
+                <ul>
+                    <li><strong>Atomic Rollbacks</strong>: If a new version crashes, we can instantly switch traffic
+                        back to the previous Build ID in Cloud Run without rebuilding.</li>
+                    <li><strong>Traceability</strong>: You can look at any running container and know exactly which
+                        Cloud Build event created it.</li>
+                    <li><strong>Parallel Safety</strong>: Multiple developers can trigger builds simultaneously without
+                        overwriting each other's work.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>2. Health-Check Gated Deployment</h2>
+            <div class="card">
+                <h3>The Logic: "Verify Before Trust"</h3>
+                <p>Dependencies in a distributed system are fragile. We implemented a gated rollout where the frontend
+                    only deploys once the backend is proven functional.</p>
+
+                <pre><code># The Deployment Sequence
+1. Deploy ad-server
+2. POLL /health endpoint
+3. IF 200 OK -> Proceed to deploy client-app
+4. ELSE -> Fail build & Alert SRE</code></pre>
+
+                <h3>Operation details</h3>
+                <p>The <code>cloudbuild.yaml</code> uses a bash polling loop that attempts to reach the service 30 times
+                    with 2-second intervals. This accommodates the "Cold Start" time of Cloud Run services.</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>3. Structural Implementation</h2>
+            <p>The following snippet from our <code>cloudbuild.yaml</code> demonstrates the integration of these
+                concepts:</p>
+            <pre><code># Health Polling Logic
+for i in {1..30}; do
+  HTTP_CODE=$$(curl -s -o /dev/null -w "%{http_code}" "$$SERVICE_URL/health")
+  if [ "$$HTTP_CODE" = "200" ]; then
+    echo "✅ Service is HEALTHY"
+    exit 0
+  fi
+  sleep 2
+done</code></pre>
+        </div>
+
+        <footer>
+            Built by Antigravity AI for softomedia-live-2026 | Deployment successful (2026-01-02)
+        </footer>
+    </div>
+</body>
+
+</html>

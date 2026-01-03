@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Softomedia Live 2026 – Technical Evolution</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-card: #ffffff;
+            --accent-blue: #2563eb;
+            --accent-purple: #7c3aed;
+            --accent-green: #059669;
+            --accent-orange: #d97706;
+            --accent-red: #dc2626;
+            --accent-cyan: #0891b2;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #64748b;
+            --border-subtle: rgba(0, 0, 0, 0.08);
+            --border-card: rgba(0, 0, 0, 0.12);
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+            --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.12);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Subtle Background Pattern */
+        .bg-pattern {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background:
+                radial-gradient(circle at 20% 20%, rgba(37, 99, 235, 0.03) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(124, 58, 237, 0.03) 0%, transparent 50%),
+                linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 80px 40px 60px;
+            position: relative;
+            background: linear-gradient(180deg, #f0f9ff 0%, #ffffff 100%);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .header::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+            border-radius: 4px;
+        }
+
+        .logo {
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: var(--accent-cyan);
+            margin-bottom: 20px;
+            opacity: 0;
+            animation: fadeInUp 0.8s ease forwards;
+        }
+
+        .title {
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-blue) 50%, var(--accent-purple) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 16px;
+            opacity: 0;
+            animation: fadeInUp 0.8s ease 0.2s forwards;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            font-weight: 400;
+            opacity: 0;
+            animation: fadeInUp 0.8s ease 0.4s forwards;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            display: flex;
+            justify-content: center;
+            gap: 60px;
+            padding: 50px 20px;
+            flex-wrap: wrap;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .stat {
+            text-align: center;
+            opacity: 0;
+            animation: fadeInUp 0.6s ease forwards;
+        }
+
+        .stat:nth-child(1) {
+            animation-delay: 0.5s;
+        }
+
+        .stat:nth-child(2) {
+            animation-delay: 0.6s;
+        }
+
+        .stat:nth-child(3) {
+            animation-delay: 0.7s;
+        }
+
+        .stat:nth-child(4) {
+            animation-delay: 0.8s;
+        }
+
+        .stat-value {
+            font-size: 3rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 8px;
+        }
+
+        /* Timeline Container */
+        .timeline-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 60px 40px;
+            position: relative;
+        }
+
+        .timeline-line {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: linear-gradient(180deg,
+                    var(--accent-cyan) 0%,
+                    var(--accent-blue) 25%,
+                    var(--accent-purple) 50%,
+                    var(--accent-orange) 75%,
+                    var(--accent-green) 100%);
+            transform: translateX(-50%);
+            border-radius: 4px;
+        }
+
+        @media (max-width: 768px) {
+            .timeline-line {
+                left: 30px;
+            }
+        }
+
+        /* Phase Section */
+        .phase {
+            margin-bottom: 80px;
+            position: relative;
+        }
+
+        .phase-header {
+            text-align: center;
+            margin-bottom: 40px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .phase-badge {
+            display: inline-block;
+            padding: 14px 36px;
+            background: var(--bg-card);
+            border: 2px solid;
+            border-radius: 50px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            box-shadow: var(--shadow-md);
+        }
+
+        .phase-badge.infrastructure {
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+
+        .phase-badge.foundation {
+            border-color: var(--accent-blue);
+            color: var(--accent-blue);
+        }
+
+        .phase-badge.security {
+            border-color: var(--accent-orange);
+            color: var(--accent-orange);
+        }
+
+        .phase-badge.services {
+            border-color: var(--accent-purple);
+            color: var(--accent-purple);
+        }
+
+        .phase-badge.quality {
+            border-color: var(--accent-green);
+            color: var(--accent-green);
+        }
+
+        .phase-badge.production {
+            border-color: var(--accent-red);
+            color: var(--accent-red);
+        }
+
+        /* Timeline Events */
+        .event {
+            display: flex;
+            margin-bottom: 40px;
+            position: relative;
+            opacity: 0;
+            transform: translateY(40px);
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .event.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .event:nth-child(odd) {
+            flex-direction: row;
+        }
+
+        .event:nth-child(even) {
+            flex-direction: row-reverse;
+        }
+
+        @media (max-width: 768px) {
+
+            .event,
+            .event:nth-child(even) {
+                flex-direction: row;
+            }
+        }
+
+        .event-content {
+            width: calc(50% - 40px);
+            padding: 28px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: 16px;
+            box-shadow: var(--shadow-sm);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .event-content::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .event-content:hover {
+            transform: translateY(-6px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--accent-purple);
+        }
+
+        .event-content:hover::before {
+            opacity: 1;
+        }
+
+        @media (max-width: 768px) {
+            .event-content {
+                width: calc(100% - 70px);
+                margin-left: 40px;
+            }
+        }
+
+        .event-dot {
+            position: absolute;
+            left: 50%;
+            top: 30px;
+            width: 20px;
+            height: 20px;
+            background: var(--bg-primary);
+            border: 4px solid var(--accent-blue);
+            border-radius: 50%;
+            transform: translateX(-50%);
+            z-index: 5;
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .event:hover .event-dot {
+            transform: translateX(-50%) scale(1.3);
+            background: var(--accent-blue);
+        }
+
+        @media (max-width: 768px) {
+            .event-dot {
+                left: 30px;
+            }
+        }
+
+        .event-date {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.85rem;
+            color: var(--accent-blue);
+            font-weight: 700;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+
+        .event-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
+
+        .event-description {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            line-height: 1.7;
+            margin-bottom: 16px;
+        }
+
+        .event-description code {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: var(--accent-purple);
+        }
+
+        /* Tags */
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .tag {
+            padding: 6px 14px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 20px;
+            background: rgba(37, 99, 235, 0.1);
+            color: var(--accent-blue);
+            border: 1px solid rgba(37, 99, 235, 0.3);
+        }
+
+        .tag.added {
+            background: rgba(5, 150, 105, 0.1);
+            color: var(--accent-green);
+            border-color: rgba(5, 150, 105, 0.3);
+        }
+
+        .tag.fixed {
+            background: rgba(217, 119, 6, 0.1);
+            color: var(--accent-orange);
+            border-color: rgba(217, 119, 6, 0.3);
+        }
+
+        .tag.security {
+            background: rgba(220, 38, 38, 0.1);
+            color: var(--accent-red);
+            border-color: rgba(220, 38, 38, 0.3);
+        }
+
+        .tag.performance {
+            background: rgba(8, 145, 178, 0.1);
+            color: var(--accent-cyan);
+            border-color: rgba(8, 145, 178, 0.3);
+        }
+
+        .tag.testing {
+            background: rgba(124, 58, 237, 0.1);
+            color: var(--accent-purple);
+            border-color: rgba(124, 58, 237, 0.3);
+        }
+
+        /* Lessons Section */
+        .lessons-section {
+            background: linear-gradient(180deg, #fafafa 0%, #f1f5f9 100%);
+            padding: 80px 40px;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .lessons-header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .lessons-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-red));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .lessons-subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .lessons-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .lesson-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: 16px;
+            padding: 28px;
+            box-shadow: var(--shadow-sm);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .lesson-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 5px;
+            height: 100%;
+            background: linear-gradient(180deg, var(--accent-orange), var(--accent-red));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .lesson-card:hover {
+            transform: translateY(-6px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .lesson-card:hover::before {
+            opacity: 1;
+        }
+
+        .lesson-category {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            background: rgba(217, 119, 6, 0.1);
+            border: 1px solid rgba(217, 119, 6, 0.3);
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--accent-orange);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+        }
+
+        .lesson-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .lesson-issue {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 16px;
+            padding-left: 16px;
+            border-left: 3px solid var(--accent-red);
+        }
+
+        .lesson-prevention {
+            font-size: 0.9rem;
+            color: var(--accent-green);
+            line-height: 1.6;
+            padding-left: 16px;
+            border-left: 3px solid var(--accent-green);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 60px 40px;
+            border-top: 1px solid var(--border-subtle);
+            background: var(--bg-primary);
+        }
+
+        .footer-text {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .footer-brand {
+            color: var(--accent-blue);
+            font-weight: 700;
+        }
+
+        /* Progress Indicator */
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue), var(--accent-purple));
+            z-index: 1000;
+            transition: width 0.1s ease;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="progress-bar" id="progressBar"></div>
+    <div class="bg-pattern"></div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="logo">Softomedia</div>
+        <h1 class="title">Technical Evolution</h1>
+        <p class="subtitle">Broadcasting Engine MVP – January 2026</p>
+    </header>
+
+    <!-- Stats Bar -->
+    <section class="stats-bar">
+        <div class="stat">
+            <div class="stat-value">6</div>
+            <div class="stat-label">Sprints Completed</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value">50+</div>
+            <div class="stat-label">Lessons Learned</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value">20+</div>
+            <div class="stat-label">Major Milestones</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value">100+</div>
+            <div class="stat-label">Tests Passing</div>
+        </div>
+    </section>
+
+    <!-- Timeline -->
+    <main class="timeline-container">
+        <div class="timeline-line"></div>
+
+        <!-- Phase 1: Infrastructure -->
+        <section class="phase">
+            <div class="phase-header">
+                <span class="phase-badge infrastructure">📦 Phase 1: Infrastructure</span>
+            </div>
+
+            <article class="event">
+                <div class="event-dot"></div>
+                <div class="event-content">
+                    <div class="event-date">
+                        <span>📅</span> January 1, 2026
+                    </div>
+                    <h3 class="event-title">GCP Infrastructure Provisioning</h3>
+                    <p class="event-description">
+                        Established the cloud foundation with Artifact Registry, Secret Manager, Firestore (Native
+                        Mode),
+                        and Cloud Storage in the <code>softomedia-live-2026</code> project. Set up IAM roles for secure
+                        access.
+                    </p>
+                    <div class="tags">
+                        <span class="tag added">+Artifact Registry</span>
+                        <span class="tag added">+Secret Manager</span>
+                        <span class="tag added">+Firestore</span>
+                        <span class="tag security">IAM</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="event">
+                <div class="event-dot"></div>
+                <div class="event-content">
+                    <div class="event-date">
+                        <span>📅</span> January 1, 2026
+                    </div>
+                    <h3 class="event-title">Deployment Pipeline Created</h3>
+                    <p class="event-description">
+                        Built <code>cloudbuild.yaml</code> for atomic Cloud Run deployments with dynamic CORS
+                        configuration.
+                        Created pre-deploy verification script and comprehensive deployment guide.
+                    </p>
+                    <div class="tags">
+                        <span class="tag added">+Cloud Build</span>
+                        <span class="tag added">+Cloud Run</span>
+                        <span class="tag fixed">CI-Aware Scripts</span>
+                    </div>
+                </div>
+            </article>
+        </section>
+
+        <!-- Phase 2: Foundation -->
+        <section class="phase">
+            <div class="phase-header">
+                <span class="phase-badge foundation">🏗️ Phase 2: Database & Architecture</span>
+            </div>
+
+            <article class="event">
+                <div class="event-dot"></div>
+                <div class="event-content">
+                    <div class="event-date">
+                        <span>📅</span> January 1, 2026 – Sprint 2
+                    </div>
+                    <h3 class="event-title">Firestore Database Migration</h3>
+                    <p class="event-description">
+                        Migrated from in-memory storage to Firestore with the Repository Pattern. Implemented
+                        BaseRepository
+                        with auto-timestamps, domain repositories, and idempotent seeding scripts.
+                    </p>
+                    <div class="tags">
+                        <span class="tag added">+Repository Pattern</span>
+                        <span class="tag added">+Auto-Timestamps</span>
+                        <span class="tag performance">Persistence</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="event">
+                <div class="event-dot"></div>
+                <div class="event-content">
+                    <div class="event-date">
+                        <span>📅</span> January 1, 2026 – Sprint 3
+                    </div>
+                    <h3 class="event-title">Service Layer Architecture</h3>
+                    <p class="event-description">
+                        Separated business logic from routes with AuthService and PlaylistService. Created frontend
+                        API client with retry logic, interceptors, and centralized error handling.
+                    </p>
+                    <div class="tags">
+                        <span class="tag added">+Service Layer</span>
+                        <span class="tag added">+API Client</span>
+                        <span class="tag performance">Retry Logic</span>
+                    </div>
+                </div>
+            </article>
+        </section>
+
+        <!-- Phase 3: Security -->
+        <section class="phase">
+            <div class="phase-header">
+                <span class="phase-badge security">🔒 Phase 3: Security & Validation</span>
+            </div>
+
+            <article class="event">
+                <div class="event-dot"></div>
+                <div class="event-content">
+                    <div class="event-date">
+                        <span>📅</span> January 1, 2026 – Sprint 4
+                    </div>
+                    <h3 class="event-title">Input Validation & Security Headers</h3>
+                    <p class="event-description">
+                        Implemented express-validator middleware for all endpoints. Added security headers (CSP,
+                        X-Frame-Options),
+                        request size limits, and XSS prevention. JWT secrets now required, never fall back to defaults.
+                    </p>
+                    <div class="tags">
+                        <span class="tag security">Validation</span>
+                        <span class="tag security">CSP</span>
+                        <span class="tag security">DoS Protection</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="event">
+                <div class="event-dot"></div>
+                <div class="event-content">
+                    <div class="event-date">
+                        <span>📅</span> January 1, 2026 – SDLC##12
+                    </div>
+                    <h3 class="event-title">Firebase Hardening</h3>
+                    <p class="event-description">
+                        Deployed "deny-all" Firestore and Storage security rules. Optimized BaseRepository.count()
+                        from O(n) to O(1) using native aggregation. Applied auth middleware to all management routes.
+                    </p>
+                    <div class="tags">
+                        <span class="tag security">Firestore Rules</span>
+                        <span class="tag performance">O(1) Counting</span>
+                        <span class="tag fixed">Route Protection</span>
+                    </div>
+                </div>
+            </article>
+        </section>
+
+        <!-- Phase 4: Services & Features -->
+        <section class="phase">
+            <div class="phase-header">
+                <span class="phase-badge services">⚡ Phase 4: Core Features</span>
+            </div>
+
+            <article class="event">
+                <div class="event-dot"></div>
+                <div class="event-content">
+                    <div class="event-date">
+                        <span>📅</span> January 1, 2026 – Sprints 1-2
+                    </div>
+                    <h3 class="event-title">Multi-Tenancy & Media Lifecycle</h3>
+                    <p class="event-description">
+                        Implemented Retailer, Advertiser, and Location repositories. Standardized 5 MVP roles with RBAC.
+                        Created Media API with 5-second metadata validation and Campaign workflow with approval states.
+                    </p>
+                    <div class="tags">
+                        <span class="tag added">+Multi-Tenancy</span>
+                        <span class="tag added">+RBAC</span>
+                        <span class="tag added">+Campaign Workflow</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="event">
+                <div class="event-dot"></div>
+                <div class="event-content">
+                    <div class="event-date">
+                        <span>📅</span> January 2, 2026 – Sprint 6
+                    </div>
+                    <h3 class="event-title">Global Playlist & Media Upload</h3>
+                    <p class="event-description">
+                        Implemented <code>is_global</code> flag for system-wide fallback playlists with forced 5-second
+                        rotation.
+                        Added multipart file upload using Multer and Asset Upload API with file validation.
+                    </p>
+                    <div class="tags">
+                        <span class="tag added">+Global Playlist</span>
+                        <span class="tag added">+File Upload</span>
+                        <span class="tag fixed">Forced 5s Rotation</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="event">
+                <div class="event-dot"></div>
+                <div class="event-content">
+                    <div class="event-date">
+                        <span>📅</span> January 2, 2026 – Sprints 1-6
+                    </div>
+                    <h3 class="event-title">Broadcasting Engine MVP</h3>
+                    <p class="event-description">
+                        Built complete Loop system: LoopRepository, D-1 Generation Service, Loop Management UI,
+                        Loop Builder with 12-slot visual editor, Schedule Calendar, and dual-mode Player with hour
+                        detection.
+                    </p>
+                    <div class="tags">
+                        <span class="tag added">+Loop System</span>
+                        <span class="tag added">+D-1 Scheduling</span>
+                        <span class="tag added">+Dual-Mode Player</span>
+                    </div>
+                </div>
+            </article>
+        </section>
+
+        <!-- Phase 5: Quality & Testing -->
+        <section class="phase">
+            <div class="phase-header">
+                <span class="phase-badge quality">✅ Phase 5: Quality Gates</span>
+            </div>
+
+            <article class="event">
+                <div class="event-dot"></div>
+                <div class="event-content">
+                    <div class="event-date">
+                        <span>📅</span> January 1, 2026
+                    </div>
+                    <h3 class="event-title">Playwright E2E Stabilization</h3>
+                    <p class="event-description">
+                        Fixed async race conditions, API mocking, and test parallelization issues. Standardized on
+                        data-testid selectors, added aria-hidden to icons, and created useAsyncAction hook for
+                        consistent state management.
+                    </p>
+                    <div class="tags">
+                        <span class="tag testing">Playwright</span>
+                        <span class="tag fixed">Race Conditions</span>
+                        <span class="tag added">+useAsyncAction Hook</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="event">
+                <div class="event-dot"></div>
+                <div class="event-content">
+                    <div class="event-date">
+                        <span>📅</span> January 2, 2026 – SDLC##4
+                    </div>
+                    <h3 class="event-title">CI/CD Quality Enforcement</h3>
+                    <p class="event-description">
+                        Updated Cloud Build with mandatory lint and test steps. Configured Jest for ES modules (75%
+                        coverage)
+                        and Vitest for frontend (15%+ core logic). Playwright E2E suite now gates deployments.
+                    </p>
+                    <div class="tags">
+                        <span class="tag testing">Jest + Vitest</span>
+                        <span class="tag added">+Coverage Gates</span>
+                        <span class="tag security">CI Enforcement</span>
+                    </div>
+                </div>
+            </article>
+        </section>
+
+        <!-- Phase 6: Production -->
+        <section class="phase">
+            <div class="phase-header">
+                <span class="phase-badge production">🚀 Phase 6: Production Deploy</span>
+            </div>
+
+            <article class="event">
+                <div class="event-dot"></div>
+                <div class="event-content">
+                    <div class="event-date">
+                        <span>📅</span> January 2, 2026 – SDLC##10
+                    </div>
+                    <h3 class="event-title">Production Resilience</h3>
+                    <p class="event-description">
+                        Created ResilienceUtility.js with Exponential Retry (with jitter) and Circuit Breaker patterns.
+                        Integrated fault-tolerant repositories with graceful fallback to memory. Extended /health/v2
+                        with circuit diagnostics.
+                    </p>
+                    <div class="tags">
+                        <span class="tag added">+Circuit Breaker</span>
+                        <span class="tag added">+Retry with Jitter</span>
+                        <span class="tag performance">Fault Tolerance</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="event">
+                <div class="event-dot"></div>
+                <div class="event-content">
+                    <div class="event-date">
+                        <span>🎉</span> January 2, 2026 – MVP Launch
+                    </div>
+                    <h3 class="event-title">Broadcasting Engine MVP Deployed 🚀</h3>
+                    <p class="event-description">
+                        Successfully deployed client-app and ad-server to Cloud Run. Refactored pipeline with SRE-grade
+                        SHA-based versioning and post-deployment health-check gates. Verified live endpoint stability.
+                    </p>
+                    <div class="tags">
+                        <span class="tag added">+SHA Versioning</span>
+                        <span class="tag added">+Health Gates</span>
+                        <span class="tag performance">Production Live</span>
+                    </div>
+                </div>
+            </article>
+        </section>
+    </main>
+
+    <!-- Lessons Learned Section -->
+    <section class="lessons-section">
+        <div class="lessons-header">
+            <h2 class="lessons-title">Key Lessons Learned</h2>
+            <p class="lessons-subtitle">50+ documented insights from the development journey</p>
+        </div>
+
+        <div class="lessons-grid">
+            <article class="lesson-card">
+                <span class="lesson-category">🔥 Critical</span>
+                <h4 class="lesson-title">Never Use Default Secrets</h4>
+                <p class="lesson-issue">Using fallback secrets (e.g., JWT_SECRET || 'default') creates critical security
+                    vulnerabilities.</p>
+                <p class="lesson-prevention">Always fail fast with process.exit(1) if required secrets are missing.
+                    Forces proper configuration.</p>
+            </article>
+
+            <article class="lesson-card">
+                <span class="lesson-category">⚡ Performance</span>
+                <h4 class="lesson-title">Firestore Count Optimization</h4>
+                <p class="lesson-issue">count() implemented by fetching all documents in memory – O(n) operation.</p>
+                <p class="lesson-prevention">Use Firestore's native .count() aggregation for O(1) performance and
+                    reduced network egress.</p>
+            </article>
+
+            <article class="lesson-card">
+                <span class="lesson-category">🧪 Testing</span>
+                <h4 class="lesson-title">API Mocking in Playwright</h4>
+                <p class="lesson-issue">Tests depended on backend endpoints that weren't fully implemented, causing
+                    flaky failures.</p>
+                <p class="lesson-prevention">Use page.route() to mock API responses in beforeEach – isolates tests from
+                    backend state.</p>
+            </article>
+
+            <article class="lesson-card">
+                <span class="lesson-category">🏗️ Architecture</span>
+                <h4 class="lesson-title">Service Layer Separation</h4>
+                <p class="lesson-issue">Business logic mixed with data access made testing difficult and created tight
+                    coupling.</p>
+                <p class="lesson-prevention">Routes → Services → Repositories. Services own business logic, repositories
+                    own I/O.</p>
+            </article>
+
+            <article class="lesson-card">
+                <span class="lesson-category">🔒 Security</span>
+                <h4 class="lesson-title">Cloud Run Public Access</h4>
+                <p class="lesson-issue">Deployment succeeded but app returned 403 Forbidden – IAM not configured
+                    properly.</p>
+                <p class="lesson-prevention">Explicitly grant roles/run.invoker to allUsers for public-facing services.
+                </p>
+            </article>
+
+            <article class="lesson-card">
+                <span class="lesson-category">🛡️ Resilience</span>
+                <h4 class="lesson-title">Circuit Breaker Pattern</h4>
+                <p class="lesson-issue">Transient Firestore timeouts blocked the entire event loop when many requests
+                    waited.</p>
+                <p class="lesson-prevention">Implement Circuit Breakers for external resources – fail fast after
+                    threshold, recover in HALF_OPEN.</p>
+            </article>
+
+            <article class="lesson-card">
+                <span class="lesson-category">📦 CI/CD</span>
+                <h4 class="lesson-title">SHA-Based Image Tagging</h4>
+                <p class="lesson-issue">Overwriting :latest tag with failing builds made instant rollbacks impossible.
+                </p>
+                <p class="lesson-prevention">Implement unique $BUILD_ID or SHA-based tagging for every deployment. Never
+                    rely on :latest alone.</p>
+            </article>
+
+            <article class="lesson-card">
+                <span class="lesson-category">🧪 Testing</span>
+                <h4 class="lesson-title">Material Icons Pollution</h4>
+                <p class="lesson-issue">Icons like &lt;span&gt;add&lt;/span&gt; polluted accessible names, breaking
+                    getByRole selectors.</p>
+                <p class="lesson-prevention">Always use aria-hidden="true" on decorative icons inside interactive
+                    elements.</p>
+            </article>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p class="footer-text">
+            Technical Evolution Report – <span class="footer-brand">Softomedia Live 2026</span> – Generated January 2,
+            2026
+        </p>
+    </footer>
+
+    <script>
+        // Scroll progress indicator
+        window.addEventListener('scroll', () => {
+            const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+            const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+            const scrolled = (winScroll / height) * 100;
+            document.getElementById('progressBar').style.width = scrolled + '%';
+        });
+
+        // Reveal on scroll
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+
+        document.querySelectorAll('.event').forEach(event => observer.observe(event));
+        document.querySelectorAll('.lesson-card').forEach(card => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(30px)';
+            observer.observe(card);
+        });
+
+        // Add visible class handler for lesson cards
+        const cardObserver = new IntersectionObserver((entries) => {
+            entries.forEach((entry, index) => {
+                if (entry.isIntersecting) {
+                    setTimeout(() => {
+                        entry.target.style.opacity = '1';
+                        entry.target.style.transform = 'translateY(0)';
+                        entry.target.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+                    }, index * 100);
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.lesson-card').forEach(card => cardObserver.observe(card));
+    </script>
+</body>
+
+</html>

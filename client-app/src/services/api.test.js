@@ -7,21 +7,21 @@ describe('APIClient', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        global.fetch = vi.fn();
+        vi.stubGlobal('fetch', vi.fn());
         client = new APIClient(baseURL, { retryDelay: 1, timeout: 100 });
 
         // Mock localStorage
         const storage = {};
-        global.localStorage = {
+        vi.stubGlobal('localStorage', {
             getItem: vi.fn(key => storage[key]),
             setItem: vi.fn((key, val) => storage[key] = val),
             clear: vi.fn(() => { })
-        };
+        });
     });
 
     it('makes a successful GET request', async () => {
         const mockData = { id: 1, name: 'Test' };
-        global.fetch.mockResolvedValueOnce({
+        fetch.mockResolvedValueOnce({
             ok: true,
             json: async () => mockData,
         });
@@ -29,13 +29,13 @@ describe('APIClient', () => {
         const result = await client.get('/test');
 
         expect(result).toEqual(mockData);
-        expect(global.fetch).toHaveBeenCalledWith(`${baseURL}/test`, expect.objectContaining({
+        expect(fetch).toHaveBeenCalledWith(`${baseURL}/test`, expect.objectContaining({
             method: 'GET'
         }));
     });
 
     it('handles non-OK responses with custom APIError', async () => {
-        global.fetch.mockResolvedValueOnce({
+        fetch.mockResolvedValueOnce({
             ok: false,
             status: 404,
             json: async () => ({ error: 'Not Found' }),
@@ -45,25 +45,25 @@ describe('APIClient', () => {
     });
 
     it('retries on specific status codes', async () => {
-        global.fetch
+        fetch
             .mockResolvedValueOnce({ ok: false, status: 500 })
             .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
 
         const result = await client.get('/retry');
 
         expect(result.success).toBe(true);
-        expect(global.fetch).toHaveBeenCalledTimes(2);
+        expect(fetch).toHaveBeenCalledTimes(2);
     });
 
     it('attaches auth token from localStorage if present', async () => {
         localStorage.setItem('auth_token', 'fake-token');
 
         // We use the singleton instance here to test the interceptor
-        global.fetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+        fetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
 
         await apiClient.get('/secure');
 
-        expect(global.fetch).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+        expect(fetch).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
             headers: expect.objectContaining({
                 'Authorization': 'Bearer fake-token'
             })
@@ -71,7 +71,7 @@ describe('APIClient', () => {
     });
 
     it.skip('handles request timeout', async () => {
-        global.fetch.mockImplementationOnce((url, options) => {
+        fetch.mockImplementationOnce((url, options) => {
             return new Promise((resolve, reject) => {
                 if (options.signal) {
                     options.signal.addEventListener('abort', () => {

@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import { API_URL } from '../../config';
 
 function TechOpsDashboard() {
     const [stats, setStats] = useState({ total: 0, online: 0, offline: 0, screens: [] });
-    const [loading, setLoading] = useState(true);
+    const [, setLoading] = useState(true);
 
     useEffect(() => {
         fetchStatus();

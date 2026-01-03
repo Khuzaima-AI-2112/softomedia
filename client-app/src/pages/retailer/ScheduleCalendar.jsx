@@ -4,7 +4,7 @@
  * Business Hours: 8am - 10pm (14 loops per day)
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import LoopPreviewModal from '../../components/LoopPreviewModal';
@@ -122,7 +122,7 @@ function ScheduleCalendar() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-                        Tomorrow's Broadcast Schedule
+                        Tomorrow&apos;s Broadcast Schedule
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400">
                         Review and approve the broadcast schedule for{' '}
@@ -208,8 +208,8 @@ function ScheduleCalendar() {
                                     onClick={() => handleLoopClick(loop)}
                                     disabled={!loop}
                                     className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all ${loop
-                                            ? `${getStatusStyle(loop.status)} hover:shadow-md cursor-pointer`
-                                            : 'bg-slate-50 dark:bg-slate-800 border-dashed border-slate-200 dark:border-slate-700 opacity-50 cursor-not-allowed'
+                                        ? `${getStatusStyle(loop.status)} hover:shadow-md cursor-pointer`
+                                        : 'bg-slate-50 dark:bg-slate-800 border-dashed border-slate-200 dark:border-slate-700 opacity-50 cursor-not-allowed'
                                         }`}
                                     data-testid={`schedule-hour-${hour}`}
                                 >
@@ -228,10 +228,10 @@ function ScheduleCalendar() {
                                                         <div
                                                             key={i}
                                                             className={`h-6 flex-1 rounded ${slot?.asset_id
-                                                                    ? slot.status === 'REJECTED'
-                                                                        ? 'bg-red-400'
-                                                                        : 'bg-primary'
-                                                                    : 'bg-slate-300 dark:bg-slate-600'
+                                                                ? slot.status === 'REJECTED'
+                                                                    ? 'bg-red-400'
+                                                                    : 'bg-primary'
+                                                                : 'bg-slate-300 dark:bg-slate-600'
                                                                 }`}
                                                             title={`Slot ${i + 1}`}
                                                         />
@@ -283,7 +283,7 @@ function ScheduleCalendar() {
                         No Schedule Available
                     </h3>
                     <p className="text-slate-500">
-                        Tomorrow's broadcast schedule has not been generated yet.<br />
+                        Tomorrow&apos;s broadcast schedule has not been generated yet.<br />
                         Please contact Softomedia operations.
                     </p>
                 </div>

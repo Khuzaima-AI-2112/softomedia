@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import GlassCard from './GlassCard.jsx';
 import StatusBadge from './StatusBadge.jsx';
 import { API_URL } from '../config.js';

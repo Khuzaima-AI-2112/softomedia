@@ -33,8 +33,9 @@ const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
         // Mocking metadata extraction and validation
         const mockDuration = 5;
 
+        // Relaxed validation: Warn but allow if not exactly 5s (or just log it)
         if (mockDuration !== 5) {
-            throw new Error('Strict Validation Error: Ad must be exactly 5 seconds.');
+            console.warn('Ad duration is not exactly 5s. Auto-trimming might occur.');
         }
 
         const token = localStorage.getItem('auth_token');
@@ -97,30 +98,48 @@ const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
                     </div>
 
                     <div className="flex flex-col md:flex-row gap-8 justify-between">
-                        {/* Mock Calendar Grid */}
-                        <div className="flex-1 max-w-sm mx-auto">
-                            <div className="text-center font-bold mb-4">October 2023</div>
-                            <div className="grid grid-cols-7 gap-1 text-center text-sm">
-                                {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => <div key={d} className="py-2 text-slate-400 font-medium">{d}</div>)}
-                                {Array.from({ length: 31 }).map((_, i) => {
-                                    const day = i + 1;
-                                    const isSelected = day >= 5 && day <= 12;
-                                    return (
-                                        <div
-                                            key={i}
-                                            className={`py-2 rounded-md cursor-pointer transition-colors ${isSelected ? 'bg-primary text-white font-bold' : 'hover:bg-slate-100 dark:hover:bg-slate-800'
-                                                }`}
-                                        >
-                                            {day}
-                                        </div>
-                                    );
-                                })}
+                        {/* Date Range Inputs */}
+                        <div className="flex-1 flex flex-col gap-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Start Date</label>
+                                <input
+                                    type="date"
+                                    value={data.dateRange.start}
+                                    onChange={(e) => updateData({ dateRange: { ...data.dateRange, start: e.target.value } })}
+                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">End Date</label>
+                                <input
+                                    type="date"
+                                    value={data.dateRange.end}
+                                    onChange={(e) => updateData({ dateRange: { ...data.dateRange, end: e.target.value } })}
+                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                                />
                             </div>
                         </div>
+
                         <div className="flex-1 flex flex-col justify-center bg-slate-50 dark:bg-slate-800/50 rounded-xl p-6 border border-dashed border-slate-200 dark:border-slate-700">
-                            <h3 className="text-sm font-bold text-slate-500 uppercase mb-2">Selected Range</h3>
-                            <div className="text-2xl font-black text-primary mb-1">8 Days</div>
-                            <p className="text-sm text-slate-600 dark:text-slate-400">Oct 05 - Oct 12, 2023</p>
+                            <h3 className="text-sm font-bold text-slate-500 uppercase mb-2">Campaign Settings</h3>
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-slate-600 dark:text-slate-300">Total Duration</span>
+                                <span className="font-black text-primary">
+                                    {Math.max(1, Math.ceil((new Date(data.dateRange.end) - new Date(data.dateRange.start)) / (1000 * 60 * 60 * 24)) + 1)} Days
+                                </span>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase">Frequency per Loop</label>
+                                <select
+                                    value={data.frequency || 1}
+                                    onChange={(e) => updateData({ frequency: parseInt(e.target.value) })}
+                                    className="w-full px-2 py-1 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                                >
+                                    <option value={1}>1x (Standard)</option>
+                                    <option value={2}>2x (Double Exposure)</option>
+                                    <option value={3}>3x (High Frequency)</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </section>

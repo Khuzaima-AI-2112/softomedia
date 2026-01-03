@@ -4,7 +4,7 @@
  * Each slot: 5 seconds duration
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
@@ -251,10 +251,10 @@ function LoopBuilder() {
                             <div
                                 key={i}
                                 className={`flex-1 flex items-center justify-center text-xs font-bold transition-colors ${slot.asset_id
-                                        ? slot.status === 'REJECTED'
-                                            ? 'bg-red-400 text-white'
-                                            : 'bg-primary text-white'
-                                        : 'bg-slate-200 dark:bg-slate-700 text-slate-500'
+                                    ? slot.status === 'REJECTED'
+                                        ? 'bg-red-400 text-white'
+                                        : 'bg-primary text-white'
+                                    : 'bg-slate-200 dark:bg-slate-700 text-slate-500'
                                     }`}
                                 title={`Slot ${i + 1}: ${slot.asset_id || 'Empty'}`}
                             >

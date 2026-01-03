@@ -266,8 +266,14 @@ function Player() {
         if (playbackMode === 'loop' && currentLoop) {
             const slot = currentLoop.slots?.[currentSlotIndex];
             if (slot?.asset_id) {
+                // Ensure URL is valid. If it's just a filename/ID, construct full path
+                let assetUrl = slot.url || `${API_URL}/api/assets/${slot.asset_id}`;
+                if (!assetUrl.startsWith('http')) {
+                    assetUrl = `${API_URL}/api/assets/${slot.asset_id}`;
+                }
+
                 return {
-                    url: slot.url || `${API_URL}/api/assets/${slot.asset_id}`,
+                    url: assetUrl,
                     title: slot.asset_name || `Slot ${currentSlotIndex + 1}`,
                     duration: slot.duration || 5,
                     isLoop: true,
@@ -278,8 +284,14 @@ function Player() {
         }
 
         if (playlist && playlist[currentAdIndex]) {
+            let assetUrl = playlist[currentAdIndex].url || `${API_URL}/api/assets/${playlist[currentAdIndex].media_id}`;
+            if (!assetUrl.startsWith('http')) {
+                assetUrl = `${API_URL}/api/assets/${playlist[currentAdIndex].media_id}`;
+            }
+
             return {
                 ...playlist[currentAdIndex],
+                url: assetUrl,
                 isLoop: false
             };
         }

@@ -4,7 +4,7 @@
  * Business Hours: 8am - 10pm (14 loops per day)
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
@@ -202,8 +202,8 @@ function LoopManagement() {
                                     onClick={() => loop && navigate(`/dashboard/admin/loops/${loop.id}`)}
                                     disabled={!loop}
                                     className={`p-4 rounded-xl border transition-all text-left ${loop
-                                            ? 'border-slate-200 dark:border-slate-700 hover:border-primary hover:shadow-lg cursor-pointer'
-                                            : 'border-dashed border-slate-300 dark:border-slate-700 opacity-50 cursor-not-allowed'
+                                        ? 'border-slate-200 dark:border-slate-700 hover:border-primary hover:shadow-lg cursor-pointer'
+                                        : 'border-dashed border-slate-300 dark:border-slate-700 opacity-50 cursor-not-allowed'
                                         }`}
                                     data-testid={`loop-hour-${hour}`}
                                 >
@@ -226,10 +226,10 @@ function LoopManagement() {
                                                     <div
                                                         key={i}
                                                         className={`h-1.5 flex-1 rounded-full ${loop.slots?.[i]?.asset_id
-                                                                ? loop.slots[i].status === 'REJECTED'
-                                                                    ? 'bg-red-400'
-                                                                    : 'bg-primary'
-                                                                : 'bg-slate-200 dark:bg-slate-700'
+                                                            ? loop.slots[i].status === 'REJECTED'
+                                                                ? 'bg-red-400'
+                                                                : 'bg-primary'
+                                                            : 'bg-slate-200 dark:bg-slate-700'
                                                             }`}
                                                     />
                                                 ))}
@@ -262,7 +262,7 @@ function LoopManagement() {
                         disabled={generating}
                         className="px-6 py-3 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover transition-colors"
                     >
-                        {generating ? 'Generating...' : 'Generate D-1 Loops'}
+                        {generating ? 'Generating...' : `Generate Loops for ${targetDate}`}
                     </button>
                 </div>
             )}

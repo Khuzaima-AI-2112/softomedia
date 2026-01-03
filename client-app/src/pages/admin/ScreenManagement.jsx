@@ -27,6 +27,22 @@ function ScreenManagement() {
         fetchScreens();
     }, []);
 
+    const handleDelete = async (id) => {
+        if (!confirm('Are you sure you want to delete this screen? This action cannot be undone.')) return;
+        try {
+            const res = await fetch(`${API_URL}/api/screens/${id}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                fetchScreens();
+            } else {
+                alert('Failed to delete screen');
+            }
+        } catch (error) {
+            console.error('Failed to delete screen', error);
+        }
+    };
+
     const handleCreateScreen = async (e) => {
         e.preventDefault();
         try {
@@ -90,8 +106,15 @@ function ScreenManagement() {
                                             <StatusBadge status={screen.status} />
                                         </td>
                                         <td className="py-3 px-4 text-right">
-                                            <button className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-500 transition-colors">
+                                            <button className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-500 transition-colors mr-1" title="Settings">
                                                 <span className="material-symbols-outlined text-[20px]">settings</span>
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(screen.screen_id)}
+                                                className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-500 transition-colors"
+                                                title="Delete Screen"
+                                            >
+                                                <span className="material-symbols-outlined text-[20px]">delete</span>
                                             </button>
                                         </td>
                                     </tr>
