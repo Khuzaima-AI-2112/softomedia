@@ -60,7 +60,7 @@ export class LoopGenerationService {
         const loopId = `${date}_${hour}_${locationId}`;
 
         // Build 12 slots using priority algorithm
-        const slots = this.buildSlots(campaigns, hour);
+        const slots = this.buildSlots(campaigns);
 
         const loop = await loopRepository.create(loopId, {
             date,
@@ -77,10 +77,9 @@ export class LoopGenerationService {
     /**
      * Build 12 slots for a loop using campaign priority
      * @param {Array} campaigns - Available campaigns
-     * @param {number} hour - Target hour
      * @returns {Array} 12 slots
      */
-    buildSlots(campaigns, hour) {
+    buildSlots(campaigns) {
         const slots = [];
 
         // Sort campaigns by priority

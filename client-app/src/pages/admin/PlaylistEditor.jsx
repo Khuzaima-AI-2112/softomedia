@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { API_URL } from '../../config';
+import apiService from '../../services/ApiService';
 
 function PlaylistEditor() {
     const { id } = useParams();
@@ -19,28 +19,19 @@ function PlaylistEditor() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const token = localStorage.getItem('token');
-                const headers = { 'Authorization': `Bearer ${token}` };
-
-                // Fetch Assets
-                const assetsRes = await fetch(`${API_URL}/api/assets`, { headers });
-                const assetsData = await assetsRes.json();
-                setAvailableAssets(assetsData);
-
-                // Fetch Screens
-                const screensRes = await fetch(`${API_URL}/api/screens`, { headers });
-                const screensData = await screensRes.json();
-                setAvailableScreens(screensData);
-
-                // Fetch Locations
-                const locationsRes = await fetch(`${API_URL}/api/locations`, { headers });
-                const locationsData = await locationsRes.json();
-                setLocations(locationsData);
+                // Fetch Assets, Screens, Locations in parallel
+                const [assetsData, screensData, locationsData] = await Promise.all([
+                    apiService.getAssets(),
+                    apiService.getScreens(),
+                    apiService.getLocations()
+                ]);
+                setAvailableAssets(assetsData || []);
+                setAvailableScreens(screensData || []);
+                setLocations(locationsData || []);
 
                 // Fetch Playlist if Editing
                 if (!isNew) {
-                    const playlistRes = await fetch(`${API_URL}/api/playlists/${id}`, { headers });
-                    const playlistData = await playlistRes.json();
+                    const playlistData = await apiService.getPlaylist(id);
                     setDetails({
                         name: playlistData.name,
                         description: playlistData.description,
@@ -49,10 +40,9 @@ function PlaylistEditor() {
                         is_global: playlistData.is_global || false
                     });
 
-                    // Map items to include details from assets if needed, 
-                    // or just trust the playlist data + asset lookup
+                    // Map items to include details from assets if needed
                     const hydratedItems = playlistData.items.map(item => {
-                        const asset = assetsData.find(a => a.id === item.media_id);
+                        const asset = (assetsData || []).find(a => a.id === item.media_id);
                         return {
                             ...item,
                             filename: asset?.filename || 'Unknown Asset',
@@ -96,24 +86,16 @@ function PlaylistEditor() {
             formData.append('file_type', file.type);
             formData.append('duration', details.is_global ? 5 : 10);
 
-            const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/api/assets/upload`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
-                body: formData
-            });
-
-            if (res.ok) {
-                const asset = await res.json();
+            const asset = await apiService.uploadAsset(formData);
+            if (asset) {
                 handleAddItem(asset);
                 // Refresh assets list
-                const assetsRes = await fetch(`${API_URL}/api/assets`, { headers: { 'Authorization': `Bearer ${token}` } });
-                setAvailableAssets(await assetsRes.json());
-            } else {
-                alert('Upload failed');
+                const assetsData = await apiService.getAssets();
+                setAvailableAssets(assetsData || []);
             }
         } catch (error) {
             console.error('Upload error', error);
+            alert('Upload failed');
         } finally {
             setUploading(false);
         }
@@ -143,9 +125,6 @@ function PlaylistEditor() {
         setPlaylistItems(newItems);
     };
 
-    // Handling multi-select for assignments is tricky with standard select, 
-    // for MVP we'll stick to single selection 'ALL' vs specific Screen.
-    // If 'ALL' is selected, it overrides others.
     const handleAssignmentChange = (e) => {
         const val = e.target.value;
         setDetails({ ...details, assignments: [val] });
@@ -164,26 +143,15 @@ function PlaylistEditor() {
         };
 
         try {
-            const token = localStorage.getItem('token');
-            const url = isNew ? `${API_URL}/api/playlists` : `${API_URL}/api/playlists/${id}`;
-            const method = isNew ? 'POST' : 'PUT';
-
-            const res = await fetch(url, {
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(payload)
-            });
-
-            if (res.ok) {
-                navigate('/admin/playlists');
+            if (isNew) {
+                await apiService.createPlaylist(payload);
             } else {
-                alert('Failed to save playlist');
+                await apiService.updatePlaylist(id, payload);
             }
+            navigate('/admin/playlists');
         } catch (error) {
             console.error('Save failed', error);
+            alert('Failed to save playlist');
         }
     };
 

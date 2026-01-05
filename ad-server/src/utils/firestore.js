@@ -8,18 +8,17 @@ export const getFirestore = () => {
     if (db) return db;
 
     try {
-        if (!process.env.GOOGLE_APPLICATION_CREDENTIALS && process.env.NODE_ENV !== 'production') {
-            logger.warn('No GOOGLE_APPLICATION_CREDENTIALS found. Using in-memory mock mode.');
-            useMock = true;
-            return null;
-        }
+        // Only force mock if we're not in production AND not even trying a project ID
+        // Note: softomedia-live-2026 is hardcoded here for safety
+        const projectId = 'softomedia-live-2026';
 
         db = new Firestore({
-            projectId: 'softomedia-live-2026',
-            keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+            projectId: projectId,
+            keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS, // Can be undefined
             retry: { retries: 1 }
         });
 
+        logger.info('Firestore initialized', { projectId });
         return db;
     } catch (error) {
         logger.error('Firestore initialization failed, switching to mock mode', { error: error.message });

@@ -3,12 +3,13 @@ import { useNavigate, Link } from 'react-router-dom';
 import KPICard from '../../components/KPICard';
 import DataTable from '../../components/DataTable';
 import GlassCard from '../../components/GlassCard';
-import localStorageService from '../../services/LocalStorageService';
+import apiService from '../../services/ApiService';
 import pricingService from '../../services/PricingService';
 
 const BrandDashboard = () => {
     const navigate = useNavigate();
     const [campaigns, setCampaigns] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({
         active: 0,
         screens: 0,
@@ -20,25 +21,36 @@ const BrandDashboard = () => {
         loadData();
     }, []);
 
-    const loadData = () => {
-        localStorageService.init();
+    const loadData = async () => {
+        try {
+            setLoading(true);
+            await pricingService.init();
 
-        // Get campaigns for this advertiser (demo: first advertiser)
-        const allCampaigns = localStorageService.getCampaigns();
-        setCampaigns(allCampaigns);
+            // Get campaigns for this advertiser (demo: use ALL for now, or filter if backend supports it)
+            const [allCampaigns, allScreens] = await Promise.all([
+                apiService.getCampaigns(),
+                apiService.getScreens()
+            ]);
 
-        // Calculate stats
-        const liveCampaigns = allCampaigns.filter(c => c.status === 'live');
-        const totalSpent = allCampaigns.reduce((sum, c) => sum + (c.spent || 0), 0);
-        const totalImpressions = allCampaigns.reduce((sum, c) => sum + (c.impressions || 0), 0);
-        const screens = localStorageService.getScreens().filter(s => s.status === 'online').length;
+            setCampaigns(allCampaigns);
 
-        setStats({
-            active: liveCampaigns.length,
-            screens,
-            impressions: totalImpressions,
-            spent: totalSpent
-        });
+            // Calculate stats
+            const liveCampaigns = allCampaigns.filter(c => c.status === 'live');
+            const totalSpent = allCampaigns.reduce((sum, c) => sum + (c.spent || 0), 0);
+            const totalImpressions = allCampaigns.reduce((sum, c) => sum + (c.impressions || 0), 0);
+            const onlineScreens = allScreens.filter(s => s.status === 'online').length;
+
+            setStats({
+                active: liveCampaigns.length,
+                screens: onlineScreens,
+                impressions: totalImpressions,
+                spent: totalSpent
+            });
+        } catch (error) {
+            console.error('Failed to load dashboard data:', error);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const kpis = [
@@ -63,7 +75,7 @@ const BrandDashboard = () => {
                 <div className="relative w-16 h-10 rounded-md overflow-hidden bg-slate-200 dark:bg-slate-700 ring-1 ring-slate-200 dark:ring-slate-700">
                     <div
                         className="absolute inset-0 bg-cover bg-center"
-                        style={{ backgroundImage: `url("${cmp.creativeUrl}")` }}
+                        style={{ backgroundImage: `url("${cmp.creative_url}")` }}
                     />
                 </div>
             )
@@ -72,9 +84,9 @@ const BrandDashboard = () => {
             header: 'Status',
             render: (cmp) => (
                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${cmp.status === 'live' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' :
-                        cmp.status === 'scheduled' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800' :
-                            cmp.status === 'pending_approval' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800' :
-                                'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                    cmp.status === 'scheduled' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800' :
+                        cmp.status === 'pending_approval' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800' :
+                            'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
                     }`}>
                     {cmp.status === 'live' && <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>}
                     {cmp.status === 'live' ? 'Live' : cmp.status === 'scheduled' ? 'Scheduled' : cmp.status === 'pending_approval' ? 'Pending' : 'Ended'}
@@ -85,7 +97,7 @@ const BrandDashboard = () => {
             header: 'Duration',
             render: (cmp) => (
                 <span className="text-sm">
-                    {new Date(cmp.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(cmp.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {new Date(cmp.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(cmp.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                 </span>
             )
         },

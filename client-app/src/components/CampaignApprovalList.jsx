@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import GlassCard from './GlassCard.jsx';
 import StatusBadge from './StatusBadge.jsx';
-import { API_URL } from '../config.js';
+import apiService from '../services/ApiService.js';
 
 /**
  * Super Admin Approval List
@@ -17,14 +17,12 @@ const CampaignApprovalList = () => {
 
     const fetchPending = async () => {
         try {
-            const token = localStorage.getItem('auth_token');
-            const res = await fetch(`${API_URL}/api/campaigns?status=pending_approval`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setCampaigns(data);
-            }
+            // Updated to use ApiService
+            const data = await apiService.getCampaigns();
+            // Filter for pending status locally if the API doesn't support filtering yet
+            // Assuming advertiserId=null gets all campaigns if admin
+            const pending = data.filter(c => c.status === 'pending_approval' || c.status === 'PENDING');
+            setCampaigns(pending);
         } catch (error) {
             console.error('Fetch pending failed:', error);
         } finally {
@@ -34,21 +32,11 @@ const CampaignApprovalList = () => {
 
     const handleApproval = async (id, status) => {
         try {
-            const token = localStorage.getItem('auth_token');
-            const res = await fetch(`${API_URL}/api/campaigns/${id}/status`, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ status })
-            });
-
-            if (res.ok) {
-                setCampaigns(prev => prev.filter(c => c.id !== id));
-            }
+            await apiService.updateCampaignStatus(id, status);
+            setCampaigns(prev => prev.filter(c => c.id !== id));
         } catch (error) {
             console.error('Status transition failed:', error);
+            alert('Failed to update campaign status');
         }
     };
 
@@ -66,23 +54,23 @@ const CampaignApprovalList = () => {
                     <GlassCard key={c.id} className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
                             <div className="size-12 rounded-full overflow-hidden border-2 border-white/20">
-                                <img src={`https://placehold.co/100x100?text=${encodeURIComponent(c.title)}`} alt={c.title} />
+                                <img src={c.creative_url || `https://placehold.co/100x100?text=${encodeURIComponent(c.name || 'Ad')}`} alt={c.name} />
                             </div>
                             <div>
-                                <h4 className="font-bold">{c.title}</h4>
+                                <h4 className="font-bold">{c.name}</h4>
                                 <p className="text-xs text-slate-500 uppercase tracking-wider">{c.advertiser_id}</p>
                             </div>
                         </div>
 
                         <div className="flex items-center gap-2">
                             <button
-                                onClick={() => handleApproval(c.id, 'rejected')}
+                                onClick={() => handleApproval(c.id, 'REJECTED')}
                                 className="px-4 py-2 rounded-lg bg-red-500/10 text-red-500 font-bold hover:bg-red-500/20 transition-all"
                             >
                                 Reject
                             </button>
                             <button
-                                onClick={() => handleApproval(c.id, 'approved')}
+                                onClick={() => handleApproval(c.id, 'APPROVED')}
                                 className="px-4 py-2 rounded-lg bg-green-500 text-white font-bold hover:bg-green-600 transition-all shadow-lg shadow-green-500/20"
                             >
                                 Approve

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
-import { API_URL } from '../../config';
+import apiService from '../../services/ApiService';
 
 function ScreenManagement() {
     const [screens, setScreens] = useState([]);
@@ -10,14 +10,12 @@ function ScreenManagement() {
     const [newScreen, setNewScreen] = useState({ screen_id: '', resolution: '1920x1080', user_agent: 'Manual Admin Entry' });
 
     const fetchScreens = async () => {
+        setLoading(true);
         try {
-            const res = await fetch(`${API_URL}/api/screens`);
-            if (res.ok) {
-                const data = await res.json();
-                setScreens(data);
-            }
+            const data = await apiService.getScreens();
+            setScreens(data || []);
         } catch (error) {
-            console.error('Failed to fetch screens', error);
+            console.error('Failed to fetch screens:', error);
         } finally {
             setLoading(false);
         }
@@ -30,34 +28,23 @@ function ScreenManagement() {
     const handleDelete = async (id) => {
         if (!confirm('Are you sure you want to delete this screen? This action cannot be undone.')) return;
         try {
-            const res = await fetch(`${API_URL}/api/screens/${id}`, {
-                method: 'DELETE'
-            });
-            if (res.ok) {
-                fetchScreens();
-            } else {
-                alert('Failed to delete screen');
-            }
+            await apiService.deleteScreen(id);
+            await fetchScreens();
         } catch (error) {
-            console.error('Failed to delete screen', error);
+            console.error('Failed to delete screen:', error);
+            alert('Failed to delete screen');
         }
     };
 
     const handleCreateScreen = async (e) => {
         e.preventDefault();
         try {
-            const res = await fetch(`${API_URL}/api/screens/register`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newScreen)
-            });
-            if (res.ok) {
-                setShowAddModal(false);
-                setNewScreen({ screen_id: '', resolution: '1920x1080', user_agent: 'Manual Admin Entry' }); // Reset
-                fetchScreens(); // Refresh list
-            }
+            await apiService.registerScreen(newScreen);
+            setShowAddModal(false);
+            setNewScreen({ screen_id: '', resolution: '1920x1080', user_agent: 'Manual Admin Entry' }); // Reset
+            await fetchScreens(); // Refresh list
         } catch (error) {
-            console.error('Failed to create screen', error);
+            console.error('Failed to create screen:', error);
         }
     };
 

@@ -6,7 +6,7 @@ import Step3LoopSlotSelection from './wizard/Step3LoopSlotSelection';
 import Step4CreativeUpload from './wizard/Step4CreativeUpload';
 import Step5ReviewConfirm from './wizard/Step5ReviewConfirm';
 import GlassCard from '../../components/GlassCard';
-import localStorageService from '../../services/LocalStorageService';
+import apiService from '../../services/ApiService';
 
 const STEPS = [
     { id: 1, name: 'Location', icon: 'location_on', description: 'Select stores & screens' },
@@ -53,32 +53,38 @@ const BrandCampaignWizard = () => {
         setWizardData((prev) => ({ ...prev, ...newData }));
     };
 
-    const handleConfirm = () => {
-        // Create campaign in localStorage
-        const campaign = localStorageService.createCampaign({
-            advertiserId: 'adv_001', // Demo - would come from auth context
-            name: wizardData.campaignName || 'New Campaign',
-            creativeUrl: wizardData.creativeUrl,
-            duration: wizardData.creativeDuration,
-            startDate: wizardData.dateRange.start,
-            endDate: wizardData.dateRange.end,
-            budget: wizardData.budget,
-            slots: wizardData.selectedSlots
-        });
+    const handleConfirm = async () => {
+        try {
+            // Create campaign in backend
+            const campaignData = {
+                advertiser_id: 'adv_001', // Demo - would come from auth context
+                name: wizardData.campaignName || 'New Campaign',
+                creative_url: wizardData.creativeUrl,
+                duration: wizardData.creativeDuration,
+                start_date: wizardData.dateRange.start,
+                end_date: wizardData.dateRange.end,
+                budget: wizardData.budget,
+                status: 'pending'
+            };
 
-        // Book selected slots
-        wizardData.selectedSlots.forEach(slot => {
-            localStorageService.bookSlot(
-                slot.loopId,
-                slot.slotIndex,
-                campaign.id,
-                'adv_001',
-                wizardData.creativeUrl
-            );
-        });
+            const campaign = await apiService.createCampaign(campaignData);
 
-        // Navigate back to dashboard
-        navigate('/dashboard/brand');
+            // Book selected slots via the unified endpoint
+            const slotMappings = wizardData.selectedSlots.map(slot => ({
+                loopId: slot.loopId,
+                slotIndex: slot.slotIndex,
+                creativeUrl: wizardData.creativeUrl,
+                advertiser_id: 'adv_001'
+            }));
+
+            await apiService.bookSlots(campaign.id, slotMappings);
+
+            // Navigate back to dashboard
+            navigate('/dashboard/brand');
+        } catch (error) {
+            console.error('Failed to book campaign:', error);
+            alert('An error occurred while booking your campaign. Please try again.');
+        }
     };
 
     const renderStep = () => {

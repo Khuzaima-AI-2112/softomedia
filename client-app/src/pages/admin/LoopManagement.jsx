@@ -1,14 +1,8 @@
-/**
- * Loop Management Page
- * Admin interface for viewing and managing daily broadcast loops
- * Business Hours: 8am - 10pm (14 loops per day)
- */
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
-import { API_URL } from '../../config';
+import apiService from '../../services/ApiService';
 
 // Business hours configuration
 const BUSINESS_HOURS = {
@@ -64,11 +58,8 @@ function LoopManagement() {
     const fetchLoops = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`${API_URL}/api/loops?date=${targetDate}`);
-            if (res.ok) {
-                const data = await res.json();
-                setLoops(data.loops || []);
-            }
+            const data = await apiService.getLoopsByDate(targetDate);
+            setLoops(data || []);
         } catch (error) {
             console.error('Failed to fetch loops:', error);
         } finally {
@@ -79,19 +70,13 @@ function LoopManagement() {
     const handleGenerate = async () => {
         setGenerating(true);
         try {
-            const res = await fetch(`${API_URL}/api/loops/generate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    targetDate,
-                    retailerId: 'ret_demo', // 🔶 TODO: Get from context/selection
-                    locationId: 'loc_downtown', // 🔶 TODO: Get from context/selection
-                    mock: true // Use mock generation for demo
-                })
+            await apiService.generateLoops({
+                target_date: targetDate,
+                retailer_id: 'ret_demo', // 🔶 TODO: Get from context/selection
+                store_id: 'store_downtown', // 🔶 TODO: Get from context/selection
+                mock: true // Use mock generation for demo
             });
-            if (res.ok) {
-                await fetchLoops();
-            }
+            await fetchLoops();
         } catch (error) {
             console.error('Failed to generate loops:', error);
         } finally {

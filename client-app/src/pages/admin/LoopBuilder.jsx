@@ -1,26 +1,8 @@
-/**
- * Loop Builder Page
- * Admin interface for editing a single hourly loop (12 slots)
- * Each slot: 5 seconds duration
- */
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
-import { API_URL } from '../../config';
-
-// Mock asset library for demo
-const MOCK_ASSETS = [
-    { id: 'asset_001', name: 'Summer Sale Banner', type: 'image', thumbnail: '🏖️' },
-    { id: 'asset_002', name: 'Tech Deal Video', type: 'video', thumbnail: '💻' },
-    { id: 'asset_003', name: 'Fashion Promo', type: 'image', thumbnail: '👗' },
-    { id: 'asset_004', name: 'Food Special', type: 'image', thumbnail: '🍕' },
-    { id: 'asset_005', name: 'Sports Brand', type: 'video', thumbnail: '⚽' },
-    { id: 'asset_006', name: 'Beauty Product', type: 'image', thumbnail: '💄' },
-    { id: 'asset_007', name: 'Auto Dealer', type: 'video', thumbnail: '🚗' },
-    { id: 'asset_008', name: 'Travel Agency', type: 'image', thumbnail: '✈️' },
-];
+import apiService from '../../services/ApiService';
 
 // Get slot status styling
 const getSlotStyle = (slot) => {
@@ -34,27 +16,27 @@ function LoopBuilder() {
     const { id } = useParams();
     const navigate = useNavigate();
     const [loop, setLoop] = useState(null);
+    const [assets, setAssets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [selectedSlot, setSelectedSlot] = useState(null);
     const [showAssetPicker, setShowAssetPicker] = useState(false);
 
     useEffect(() => {
-        if (id) fetchLoop();
+        if (id) loadData();
     }, [id]);
 
-    const fetchLoop = async () => {
+    const loadData = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`${API_URL}/api/loops/${id}`);
-            if (res.ok) {
-                const data = await res.json();
-                setLoop(data);
-            } else {
-                console.error('Loop not found');
-            }
+            const [loopData, assetsData] = await Promise.all([
+                apiService.getLoop(id),
+                apiService.getAssets()
+            ]);
+            setLoop(loopData);
+            setAssets(assetsData || []);
         } catch (error) {
-            console.error('Failed to fetch loop:', error);
+            console.error('Failed to load loop data:', error);
         } finally {
             setLoading(false);
         }
@@ -73,33 +55,28 @@ function LoopBuilder() {
         newSlots[selectedSlot] = {
             ...newSlots[selectedSlot],
             asset_id: asset.id,
-            asset_name: asset.name,
-            asset_thumbnail: asset.thumbnail,
+            asset_name: asset.filename,
+            asset_thumbnail: asset.file_type === 'image' ? '🖼️' : '🎬',
             status: 'PENDING'
         };
         setLoop({ ...loop, slots: newSlots });
         setShowAssetPicker(false);
         setSelectedSlot(null);
 
-        // 🔶 TODO: Persist to backend
-        // await fetch(`${API_URL}/api/loops/${id}/slots/${selectedSlot}/replace`, {
-        //     method: 'PATCH',
-        //     headers: { 'Content-Type': 'application/json' },
-        //     body: JSON.stringify({ assetId: asset.id })
-        // });
+        try {
+            await apiService.replaceLoopSlot(id, selectedSlot, asset.id);
+            await loadData();
+        } catch (error) {
+            console.error('Failed to replace slot:', error);
+            alert('Failed to replace slot');
+        }
     };
 
     const handleApproveAll = async () => {
         setSaving(true);
         try {
-            const res = await fetch(`${API_URL}/api/loops/${id}/approve`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: 'admin_demo' })
-            });
-            if (res.ok) {
-                await fetchLoop();
-            }
+            await apiService.approveLoop(id);
+            await loadData();
         } catch (error) {
             console.error('Failed to approve loop:', error);
         } finally {
@@ -192,7 +169,7 @@ function LoopBuilder() {
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4" data-testid="slot-grid">
                     {Array.from({ length: 12 }).map((_, position) => {
                         const slot = loop.slots?.[position] || {};
-                        const asset = MOCK_ASSETS.find(a => a.id === slot.asset_id);
+                        const asset = assets.find(a => a.id === slot.asset_id);
 
                         return (
                             <button
@@ -211,10 +188,10 @@ function LoopBuilder() {
                                     {slot.asset_id ? (
                                         <>
                                             <span className="text-3xl mb-1">
-                                                {slot.asset_thumbnail || asset?.thumbnail || '📄'}
+                                                {slot.asset_thumbnail || (asset?.file_type === 'image' ? '🖼️' : '🎬')}
                                             </span>
                                             <span className="text-xs font-medium text-slate-700 dark:text-slate-300 text-center line-clamp-1">
-                                                {slot.asset_name || asset?.name || slot.asset_id}
+                                                {slot.asset_name || asset?.filename || slot.asset_id}
                                             </span>
                                             {slot.status === 'REJECTED' && (
                                                 <span className="text-[10px] text-red-500 font-bold mt-1">REJECTED</span>
@@ -286,16 +263,16 @@ function LoopBuilder() {
                             </button>
                         </div>
                         <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto max-h-[60vh]">
-                            {MOCK_ASSETS.map(asset => (
+                            {assets.map(asset => (
                                 <button
                                     key={asset.id}
                                     onClick={() => handleAssetSelect(asset)}
                                     className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary hover:shadow-lg transition-all text-center"
                                     data-testid={`asset-${asset.id}`}
                                 >
-                                    <span className="text-4xl block mb-2">{asset.thumbnail}</span>
-                                    <span className="text-sm font-medium">{asset.name}</span>
-                                    <span className="text-xs text-slate-500 block">{asset.type}</span>
+                                    <span className="text-4xl block mb-2">{asset.file_type === 'image' ? '🖼️' : '🎬'}</span>
+                                    <span className="text-sm font-medium">{asset.filename}</span>
+                                    <span className="text-xs text-slate-500 block">{asset.file_type}</span>
                                 </button>
                             ))}
                         </div>

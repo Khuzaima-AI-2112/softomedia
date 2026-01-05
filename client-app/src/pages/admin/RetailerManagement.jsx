@@ -1,48 +1,62 @@
-/**
- * RetailerManagement - Admin page for managing retail partners
- * CRUD operations for retailers with store and screen management
- */
-
 import React, { useState, useEffect } from 'react';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import DataTable from '../../components/DataTable';
-import localStorageService from '../../services/LocalStorageService';
+import apiService from '../../services/ApiService';
 
 function RetailerManagement() {
     const [retailers, setRetailers] = useState([]);
     const [stores, setStores] = useState([]);
     const [screens, setScreens] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingRetailer, setEditingRetailer] = useState(null);
     const [selectedRetailer, setSelectedRetailer] = useState(null);
     const [formData, setFormData] = useState({
         name: '',
         logo: '🏪',
-        contactEmail: '',
-        contractStart: new Date().toISOString().split('T')[0]
+        contact_email: '',
+        contract_start: new Date().toISOString().split('T')[0]
     });
 
     useEffect(() => {
         loadData();
     }, []);
 
-    const loadData = () => {
-        localStorageService.init();
-        setRetailers(localStorageService.getRetailers());
-        setStores(localStorageService.getStores());
-        setScreens(localStorageService.getScreens());
+    const loadData = async () => {
+        try {
+            setLoading(true);
+            const [allRetailers, allStores, allScreens] = await Promise.all([
+                apiService.getRetailers(),
+                apiService.getStores(),
+                apiService.getScreens()
+            ]);
+            setRetailers(allRetailers);
+            setStores(allStores);
+            setScreens(allScreens);
+        } catch (error) {
+            console.error('Failed to load retailer management data:', error);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        if (editingRetailer) {
-            localStorageService.updateRetailer(editingRetailer.id, formData);
-        } else {
-            localStorageService.createRetailer(formData);
+        try {
+            if (editingRetailer) {
+                await apiService.updateRetailer(editingRetailer.id, formData);
+            } else {
+                await apiService.createRetailer({
+                    ...formData,
+                    status: 'active'
+                });
+            }
+            await loadData();
+            closeModal();
+        } catch (error) {
+            console.error('Failed to save retailer:', error);
         }
-        loadData();
-        closeModal();
     };
 
     const openModal = (retailer = null) => {
@@ -51,16 +65,16 @@ function RetailerManagement() {
             setFormData({
                 name: retailer.name,
                 logo: retailer.logo,
-                contactEmail: retailer.contactEmail,
-                contractStart: retailer.contractStart
+                contact_email: retailer.contact_email,
+                contract_start: retailer.contract_start
             });
         } else {
             setEditingRetailer(null);
             setFormData({
                 name: '',
                 logo: '🏪',
-                contactEmail: '',
-                contractStart: new Date().toISOString().split('T')[0]
+                contact_email: '',
+                contract_start: new Date().toISOString().split('T')[0]
             });
         }
         setShowModal(true);
@@ -71,18 +85,22 @@ function RetailerManagement() {
         setEditingRetailer(null);
     };
 
-    const toggleStatus = (retailerId) => {
+    const toggleStatus = async (retailerId) => {
         const retailer = retailers.find(r => r.id === retailerId);
         if (retailer) {
-            localStorageService.updateRetailer(retailerId, {
-                status: retailer.status === 'active' ? 'inactive' : 'active'
-            });
-            loadData();
+            try {
+                await apiService.updateRetailer(retailerId, {
+                    status: retailer.status === 'active' ? 'inactive' : 'active'
+                });
+                await loadData();
+            } catch (error) {
+                console.error('Failed to toggle retailer status:', error);
+            }
         }
     };
 
-    const getRetailerStores = (retailerId) => stores.filter(s => s.retailerId === retailerId);
-    const getRetailerScreens = (retailerId) => screens.filter(s => s.retailerId === retailerId);
+    const getRetailerStores = (retailerId) => stores.filter(s => s.retailer_id === retailerId);
+    const getRetailerScreens = (retailerId) => screens.filter(s => s.retailer_id === retailerId);
     const getOnlineScreens = (retailerId) => getRetailerScreens(retailerId).filter(s => s.status === 'online');
 
     const columns = [
@@ -100,7 +118,7 @@ function RetailerManagement() {
                         <p className="font-semibold text-slate-900 dark:text-white group-hover:text-primary transition-colors">
                             {retailer.name}
                         </p>
-                        <p className="text-xs text-slate-500">{retailer.contactEmail}</p>
+                        <p className="text-xs text-slate-500">{retailer.contact_email}</p>
                     </div>
                 </div>
             )
@@ -135,7 +153,7 @@ function RetailerManagement() {
             header: 'Contract Start',
             render: (retailer) => (
                 <span className="text-sm text-slate-600 dark:text-slate-400">
-                    {new Date(retailer.contractStart).toLocaleDateString('en-US', {
+                    {new Date(retailer.contract_start).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
                         year: 'numeric'
@@ -164,8 +182,8 @@ function RetailerManagement() {
                     <button
                         onClick={() => toggleStatus(retailer.id)}
                         className={`p-1.5 rounded-lg transition-colors ${retailer.status === 'active'
-                                ? 'text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
-                                : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                            ? 'text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                            : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
                             }`}
                         title={retailer.status === 'active' ? 'Deactivate' : 'Activate'}
                     >
@@ -255,7 +273,7 @@ function RetailerManagement() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {getRetailerStores(selectedRetailer.id).map(store => {
-                            const storeScreens = screens.filter(s => s.storeId === store.id);
+                            const storeScreens = screens.filter(s => s.store_id === store.id);
                             const storeOnline = storeScreens.filter(s => s.status === 'online').length;
                             return (
                                 <div
@@ -267,13 +285,13 @@ function RetailerManagement() {
                                             <p className="font-semibold text-sm">{store.name}</p>
                                             <p className="text-xs text-slate-500">{store.address}</p>
                                         </div>
-                                        <span className={`text-xs px-2 py-0.5 rounded-full ${store.trafficLevel === 'high'
-                                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                                : store.trafficLevel === 'low'
-                                                    ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                                                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                                        <span className={`text-xs px-2 py-0.5 rounded-full ${store.traffic_level === 'high'
+                                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                            : store.traffic_level === 'low'
+                                                ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                                : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
                                             }`}>
-                                            {store.trafficLevel} traffic
+                                            {store.traffic_level} traffic
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-4 text-xs mt-3">
@@ -331,8 +349,8 @@ function RetailerManagement() {
                                 <input
                                     type="email"
                                     required
-                                    value={formData.contactEmail}
-                                    onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
+                                    value={formData.contact_email}
+                                    onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
                                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
                                     placeholder="admin@retailer.com"
                                 />
@@ -342,8 +360,8 @@ function RetailerManagement() {
                                 <input
                                     type="date"
                                     required
-                                    value={formData.contractStart}
-                                    onChange={(e) => setFormData({ ...formData, contractStart: e.target.value })}
+                                    value={formData.contract_start}
+                                    onChange={(e) => setFormData({ ...formData, contract_start: e.target.value })}
                                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
                                 />
                             </div>

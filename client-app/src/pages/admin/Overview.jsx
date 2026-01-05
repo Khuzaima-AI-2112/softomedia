@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
-import localStorageService from '../../services/LocalStorageService';
+import apiService from '../../services/ApiService';
 import pricingService from '../../services/PricingService';
 
 function AdminOverview() {
@@ -18,6 +18,7 @@ function AdminOverview() {
 
     const [retailers, setRetailers] = useState([]);
     const [advertisers, setAdvertisers] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [showRetailerModal, setShowRetailerModal] = useState(false);
     const [newRetailerName, setNewRetailerName] = useState('');
     const [newRetailerEmail, setNewRetailerEmail] = useState('');
@@ -26,39 +27,53 @@ function AdminOverview() {
         loadData();
     }, []);
 
-    const loadData = () => {
-        localStorageService.init();
+    const loadData = async () => {
+        try {
+            setLoading(true);
+            await pricingService.init();
 
-        const allRetailers = localStorageService.getRetailers();
-        const allAdvertisers = localStorageService.getAdvertisers();
-        const allScreens = localStorageService.getScreens();
-        const allLoops = localStorageService.getLoops();
-        const allUsers = localStorageService.getUsers();
+            const [allRetailers, allAdvertisers, allScreens, allLoops, allUsers] = await Promise.all([
+                apiService.getRetailers(),
+                apiService.getAdvertisers(),
+                apiService.getScreens(),
+                apiService.getLoops(),
+                apiService.getUsers()
+            ]);
 
-        setRetailers(allRetailers.slice(0, 4));
-        setAdvertisers(allAdvertisers.slice(0, 4));
+            setRetailers(allRetailers.slice(0, 4));
+            setAdvertisers(allAdvertisers.slice(0, 4));
 
-        setStats({
-            retailers: allRetailers.length,
-            advertisers: allAdvertisers.length,
-            activeScreens: allScreens.filter(s => s.status === 'online').length,
-            totalScreens: allScreens.length,
-            pendingLoops: allLoops.filter(l => l.validationStatus === 'pending').length,
-            totalUsers: allUsers.length
-        });
+            setStats({
+                retailers: allRetailers.length,
+                advertisers: allAdvertisers.length,
+                activeScreens: allScreens.filter(s => s.status === 'online').length,
+                totalScreens: allScreens.length,
+                pendingLoops: allLoops.filter(l => l.status === 'PENDING_APPROVAL').length,
+                totalUsers: allUsers.length
+            });
+        } catch (error) {
+            console.error('Failed to load admin overview data:', error);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleCreateRetailer = () => {
+    const handleCreateRetailer = async () => {
         if (newRetailerName && newRetailerEmail) {
-            localStorageService.createRetailer({
-                name: newRetailerName,
-                contactEmail: newRetailerEmail,
-                logo: '🏪'
-            });
-            loadData();
-            setShowRetailerModal(false);
-            setNewRetailerName('');
-            setNewRetailerEmail('');
+            try {
+                await apiService.createRetailer({
+                    name: newRetailerName,
+                    contactEmail: newRetailerEmail,
+                    logo: '🏪',
+                    status: 'active'
+                });
+                await loadData();
+                setShowRetailerModal(false);
+                setNewRetailerName('');
+                setNewRetailerEmail('');
+            } catch (error) {
+                console.error('Failed to create retailer:', error);
+            }
         }
     };
 
@@ -146,7 +161,7 @@ function AdminOverview() {
                             {stats.pendingLoops} loops awaiting retailer approval
                         </p>
                         <p className="text-sm text-amber-600 dark:text-amber-400">
-                            Retailers need to approve tomorrow's schedule
+                            Retailers need to approve tomorrow&apos;s schedule
                         </p>
                     </div>
                     <Link
@@ -168,7 +183,6 @@ function AdminOverview() {
                     </div>
                     <div className="space-y-3">
                         {retailers.map(ret => {
-                            const stores = localStorageService.getStores().filter(s => s.retailerId === ret.id);
                             return (
                                 <Link
                                     key={ret.id}
@@ -181,7 +195,7 @@ function AdminOverview() {
                                         </div>
                                         <div>
                                             <p className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">{ret.name}</p>
-                                            <p className="text-[11px] text-slate-500">{stores.length} Locations</p>
+                                            <p className="text-[11px] text-slate-500">{ret.store_count || 0} Locations</p>
                                         </div>
                                     </div>
                                     <StatusBadge status={ret.status === 'active' ? 'Active' : 'Inactive'} />
@@ -200,8 +214,6 @@ function AdminOverview() {
                     </div>
                     <div className="space-y-3">
                         {advertisers.map(adv => {
-                            const campaigns = localStorageService.getCampaigns().filter(c => c.advertiserId === adv.id);
-                            const liveCampaigns = campaigns.filter(c => c.status === 'live').length;
                             return (
                                 <Link
                                     key={adv.id}
@@ -214,7 +226,7 @@ function AdminOverview() {
                                         </div>
                                         <div>
                                             <p className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-amber-500 transition-colors">{adv.name}</p>
-                                            <p className="text-[11px] text-slate-500">{liveCampaigns} Active Campaigns</p>
+                                            <p className="text-[11px] text-slate-500">{adv.active_campaign_count || 0} Active Campaigns</p>
                                         </div>
                                     </div>
                                     <div className="text-right">

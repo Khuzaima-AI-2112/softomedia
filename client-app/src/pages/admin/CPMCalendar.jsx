@@ -1,19 +1,14 @@
-/**
- * CPM Calendar - Admin Pricing Management
- * Manage CPM pricing across the network with traffic tiers and date overrides
- */
-
 import React, { useState, useEffect, useMemo } from 'react';
 import GlassCard from '../../components/GlassCard';
 import TrafficTierBadge from '../../components/TrafficTierBadge';
 import PriceDisplay from '../../components/PriceDisplay';
-import localStorageService, { BUSINESS_HOURS, DEFAULT_TRAFFIC_TIERS } from '../../services/LocalStorageService';
+import apiService from '../../services/ApiService';
 import pricingService from '../../services/PricingService';
 
-// Generate array of business hours
+// Generate array of business hours (8 AM to 10 PM)
 const getBusinessHours = () => {
     const hours = [];
-    for (let h = BUSINESS_HOURS.START; h < BUSINESS_HOURS.END; h++) {
+    for (let h = 8; h < 22; h++) {
         hours.push(h);
     }
     return hours;
@@ -30,59 +25,94 @@ function CPMCalendar() {
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [pricingConfig, setPricingConfig] = useState(null);
     const [editMode, setEditMode] = useState(false);
-    const [editedBaseCPM, setEditedBaseCPM] = useState(2.50);
+    const [editedBaseCPM, setEditedBaseCPM] = useState(15.00);
     const [dateOverride, setDateOverride] = useState(null);
     const [selectedRetailer, setSelectedRetailer] = useState('all');
     const [retailers, setRetailers] = useState([]);
+    const [stores, setStores] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     const businessHours = useMemo(() => getBusinessHours(), []);
 
     useEffect(() => {
-        localStorageService.init();
         loadData();
     }, []);
 
     useEffect(() => {
         if (pricingConfig) {
-            setEditedBaseCPM(pricingConfig.baseCPM);
-            setDateOverride(pricingConfig.dateOverrides?.[selectedDate] || null);
+            setEditedBaseCPM(pricingConfig.base_cpm || 15.00);
+            setDateOverride(pricingConfig.date_overrides?.[selectedDate] || null);
         }
     }, [selectedDate, pricingConfig]);
 
-    const loadData = () => {
-        const config = localStorageService.getPricingConfig();
-        setPricingConfig(config);
-        setEditedBaseCPM(config.baseCPM);
-        setRetailers(localStorageService.getRetailers());
-    };
-
-    const handleSaveBaseCPM = () => {
-        const updated = localStorageService.updatePricingConfig({ baseCPM: editedBaseCPM });
-        setPricingConfig(updated);
-        setEditMode(false);
-    };
-
-    const handleSetDateOverride = (multiplier, label) => {
-        localStorageService.setDateOverride(selectedDate, { multiplier, label });
-        loadData();
-    };
-
-    const handleClearDateOverride = () => {
-        const config = localStorageService.getPricingConfig();
-        delete config.dateOverrides[selectedDate];
-        localStorageService.updatePricingConfig({ dateOverrides: config.dateOverrides });
-        loadData();
-    };
-
-    const handleRetailerOverride = (retailerId, baseCPM) => {
-        const config = localStorageService.getPricingConfig();
-        if (baseCPM === null) {
-            delete config.retailerOverrides[retailerId];
-        } else {
-            config.retailerOverrides[retailerId] = { baseCPM };
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            const [config, retailersData, storesData] = await Promise.all([
+                apiService.getPricingConfig(),
+                apiService.getRetailers(),
+                apiService.getStores()
+            ]);
+            setPricingConfig(config);
+            setRetailers(retailersData || []);
+            setStores(storesData || []);
+            setEditedBaseCPM(config.base_cpm || 15.00);
+        } catch (error) {
+            console.error('Failed to load pricing data:', error);
+        } finally {
+            setLoading(false);
         }
-        localStorageService.updatePricingConfig({ retailerOverrides: config.retailerOverrides });
-        loadData();
+    };
+
+    const handleSaveBaseCPM = async () => {
+        try {
+            const updated = await apiService.updatePricingConfig({ base_cpm: editedBaseCPM });
+            setPricingConfig(updated);
+            setEditMode(false);
+        } catch (error) {
+            console.error('Failed to update base CPM:', error);
+            alert('Update failed');
+        }
+    };
+
+    const handleSetDateOverride = async (multiplier, label) => {
+        try {
+            const currentOverrides = pricingConfig.date_overrides || pricingConfig.dateOverrides || {};
+            const updatedOverrides = {
+                ...currentOverrides,
+                [selectedDate]: { multiplier, label }
+            };
+            const updated = await apiService.updatePricingConfig({ date_overrides: updatedOverrides });
+            setPricingConfig(updated);
+        } catch (error) {
+            console.error('Failed to set date override:', error);
+        }
+    };
+
+    const handleClearDateOverride = async () => {
+        try {
+            const currentOverrides = { ...(pricingConfig.date_overrides || pricingConfig.dateOverrides || {}) };
+            delete currentOverrides[selectedDate];
+            const updated = await apiService.updatePricingConfig({ date_overrides: currentOverrides });
+            setPricingConfig(updated);
+        } catch (error) {
+            console.error('Failed to clear date override:', error);
+        }
+    };
+
+    const handleRetailerOverride = async (retailerId, baseCPM) => {
+        try {
+            const currentOverrides = { ...(pricingConfig.retailer_overrides || pricingConfig.retailerOverrides || {}) };
+            if (baseCPM === null) {
+                delete currentOverrides[retailerId];
+            } else {
+                currentOverrides[retailerId] = { base_cpm: baseCPM };
+            }
+            const updated = await apiService.updatePricingConfig({ retailer_overrides: currentOverrides });
+            setPricingConfig(updated);
+        } catch (error) {
+            console.error('Failed to update retailer override:', error);
+        }
     };
 
     // Generate calendar days for current month
@@ -105,7 +135,7 @@ function CPMCalendar() {
             days.push({
                 day: d,
                 date: dateStr,
-                hasOverride: !!pricingConfig?.dateOverrides?.[dateStr],
+                hasOverride: !!(pricingConfig?.date_overrides?.[dateStr] || pricingConfig?.dateOverrides?.[dateStr]),
                 isSelected: dateStr === selectedDate,
                 isToday: dateStr === new Date().toISOString().split('T')[0]
             });
@@ -115,6 +145,8 @@ function CPMCalendar() {
     };
 
     const dailySummary = useMemo(() => {
+        if (!pricingConfig) return { totalScreens: 0, hourlyBreakdown: [] };
+        // We use the existing pricingService assuming it can handle the new config or we update it
         return pricingService.getDailyPricingSummary(selectedDate);
     }, [selectedDate, pricingConfig]);
 
@@ -380,7 +412,8 @@ function CPMCalendar() {
                 <h3 className="font-bold text-lg mb-4">Retailer Pricing Overrides</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {retailers.map(retailer => {
-                        const override = pricingConfig.retailerOverrides?.[retailer.id];
+                        const override = pricingConfig.retailer_overrides?.[retailer.id];
+                        const retailerStores = stores.filter(s => s.retailer_id === retailer.id);
                         return (
                             <div
                                 key={retailer.id}
@@ -391,7 +424,7 @@ function CPMCalendar() {
                                     <div>
                                         <p className="font-bold text-sm">{retailer.name}</p>
                                         <p className="text-xs text-slate-500">
-                                            {localStorageService.getStores(retailer.id).length} stores
+                                            {retailerStores.length} stores
                                         </p>
                                     </div>
                                 </div>
@@ -402,8 +435,8 @@ function CPMCalendar() {
                                             type="number"
                                             step="0.01"
                                             min="0"
-                                            placeholder={pricingConfig.baseCPM.toString()}
-                                            value={override?.baseCPM || ''}
+                                            placeholder={(pricingConfig.base_cpm || 15).toString()}
+                                            value={override?.base_cpm || ''}
                                             onChange={(e) => handleRetailerOverride(
                                                 retailer.id,
                                                 e.target.value ? parseFloat(e.target.value) : null
@@ -427,7 +460,7 @@ function CPMCalendar() {
             <GlassCard>
                 <h3 className="font-bold text-lg mb-4">Traffic Tier Configuration</h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    {Object.entries(pricingConfig.trafficTiers).map(([key, tier]) => (
+                    {Object.entries(pricingConfig.traffic_tiers || {}).map(([key, tier]) => (
                         <div
                             key={key}
                             className="p-4 rounded-xl border-2"

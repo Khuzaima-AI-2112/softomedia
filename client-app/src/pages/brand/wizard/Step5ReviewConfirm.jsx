@@ -1,14 +1,9 @@
-/**
- * Step5ReviewConfirm - Final review and booking confirmation
- * Part of the advertiser campaign booking wizard
- */
-
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import GlassCard from '../../../components/GlassCard';
 import { PriceSummary } from '../../../components/PriceDisplay';
 import TrafficTierBadge from '../../../components/TrafficTierBadge';
-import localStorageService from '../../../services/LocalStorageService';
+import apiService from '../../../services/ApiService';
 import pricingService from '../../../services/PricingService';
 
 function Step5ReviewConfirm({ data, onConfirm, onPrev }) {
@@ -21,7 +16,7 @@ function Step5ReviewConfirm({ data, onConfirm, onPrev }) {
         let totalImpressions = 0;
 
         slots.forEach(s => {
-            totalImpressions += pricingService.getEstimatedImpressions(s.screenId, s.hour);
+            totalImpressions += pricingService.getEstimatedImpressions(s.screen_id, s.hour);
         });
 
         // Group by date and hour
@@ -35,7 +30,9 @@ function Step5ReviewConfirm({ data, onConfirm, onPrev }) {
         }, {});
 
         // Get unique screens
-        const screens = [...new Set(slots.map(s => s.screenId))];
+        const screens = [
+            ...new Set(slots.map(s => s.screen_id))
+        ];
 
         return {
             totalCost,

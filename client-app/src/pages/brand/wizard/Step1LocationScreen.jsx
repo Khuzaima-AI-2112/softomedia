@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import localStorageService from '../../../services/LocalStorageService';
+import apiService from '../../../services/ApiService';
 
 const Step1LocationScreen = ({ data, updateData, onNext }) => {
     const [searchQuery, setSearchQuery] = useState('');
@@ -7,31 +7,43 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
     const [retailers, setRetailers] = useState([]);
     const [stores, setStores] = useState([]);
     const [screens, setScreens] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         loadData();
     }, []);
 
-    const loadData = () => {
-        localStorageService.init();
-        setRetailers(localStorageService.getRetailers());
-        setStores(localStorageService.getStores());
-        setScreens(localStorageService.getScreens());
+    const loadData = async () => {
+        try {
+            setLoading(true);
+            const [retailersData, storesData, screensData] = await Promise.all([
+                apiService.getRetailers(),
+                apiService.getStores(),
+                apiService.getScreens()
+            ]);
+            setRetailers(retailersData);
+            setStores(storesData);
+            setScreens(screensData);
+        } catch (error) {
+            console.error('Failed to load wizard data:', error);
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Filter stores based on search and retailer
     const filteredStores = useMemo(() => {
         return stores.filter(store => {
             const matchesSearch = store.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                store.address.toLowerCase().includes(searchQuery.toLowerCase());
-            const matchesRetailer = selectedRetailer === 'all' || store.retailerId === selectedRetailer;
+                (store.address && store.address.toLowerCase().includes(searchQuery.toLowerCase()));
+            const matchesRetailer = selectedRetailer === 'all' || store.retailer_id === selectedRetailer;
             return matchesSearch && matchesRetailer;
         });
     }, [stores, searchQuery, selectedRetailer]);
 
     // Get screens for selected stores
     const getStoreScreens = (storeId) => {
-        return screens.filter(s => s.storeId === storeId && s.status === 'online');
+        return screens.filter(s => s.store_id === storeId && s.status === 'online');
     };
 
     const handleStoreSelect = (storeId) => {
@@ -41,7 +53,7 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
                 selectedStores: current.filter(id => id !== storeId),
                 selectedScreens: (data.selectedScreens || []).filter(sid => {
                     const screen = screens.find(s => s.id === sid);
-                    return screen && screen.storeId !== storeId;
+                    return screen && screen.store_id !== storeId;
                 })
             });
         } else {
@@ -71,10 +83,19 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
     // Get all screens for selected stores
     const activeScreens = useMemo(() => {
         const selectedStoreIds = data.selectedStores || [];
-        return screens.filter(s => selectedStoreIds.includes(s.storeId) && s.status === 'online');
+        return screens.filter(s => selectedStoreIds.includes(s.store_id) && s.status === 'online');
     }, [screens, data.selectedStores]);
 
     const selectedScreenCount = (data.selectedScreens || []).length;
+
+    if (loading) {
+        return (
+            <div className="flex flex-col items-center justify-center py-24 text-slate-400">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+                <p>Loading screens and locations...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 min-h-[500px] pb-24">
@@ -94,8 +115,8 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
                     <button
                         onClick={() => setSelectedRetailer('all')}
                         className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${selectedRetailer === 'all'
-                                ? 'bg-primary text-white shadow-md'
-                                : 'bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 text-slate-600'
+                            ? 'bg-primary text-white shadow-md'
+                            : 'bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 text-slate-600'
                             }`}
                     >
                         All Retailers
@@ -105,8 +126,8 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
                             key={r.id}
                             onClick={() => setSelectedRetailer(r.id)}
                             className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1 ${selectedRetailer === r.id
-                                    ? 'bg-primary text-white shadow-md'
-                                    : 'bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 text-slate-600'
+                                ? 'bg-primary text-white shadow-md'
+                                : 'bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 text-slate-600'
                                 }`}
                         >
                             <span>{r.logo}</span>
@@ -117,7 +138,7 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
 
                 <div className="flex flex-col gap-3 overflow-y-auto max-h-[400px] pr-2 custom-scrollbar">
                     {filteredStores.map(store => {
-                        const retailer = retailers.find(r => r.id === store.retailerId);
+                        const retailer = retailers.find(r => r.id === store.retailer_id);
                         const storeScreens = getStoreScreens(store.id);
                         const isSelected = (data.selectedStores || []).includes(store.id);
 
@@ -127,8 +148,8 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
                                 onClick={() => handleStoreSelect(store.id)}
                                 data-testid={`store-${store.name.toLowerCase().replace(/\s+/g, '-')}`}
                                 className={`p-4 rounded-lg cursor-pointer border-2 transition-all ${isSelected
-                                        ? 'bg-primary/5 border-primary shadow-md'
-                                        : 'bg-white dark:bg-surface-dark border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                                    ? 'bg-primary/5 border-primary shadow-md'
+                                    : 'bg-white dark:bg-surface-dark border-slate-200 dark:border-slate-700 hover:border-slate-300'
                                     }`}
                             >
                                 <div className="flex justify-between items-start mb-1">
@@ -176,7 +197,7 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto max-h-[450px]">
                     {activeScreens.map(scr => {
-                        const store = stores.find(s => s.id === scr.storeId);
+                        const store = stores.find(s => s.id === scr.store_id);
                         const isSelected = (data.selectedScreens || []).includes(scr.id);
 
                         return (
@@ -185,8 +206,8 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
                                 onClick={() => toggleScreen(scr.id)}
                                 data-testid={`screen-${scr.name.toLowerCase().replace(/\s+/g, '-')}`}
                                 className={`relative group flex flex-col rounded-lg overflow-hidden border-2 cursor-pointer transition-all ${isSelected
-                                        ? 'border-primary shadow-lg ring-2 ring-primary/20'
-                                        : 'border-slate-200 dark:border-slate-700 hover:border-primary/50'
+                                    ? 'border-primary shadow-lg ring-2 ring-primary/20'
+                                    : 'border-slate-200 dark:border-slate-700 hover:border-primary/50'
                                     }`}
                             >
                                 {isSelected && (

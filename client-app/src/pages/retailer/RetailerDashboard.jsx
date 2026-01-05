@@ -5,11 +5,12 @@ import StatusBadge from '../../components/StatusBadge';
 import SupportTicketModal from '../../components/SupportTicketModal';
 import LocationManager from '../../components/LocationManager';
 import CampaignApprovalList from '../../components/CampaignApprovalList';
-import localStorageService from '../../services/LocalStorageService';
+import apiService from '../../services/ApiService';
 
 function RetailerDashboard() {
     const [isSyncActive, setIsSyncActive] = useState(true);
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({
         stores: 0,
         screens: 0,
@@ -21,18 +22,26 @@ function RetailerDashboard() {
         loadStats();
     }, []);
 
-    const loadStats = () => {
-        localStorageService.init();
-        const stores = localStorageService.getStores();
-        const screens = localStorageService.getScreens();
-        const loops = localStorageService.getLoops();
+    const loadStats = async () => {
+        setLoading(true);
+        try {
+            const [stores, screens, loops] = await Promise.all([
+                apiService.getStores(),
+                apiService.getScreens(),
+                apiService.getLoops()
+            ]);
 
-        setStats({
-            stores: stores.length,
-            screens: screens.length,
-            onlineScreens: screens.filter(s => s.status === 'online').length,
-            pendingLoops: loops.filter(l => l.validationStatus === 'pending').length
-        });
+            setStats({
+                stores: stores.length,
+                screens: screens.length,
+                onlineScreens: screens.filter(s => s.status === 'online' || s.status === 'ACTIVE').length,
+                pendingLoops: loops.filter(l => l.validation_status === 'pending' || l.status === 'PENDING').length
+            });
+        } catch (error) {
+            console.error('Failed to load retailer stats:', error);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const toggleSync = () => setIsSyncActive(!isSyncActive);
@@ -59,7 +68,7 @@ function RetailerDashboard() {
                     </button>
                     <button
                         onClick={toggleSync}
-                        className={`flex-1 md:flex-none px-4 py-2 text-white border-none rounded-lg font-bold transition-all ${isSyncActive ? 'bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/20' : 'bg-green-500 hover:bg-green-600 shadow-lg shadow-green-500/20'}`}
+                        className={`flex-1 md:flex-none px-4 py-2 text-white border-none rounded-lg font-bold transition-all ${isSyncActive ? 'bg-orange-500 hover:bg-orange-600 shadow-lg shadow-orange-500/20' : 'bg-green-500 hover:bg-green-600 shadow-lg shadow-green-500/20'}`}
                     >
                         {isSyncActive ? 'Disconnect Sync' : 'Re-establish Sync'}
                     </button>
@@ -67,18 +76,18 @@ function RetailerDashboard() {
             </div>
 
             {/* Quick Actions */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {quickActions.map(action => (
                     <Link
                         key={action.path}
                         to={action.path}
                         className={`
                             p-4 rounded-xl border border-slate-200 dark:border-slate-700 
-                            bg-white dark:bg-slate-800/50 hover:border-${action.color}-400 
+                            bg-white dark:bg-slate-800/50 hover:border-primary/50
                             hover:shadow-lg transition-all flex items-center gap-3 group
                         `}
                     >
-                        <div className={`size-10 rounded-lg bg-${action.color}/10 flex items-center justify-center text-${action.color === 'primary' ? 'primary' : action.color + '-500'} group-hover:scale-110 transition-transform`}>
+                        <div className={`size-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform`}>
                             <span className="material-symbols-outlined">{action.icon}</span>
                         </div>
                         <span className="font-medium text-slate-700 dark:text-slate-300">{action.label}</span>
@@ -90,26 +99,26 @@ function RetailerDashboard() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <GlassCard className="!p-4">
                     <p className="text-sm text-slate-500 mb-1">Stores</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.stores}</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{loading ? '...' : stats.stores}</p>
                 </GlassCard>
                 <GlassCard className="!p-4">
                     <p className="text-sm text-slate-500 mb-1">Screens</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.screens}</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{loading ? '...' : stats.screens}</p>
                 </GlassCard>
                 <GlassCard className="!p-4">
                     <p className="text-sm text-slate-500 mb-1">Online</p>
-                    <p className="text-2xl font-bold text-emerald-500">{stats.onlineScreens}</p>
+                    <p className="text-2xl font-bold text-emerald-500">{loading ? '...' : stats.onlineScreens}</p>
                 </GlassCard>
                 <GlassCard className="!p-4">
                     <p className="text-sm text-slate-500 mb-1">Pending Approvals</p>
                     <p className={`text-2xl font-bold ${stats.pendingLoops > 0 ? 'text-amber-500' : 'text-slate-400'}`}>
-                        {stats.pendingLoops}
+                        {loading ? '...' : stats.pendingLoops}
                     </p>
                 </GlassCard>
             </div>
 
             {/* Pending Alert */}
-            {stats.pendingLoops > 0 && (
+            {!loading && stats.pendingLoops > 0 && (
                 <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
                     <span className="material-symbols-outlined text-amber-500">pending_actions</span>
                     <div className="flex-1">
@@ -117,7 +126,7 @@ function RetailerDashboard() {
                             {stats.pendingLoops} loops awaiting your approval
                         </p>
                         <p className="text-sm text-amber-600 dark:text-amber-400">
-                            Review tomorrow's broadcast schedule before midnight
+                            Review tomorrow&apos;s broadcast schedule before midnight
                         </p>
                     </div>
                     <Link

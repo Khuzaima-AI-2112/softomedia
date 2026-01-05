@@ -1,11 +1,40 @@
-/**
- * PricingService - CPM Pricing Calculation Engine
- * Calculates slot prices based on traffic tiers, location, and overrides
- */
-
-import localStorageService, { BUSINESS_HOURS, DEFAULT_TRAFFIC_TIERS } from './LocalStorageService';
+import apiService from './ApiService';
 
 class PricingService {
+    constructor() {
+        this.config = null;
+        this.screens = [];
+        this.stores = [];
+    }
+
+    /**
+     * Initialize PricingService with data from backend
+     */
+    async init() {
+        if (this.config) return;
+        try {
+            const [configData, screensData, storesData] = await Promise.all([
+                apiService.getPricingConfig(),
+                apiService.getScreens(),
+                apiService.getStores()
+            ]);
+            this.config = configData;
+            this.screens = screensData;
+            this.stores = storesData;
+        } catch (error) {
+            console.error('Failed to initialize PricingService:', error);
+            // Fallback to defaults
+            this.config = {
+                baseCPM: 2.50,
+                trafficTiers: {
+                    veryLow: { multiplier: 0.5, label: 'Very Low', color: '#94a3b8', hours: [8, 9, 20, 21] },
+                    low: { multiplier: 0.75, label: 'Low', color: '#60a5fa', hours: [10, 11, 19] },
+                    medium: { multiplier: 1.0, label: 'Medium', color: '#fbbf24', hours: [14, 15, 16] },
+                    high: { multiplier: 1.5, label: 'High', color: '#22c55e', hours: [12, 13, 17, 18] }
+                }
+            };
+        }
+    }
 
     /**
      * Get the traffic tier for a specific hour
@@ -13,8 +42,9 @@ class PricingService {
      * @returns {object} Traffic tier info { key, multiplier, label, color }
      */
     getTrafficTier(hour) {
-        const config = localStorageService.getPricingConfig();
-        const tiers = config.trafficTiers || DEFAULT_TRAFFIC_TIERS;
+        if (!this.config) return { key: 'medium', multiplier: 1.0, label: 'Medium', color: '#fbbf24' };
+
+        const tiers = this.config.trafficTiers;
 
         for (const [key, tier] of Object.entries(tiers)) {
             if (tier.hours.includes(hour)) {
@@ -35,7 +65,8 @@ class PricingService {
      * @returns {number} Base CPM in dollars
      */
     getBaseCPM(screenId, storeId, retailerId) {
-        const config = localStorageService.getPricingConfig();
+        if (!this.config) return 2.50;
+        const config = this.config;
 
         // Check screen-level override
         if (screenId && config.screenOverrides?.[screenId]?.baseCPM) {
@@ -62,8 +93,8 @@ class PricingService {
      * @returns {number} Multiplier (1.0 = no change)
      */
     getDateMultiplier(date) {
-        const config = localStorageService.getPricingConfig();
-        return config.dateOverrides?.[date]?.multiplier || 1.0;
+        if (!this.config) return 1.0;
+        return this.config.dateOverrides?.[date]?.multiplier || 1.0;
     }
 
     /**
@@ -74,21 +105,21 @@ class PricingService {
      * @returns {object} { price, baseCPM, trafficTier, multipliers }
      */
     getSlotPrice(screenId, date, hour) {
-        const screen = localStorageService.getScreen(screenId);
+        const screen = this.screens.find(s => s.id === screenId);
         if (!screen) {
             return { price: 0, error: 'Screen not found' };
         }
 
-        const store = localStorageService.getStore(screen.storeId);
-        const baseCPM = this.getBaseCPM(screenId, screen.storeId, screen.retailerId);
+        const store = this.stores.find(s => s.id === screen.store_id);
+        const baseCPM = this.getBaseCPM(screenId, screen.store_id, screen.retailer_id);
         const trafficTier = this.getTrafficTier(hour);
         const dateMultiplier = this.getDateMultiplier(date);
 
         // Apply store traffic level bonus
         let storeTrafficMultiplier = 1.0;
-        if (store?.trafficLevel === 'high') storeTrafficMultiplier = 1.25;
-        else if (store?.trafficLevel === 'medium') storeTrafficMultiplier = 1.0;
-        else if (store?.trafficLevel === 'low') storeTrafficMultiplier = 0.8;
+        if (store?.traffic_level === 'high') storeTrafficMultiplier = 1.25;
+        else if (store?.traffic_level === 'medium') storeTrafficMultiplier = 1.0;
+        else if (store?.traffic_level === 'low') storeTrafficMultiplier = 0.8;
 
         // Final price calculation
         const price = baseCPM * trafficTier.multiplier * dateMultiplier * storeTrafficMultiplier;
@@ -130,8 +161,8 @@ class PricingService {
      * @returns {number} Estimated impressions per slot
      */
     getEstimatedImpressions(screenId, hour) {
-        const screen = localStorageService.getScreen(screenId);
-        const store = screen ? localStorageService.getStore(screen.storeId) : null;
+        const screen = this.screens.find(s => s.id === screenId);
+        const store = screen ? this.stores.find(s => s.id === screen.store_id) : null;
         const trafficTier = this.getTrafficTier(hour);
 
         // Base impressions per slot (5 seconds)
@@ -146,8 +177,8 @@ class PricingService {
         }
 
         // Adjust by store traffic level
-        if (store?.trafficLevel === 'high') baseImpressions *= 1.5;
-        else if (store?.trafficLevel === 'low') baseImpressions *= 0.7;
+        if (store?.traffic_level === 'high') baseImpressions *= 1.5;
+        else if (store?.traffic_level === 'low') baseImpressions *= 0.7;
 
         // Adjust by screen type
         if (screen?.type === 'checkout') baseImpressions *= 1.3; // More eyeballs at checkout
@@ -206,10 +237,12 @@ class PricingService {
      * @returns {object} Summary with hourly breakdown
      */
     getDailyPricingSummary(date) {
-        const screens = localStorageService.getScreens();
+        const screens = this.screens;
         const hours = [];
 
-        for (let hour = BUSINESS_HOURS.START; hour < BUSINESS_HOURS.END; hour++) {
+        const businessHours = { START: 8, END: 22 };
+
+        for (let hour = businessHours.START; hour < businessHours.END; hour++) {
             const trafficTier = this.getTrafficTier(hour);
             const dateMultiplier = this.getDateMultiplier(date);
 
@@ -236,22 +269,18 @@ class PricingService {
 
         return {
             date,
-            businessHours: { start: BUSINESS_HOURS.START, end: BUSINESS_HOURS.END },
+            businessHours,
             hourlyBreakdown: hours,
             totalScreens: screens.length
         };
     }
 
     /**
-     * Get slot availability for a screen on a specific date/hour
-     * @param {string} screenId 
-     * @param {string} date 
-     * @param {number} hour 
+     * Get slot availability summary (Sync version using provided loop data)
+     * @param {object} loop 
      * @returns {object} { available, booked, total, slots }
      */
-    getSlotAvailability(screenId, date, hour) {
-        const loop = localStorageService.getLoopByParams(screenId, date, hour);
-
+    getSlotAvailabilityFromLoop(loop) {
         if (!loop) {
             return {
                 available: 12,

@@ -1,14 +1,9 @@
-/**
- * AdvertiserManagement - Admin page for managing advertiser/agency accounts
- * CRUD operations for advertisers with campaign tracking
- */
-
 import React, { useState, useEffect } from 'react';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import DataTable from '../../components/DataTable';
 import PriceDisplay from '../../components/PriceDisplay';
-import localStorageService from '../../services/LocalStorageService';
+import apiService from '../../services/ApiService';
 import pricingService from '../../services/PricingService';
 
 const INDUSTRIES = [
@@ -21,6 +16,7 @@ const LOGOS = ['📱', '🥤', '👗', '🚗', '💊', '💰', '🎬', '✈️',
 function AdvertiserManagement() {
     const [advertisers, setAdvertisers] = useState([]);
     const [campaigns, setCampaigns] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingAdvertiser, setEditingAdvertiser] = useState(null);
     const [selectedAdvertiser, setSelectedAdvertiser] = useState(null);
@@ -28,7 +24,7 @@ function AdvertiserManagement() {
         name: '',
         logo: '🏢',
         industry: 'Other',
-        contactEmail: '',
+        contact_email: '',
         budget: 10000
     });
 
@@ -36,21 +32,38 @@ function AdvertiserManagement() {
         loadData();
     }, []);
 
-    const loadData = () => {
-        localStorageService.init();
-        setAdvertisers(localStorageService.getAdvertisers());
-        setCampaigns(localStorageService.getCampaigns());
+    const loadData = async () => {
+        try {
+            setLoading(true);
+            const [allAdvertisers, allCampaigns] = await Promise.all([
+                apiService.getAdvertisers(),
+                apiService.getCampaigns()
+            ]);
+            setAdvertisers(allAdvertisers);
+            setCampaigns(allCampaigns);
+        } catch (error) {
+            console.error('Failed to load advertiser management data:', error);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        if (editingAdvertiser) {
-            localStorageService.updateAdvertiser(editingAdvertiser.id, formData);
-        } else {
-            localStorageService.createAdvertiser(formData);
+        try {
+            if (editingAdvertiser) {
+                await apiService.updateAdvertiser(editingAdvertiser.id, formData);
+            } else {
+                await apiService.createAdvertiser({
+                    ...formData,
+                    status: 'active'
+                });
+            }
+            await loadData();
+            closeModal();
+        } catch (error) {
+            console.error('Failed to save advertiser:', error);
         }
-        loadData();
-        closeModal();
     };
 
     const openModal = (advertiser = null) => {
@@ -60,7 +73,7 @@ function AdvertiserManagement() {
                 name: advertiser.name,
                 logo: advertiser.logo,
                 industry: advertiser.industry,
-                contactEmail: advertiser.contactEmail,
+                contact_email: advertiser.contact_email,
                 budget: advertiser.budget
             });
         } else {
@@ -69,7 +82,7 @@ function AdvertiserManagement() {
                 name: '',
                 logo: '🏢',
                 industry: 'Other',
-                contactEmail: '',
+                contact_email: '',
                 budget: 10000
             });
         }
@@ -81,17 +94,21 @@ function AdvertiserManagement() {
         setEditingAdvertiser(null);
     };
 
-    const toggleStatus = (advertiserId) => {
+    const toggleStatus = async (advertiserId) => {
         const advertiser = advertisers.find(a => a.id === advertiserId);
         if (advertiser) {
-            localStorageService.updateAdvertiser(advertiserId, {
-                status: advertiser.status === 'active' ? 'inactive' : 'active'
-            });
-            loadData();
+            try {
+                await apiService.updateAdvertiser(advertiserId, {
+                    status: advertiser.status === 'active' ? 'inactive' : 'active'
+                });
+                await loadData();
+            } catch (error) {
+                console.error('Failed to toggle advertiser status:', error);
+            }
         }
     };
 
-    const getAdvertiserCampaigns = (advertiserId) => campaigns.filter(c => c.advertiserId === advertiserId);
+    const getAdvertiserCampaigns = (advertiserId) => campaigns.filter(c => c.advertiser_id === advertiserId);
     const getLiveCampaigns = (advertiserId) => getAdvertiserCampaigns(advertiserId).filter(c => c.status === 'live');
     const getTotalSpent = (advertiserId) => getAdvertiserCampaigns(advertiserId).reduce((sum, c) => sum + (c.spent || 0), 0);
 
@@ -177,8 +194,8 @@ function AdvertiserManagement() {
                     <button
                         onClick={() => toggleStatus(advertiser.id)}
                         className={`p-1.5 rounded-lg transition-colors ${advertiser.status === 'active'
-                                ? 'text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
-                                : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                            ? 'text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                            : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
                             }`}
                         title={advertiser.status === 'active' ? 'Deactivate' : 'Activate'}
                     >
@@ -278,7 +295,7 @@ function AdvertiserManagement() {
                                     <div className="flex items-center gap-4">
                                         <div className="size-16 rounded-lg overflow-hidden bg-slate-200 dark:bg-slate-700">
                                             <img
-                                                src={campaign.creativeUrl}
+                                                src={campaign.creative_url}
                                                 alt={campaign.name}
                                                 className="w-full h-full object-cover"
                                             />
@@ -286,7 +303,7 @@ function AdvertiserManagement() {
                                         <div>
                                             <p className="font-semibold">{campaign.name}</p>
                                             <p className="text-xs text-slate-500">
-                                                {campaign.startDate} → {campaign.endDate}
+                                                {campaign.start_date} → {campaign.end_date}
                                             </p>
                                         </div>
                                     </div>
@@ -362,8 +379,8 @@ function AdvertiserManagement() {
                                 <input
                                     type="email"
                                     required
-                                    value={formData.contactEmail}
-                                    onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
+                                    value={formData.contact_email}
+                                    onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
                                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
                                     placeholder="marketing@brand.com"
                                 />

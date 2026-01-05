@@ -1,13 +1,8 @@
-/**
- * UserManagement - Admin page for managing platform users
- * CRUD operations for users with role-based access control
- */
-
 import React, { useState, useEffect } from 'react';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import DataTable from '../../components/DataTable';
-import localStorageService from '../../services/LocalStorageService';
+import apiService from '../../services/ApiService';
 
 const ROLES = [
     { value: 'super_admin', label: 'Super Admin', color: 'text-purple-500', icon: 'shield_person' },
@@ -21,14 +16,15 @@ function UserManagement() {
     const [users, setUsers] = useState([]);
     const [retailers, setRetailers] = useState([]);
     const [advertisers, setAdvertisers] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
     const [formData, setFormData] = useState({
         name: '',
         email: '',
         role: 'advertiser',
-        retailerId: '',
-        advertiserId: ''
+        retailer_id: '',
+        advertiser_id: ''
     });
     const [filterRole, setFilterRole] = useState('all');
 
@@ -36,27 +32,40 @@ function UserManagement() {
         loadData();
     }, []);
 
-    const loadData = () => {
-        localStorageService.init();
-        setUsers(localStorageService.getUsers());
-        setRetailers(localStorageService.getRetailers());
-        setAdvertisers(localStorageService.getAdvertisers());
+    const loadData = async () => {
+        try {
+            setLoading(true);
+            const [allUsers, allRetailers, allAdvertisers] = await Promise.all([
+                apiService.getUsers(),
+                apiService.getRetailers(),
+                apiService.getAdvertisers()
+            ]);
+            setUsers(allUsers);
+            setRetailers(allRetailers);
+            setAdvertisers(allAdvertisers);
+        } catch (error) {
+            console.error('Failed to load user management data:', error);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        if (editingUser) {
-            // Update existing user
-            const updatedUsers = users.map(u =>
-                u.id === editingUser.id ? { ...u, ...formData } : u
-            );
-            localStorageService._set('users', updatedUsers);
-        } else {
-            // Create new user
-            localStorageService.createUser(formData);
+        try {
+            if (editingUser) {
+                await apiService.updateUser(editingUser.id, formData);
+            } else {
+                await apiService.createUser({
+                    ...formData,
+                    status: 'active'
+                });
+            }
+            await loadData();
+            closeModal();
+        } catch (error) {
+            console.error('Failed to save user:', error);
         }
-        loadData();
-        closeModal();
     };
 
     const openModal = (user = null) => {
@@ -66,8 +75,8 @@ function UserManagement() {
                 name: user.name,
                 email: user.email,
                 role: user.role,
-                retailerId: user.retailerId || '',
-                advertiserId: user.advertiserId || ''
+                retailer_id: user.retailer_id || '',
+                advertiser_id: user.advertiser_id || ''
             });
         } else {
             setEditingUser(null);
@@ -75,8 +84,8 @@ function UserManagement() {
                 name: '',
                 email: '',
                 role: 'advertiser',
-                retailerId: '',
-                advertiserId: ''
+                retailer_id: '',
+                advertiser_id: ''
             });
         }
         setShowModal(true);
@@ -87,15 +96,18 @@ function UserManagement() {
         setEditingUser(null);
     };
 
-    const toggleUserStatus = (userId) => {
-        const updatedUsers = users.map(u => {
-            if (u.id === userId) {
-                return { ...u, status: u.status === 'active' ? 'inactive' : 'active' };
+    const toggleUserStatus = async (userId) => {
+        const user = users.find(u => u.id === userId);
+        if (user) {
+            try {
+                await apiService.updateUser(userId, {
+                    status: user.status === 'active' ? 'inactive' : 'active'
+                });
+                await loadData();
+            } catch (error) {
+                console.error('Failed to toggle user status:', error);
             }
-            return u;
-        });
-        localStorageService._set('users', updatedUsers);
-        loadData();
+        }
     };
 
     const getRoleInfo = (roleName) => ROLES.find(r => r.value === roleName) || ROLES[4];
@@ -134,14 +146,14 @@ function UserManagement() {
         {
             header: 'Organization',
             render: (user) => {
-                if (user.retailerId) {
-                    const retailer = retailers.find(r => r.id === user.retailerId);
+                if (user.retailer_id) {
+                    const retailer = retailers.find(r => r.id === user.retailer_id);
                     return retailer ? (
                         <span className="text-sm">{retailer.logo} {retailer.name}</span>
                     ) : '-';
                 }
-                if (user.advertiserId) {
-                    const advertiser = advertisers.find(a => a.id === user.advertiserId);
+                if (user.advertiser_id) {
+                    const advertiser = advertisers.find(a => a.id === user.advertiser_id);
                     return advertiser ? (
                         <span className="text-sm">{advertiser.logo} {advertiser.name}</span>
                     ) : '-';
@@ -170,8 +182,8 @@ function UserManagement() {
                     <button
                         onClick={() => toggleUserStatus(user.id)}
                         className={`p-1.5 rounded-lg transition-colors ${user.status === 'active'
-                                ? 'text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
-                                : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                            ? 'text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                            : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
                             }`}
                         title={user.status === 'active' ? 'Deactivate' : 'Activate'}
                     >
@@ -291,8 +303,8 @@ function UserManagement() {
                                 <div>
                                     <label className="block text-sm font-medium mb-1">Assign to Retailer</label>
                                     <select
-                                        value={formData.retailerId}
-                                        onChange={(e) => setFormData({ ...formData, retailerId: e.target.value })}
+                                        value={formData.retailer_id}
+                                        onChange={(e) => setFormData({ ...formData, retailer_id: e.target.value })}
                                         className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
                                     >
                                         <option value="">Select Retailer...</option>
@@ -307,8 +319,8 @@ function UserManagement() {
                                 <div>
                                     <label className="block text-sm font-medium mb-1">Assign to Advertiser</label>
                                     <select
-                                        value={formData.advertiserId}
-                                        onChange={(e) => setFormData({ ...formData, advertiserId: e.target.value })}
+                                        value={formData.advertiser_id}
+                                        onChange={(e) => setFormData({ ...formData, advertiser_id: e.target.value })}
                                         className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
                                     >
                                         <option value="">Select Advertiser...</option>

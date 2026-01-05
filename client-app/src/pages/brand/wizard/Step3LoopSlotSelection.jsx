@@ -1,15 +1,13 @@
-/**
- * Step3LoopSlotSelection - Select hourly loops and individual slots
- * Part of the advertiser campaign booking wizard
- */
-
 import React, { useState, useEffect, useMemo } from 'react';
 import GlassCard from '../../../components/GlassCard';
 import SlotGrid, { BookFullLoopButton } from '../../../components/SlotGrid';
 import TrafficTierBadge from '../../../components/TrafficTierBadge';
 import { PriceSummary } from '../../../components/PriceDisplay';
-import localStorageService, { BUSINESS_HOURS } from '../../../services/LocalStorageService';
+import apiService from '../../../services/ApiService';
 import pricingService from '../../../services/PricingService';
+
+// Constants for business hours (matching backend)
+const BUSINESS_HOURS = { START: 8, END: 22 };
 
 // Generate business hours array
 const getBusinessHours = () => {
@@ -36,35 +34,47 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
     const businessHours = useMemo(() => getBusinessHours(), []);
 
     useEffect(() => {
-        localStorageService.init();
-        loadLoops();
+        const init = async () => {
+            setLoading(true);
+            await pricingService.init();
+            await loadLoops();
+            setLoading(false);
+        };
+        init();
     }, [selectedDate, data.selectedScreens]);
 
-    const loadLoops = () => {
-        setLoading(true);
-        // Get loops for selected screens and date
-        const allLoops = [];
-        (data.selectedScreens || []).forEach(screenId => {
-            businessHours.forEach(hour => {
-                const loop = localStorageService.getLoopByParams(screenId, selectedDate, hour);
-                if (loop) {
-                    allLoops.push(loop);
-                } else {
-                    // Create empty loop for availability
-                    allLoops.push({
-                        id: `loop_${screenId}_${selectedDate}_${hour}`,
-                        screenId,
-                        date: selectedDate,
-                        hour,
-                        slots: Array(12).fill({ status: 'available' }),
-                        totalSlots: 12,
-                        bookedSlots: 0
-                    });
-                }
+    const loadLoops = async () => {
+        try {
+            // Get loops for selected screens and date from backend
+            const activeLoops = await apiService.getLoops({
+                date: selectedDate,
+                screenId: (data.selectedScreens || []).join(',')
             });
-        });
-        setLoops(allLoops);
-        setLoading(false);
+
+            // Fill in missing loops (if no loop exists in DB yet, create local placeholders)
+            const allLoops = [];
+            (data.selectedScreens || []).forEach(screenId => {
+                businessHours.forEach(hour => {
+                    const existingLoop = activeLoops.find(l => l.screen_id === screenId && l.hour === hour);
+                    if (existingLoop) {
+                        allLoops.push(existingLoop);
+                    } else {
+                        allLoops.push({
+                            id: `loop_${screenId}_${selectedDate}_${hour}`,
+                            screen_id: screenId,
+                            date: selectedDate,
+                            hour,
+                            slots: Array(12).fill({ status: 'available' }),
+                            totalSlots: 12,
+                            bookedSlots: 0
+                        });
+                    }
+                });
+            });
+            setLoops(allLoops);
+        } catch (error) {
+            console.error('Failed to load loops:', error);
+        }
     };
 
     // Group loops by hour for the current view
@@ -89,7 +99,7 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
         let avgPrice = 0;
         if (hourLoops.length > 0) {
             const prices = hourLoops.map(loop =>
-                pricingService.getSlotPrice(loop.screenId, selectedDate, hour).price
+                pricingService.getSlotPrice(loop.screen_id, selectedDate, hour).price
             );
             avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
         }
@@ -113,12 +123,12 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
         } else {
             const loop = loops.find(l => l.id === loopId);
             if (loop) {
-                const pricing = pricingService.getSlotPrice(loop.screenId, selectedDate, loop.hour);
+                const pricing = pricingService.getSlotPrice(loop.screen_id, selectedDate, loop.hour);
                 setSelections([...selections, {
                     key,
                     loopId,
                     slotIndex,
-                    screenId: loop.screenId,
+                    screen_id: loop.screen_id,
                     date: selectedDate,
                     hour: loop.hour,
                     price: pricing.price
@@ -136,14 +146,14 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
         const newSelections = selections.filter(s => !s.loopId.startsWith(loopId));
 
         // Add all available slots
-        const pricing = pricingService.getSlotPrice(loop.screenId, selectedDate, loop.hour);
+        const pricing = pricingService.getSlotPrice(loop.screen_id, selectedDate, loop.hour);
         loop.slots.forEach((slot, index) => {
             if (slot.status === 'available') {
                 newSelections.push({
                     key: `${loopId}_${index}`,
                     loopId,
                     slotIndex: index,
-                    screenId: loop.screenId,
+                    screen_id: loop.screen_id,
                     date: selectedDate,
                     hour: loop.hour,
                     price: pricing.price
@@ -167,7 +177,7 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
         // Estimate impressions
         let totalImpressions = 0;
         selections.forEach(s => {
-            totalImpressions += pricingService.getEstimatedImpressions(s.screenId, s.hour);
+            totalImpressions += pricingService.getEstimatedImpressions(s.screen_id, s.hour);
         });
 
         return { totalCost, totalSlots, totalImpressions };
@@ -290,8 +300,8 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
                             {isExpanded && (
                                 <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
                                     {loopsByHour[hour]?.map(loop => {
-                                        const screen = localStorageService.getScreen(loop.screenId);
-                                        const pricing = pricingService.getSlotPrice(loop.screenId, selectedDate, hour);
+                                        const screen = pricingService.screens.find(s => s.id === loop.screen_id);
+                                        const pricing = pricingService.getSlotPrice(loop.screen_id, selectedDate, hour);
                                         const loopSelections = getLoopSelections(loop.id);
 
                                         return (
@@ -299,7 +309,7 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
                                                 <div className="flex items-center justify-between mb-3">
                                                     <div className="flex items-center gap-2">
                                                         <span className="material-symbols-outlined text-slate-400">tv</span>
-                                                        <span className="font-medium text-sm">{screen?.name || loop.screenId}</span>
+                                                        <span className="font-medium text-sm">{screen?.name || loop.screen_id}</span>
                                                     </div>
                                                     <span className="text-xs text-slate-500">
                                                         {loop.slots.filter(s => s.status !== 'available').length}/12 booked

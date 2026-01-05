@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API_URL } from '../../config';
+import apiService from '../../services/ApiService';
 
 function PlaylistManagement() {
     const navigate = useNavigate();
@@ -13,17 +13,12 @@ function PlaylistManagement() {
     }, []);
 
     const fetchPlaylists = async () => {
+        setLoading(true);
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/api/playlists`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setPlaylists(data);
-            }
+            const data = await apiService.getPlaylists();
+            setPlaylists(data || []);
         } catch (error) {
-            console.error('Failed to fetch playlists', error);
+            console.error('Failed to fetch playlists:', error);
         } finally {
             setLoading(false);
         }
@@ -32,14 +27,10 @@ function PlaylistManagement() {
     const handleDelete = async (id) => {
         if (!confirm('Are you sure you want to delete this playlist?')) return;
         try {
-            const token = localStorage.getItem('token');
-            await fetch(`${API_URL}/api/playlists/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            fetchPlaylists();
+            await apiService.deletePlaylist(id);
+            await fetchPlaylists();
         } catch (error) {
-            console.error('Failed to delete playlist', error);
+            console.error('Failed to delete playlist:', error);
         }
     };
 
