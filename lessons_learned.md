@@ -360,6 +360,27 @@ Objectives: Document errors, bugs, and mistakes so we do not make them again.
 - **Root Cause**: Standard telemetry only captured the asset ID, not the schedule context.
 - **Prevention**: Enrich the telemetry payload with `loop_id`, `loop_hour`, and `slot_position`. This allows the Analytics dashboard to report on "Delivery Rate" (how many scheduled slots actually played) vs just raw impression counts.
 
+### [2026-01-05] localStorage Prototyping for MVP Development
+- **Issue**: Rapid UI development blocked on backend API completion for complex multi-entity data flows.
+- **Root Cause**: Frontend development outpaced API implementation, and demo scenarios needed interconnected entities (retailers → stores → screens → loops).
+- **Prevention**: Use a centralized `LocalStorageService` with realistic seed data and proper relationships. This enables full UI development including CRUD operations, filtering, and cross-entity queries without backend dependency. When backend is ready, replace localStorage calls with API calls using the same interface.
+
+### [2026-01-05] Wizard Step Progress as Navigation Aid
+- **Issue**: Multi-step wizards without visual progress indicators caused user confusion about remaining steps and completed work.
+- **Root Cause**: Wizard implementations focused on logic flow but neglected UX for navigation awareness.
+- **Prevention**: Always include a visual step progress indicator showing: (1) completed steps with checkmarks, (2) current step highlighted, (3) future steps with icons. Allow clicking completed steps to go back without losing data.
+
+### [2026-01-05] Traffic Tier Pricing Model
+- **Issue**: Flat CPM pricing doesn't reflect actual advertising value differences across time-of-day.
+- **Root Cause**: Ignoring the reality that peak hours (lunch, rush hour) have higher foot traffic and advertising value.
+- **Prevention**: Implement traffic tiers (VeryLow, Low, Medium, High) with CPM multipliers (0.5x to 1.5x). Map specific hours to tiers based on business patterns. Support retailer-level and date-level overrides for special events or partner negotiations.
+
+### [2026-01-05] Service Layer Singleton Pattern for UI State
+- **Issue**: Multiple components needed shared access to pricing calculations and data queries without prop drilling or complex context.
+- **Root Cause**: Traditional React patterns (Context, props) become unwieldy for domain-specific calculation services.
+- **Prevention**: Create singleton service classes (`pricingService`, `localStorageService`) that components import directly. These provide business logic and data access without React lifecycle management. Works well for read-heavy operations and calculations.
+
 ---
 *Note: This file is a permanent project record. Do not delete or purge entries.*
+
 

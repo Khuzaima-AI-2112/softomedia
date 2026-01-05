@@ -10,12 +10,27 @@ function HamburgerMenu() {
     const menuItems = [
         { label: 'Dashboard', path: `/dashboard/${user?.role || 'admin'}`, icon: 'dashboard' },
         { label: 'Ad Player', path: '/player', icon: 'play_circle' },
+        { label: 'Demo Player', path: '/player/demo', icon: 'slideshow' },
         ...(user?.role === 'admin' ? [
-            { label: 'System Health', path: '/admin/health', icon: 'health_metrics' },
-            { label: 'Screens', path: '/admin/screens', icon: 'monitor' },
-            { label: 'Playlists', path: '/admin/playlists', icon: 'playlist_play' }
+            { label: 'Screens', path: '/dashboard/admin/screens', icon: 'monitor' },
+            { label: 'Playlists', path: '/dashboard/admin/playlists', icon: 'playlist_play' },
+            { label: 'Loops', path: '/dashboard/admin/loops', icon: 'loop' },
+            { label: 'Analytics', path: '/dashboard/admin/analytics', icon: 'analytics' },
+            { label: 'Pricing', path: '/dashboard/admin/pricing', icon: 'attach_money' },
+            { label: 'Users', path: '/dashboard/admin/users', icon: 'people' },
+            { label: 'Retailers', path: '/dashboard/admin/retailers', icon: 'storefront' },
+            { label: 'Advertisers', path: '/dashboard/admin/advertisers', icon: 'campaign' },
+            { label: 'Network Map', path: '/dashboard/admin/map', icon: 'map' },
+            { label: 'System Health', path: '/dashboard/health', icon: 'health_metrics' }
         ] : []),
-        ...(user?.role === 'retailer' ? [{ label: 'Schedule Manager', path: '/dashboard/retailer/schedule', icon: 'calendar_today' }] : []),
+        ...(user?.role === 'retailer' ? [
+            { label: 'Schedule Manager', path: '/dashboard/retailer/schedule', icon: 'calendar_today' },
+            { label: 'Schedule Calendar', path: '/dashboard/retailer/schedule/calendar', icon: 'event' },
+            { label: 'History', path: '/dashboard/retailer/history', icon: 'history' }
+        ] : []),
+        ...(user?.role === 'brand' ? [
+            { label: 'New Campaign', path: '/dashboard/brand/campaign/new', icon: 'add_circle' }
+        ] : []),
         { label: 'Settings', path: '#', icon: 'settings' },
     ];
 

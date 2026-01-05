@@ -1,0 +1,307 @@
+/**
+ * ScheduleHistory - Retailer page for viewing past approval history
+ * Historical view of approved/rejected schedules with audit log
+ */
+
+import React, { useState, useEffect, useMemo } from 'react';
+import GlassCard from '../../components/GlassCard';
+import StatusBadge from '../../components/StatusBadge';
+import localStorageService from '../../services/LocalStorageService';
+
+function ScheduleHistory() {
+    const [loops, setLoops] = useState([]);
+    const [auditLog, setAuditLog] = useState([]);
+    const [dateFilter, setDateFilter] = useState('all');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [currentRetailer, setCurrentRetailer] = useState(null);
+
+    useEffect(() => {
+        loadData();
+    }, []);
+
+    const loadData = () => {
+        localStorageService.init();
+
+        // For demo, get first retailer as "current" retailer
+        const retailers = localStorageService.getRetailers();
+        if (retailers.length > 0) {
+            setCurrentRetailer(retailers[0]);
+        }
+
+        // Get all loops
+        const allLoops = localStorageService.getLoops();
+        setLoops(allLoops);
+
+        // Get audit log
+        const log = localStorageService.getAuditLog();
+        setAuditLog(log.filter(l =>
+            l.action === 'loop_approved' ||
+            l.action === 'slot_rejected' ||
+            l.action === 'slot_booked'
+        ));
+    };
+
+    // Get unique dates from loops
+    const availableDates = useMemo(() => {
+        const dates = [...new Set(loops.map(l => l.date))];
+        return dates.sort().reverse();
+    }, [loops]);
+
+    // Filter loops
+    const filteredLoops = useMemo(() => {
+        let result = currentRetailer
+            ? loops.filter(l => l.retailerId === currentRetailer.id)
+            : loops;
+
+        if (dateFilter !== 'all') {
+            result = result.filter(l => l.date === dateFilter);
+        }
+
+        if (statusFilter !== 'all') {
+            result = result.filter(l => l.validationStatus === statusFilter);
+        }
+
+        // Group by date and hour
+        return result.reduce((acc, loop) => {
+            const key = `${loop.date}_${loop.hour}`;
+            if (!acc[key]) {
+                acc[key] = {
+                    date: loop.date,
+                    hour: loop.hour,
+                    loops: []
+                };
+            }
+            acc[key].loops.push(loop);
+            return acc;
+        }, {});
+    }, [loops, currentRetailer, dateFilter, statusFilter]);
+
+    const formatHour = (hour) => {
+        const suffix = hour >= 12 ? 'PM' : 'AM';
+        const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+        return `${displayHour}:00 ${suffix}`;
+    };
+
+    const formatDate = (dateStr) => {
+        return new Date(dateStr).toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric'
+        });
+    };
+
+    const getStatusCounts = () => {
+        const retailerLoops = currentRetailer
+            ? loops.filter(l => l.retailerId === currentRetailer.id)
+            : loops;
+
+        return {
+            approved: retailerLoops.filter(l => l.validationStatus === 'approved').length,
+            pending: retailerLoops.filter(l => l.validationStatus === 'pending').length,
+            rejected: retailerLoops.filter(l => l.slots.some(s => s.status === 'rejected')).length
+        };
+    };
+
+    const statusCounts = getStatusCounts();
+
+    return (
+        <div className="space-y-8 animate-in fade-in duration-500">
+            {/* Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+                        Schedule History
+                    </h1>
+                    <p className="text-slate-500 dark:text-slate-400">
+                        {currentRetailer ? (
+                            <>
+                                <span className="text-xl mr-1">{currentRetailer.logo}</span>
+                                {currentRetailer.name} - Approval History
+                            </>
+                        ) : (
+                            'View past schedule approvals and rejections'
+                        )}
+                    </p>
+                </div>
+                <div className="flex items-center gap-3">
+                    <select
+                        value={dateFilter}
+                        onChange={(e) => setDateFilter(e.target.value)}
+                        className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                    >
+                        <option value="all">All Dates</option>
+                        {availableDates.map(date => (
+                            <option key={date} value={date}>{formatDate(date)}</option>
+                        ))}
+                    </select>
+                    <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                    >
+                        <option value="all">All Status</option>
+                        <option value="approved">Approved</option>
+                        <option value="pending">Pending</option>
+                    </select>
+                </div>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <GlassCard
+                    className={`border-l-4 border-l-emerald-500 cursor-pointer transition-all ${statusFilter === 'approved' ? 'ring-2 ring-emerald-500' : ''}`}
+                    onClick={() => setStatusFilter(statusFilter === 'approved' ? 'all' : 'approved')}
+                >
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="material-symbols-outlined text-emerald-500">check_circle</span>
+                        <p className="text-sm font-medium text-slate-500">Approved Loops</p>
+                    </div>
+                    <p className="text-3xl font-bold text-emerald-500">{statusCounts.approved}</p>
+                </GlassCard>
+                <GlassCard
+                    className={`border-l-4 border-l-amber-500 cursor-pointer transition-all ${statusFilter === 'pending' ? 'ring-2 ring-amber-500' : ''}`}
+                    onClick={() => setStatusFilter(statusFilter === 'pending' ? 'all' : 'pending')}
+                >
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="material-symbols-outlined text-amber-500">schedule</span>
+                        <p className="text-sm font-medium text-slate-500">Pending Review</p>
+                    </div>
+                    <p className="text-3xl font-bold text-amber-500">{statusCounts.pending}</p>
+                </GlassCard>
+                <GlassCard className="border-l-4 border-l-rose-500">
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="material-symbols-outlined text-rose-500">block</span>
+                        <p className="text-sm font-medium text-slate-500">Rejected Slots</p>
+                    </div>
+                    <p className="text-3xl font-bold text-rose-500">{statusCounts.rejected}</p>
+                </GlassCard>
+            </div>
+
+            {/* History List */}
+            <GlassCard>
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-bold text-lg">Schedule Log</h3>
+                    <button className="text-sm text-primary hover:underline flex items-center gap-1">
+                        <span className="material-symbols-outlined text-sm">download</span>
+                        Export CSV
+                    </button>
+                </div>
+
+                <div className="space-y-4">
+                    {Object.keys(filteredLoops).length === 0 ? (
+                        <p className="text-center text-slate-400 py-8">No schedule history found</p>
+                    ) : (
+                        Object.values(filteredLoops)
+                            .sort((a, b) => `${b.date}_${b.hour}`.localeCompare(`${a.date}_${a.hour}`))
+                            .slice(0, 20) // Limit display
+                            .map((group, idx) => (
+                                <div
+                                    key={idx}
+                                    className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30"
+                                >
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                                                <span className="material-symbols-outlined text-primary">calendar_today</span>
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold">{formatDate(group.date)}</p>
+                                                <p className="text-xs text-slate-500">{formatHour(group.hour)}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <span className="text-sm text-slate-500">
+                                                {group.loops.length} screen{group.loops.length > 1 ? 's' : ''}
+                                            </span>
+                                            <StatusBadge status={
+                                                group.loops.every(l => l.validationStatus === 'approved')
+                                                    ? 'Approved'
+                                                    : group.loops.some(l => l.validationStatus === 'approved')
+                                                        ? 'Partial'
+                                                        : 'Pending'
+                                            } />
+                                        </div>
+                                    </div>
+
+                                    {/* Slot summary */}
+                                    <div className="flex flex-wrap gap-1">
+                                        {group.loops.slice(0, 3).map(loop => {
+                                            const bookedSlots = loop.slots.filter(s => s.status === 'booked').length;
+                                            const rejectedSlots = loop.slots.filter(s => s.status === 'rejected').length;
+                                            return (
+                                                <span
+                                                    key={loop.id}
+                                                    className="text-xs px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                                                >
+                                                    {loop.screenId.split('_').slice(-2).join('-')}: {bookedSlots}/12 booked
+                                                    {rejectedSlots > 0 && (
+                                                        <span className="text-rose-500 ml-1">({rejectedSlots} rejected)</span>
+                                                    )}
+                                                </span>
+                                            );
+                                        })}
+                                        {group.loops.length > 3 && (
+                                            <span className="text-xs px-2 py-1 text-slate-400">
+                                                +{group.loops.length - 3} more
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Validation info */}
+                                    {group.loops[0].validatedAt && (
+                                        <p className="text-xs text-slate-400 mt-2">
+                                            Validated: {new Date(group.loops[0].validatedAt).toLocaleString()}
+                                        </p>
+                                    )}
+                                </div>
+                            ))
+                    )}
+                </div>
+            </GlassCard>
+
+            {/* Recent Activity */}
+            <GlassCard>
+                <h3 className="font-bold text-lg mb-4">Recent Activity</h3>
+                <div className="space-y-3">
+                    {auditLog.slice(0, 10).map(entry => (
+                        <div
+                            key={entry.id}
+                            className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                        >
+                            <div className={`size-8 rounded-lg flex items-center justify-center ${entry.action === 'loop_approved'
+                                    ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600'
+                                    : entry.action === 'slot_rejected'
+                                        ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-600'
+                                        : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600'
+                                }`}>
+                                <span className="material-symbols-outlined text-lg">
+                                    {entry.action === 'loop_approved' ? 'check' :
+                                        entry.action === 'slot_rejected' ? 'block' : 'add_circle'}
+                                </span>
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {entry.action === 'loop_approved' && 'Loop approved'}
+                                    {entry.action === 'slot_rejected' && 'Slot rejected'}
+                                    {entry.action === 'slot_booked' && 'Slot booked'}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                    {entry.entityId}
+                                    {entry.details?.reason && ` - ${entry.details.reason}`}
+                                </p>
+                            </div>
+                            <span className="text-xs text-slate-400">
+                                {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                        </div>
+                    ))}
+                    {auditLog.length === 0 && (
+                        <p className="text-center text-slate-400 py-4">No recent activity</p>
+                    )}
+                </div>
+            </GlassCard>
+        </div>
+    );
+}
+
+export default ScheduleHistory;

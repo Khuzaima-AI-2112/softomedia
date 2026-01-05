@@ -1,15 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import SupportTicketModal from '../../components/SupportTicketModal';
 import LocationManager from '../../components/LocationManager';
 import CampaignApprovalList from '../../components/CampaignApprovalList';
+import localStorageService from '../../services/LocalStorageService';
 
 function RetailerDashboard() {
     const [isSyncActive, setIsSyncActive] = useState(true);
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+    const [stats, setStats] = useState({
+        stores: 0,
+        screens: 0,
+        onlineScreens: 0,
+        pendingLoops: 0
+    });
+
+    useEffect(() => {
+        loadStats();
+    }, []);
+
+    const loadStats = () => {
+        localStorageService.init();
+        const stores = localStorageService.getStores();
+        const screens = localStorageService.getScreens();
+        const loops = localStorageService.getLoops();
+
+        setStats({
+            stores: stores.length,
+            screens: screens.length,
+            onlineScreens: screens.filter(s => s.status === 'online').length,
+            pendingLoops: loops.filter(l => l.validationStatus === 'pending').length
+        });
+    };
 
     const toggleSync = () => setIsSyncActive(!isSyncActive);
+
+    const quickActions = [
+        { label: 'Schedule Calendar', icon: 'event', path: '/dashboard/retailer/schedule/calendar', color: 'primary' },
+        { label: 'Approval History', icon: 'history', path: '/dashboard/retailer/history', color: 'amber' },
+        { label: 'Demo Player', icon: 'slideshow', path: '/player/demo', color: 'purple' }
+    ];
 
     return (
         <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -33,6 +65,69 @@ function RetailerDashboard() {
                     </button>
                 </div>
             </div>
+
+            {/* Quick Actions */}
+            <div className="grid grid-cols-3 gap-4">
+                {quickActions.map(action => (
+                    <Link
+                        key={action.path}
+                        to={action.path}
+                        className={`
+                            p-4 rounded-xl border border-slate-200 dark:border-slate-700 
+                            bg-white dark:bg-slate-800/50 hover:border-${action.color}-400 
+                            hover:shadow-lg transition-all flex items-center gap-3 group
+                        `}
+                    >
+                        <div className={`size-10 rounded-lg bg-${action.color}/10 flex items-center justify-center text-${action.color === 'primary' ? 'primary' : action.color + '-500'} group-hover:scale-110 transition-transform`}>
+                            <span className="material-symbols-outlined">{action.icon}</span>
+                        </div>
+                        <span className="font-medium text-slate-700 dark:text-slate-300">{action.label}</span>
+                    </Link>
+                ))}
+            </div>
+
+            {/* Stats Row */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <GlassCard className="!p-4">
+                    <p className="text-sm text-slate-500 mb-1">Stores</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.stores}</p>
+                </GlassCard>
+                <GlassCard className="!p-4">
+                    <p className="text-sm text-slate-500 mb-1">Screens</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.screens}</p>
+                </GlassCard>
+                <GlassCard className="!p-4">
+                    <p className="text-sm text-slate-500 mb-1">Online</p>
+                    <p className="text-2xl font-bold text-emerald-500">{stats.onlineScreens}</p>
+                </GlassCard>
+                <GlassCard className="!p-4">
+                    <p className="text-sm text-slate-500 mb-1">Pending Approvals</p>
+                    <p className={`text-2xl font-bold ${stats.pendingLoops > 0 ? 'text-amber-500' : 'text-slate-400'}`}>
+                        {stats.pendingLoops}
+                    </p>
+                </GlassCard>
+            </div>
+
+            {/* Pending Alert */}
+            {stats.pendingLoops > 0 && (
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                    <span className="material-symbols-outlined text-amber-500">pending_actions</span>
+                    <div className="flex-1">
+                        <p className="font-medium text-amber-800 dark:text-amber-200">
+                            {stats.pendingLoops} loops awaiting your approval
+                        </p>
+                        <p className="text-sm text-amber-600 dark:text-amber-400">
+                            Review tomorrow's broadcast schedule before midnight
+                        </p>
+                    </div>
+                    <Link
+                        to="/dashboard/retailer/schedule/calendar"
+                        className="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600"
+                    >
+                        Review Now
+                    </Link>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <GlassCard className="flex flex-col justify-between">
@@ -69,3 +164,4 @@ function RetailerDashboard() {
 }
 
 export default RetailerDashboard;
+

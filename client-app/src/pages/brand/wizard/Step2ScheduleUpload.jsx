@@ -1,262 +1,172 @@
-import React, { useState, useCallback } from 'react';
-import { API_URL } from '../../../config';
-import useAsyncAction from '../../../hooks/useAsyncAction';
+/**
+ * Step2ScheduleUpload - Campaign name and date range selection
+ * Part of the advertiser campaign booking wizard (5-step flow)
+ */
+
+import React from 'react';
+import GlassCard from '../../../components/GlassCard';
 
 const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
-    const [dragActive, setDragActive] = useState(false);
-    const [validationError, setValidationError] = useState('');
-
-    const handleDrag = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.type === "dragenter" || e.type === "dragover") {
-            setDragActive(true);
-        } else if (e.type === "dragleave") {
-            setDragActive(false);
-        }
+    // Calculate campaign duration
+    const getDuration = () => {
+        if (!data.dateRange?.start || !data.dateRange?.end) return 0;
+        const start = new Date(data.dateRange.start);
+        const end = new Date(data.dateRange.end);
+        return Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1);
     };
 
-    const timeSlots = [
-        { time: '08:00 AM', availability: 85, status: 'Available' },
-        { time: '09:00 AM', availability: 40, status: 'Limited' },
-        { time: '10:00 AM', availability: 0, status: 'Sold Out' },
-        { time: '11:00 AM', availability: 90, status: 'Available' },
-        { time: '12:00 PM', availability: 20, status: 'Available' },
-        { time: '01:00 PM', availability: 50, status: 'Available' },
-        { time: '02:00 PM', availability: 10, status: 'Limited' },
-        { time: '03:00 PM', availability: 100, status: 'Available' }
-    ];
+    const duration = getDuration();
 
-    // Async upload function that will be wrapped by useAsyncAction
-    const uploadAsset = useCallback(async (fileName) => {
-        setValidationError('');
-        // Mocking metadata extraction and validation
-        const mockDuration = 5;
-
-        // Relaxed validation: Warn but allow if not exactly 5s (or just log it)
-        if (mockDuration !== 5) {
-            console.warn('Ad duration is not exactly 5s. Auto-trimming might occur.');
+    const handleContinue = () => {
+        if (!data.campaignName) {
+            updateData({ campaignName: 'Untitled Campaign' });
         }
-
-        const token = localStorage.getItem('auth_token');
-        const res = await fetch(`${API_URL}/api/assets/upload`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                filename: fileName,
-                duration: mockDuration,
-                file_type: fileName.endsWith('.mp4') ? 'video/mp4' : 'image/jpeg'
-            })
-        });
-
-        if (!res.ok) {
-            throw new Error('Failed to register asset on server.');
-        }
-
-        const asset = await res.json();
-        updateData({
-            creativeFile: fileName,
-            media_id: asset.id
-        });
-        return asset;
-    }, [updateData]);
-
-    // Use the hook for automatic loading state management
-    const { execute: validateAndUpload, isLoading: isUploading } = useAsyncAction(uploadAsset, {
-        onError: (err) => setValidationError(err.message || 'Server connection error.')
-    });
-
-    const handleDrop = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setDragActive(false);
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            validateAndUpload(e.dataTransfer.files[0].name);
-        }
-    };
-
-    const toggleSlot = (slot) => {
-        const current = data.selectedSlots;
-        if (current.includes(slot)) {
-            updateData({ selectedSlots: current.filter(s => s !== slot) });
-        } else {
-            updateData({ selectedSlots: [...current, slot] });
-        }
+        onNext();
     };
 
     return (
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 mb-24">
-            <div className="xl:col-span-8 flex flex-col gap-8">
-                {/* Duration Section */}
-                <section className="p-8 rounded-xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 shadow-sm">
-                    <div className="flex items-center gap-3 mb-6">
-                        <span className="material-symbols-outlined text-primary">calendar_month</span>
-                        <h2 className="text-xl font-bold">Campaign Duration</h2>
+        <div className="space-y-6 pb-24">
+            {/* Step Header */}
+            <GlassCard className="border-l-4 border-l-primary">
+                <div className="flex items-center gap-4">
+                    <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-primary text-2xl">calendar_month</span>
                     </div>
-
-                    <div className="flex flex-col md:flex-row gap-8 justify-between">
-                        {/* Date Range Inputs */}
-                        <div className="flex-1 flex flex-col gap-4">
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Start Date</label>
-                                <input
-                                    type="date"
-                                    value={data.dateRange.start}
-                                    onChange={(e) => updateData({ dateRange: { ...data.dateRange, start: e.target.value } })}
-                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-1">End Date</label>
-                                <input
-                                    type="date"
-                                    value={data.dateRange.end}
-                                    onChange={(e) => updateData({ dateRange: { ...data.dateRange, end: e.target.value } })}
-                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex-1 flex flex-col justify-center bg-slate-50 dark:bg-slate-800/50 rounded-xl p-6 border border-dashed border-slate-200 dark:border-slate-700">
-                            <h3 className="text-sm font-bold text-slate-500 uppercase mb-2">Campaign Settings</h3>
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-slate-600 dark:text-slate-300">Total Duration</span>
-                                <span className="font-black text-primary">
-                                    {Math.max(1, Math.ceil((new Date(data.dateRange.end) - new Date(data.dateRange.start)) / (1000 * 60 * 60 * 24)) + 1)} Days
-                                </span>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                                <label className="text-xs font-bold text-slate-500 uppercase">Frequency per Loop</label>
-                                <select
-                                    value={data.frequency || 1}
-                                    onChange={(e) => updateData({ frequency: parseInt(e.target.value) })}
-                                    className="w-full px-2 py-1 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
-                                >
-                                    <option value={1}>1x (Standard)</option>
-                                    <option value={2}>2x (Double Exposure)</option>
-                                    <option value={3}>3x (High Frequency)</option>
-                                </select>
-                            </div>
-                        </div>
+                    <div>
+                        <h2 className="text-xl font-bold">Step 2: Campaign Schedule</h2>
+                        <p className="text-slate-500 dark:text-slate-400">
+                            Set your campaign name and date range
+                        </p>
                     </div>
-                </section>
+                </div>
+            </GlassCard>
 
-                {/* Time Slot Section */}
-                <section className="p-8 rounded-xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 shadow-sm">
-                    <div className="flex items-center gap-3 mb-6">
-                        <span className="material-symbols-outlined text-primary">schedule</span>
-                        <h2 className="text-xl font-bold">Daily Time Slots</h2>
-                    </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Campaign Name */}
+                <GlassCard>
+                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary">badge</span>
+                        Campaign Name
+                    </h3>
+                    <input
+                        type="text"
+                        value={data.campaignName || ''}
+                        onChange={(e) => updateData({ campaignName: e.target.value })}
+                        placeholder="e.g., Summer Sale 2026"
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                    />
+                    <p className="text-sm text-slate-500 mt-2">
+                        Choose a memorable name for your campaign
+                    </p>
+                </GlassCard>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {timeSlots.map((slot, i) => {
-                            const isSelected = data.selectedSlots.includes(slot.time);
-                            const isSoldOut = slot.status === 'Sold Out';
-                            return (
-                                <button
-                                    key={i}
-                                    disabled={isSoldOut}
-                                    onClick={() => toggleSlot(slot.time)}
-                                    data-testid={`timeslot-${slot.time.replace(/\s+/g, '')}`}
-                                    className={`relative flex flex-col gap-2 p-3 text-left rounded-lg border-2 transition-all ${isSelected
-                                        ? 'border-primary bg-primary/5'
-                                        : isSoldOut
-                                            ? 'border-slate-100 dark:border-slate-800 opacity-50 cursor-not-allowed'
-                                            : 'border-slate-200 dark:border-slate-700 hover:border-primary/50'
-                                        }`}
-                                >
-                                    <span className="text-sm font-bold">{slot.time}</span>
-                                    <div className="flex flex-col gap-1.5">
-                                        <div className="w-full h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                            <div
-                                                className={`h-full rounded-full ${isSelected ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-600'}`}
-                                                style={{ width: `${slot.availability}%` }}
-                                            />
-                                        </div>
-                                        <span className={`text-[10px] font-bold uppercase ${isSoldOut ? 'text-red-500' : 'text-slate-400'}`}>
-                                            {slot.status}
-                                        </span>
-                                    </div>
-                                </button>
-                            );
-                        })}
+                {/* Budget */}
+                <GlassCard>
+                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary">payments</span>
+                        Campaign Budget
+                    </h3>
+                    <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-slate-400">$</span>
+                        <input
+                            type="number"
+                            value={data.budget || 1000}
+                            onChange={(e) => updateData({ budget: parseInt(e.target.value) || 0 })}
+                            min="100"
+                            step="100"
+                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                        />
                     </div>
-                </section>
-
-                {/* Creative Upload Section */}
-                <section className="p-8 rounded-xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 shadow-sm">
-                    <div className="flex items-center gap-3 mb-6">
-                        <span className="material-symbols-outlined text-primary">cloud_upload</span>
-                        <h2 className="text-xl font-bold">Upload Creative</h2>
-                    </div>
-
-                    <div
-                        onDragEnter={handleDrag}
-                        onDragLeave={handleDrag}
-                        onDragOver={handleDrag}
-                        onDrop={handleDrop}
-                        onClick={() => validateAndUpload('demo-ad.mp4')}
-                        data-testid="upload-creative-area"
-                        className={`relative group h-48 border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer ${dragActive ? 'border-primary bg-primary/5' : 'border-slate-200 dark:border-slate-800 hover:border-primary/50'
-                            } ${data.creativeFile ? 'border-emerald-500 bg-emerald-500/5' : ''} ${validationError ? 'border-red-500 bg-red-500/5' : ''}`}
-                    >
-                        <span className={`material-symbols-outlined text-4xl mb-4 ${data.creativeFile ? 'text-emerald-500' : validationError ? 'text-red-500' : 'group-hover:text-primary transition-colors'}`}>
-                            {data.creativeFile ? 'check_circle' : validationError ? 'error' : 'cloud_upload'}
-                        </span>
-                        <p className="font-bold text-lg mb-1">{data.creativeFile || validationError || 'Click or drag file to upload'}</p>
-                        <p className="text-xs text-slate-500">MP4, JPG, PNG up to 50MB (Must be exactly 5.0s)</p>
-                    </div>
-                </section>
+                    <p className="text-sm text-slate-500 mt-2">
+                        Set your maximum spending limit
+                    </p>
+                </GlassCard>
             </div>
 
-            {/* Sticky Sidebar Summary */}
-            <aside className="xl:col-span-4">
-                <div className="sticky top-24 flex flex-col gap-6 p-8 rounded-xl bg-slate-900 text-white shadow-2xl border border-white/10 ring-1 ring-white/5">
-                    <h3 className="text-xl font-bold pb-4 border-b border-white/10">Booking Summary</h3>
+            {/* Date Range */}
+            <GlassCard>
+                <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary">date_range</span>
+                    Campaign Duration
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <label className="block text-sm font-medium mb-2">Start Date</label>
+                        <input
+                            type="date"
+                            value={data.dateRange?.start || ''}
+                            onChange={(e) => updateData({
+                                dateRange: { ...data.dateRange, start: e.target.value }
+                            })}
+                            min={new Date().toISOString().split('T')[0]}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-2">End Date</label>
+                        <input
+                            type="date"
+                            value={data.dateRange?.end || ''}
+                            onChange={(e) => updateData({
+                                dateRange: { ...data.dateRange, end: e.target.value }
+                            })}
+                            min={data.dateRange?.start || new Date().toISOString().split('T')[0]}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
+                        />
+                    </div>
+                    <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-primary/5 border border-primary/20">
+                        <p className="text-4xl font-black text-primary">{duration}</p>
+                        <p className="text-sm text-slate-500">Days</p>
+                    </div>
+                </div>
+            </GlassCard>
 
-                    <div className="flex flex-col gap-4">
-                        <div className="flex justify-between items-start">
-                            <span className="text-sm text-slate-400">Selected Screens</span>
-                            <span className="font-bold">{data.selectedScreens.length} Units</span>
+            {/* Selected Screens Summary */}
+            <GlassCard className="bg-slate-50 dark:bg-slate-800/50">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <span className="material-symbols-outlined text-primary">tv</span>
                         </div>
-                        <div className="flex justify-between items-start">
-                            <span className="text-sm text-slate-400">Duration</span>
-                            <span className="font-bold text-right">8 Days<br /><span className="text-[10px] font-normal opacity-60">Oct 05 - Oct 12</span></span>
-                        </div>
-                        <div className="flex justify-between items-start">
-                            <span className="text-sm text-slate-400">Time Slots</span>
-                            <span className="font-bold text-right">{data.selectedSlots.length} Slots/Day</span>
-                        </div>
-                        <div className="pt-4 border-t border-white/10 flex justify-between items-end">
-                            <span className="text-sm text-slate-400 font-medium">Total Cost</span>
-                            <div className="flex flex-col items-end">
-                                <span className="text-3xl font-black text-primary">$720.00</span>
-                                <span className="text-[10px] opacity-40">Inclusive of VAT</span>
-                            </div>
+                        <div>
+                            <p className="font-bold">{(data.selectedScreens || []).length} Screens Selected</p>
+                            <p className="text-sm text-slate-500">{(data.selectedStores || []).length} Stores</p>
                         </div>
                     </div>
-
-                    <button
-                        onClick={onNext}
-                        disabled={isUploading || !data.creativeFile || data.selectedSlots.length === 0}
-                        data-testid="proceed-to-review"
-                        className="w-full py-4 rounded-lg bg-primary hover:bg-primary/90 text-white font-bold transition-all flex items-center justify-center gap-2 group shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed mt-4"
-                    >
-                        <span>Proceed to Review</span>
-                        <span className="material-symbols-outlined text-[20px] group-hover:translate-x-1 transition-transform">payments</span>
-                    </button>
-
                     <button
                         onClick={onPrev}
-                        className="w-full py-2 text-slate-400 hover:text-white text-sm font-medium transition-colors"
+                        className="text-primary hover:underline text-sm font-medium"
                     >
-                        Back to Selection
+                        Change Selection
                     </button>
                 </div>
-            </aside>
+            </GlassCard>
+
+            {/* Navigation */}
+            <div className="fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-[#111722] border-t border-slate-200 dark:border-slate-800 shadow-[0_-4px_20px_rgba(0,0,0,0.15)]">
+                <div className="max-w-[1440px] mx-auto px-10 py-4 flex items-center justify-between">
+                    <button
+                        onClick={onPrev}
+                        className="px-6 py-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium transition-colors"
+                    >
+                        Back
+                    </button>
+                    <div className="flex items-center gap-4">
+                        <div className="text-right">
+                            <p className="text-sm text-slate-500">Campaign Duration</p>
+                            <p className="font-bold text-lg">{duration} Days</p>
+                        </div>
+                        <button
+                            onClick={handleContinue}
+                            disabled={duration < 1}
+                            className="px-8 py-3 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold shadow-lg shadow-primary/30 transition-all flex items-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <span>Select Time Slots</span>
+                            <span className="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };
