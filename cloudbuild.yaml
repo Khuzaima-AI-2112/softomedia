@@ -32,6 +32,10 @@ steps:
         burl=$$(gcloud run services describe ${_SERVICE_ADSERVER} --region ${_REGION} --format='value(status.url)' --project ${PROJECT_ID} 2>/dev/null || echo "https://ad-server-kiieh7nmwa-uc.a.run.app")
         echo "🔗 Linking frontend to Backend URL: $$burl"
         
+        # PROACTIVE FIX: Create a .env file that Docker will COPY
+        echo "VITE_API_URL=$$burl" > client-app/.env.production
+        echo "VITE_BUILD_ID=${BUILD_ID}" >> client-app/.env.production
+        
         docker build \
           --build-arg VITE_API_URL=$$burl \
           -t ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_ARTIFACT_REGISTRY}/${_SERVICE_CLIENT}:${BUILD_ID} \
