@@ -25,7 +25,7 @@ const corsOptions = {
         // Allow requests with no origin (mobile apps, Postman, etc.)
         if (!origin) return callback(null, true);
 
-        if (CORS_ORIGINS.indexOf(origin) !== -1 || (process.env.NODE_ENV !== 'production' && DEV_ORIGINS.includes(origin))) {
+        if (CORS_ORIGINS.includes('*') || CORS_ORIGINS.indexOf(origin) !== -1 || (process.env.NODE_ENV !== 'production' && DEV_ORIGINS.includes(origin))) {
             callback(null, true);
         } else {
             console.warn(`[CORS] Blocked request from origin: ${origin}`);
