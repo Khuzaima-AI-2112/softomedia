@@ -64,4 +64,25 @@ router.put('/sink/*', (req, res) => {
     res.status(200).send('OK');
 });
 
+/**
+ * POST /api/telemetry/error
+ * Receives client-side exception reports (stack traces, component stacks)
+ */
+router.post('/error', (req, res) => {
+    const { message, stack, componentStack, url, userAgent } = req.body;
+
+    logger.error('Client-Side Application Error', {
+        type: 'client_error',
+        message,
+        stack,
+        component_stack: componentStack,
+        url: url || 'unknown',
+        user_agent: userAgent || req.get('user-agent'),
+        ip: req.ip
+    });
+
+    res.status(200).json({ status: 'logged' });
+});
+
 export default router;
+

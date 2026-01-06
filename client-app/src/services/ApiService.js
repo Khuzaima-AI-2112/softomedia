@@ -273,7 +273,29 @@ class ApiService {
     async deleteScreen(id) {
         return apiClient.delete(`/api/screens/${id}`);
     }
+
+    // ============================================
+    // TELEMETRY & OBSERVABILITY
+    // ============================================
+
+    async reportError(error, componentStack = null) {
+        // Safe wrapper to prevent error reporting from causing errors
+        try {
+            const payload = {
+                message: error.message || String(error),
+                stack: error.stack,
+                componentStack,
+                url: window.location.href,
+                userAgent: navigator.userAgent
+            };
+            // Fire and forget
+            apiClient.post('/api/telemetry/error', payload).catch(e => console.error('Failed to report error:', e));
+        } catch (e) {
+            console.error('Error reporting failed:', e);
+        }
+    }
 }
+
 
 const apiService = new ApiService();
 export default apiService;

@@ -45,7 +45,9 @@
 ### Testing & Observability
 - [ ] Add accessibility (a11y) tests with `@axe-core/playwright`
 - [ ] Expand visual regression coverage to Admin and Retailer dashboards
-- [ ] **Logging**: Add `correlation-id` to Winston logger to trace requests across services.
+- [x] **Logging**: Add Global Error Handler to `ad-server`
+- [x] **Logging**: Add Client Telemetry Endpoint `POST /api/telemetry/error`
+- [x] **Docs**: Clarify Testing Protocol in `docs/TESTING.md`
 
 ### Infrastructure & Performance
 - [ ] **IaC**: Migrate GCP provisioning to Terraform for environment reproducibility.

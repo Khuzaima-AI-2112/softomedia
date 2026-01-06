@@ -1,4 +1,5 @@
 import React from 'react';
+import apiService from '../services/ApiService';
 
 class ErrorBoundary extends React.Component {
     constructor(props) {
@@ -11,8 +12,9 @@ class ErrorBoundary extends React.Component {
     }
 
     componentDidCatch(error, errorInfo) {
-        // Here we would typically send to an observability service like Sentry
+        // Send to Observability Service
         console.error("UI Error Caught:", error, errorInfo);
+        apiService.reportError(error, errorInfo?.componentStack);
     }
 
     render() {

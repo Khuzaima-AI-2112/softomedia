@@ -5,6 +5,8 @@ Objectives: Document changes and progress milestones throughout the project life
 ## Unreleased
 - [Infra] Deployed `ad-server` and `client-app` to Cloud Run (Project: `softomedia-live-2026`).
 - [Refactor] Reverted "Silent Player" telemetry to resolve TDZ crash.
+- [Feat] Added Global Error Handler (`src/middleware/error.js`) and Client Telemetry (`POST /api/telemetry/error`) to `ad-server`.
+- [Feat] Integrated `ErrorBoundary` to report client-side crashes to backend.
 - [Tests] Local regression suite run for health check.
 
 ## [2026-01-03] - UI & Orchestration Improvements (Sprint 7) - DEPLOYED

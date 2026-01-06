@@ -86,6 +86,12 @@ app.get('/health', (req, res) => res.status(200).json({ status: 'healthy' }));
 
 app.get('/', (req, res) => res.send('SoftoMedia Ad Server (Mock) Online'));
 
+
+// --- ERROR HANDLING ---
+import { errorHandler } from './src/middleware/error.js';
+app.use(errorHandler);
+
 app.listen(PORT, () => {
     console.log(`Mock Server listening on port ${PORT}`);
 });
+

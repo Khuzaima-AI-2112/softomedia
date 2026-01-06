@@ -404,6 +404,16 @@ Objectives: Document errors, bugs, and mistakes so we do not make them again.
 - **Root Cause**: `useEffect` dependency array referenced a variable (`slotContent`) that was defined *after* the hook in the component body.
 - **Prevention**: Always define computed values (`useMemo`, variables) *before* the `useEffect` hooks that verify or consume them. Enable `react-hooks/exhaustive-deps` linting to catch some dependency issues, though TDZ is a runtime JS scope issue.
 
+### [2026-01-05] Seed Script Environment Parity
+- **Issue**: Uncertainty if production database has required data after initial deployment.
+- **Root Cause**: Deployment pipelines often handle code but not data state.
+- **Prevention**: design `seed.js` scripts to accept a `projectId` or environment variable. This allows the exact same script to populate local emulators (`demo-project`) and production clouds (`softomedia-live-2026`) without code changes, ensuring data consistency across environments.
+
+### [2026-01-05] Observability Blind Spot (The "Silent Player")
+- **Issue**: Client-side crash (TDZ bug) was invisible to backend monitoring because no error reporter existed.
+- **Root Cause**: Reliance on user reports for client-side issues.
+- **Prevention**: Implement a "Global Error Handler" on the backend to catch unhandled exceptions, and a "Client Telemetry" endpoint (`POST /api/telemetry/error`) to receive reports from `ErrorBoundary`.
+
 ---
 *Note: This file is a permanent project record. Do not delete or purge entries.*
 
