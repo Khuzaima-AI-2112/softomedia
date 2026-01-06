@@ -22,34 +22,17 @@ steps:
     env:
       - 'PROJECT_ID=$PROJECT_ID'
 
-  # Step 2a: Fetch Backend URL and create .env file
-  - name: 'gcr.io/cloud-builders/gcloud'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        echo "🌐 Fetching backend URL..."
-        burl=$$(gcloud run services describe ${_SERVICE_ADSERVER} --region ${_REGION} --format='value(status.url)' --project ${PROJECT_ID} 2>/dev/null || echo "https://ad-server-kiieh7nmwa-uc.a.run.app")
-        
-        echo "🔗 Linking frontend to Backend URL: $$burl"
-        echo "VITE_API_URL=$$burl" > client-app/.env.production
-        echo "VITE_BUILD_ID=${BUILD_ID}" >> client-app/.env.production
-    id: 'fetch-backend-url'
-    waitFor: ['verify-predeploy']
-
-  # Step 2b: Build and push client-app container
+  # Step 2: Build and push client-app container
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
-      - '--build-arg'
-      - 'VITE_API_URL=https://ad-server-kiieh7nmwa-uc.a.run.app'
       - '-t'
       - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY}/${_SERVICE_CLIENT}:$BUILD_ID'
       - '-f'
       - 'client-app/Dockerfile'
       - 'client-app'
     id: 'build-client-image'
-    waitFor: ['fetch-backend-url']
+    waitFor: ['verify-predeploy']
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
@@ -140,8 +123,8 @@ steps:
           --region ${_REGION} \
           --platform managed \
           --allow-unauthenticated \
-          --set-env-vars "VITE_API_URL=$$burl,BUILD_ID=${BUILD_ID}" \
-          --labels "version=$BUILD_ID,deployed-by=cloud-build"
+          --set-env-vars "VITE_API_URL=$$burl,BUILD_ID=${BUILD_ID},NODE_ENV=production" \
+          --labels "version=${BUILD_ID},deployed-by=cloud-build"
     id: 'deploy-client'
     waitFor: ['deploy-adserver', 'push-client-image']
 
