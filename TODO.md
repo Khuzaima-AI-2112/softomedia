@@ -29,6 +29,9 @@
 - [x] Debug persona switcher navigation timing (implemented `waitForURL`)
 - [x] Update test selectors to `data-testid`
 
+### Telemetry & Monitoring (Postponed from Rollout)
+- [ ] **Silent Player Fix**: Implement `useHeartbeat` and `useImpression` in `LoopDemoPlayer.jsx` (Beware TDZ errors, see lessons learned).
+
 ### Firebase Production Readiness (from Audit SDLC12 & SDLC2)
 - [x] **Scalability**: Refactor `PlaylistService.js` to avoid O(n) ad fetching (use subsets/caching)
 - [x] **Reliability**: Implement automated nightly Firestore exports to GCS (Cloud Scheduler)

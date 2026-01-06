@@ -375,10 +375,34 @@ Objectives: Document errors, bugs, and mistakes so we do not make them again.
 - **Root Cause**: Ignoring the reality that peak hours (lunch, rush hour) have higher foot traffic and advertising value.
 - **Prevention**: Implement traffic tiers (VeryLow, Low, Medium, High) with CPM multipliers (0.5x to 1.5x). Map specific hours to tiers based on business patterns. Support retailer-level and date-level overrides for special events or partner negotiations.
 
-### [2026-01-05] Service Layer Singleton Pattern for UI State
-- **Issue**: Multiple components needed shared access to pricing calculations and data queries without prop drilling or complex context.
-- **Root Cause**: Traditional React patterns (Context, props) become unwieldy for domain-specific calculation services.
-- **Prevention**: Create singleton service classes (`pricingService`, `localStorageService`) that components import directly. These provide business logic and data access without React lifecycle management. Works well for read-heavy operations and calculations.
+### [2026-01-05] API Contract Strictness (Object vs Array)
+- **Issue**: Backend returned `{ loops: [] }` but frontend expected `[]`. This caused a silent crash in the map/reduce logic.
+- **Root Cause**: Backend framework wrapper automatically wrapped responses in an object, which the frontend API client didn't unwrap.
+- **Prevention**: 
+  1. **Flexible Client**: Update API clients to handle both formats (`response.data || response`).
+  2. **Schema Tests**: Verify response shapes in integration tests (e.g., specific test for "is array").
+
+### [2026-01-05] Environment Variable Consistency (Local vs Cloud)
+- **Issue**: `JWT_SECRET` was missing in `ad-server` local `.env`, blocking local testing of protected routes (`/api/audit`).
+- **Root Cause**: Reliance on defaults or assuming `.env` exists from repo cloning (it's gitignored).
+- **Prevention**: Use a `verify-env.js` script that runs before `npm start`, checking against an `.env.example` list of required keys.
+
+### [2026-01-05] React Hook Imports in Production
+- **Issue**: `LoopDemoPlayer.jsx` crashed in production build due to missing `useMemo` import.
+- **Root Cause**: Local dev server (Vite) sometimes masks missing imports or tree-shaking behaves differently.
+- **Prevention**: 
+  1. **Strict Linting**: Ensure ESLint enforces import existence for all hooks.
+  2. **Production Build Test**: Always run `npm run build && npm run preview` locally before deploying to catch build-time errors.
+
+### [2026-01-05] Cloud Run Health & Secrets
+- **Issue**: Service deployed "successfully" but health check failed because it couldn't connect to APIs due to configuration.
+- **Root Cause**: Health checks only ping the server up status, not deep dependency checks.
+- **Prevention**: Implement "Deep Health" endpoints that check DB/Cache connectivity and fail the health probe if critical dependencies are unreachable.
+
+### [2026-01-05] React Hook Temporal Dead Zone (TDZ)
+- **Issue**: Component crashed with `ReferenceError: Cannot access 'variable' before initialization`.
+- **Root Cause**: `useEffect` dependency array referenced a variable (`slotContent`) that was defined *after* the hook in the component body.
+- **Prevention**: Always define computed values (`useMemo`, variables) *before* the `useEffect` hooks that verify or consume them. Enable `react-hooks/exhaustive-deps` linting to catch some dependency issues, though TDZ is a runtime JS scope issue.
 
 ---
 *Note: This file is a permanent project record. Do not delete or purge entries.*

@@ -113,15 +113,6 @@ function LoopDemoPlayer() {
         };
     }, [isPlaying, loading]);
 
-    const togglePlayPause = useCallback(() => {
-        setIsPlaying(prev => !prev);
-    }, []);
-
-    const goToSlot = useCallback((index) => {
-        setCurrentSlotIndex(index);
-        setProgress(0);
-    }, []);
-
     const slotContent = useMemo(() => {
         // First check if loop has specific booked content for this slot
         if (loop && loop.slots && loop.slots[currentSlotIndex]) {
@@ -157,6 +148,19 @@ function LoopDemoPlayer() {
             content: DEMO_CONTENT[currentSlotIndex % DEMO_CONTENT.length]
         };
     }, [loop, currentSlotIndex, bookedCreatives]);
+
+
+
+    const togglePlayPause = useCallback(() => {
+        setIsPlaying(prev => !prev);
+    }, []);
+
+    const goToSlot = useCallback((index) => {
+        setCurrentSlotIndex(index);
+        setProgress(0);
+    }, []);
+
+
 
     const formatTime = (date) => {
         return date.toLocaleTimeString('en-US', {

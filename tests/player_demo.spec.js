@@ -4,12 +4,21 @@ test.describe('Demo Player Verification', () => {
     // Tests should respect playwright.config.js baseURL (usually localhost:5173/5174)
     // If running against production, baseURL will be overriden by CLI or env.
 
-    test('Demo player should load and play content', async ({ page }) => {
+    test('Demo player should load content', async ({ page }) => {
+        // Capture console logs for debugging
+        page.on('console', msg => console.log(`[Browser Console] ${msg.type()}: ${msg.text()}`));
+        page.on('pageerror', err => console.log(`[Browser Error]: ${err.message}`));
+
         // Go to demo player with a valid screen ID mock
         await page.goto('/player/demo?screenId=scr_001_01');
 
-        // Wait for potential async data loading
-        await page.waitForTimeout(3000);
+        // Wait for content to load (handle cold start / network latency)
+        // We expect either an image/video (ad), an H2 (demo slide), or an error string
+        try {
+            await page.waitForSelector('video, img, h2, text="No loops scheduled", text="Error loading"', { timeout: 15000 });
+        } catch (e) {
+            console.log('Timed out waiting for content. Current HTML:', await page.content());
+        }
 
         // Check for ad content (video/img) OR demo content (gradients/text)
         const hasAdContent = await page.locator('video, img').count() > 0;
@@ -25,7 +34,7 @@ test.describe('Demo Player Verification', () => {
             throw new Error('Player failed to load content: Error message visible');
         }
 
-        // fail if nothing relevant is shown
+        // Verify content loads
         expect(hasAdContent || hasDemoContent || hasNoScheduleMessage).toBeTruthy();
     });
 });

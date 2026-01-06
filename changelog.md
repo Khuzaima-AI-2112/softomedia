@@ -2,6 +2,11 @@
 
 Objectives: Document changes and progress milestones throughout the project lifecycle.
 
+## Unreleased
+- [Infra] Deployed `ad-server` and `client-app` to Cloud Run (Project: `softomedia-live-2026`).
+- [Refactor] Reverted "Silent Player" telemetry to resolve TDZ crash.
+- [Tests] Local regression suite run for health check.
+
 ## [2026-01-03] - UI & Orchestration Improvements (Sprint 7) - DEPLOYED
 - **Status**: Production Deployment Successful (Build ID: `321ae9ca`...)
 - **Services**: `client-app` and `ad-server` updated on Cloud Run.
@@ -11,6 +16,14 @@ Objectives: Document changes and progress milestones throughout the project life
 - **Admin Orchestration**:
     - Added "New Retailer" modal in `Overview.jsx` for quick partner onboarding.
     - Added "Delete Screen" functionality in `ScreenManagement.jsx` with strict confirmation.
+- **Demo Player Fixed**:
+    - Resolved `useMemo` reference error in `LoopDemoPlayer.jsx`.
+    - Fixed API response handling in `ApiService.js` to support `{ loops: [] }` format.
+    - Added permanent regression test `tests/player_demo.spec.js`.
+- **Infrastructure**:
+    - **Ad Server**: Deployed to `https://ad-server-kiieh7nmwa-uc.a.run.app`.
+    - **Client App**: Deployed to `https://client-app-kiieh7nmwa-uc.a.run.app`.
+    - **Secrets**: Configured `JWT_SECRET` in local and cloud environments.
 - **Brand Campaign Flexibility**:
     - Updated `Step2ScheduleUpload.jsx` (Brand Wizard) with Date Range pickers for custom campaign durations.
     - Added "Frequency" selector (1x, 2x, 3x) to allow multiple ad instances per loop.
