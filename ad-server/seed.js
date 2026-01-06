@@ -108,72 +108,86 @@ async function seed() {
         // Initialize Firestore
         getFirestore();
 
+        // Production safety guard
+        if (process.env.NODE_ENV === 'production' && process.env.SEED_ALLOW_PRODUCTION !== 'true') {
+            logger.error('[Seed] ❌ SEEDING DENIED: Running in production without SEED_ALLOW_PRODUCTION=true');
+            process.exit(1);
+        }
+
+        const stats = { created: 0, skipped: 0, failed: 0 };
+
+        async function safeCreate(repo, id, data, name) {
+            try {
+                await repo.create(id, data);
+                logger.info(`[Seed] ✅ Created ${name}: ${id}`);
+                stats.created++;
+            } catch (error) {
+                if (error.code === 6 || error.message.includes('already exists')) {
+                    logger.info(`[Seed] ⏭️  Skipped ${name} (already exists): ${id}`);
+                    stats.skipped++;
+                } else {
+                    logger.error(`[Seed] ❌ Failed to create ${name}: ${id}`, { error: error.message });
+                    stats.failed++;
+                }
+            }
+        }
+
         // Seed retailers
         logger.info('[Seed] Seeding retailers...');
         for (const retailer of seedData.retailers) {
-            await retailerRepository.create(retailer.id, retailer);
-            logger.info(`[Seed] Created retailer: ${retailer.name}`);
+            await safeCreate(retailerRepository, retailer.id, retailer, 'retailer');
         }
 
         // Seed locations
         logger.info('[Seed] Seeding locations...');
         for (const loc of seedData.locations) {
-            await locationRepository.create(loc.id, loc);
-            logger.info(`[Seed] Created location: ${loc.name}`);
+            await safeCreate(locationRepository, loc.id, loc, 'location');
         }
 
         // Seed stores
         logger.info('[Seed] Seeding stores...');
         for (const store of seedData.stores) {
-            await StoreRepository.create(store.id, store);
-            logger.info(`[Seed] Created store: ${store.name}`);
+            await safeCreate(StoreRepository, store.id, store, 'store');
         }
 
         // Seed advertisers
         logger.info('[Seed] Seeding advertisers...');
         for (const advertiser of seedData.advertisers) {
-            await advertiserRepository.create(advertiser.id, advertiser);
-            logger.info(`[Seed] Created advertiser: ${advertiser.name}`);
+            await safeCreate(advertiserRepository, advertiser.id, advertiser, 'advertiser');
         }
 
         // Seed users
         logger.info('[Seed] Seeding users...');
         for (const user of seedData.users) {
-            await userRepository.create(user.id, user);
-            logger.info(`[Seed] Created user: ${user.email} (${user.role})`);
+            await safeCreate(userRepository, user.id, user, 'user');
         }
 
         // Seed campaigns
         logger.info('[Seed] Seeding campaigns...');
         for (const campaign of seedData.campaigns) {
-            await campaignRepository.create(campaign.id, campaign);
-            logger.info(`[Seed] Created campaign: ${campaign.name}`);
+            await safeCreate(campaignRepository, campaign.id, campaign, 'campaign');
         }
 
         // Seed media
         logger.info('[Seed] Seeding media assets...');
         for (const asset of seedData.media) {
-            await mediaRepository.create(asset.id, asset);
-            logger.info(`[Seed] Created asset: ${asset.filename}`);
+            await safeCreate(mediaRepository, asset.id, asset, 'media');
         }
 
         // Seed playlists
         logger.info('[Seed] Seeding playlists...');
         for (const playlist of seedData.playlists) {
-            await playlistRepository.create(playlist.id, playlist);
-            logger.info(`[Seed] Created playlist: ${playlist.name}`);
+            await safeCreate(playlistRepository, playlist.id, playlist, 'playlist');
         }
 
         // Seed pricing
         logger.info('[Seed] Seeding pricing...');
-        await pricingRepository.create(seedData.pricing.id, seedData.pricing);
-        logger.info('[Seed] Created global pricing config');
+        await safeCreate(pricingRepository, seedData.pricing.id, seedData.pricing, 'pricing');
 
         // Seed screens
         logger.info('[Seed] Seeding screens...');
         for (const screen of seedData.screens) {
-            await screenRepository.create(screen.id, screen);
-            logger.info(`[Seed] Created screen: ${screen.screen_id}`);
+            await safeCreate(screenRepository, screen.id, screen, 'screen');
         }
 
         // Generate loops for today
@@ -190,7 +204,7 @@ async function seed() {
                     creative_url: null
                 }));
 
-                await loopRepository.create(loopId, {
+                await safeCreate(loopRepository, loopId, {
                     id: loopId,
                     screen_id: screen.id,
                     store_id: screen.store_id,
@@ -199,12 +213,11 @@ async function seed() {
                     hour: hour,
                     slots: slots,
                     status: 'APPROVED'
-                });
+                }, 'loop');
             }
         }
-        logger.info('[Seed] Created hourly loops for active screens');
 
-        logger.info('[Seed] ✅ Seed completed successfully!');
+        logger.info('[Seed] ✅ Seed completed!', stats);
 
     } catch (error) {
         logger.error('[Seed] ❌ Seed failed:', { error: error.message, stack: error.stack });

@@ -36,7 +36,8 @@ export class BaseRepository {
 
         try {
             if (this.collection) {
-                await this.breaker.execute(() => this.collection.doc(id).set(docData));
+                // Use .create() instead of .set() to prevent overwriting existing data
+                await this.breaker.execute(() => this.collection.doc(id).create(docData));
             }
         } catch (e) {
             logger.error(`Create failed for ${this.collectionName}`, {

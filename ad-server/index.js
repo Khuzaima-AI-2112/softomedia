@@ -66,7 +66,9 @@ import apiRouter from './src/api/index.js';
 import { seedDatabase } from './src/services/SeedService.js';
 
 // Auto-seed for development/test
-seedDatabase();
+if (process.env.NODE_ENV !== 'production') {
+    seedDatabase();
+}
 
 // --- ROUTES ---
 

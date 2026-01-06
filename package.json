@@ -10,7 +10,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "db:seed": "cd ad-server && npm run seed"
   },
   "keywords": [],
   "author": "",

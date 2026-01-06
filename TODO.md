@@ -11,6 +11,11 @@
 - [x] Create `verify_predeploy.js` script
 - [ ] **Verify Production Release**: Monitor first deploy logs for successful Rules and dynamic CORS injection.
 
+## Maintenance & Operations
+- [ ] Implement periodic database synchronization workflow for staging.
+- [ ] Set up automated backup verification using `BackupService.js`.
+- [ ] Monitor Firestore quota usage for softomedia-live-2026.
+
 ### Critical Test Failures
 - [x] Fix failing Playwright tests (standardized on `data-testid`)
 - [ ] **Broadcasting Engine Baseline**: Stabilize the 10 failing tests identified in the full integration run (`loop_playback.spec.js` timeouts).
