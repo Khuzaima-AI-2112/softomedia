@@ -43,11 +43,14 @@ export class LoopGenerationService {
         // Get available campaigns for this retailer/location
         const campaigns = await this.getAvailableCampaigns(retailerId, locationId, targetDate);
 
-        // Generate loop for each business hour
+        // Generate loop for each business hour (PARALLELIZED)
+        const hourPromises = [];
         for (let hour = BUSINESS_HOURS.START; hour < BUSINESS_HOURS.END; hour++) {
-            const loop = await this.generateHourlyLoop(targetDate, hour, retailerId, locationId, campaigns);
-            loops.push(loop);
+            hourPromises.push(this.generateHourlyLoop(targetDate, hour, retailerId, locationId, campaigns));
         }
+
+        const generatedLoops = await Promise.all(hourPromises);
+        loops.push(...generatedLoops);
 
         logger.info(`[LoopGeneration] Generated ${loops.length} loops for ${targetDate}`);
         return loops;

@@ -414,6 +414,11 @@ Objectives: Document errors, bugs, and mistakes so we do not make them again.
 - **Root Cause**: Reliance on user reports for client-side issues.
 - **Prevention**: Implement a "Global Error Handler" on the backend to catch unhandled exceptions, and a "Client Telemetry" endpoint (`POST /api/telemetry/error`) to receive reports from `ErrorBoundary`.
 
+### [2026-01-06] Scalability Anti-Patterns (SDLC#9)
+- **Issue**: `BaseRepository.findAll` ignored `limit` option, causing full-table scans and OOM risk.
+- **Root Cause**: Initial implementation focused on feature correctness over query efficiency.
+- **Prevention**: Always apply `.limit()` to Firestore/DB queries when provided. Sequential writes should use `Promise.all()` for parallelism.
+
 ---
 *Note: This file is a permanent project record. Do not delete or purge entries.*
 

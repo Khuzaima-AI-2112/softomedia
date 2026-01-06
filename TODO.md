@@ -53,6 +53,7 @@
 - [ ] **IaC**: Migrate GCP provisioning to Terraform for environment reproducibility.
 - [ ] Configure CSP headers in `index.html`
 - [ ] Add real backend connectivity checks to `Health.jsx`
+- [ ] **Offline Resilience**: Implement Service Worker/CacheStorage for ads to enable playback during internet outages.
 
 ## 🎯 Remaining Test Failures (Fix Instructions)
 

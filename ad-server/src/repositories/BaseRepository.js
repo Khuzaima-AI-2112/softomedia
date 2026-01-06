@@ -74,6 +74,12 @@ export class BaseRepository {
                         query = query.where(field, op, value);
                     });
                 }
+
+                // PERFORMANCE FIX: Apply limit to Firestore query
+                if (options.limit) {
+                    query = query.limit(options.limit);
+                }
+
                 const snapshot = await this.breaker.execute(() => query.get());
                 results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 if (results.length > 0) return results;
