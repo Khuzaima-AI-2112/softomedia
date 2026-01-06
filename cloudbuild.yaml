@@ -22,27 +22,34 @@ steps:
     env:
       - 'PROJECT_ID=$PROJECT_ID'
 
-  # Step 2: Build and push client-app container
+  # Step 2a: Fetch Backend URL and create .env file
   - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        # Fetch the live backend URL
+        echo "🌐 Fetching backend URL..."
         burl=$$(gcloud run services describe ${_SERVICE_ADSERVER} --region ${_REGION} --format='value(status.url)' --project ${PROJECT_ID} 2>/dev/null || echo "https://ad-server-kiieh7nmwa-uc.a.run.app")
-        echo "🔗 Linking frontend to Backend URL: $$burl"
         
-        # PROACTIVE FIX: Create a .env file that Docker will COPY
+        echo "🔗 Linking frontend to Backend URL: $$burl"
         echo "VITE_API_URL=$$burl" > client-app/.env.production
         echo "VITE_BUILD_ID=${BUILD_ID}" >> client-app/.env.production
-        
-        docker build \
-          --build-arg VITE_API_URL=$$burl \
-          -t ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_ARTIFACT_REGISTRY}/${_SERVICE_CLIENT}:${BUILD_ID} \
-          -f client-app/Dockerfile \
-          client-app
-    id: 'build-client-image'
+    id: 'fetch-backend-url'
     waitFor: ['verify-predeploy']
+
+  # Step 2b: Build and push client-app container
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--build-arg'
+      - 'VITE_API_URL=https://ad-server-kiieh7nmwa-uc.a.run.app'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY}/${_SERVICE_CLIENT}:$BUILD_ID'
+      - '-f'
+      - 'client-app/Dockerfile'
+      - 'client-app'
+    id: 'build-client-image'
+    waitFor: ['fetch-backend-url']
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
