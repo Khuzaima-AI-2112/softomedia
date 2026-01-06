@@ -1,12 +1,7 @@
-/**
- * ScheduleHistory - Retailer page for viewing past approval history
- * Historical view of approved/rejected schedules with audit log
- */
-
 import React, { useState, useEffect, useMemo } from 'react';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
-import localStorageService from '../../services/LocalStorageService';
+import apiService from '../../services/ApiService';
 
 function ScheduleHistory() {
     const [loops, setLoops] = useState([]);
@@ -14,31 +9,39 @@ function ScheduleHistory() {
     const [dateFilter, setDateFilter] = useState('all');
     const [statusFilter, setStatusFilter] = useState('all');
     const [currentRetailer, setCurrentRetailer] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         loadData();
     }, []);
 
-    const loadData = () => {
-        localStorageService.init();
+    const loadData = async () => {
+        try {
+            setLoading(true);
+            const [retailers, allLoops, log] = await Promise.all([
+                apiService.getRetailers(),
+                apiService.getLoops(),
+                apiService.getAuditLogs()
+            ]);
 
-        // For demo, get first retailer as "current" retailer
-        const retailers = localStorageService.getRetailers();
-        if (retailers.length > 0) {
-            setCurrentRetailer(retailers[0]);
+            // For demo, get first retailer as "current" retailer
+            if (retailers.length > 0) {
+                setCurrentRetailer(retailers[0]);
+            }
+
+            setLoops(allLoops);
+
+            // Filter relevant audit logs
+            setAuditLog(log.filter(l =>
+                l.action === 'loop_approved' ||
+                l.action === 'slot_rejected' ||
+                l.action === 'slot_booked'
+            ));
+        } catch (error) {
+            console.error('Failed to load schedule history:', error);
+        } finally {
+            setLoading(false);
         }
-
-        // Get all loops
-        const allLoops = localStorageService.getLoops();
-        setLoops(allLoops);
-
-        // Get audit log
-        const log = localStorageService.getAuditLog();
-        setAuditLog(log.filter(l =>
-            l.action === 'loop_approved' ||
-            l.action === 'slot_rejected' ||
-            l.action === 'slot_booked'
-        ));
     };
 
     // Get unique dates from loops
@@ -50,7 +53,7 @@ function ScheduleHistory() {
     // Filter loops
     const filteredLoops = useMemo(() => {
         let result = currentRetailer
-            ? loops.filter(l => l.retailerId === currentRetailer.id)
+            ? loops.filter(l => l.retailer_id === currentRetailer.id)
             : loops;
 
         if (dateFilter !== 'all') {
@@ -58,7 +61,8 @@ function ScheduleHistory() {
         }
 
         if (statusFilter !== 'all') {
-            result = result.filter(l => l.validationStatus === statusFilter);
+            const filterValue = statusFilter.toUpperCase();
+            result = result.filter(l => (l.status || '').toUpperCase() === filterValue);
         }
 
         // Group by date and hour
@@ -92,17 +96,24 @@ function ScheduleHistory() {
 
     const getStatusCounts = () => {
         const retailerLoops = currentRetailer
-            ? loops.filter(l => l.retailerId === currentRetailer.id)
+            ? loops.filter(l => l.retailer_id === currentRetailer.id)
             : loops;
 
         return {
-            approved: retailerLoops.filter(l => l.validationStatus === 'approved').length,
-            pending: retailerLoops.filter(l => l.validationStatus === 'pending').length,
-            rejected: retailerLoops.filter(l => l.slots.some(s => s.status === 'rejected')).length
+            approved: retailerLoops.filter(l => (l.status || '').toUpperCase() === 'APPROVED').length,
+            pending: retailerLoops.filter(l => (l.status || '').toUpperCase() === 'PENDING' || l.status === 'PENDING_APPROVAL').length,
+            rejected: retailerLoops.filter(l => l.slots?.some(s => s.status === 'REJECTED')).length
         };
     };
 
     const statusCounts = getStatusCounts();
+
+    if (loading) return <div className="animate-pulse space-y-4">
+        <div className="h-20 bg-slate-200 dark:bg-slate-700 rounded-xl w-1/3"></div>
+        <div className="grid grid-cols-3 gap-4">
+            {[1, 2, 3].map(i => <div key={i} className="h-32 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>)}
+        </div>
+    </div>;
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -127,7 +138,7 @@ function ScheduleHistory() {
                     <select
                         value={dateFilter}
                         onChange={(e) => setDateFilter(e.target.value)}
-                        className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                        className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm outline-none focus:ring-2 focus:ring-primary/20"
                     >
                         <option value="all">All Dates</option>
                         {availableDates.map(date => (
@@ -137,7 +148,7 @@ function ScheduleHistory() {
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                        className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm outline-none focus:ring-2 focus:ring-primary/20"
                     >
                         <option value="all">All Status</option>
                         <option value="approved">Approved</option>
@@ -149,7 +160,7 @@ function ScheduleHistory() {
             {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <GlassCard
-                    className={`border-l-4 border-l-emerald-500 cursor-pointer transition-all ${statusFilter === 'approved' ? 'ring-2 ring-emerald-500' : ''}`}
+                    className={`border-l-4 border-l-emerald-500 cursor-pointer transition-all hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 ${statusFilter === 'approved' ? 'ring-2 ring-emerald-500 shadow-lg' : ''}`}
                     onClick={() => setStatusFilter(statusFilter === 'approved' ? 'all' : 'approved')}
                 >
                     <div className="flex items-center gap-2 mb-1">
@@ -159,7 +170,7 @@ function ScheduleHistory() {
                     <p className="text-3xl font-bold text-emerald-500">{statusCounts.approved}</p>
                 </GlassCard>
                 <GlassCard
-                    className={`border-l-4 border-l-amber-500 cursor-pointer transition-all ${statusFilter === 'pending' ? 'ring-2 ring-amber-500' : ''}`}
+                    className={`border-l-4 border-l-amber-500 cursor-pointer transition-all hover:bg-amber-50/50 dark:hover:bg-amber-900/10 ${statusFilter === 'pending' ? 'ring-2 ring-amber-500 shadow-lg' : ''}`}
                     onClick={() => setStatusFilter(statusFilter === 'pending' ? 'all' : 'pending')}
                 >
                     <div className="flex items-center gap-2 mb-1">
@@ -214,9 +225,9 @@ function ScheduleHistory() {
                                                 {group.loops.length} screen{group.loops.length > 1 ? 's' : ''}
                                             </span>
                                             <StatusBadge status={
-                                                group.loops.every(l => l.validationStatus === 'approved')
+                                                group.loops.every(l => (l.status || '').toUpperCase() === 'APPROVED')
                                                     ? 'Approved'
-                                                    : group.loops.some(l => l.validationStatus === 'approved')
+                                                    : group.loops.some(l => (l.status || '').toUpperCase() === 'APPROVED')
                                                         ? 'Partial'
                                                         : 'Pending'
                                             } />
@@ -225,32 +236,32 @@ function ScheduleHistory() {
 
                                     {/* Slot summary */}
                                     <div className="flex flex-wrap gap-1">
-                                        {group.loops.slice(0, 3).map(loop => {
-                                            const bookedSlots = loop.slots.filter(s => s.status === 'booked').length;
-                                            const rejectedSlots = loop.slots.filter(s => s.status === 'rejected').length;
+                                        {group.loops.slice(0, 5).map(loop => {
+                                            const bookedSlots = loop.slots?.filter(s => (s.status || '').toUpperCase() === 'BOOKED').length || 0;
+                                            const rejectedSlots = loop.slots?.filter(s => (s.status || '').toUpperCase() === 'REJECTED').length || 0;
                                             return (
                                                 <span
                                                     key={loop.id}
                                                     className="text-xs px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
                                                 >
-                                                    {loop.screenId.split('_').slice(-2).join('-')}: {bookedSlots}/12 booked
+                                                    {loop.screen_id?.split('_').slice(-2).join('-')}: {bookedSlots}/12 booked
                                                     {rejectedSlots > 0 && (
                                                         <span className="text-rose-500 ml-1">({rejectedSlots} rejected)</span>
                                                     )}
                                                 </span>
                                             );
                                         })}
-                                        {group.loops.length > 3 && (
+                                        {group.loops.length > 5 && (
                                             <span className="text-xs px-2 py-1 text-slate-400">
-                                                +{group.loops.length - 3} more
+                                                +{group.loops.length - 5} more
                                             </span>
                                         )}
                                     </div>
 
                                     {/* Validation info */}
-                                    {group.loops[0].validatedAt && (
+                                    {(group.loops[0].approved_at || group.loops[0].validatedAt) && (
                                         <p className="text-xs text-slate-400 mt-2">
-                                            Validated: {new Date(group.loops[0].validatedAt).toLocaleString()}
+                                            Validated: {new Date(group.loops[0].approved_at || group.loops[0].validatedAt).toLocaleString()}
                                         </p>
                                     )}
                                 </div>
@@ -269,10 +280,10 @@ function ScheduleHistory() {
                             className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                         >
                             <div className={`size-8 rounded-lg flex items-center justify-center ${entry.action === 'loop_approved'
-                                    ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600'
-                                    : entry.action === 'slot_rejected'
-                                        ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-600'
-                                        : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600'
+                                ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600'
+                                : entry.action === 'slot_rejected'
+                                    ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-600'
+                                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600'
                                 }`}>
                                 <span className="material-symbols-outlined text-lg">
                                     {entry.action === 'loop_approved' ? 'check' :
@@ -286,8 +297,9 @@ function ScheduleHistory() {
                                     {entry.action === 'slot_booked' && 'Slot booked'}
                                 </p>
                                 <p className="text-xs text-slate-500">
-                                    {entry.entityId}
+                                    {entry.entity_id || entry.entityId}
                                     {entry.details?.reason && ` - ${entry.details.reason}`}
+                                    {entry.reason && ` - ${entry.reason}`}
                                 </p>
                             </div>
                             <span className="text-xs text-slate-400">

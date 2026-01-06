@@ -34,11 +34,11 @@ const BrandDashboard = () => {
 
             setCampaigns(allCampaigns);
 
-            // Calculate stats
-            const liveCampaigns = allCampaigns.filter(c => c.status === 'live');
+            // Calculate stats (case-insensitive for robustness)
+            const liveCampaigns = allCampaigns.filter(c => c.status?.toLowerCase() === 'live');
             const totalSpent = allCampaigns.reduce((sum, c) => sum + (c.spent || 0), 0);
             const totalImpressions = allCampaigns.reduce((sum, c) => sum + (c.impressions || 0), 0);
-            const onlineScreens = allScreens.filter(s => s.status === 'online').length;
+            const onlineScreens = allScreens.filter(s => s.status?.toLowerCase() === 'online' || s.status === 'ACTIVE').length;
 
             setStats({
                 active: liveCampaigns.length,

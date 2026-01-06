@@ -1,13 +1,15 @@
 ﻿import express from 'express';
 import { screenRepository } from '../repositories/index.js';
 
+import { authenticate } from '../middleware/auth.js';
+
 const router = express.Router();
 
 /**
  * POST /api/screens/register
  * Register a new screen in the network
  */
-router.post('/register', async (req, res) => {
+router.post('/register', authenticate, async (req, res) => {
     try {
         const { screen_id, resolution, user_agent } = req.body;
         if (!screen_id) return res.status(400).json({ error: 'screen_id required' });

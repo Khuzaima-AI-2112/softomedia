@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import GlassCard from './GlassCard';
 import StatusBadge from './StatusBadge';
-import { API_URL } from '../config';
+import apiService from '../services/ApiService';
 import { useAuth } from '../contexts/AuthContext';
 
 function LocationManager() {
@@ -17,14 +17,8 @@ function LocationManager() {
 
     const fetchLocations = async () => {
         try {
-            const token = localStorage.getItem('auth_token');
-            const res = await fetch(`${API_URL}/api/locations`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setLocations(data);
-            }
+            const data = await apiService.getLocations();
+            setLocations(data);
         } catch (error) {
             console.error('Failed to fetch locations:', error);
         } finally {
@@ -35,23 +29,13 @@ function LocationManager() {
     const handleAdd = async (e) => {
         e.preventDefault();
         try {
-            const token = localStorage.getItem('auth_token');
-            const res = await fetch(`${API_URL}/api/locations`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(newLocation)
-            });
-            if (res.ok) {
-                const added = await res.json();
-                setLocations([...locations, added]);
-                setIsAdding(false);
-                setNewLocation({ name: '', store_profile: 'standard' });
-            }
+            const added = await apiService.createLocation(newLocation);
+            setLocations([...locations, added]);
+            setIsAdding(false);
+            setNewLocation({ name: '', store_profile: 'standard' });
         } catch (error) {
             console.error('Failed to add location:', error);
+            alert('Failed to add location');
         }
     };
 
@@ -121,11 +105,11 @@ function LocationManager() {
                         <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center text-[11px] text-slate-500">
                             <span className="flex items-center gap-1">
                                 <span className="material-symbols-outlined text-[14px]">display_settings</span>
-                                3 Screens Active
+                                {loc.screen_count || 0} Screens Active
                             </span>
                             <span className="flex items-center gap-1">
                                 <span className="material-symbols-outlined text-[14px]">history</span>
-                                Last sync: 5m ago
+                                {loc.last_sync || 'Never'}
                             </span>
                         </div>
                     </GlassCard>

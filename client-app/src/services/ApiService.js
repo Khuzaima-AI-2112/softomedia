@@ -143,11 +143,15 @@ class ApiService {
         const queryString = params.toString();
         if (queryString) url += `?${queryString}`;
 
-        return apiClient.get(url);
+        const data = await apiClient.get(url);
+        // Backend returns { loops: [], business_hours: {} }
+        return data.loops || data;
     }
 
     async getLoopByParams(screenId, date, hour) {
-        return apiClient.get(`/api/loops?screenId=${screenId}&date=${date}&hour=${hour}`);
+        const data = await apiClient.get(`/api/loops?screenId=${screenId}&date=${date}&hour=${hour}`);
+        const loops = data.loops || data;
+        return Array.isArray(loops) ? loops[0] : loops;
     }
 
     async getLoop(id) {
@@ -163,7 +167,9 @@ class ApiService {
     }
 
     async getLoopsByDate(date) {
-        return apiClient.get(`/api/loops?date=${date}`);
+        const data = await apiClient.get(`/api/loops?date=${date}`);
+        // Backend returns { loops: [], business_hours: {} }
+        return data.loops || data;
     }
 
     async generateLoops(data) {
@@ -233,6 +239,25 @@ class ApiService {
 
     async getLocations() {
         return apiClient.get('/api/locations');
+    }
+
+    async createLocation(data) {
+        return apiClient.post('/api/locations', data);
+    }
+
+    async deleteLocation(id) {
+        return apiClient.delete(`/api/locations/${id}`);
+    }
+
+    async getAuditLogs(filters = {}) {
+        let url = '/api/audit';
+        const params = new URLSearchParams();
+        if (filters.locationId) params.append('locationId', filters.locationId);
+
+        const queryString = params.toString();
+        if (queryString) url += `?${queryString}`;
+
+        return apiClient.get(url);
     }
 
     // ============================================

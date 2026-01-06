@@ -1,14 +1,6 @@
-/**
- * LoopDemoPlayer - Standalone 12-slot × 5-second loop demonstration
- * Full-screen player for demonstrating the hourly loop broadcast model
- * 
- * Shows booked campaign creatives from localStorage when available,
- * otherwise displays demo content.
- */
-
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import localStorageService from '../services/LocalStorageService';
+import apiService from '../services/ApiService';
 
 const SLOT_DURATION = 5000; // 5 seconds in milliseconds
 const TOTAL_SLOTS = 12;
@@ -35,61 +27,59 @@ function LoopDemoPlayer() {
     const [showOverlay, setShowOverlay] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [bookedCreatives, setBookedCreatives] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     const intervalRef = useRef(null);
     const progressRef = useRef(null);
 
     // Load loop data and booked campaigns
     useEffect(() => {
-        localStorageService.init();
-
-        const screenId = searchParams.get('screen');
-        const date = searchParams.get('date') || new Date().toISOString().split('T')[0];
-        const hour = parseInt(searchParams.get('hour') || new Date().getHours());
-
-        // Load all campaigns with creatives (for demo mode)
-        const campaigns = localStorageService.getCampaigns();
-        const creativesFromCampaigns = campaigns
-            .filter(c => c.creativeUrl && c.status !== 'ended')
-            .map(c => ({
-                campaignId: c.id,
-                advertiserId: c.advertiserId,
-                campaignName: c.name,
-                creativeUrl: c.creativeUrl,
-                advertiser: localStorageService.getAdvertiser(c.advertiserId)
-            }));
-        setBookedCreatives(creativesFromCampaigns);
-
-        if (screenId) {
-            const screenData = localStorageService.getScreen(screenId);
-            setScreen(screenData);
-
-            if (screenData) {
-                const storeData = localStorageService.getStore(screenData.storeId);
-                setStore(storeData);
-
-                const loopData = localStorageService.getLoopByParams(screenId, date, hour);
-                setLoop(loopData);
-            }
-        } else {
-            // Get first available screen for demo
-            const screens = localStorageService.getScreens();
-            if (screens.length > 0) {
-                const firstScreen = screens[0];
-                setScreen(firstScreen);
-
-                const storeData = localStorageService.getStore(firstScreen.storeId);
-                setStore(storeData);
-
-                const loopData = localStorageService.getLoopByParams(
-                    firstScreen.id,
-                    date,
-                    hour
-                );
-                setLoop(loopData);
-            }
-        }
+        loadData();
     }, [searchParams]);
+
+    const loadData = async () => {
+        try {
+            setLoading(true);
+            const screenId = searchParams.get('screen');
+            const date = searchParams.get('date') || new Date().toISOString().split('T')[0];
+            const hour = parseInt(searchParams.get('hour') || new Date().getHours());
+
+            // 1. Get campaigns for general demo content
+            const allCampaigns = await apiService.getCampaigns();
+            const activeCampaigns = allCampaigns.filter(c =>
+                c.creative_url &&
+                (c.status?.toLowerCase() === 'live' || c.status?.toLowerCase() === 'active' || c.status === 'APPROVED')
+            );
+
+            setBookedCreatives(activeCampaigns);
+
+            let targetScreen = null;
+            if (screenId) {
+                targetScreen = await apiService.getScreen(screenId);
+            } else {
+                const screens = await apiService.getScreens();
+                if (screens.length > 0) targetScreen = screens[0];
+            }
+
+            if (targetScreen) {
+                setScreen(targetScreen);
+
+                // Fetch store and loop in parallel
+                const storeId = targetScreen.store_id || targetScreen.storeId;
+                const [storeData, loopData] = await Promise.all([
+                    storeId ? apiService.getStore(storeId) : Promise.resolve(null),
+                    apiService.getLoopByParams(targetScreen.id || targetScreen.screen_id, date, hour)
+                ]);
+
+                setStore(storeData);
+                setLoop(loopData);
+            }
+        } catch (error) {
+            console.error('Failed to load player data:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Update current time
     useEffect(() => {
@@ -101,7 +91,7 @@ function LoopDemoPlayer() {
 
     // Handle slot progression
     useEffect(() => {
-        if (!isPlaying) return;
+        if (!isPlaying || loading) return;
 
         // Progress animation within slot
         progressRef.current = setInterval(() => {
@@ -118,10 +108,10 @@ function LoopDemoPlayer() {
         }, SLOT_DURATION);
 
         return () => {
-            clearInterval(intervalRef.current);
-            clearInterval(progressRef.current);
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            if (progressRef.current) clearInterval(progressRef.current);
         };
-    }, [isPlaying]);
+    }, [isPlaying, loading]);
 
     const togglePlayPause = useCallback(() => {
         setIsPlaying(prev => !prev);
@@ -132,41 +122,41 @@ function LoopDemoPlayer() {
         setProgress(0);
     }, []);
 
-    const getCurrentSlotContent = () => {
-        // First check if loop has booked content for this slot
+    const slotContent = useMemo(() => {
+        // First check if loop has specific booked content for this slot
         if (loop && loop.slots && loop.slots[currentSlotIndex]) {
             const slot = loop.slots[currentSlotIndex];
-            if (slot.status === 'booked' && slot.creativeUrl) {
-                const campaign = localStorageService.getCampaign(slot.campaignId);
-                const advertiser = localStorageService.getAdvertiser(slot.advertiserId);
+            if ((slot.status?.toLowerCase() === 'booked' || slot.status === 'BOOKED') && slot.creative_url) {
                 return {
                     type: 'ad',
                     content: {
-                        ...slot,
-                        campaignName: campaign?.name || 'Campaign',
-                        advertiserName: advertiser?.name || 'Advertiser'
+                        creative_url: slot.creative_url,
+                        campaign_name: slot.campaign_name || 'Campaign Content',
+                        advertiser_name: slot.advertiser_name || 'Verified Partner'
                     }
                 };
             }
         }
 
-        // Otherwise, if we have booked creatives from campaigns, show them
+        // Otherwise, if we have active campaigns across the network, show them as fallback demo
         if (bookedCreatives.length > 0) {
             const creative = bookedCreatives[currentSlotIndex % bookedCreatives.length];
             return {
                 type: 'campaign',
-                content: creative
+                content: {
+                    creative_url: creative.creative_url,
+                    campaign_name: creative.name,
+                    advertiser_name: creative.advertiser_name || 'Network Partner'
+                }
             };
         }
 
-        // Fall back to demo content
+        // Fall back to system demo content
         return {
             type: 'demo',
             content: DEMO_CONTENT[currentSlotIndex % DEMO_CONTENT.length]
         };
-    };
-
-    const slotContent = getCurrentSlotContent();
+    }, [loop, currentSlotIndex, bookedCreatives]);
 
     const formatTime = (date) => {
         return date.toLocaleTimeString('en-US', {
@@ -175,6 +165,13 @@ function LoopDemoPlayer() {
             second: '2-digit'
         });
     };
+
+    if (loading) return (
+        <div className="fixed inset-0 bg-slate-900 flex flex-col items-center justify-center text-white gap-4">
+            <div className="size-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+            <p className="font-bold tracking-widest text-primary animate-pulse">SYNCHRONIZING BROADCAST...</p>
+        </div>
+    );
 
     return (
         <div
@@ -190,7 +187,8 @@ function LoopDemoPlayer() {
                     {slotContent.type === 'ad' || slotContent.type === 'campaign' ? (
                         <div className="w-full h-full relative">
                             <img
-                                src={slotContent.content.creativeUrl}
+                                key={currentSlotIndex}
+                                src={slotContent.content.creative_url}
                                 alt="Advertisement"
                                 className="w-full h-full object-cover animate-in fade-in duration-500"
                                 onError={(e) => {
@@ -198,13 +196,13 @@ function LoopDemoPlayer() {
                                 }}
                             />
                             {/* Campaign info overlay */}
-                            <div className="absolute bottom-20 right-4 px-4 py-2 rounded-lg bg-black/60 backdrop-blur-sm text-white text-sm max-w-xs">
-                                <p className="font-bold truncate">{slotContent.content.campaignName || slotContent.content.advertiser?.name}</p>
-                                <p className="text-white/60 text-xs">Sponsored</p>
+                            <div className="absolute bottom-20 right-4 px-4 py-2 rounded-lg bg-black/60 backdrop-blur-sm text-white text-sm max-w-xs shadow-2xl border border-white/10">
+                                <p className="font-bold truncate">{slotContent.content.campaign_name}</p>
+                                <p className="text-white/60 text-xs">{slotContent.content.advertiser_name}</p>
                             </div>
                         </div>
                     ) : (
-                        <div className={`w-full h-full bg-gradient-to-br ${slotContent.content.color} flex flex-col items-center justify-center animate-in fade-in duration-500`}>
+                        <div key={currentSlotIndex} className={`w-full h-full bg-gradient-to-br ${slotContent.content.color} flex flex-col items-center justify-center animate-in fade-in duration-500`}>
                             <span className="material-symbols-outlined text-white/80 text-[120px] mb-4">
                                 {slotContent.content.icon}
                             </span>
@@ -219,34 +217,33 @@ function LoopDemoPlayer() {
                 </div>
 
                 {/* Slot Progress Bar */}
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50">
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50 overflow-hidden">
                     <div
-                        className="h-full bg-white transition-all duration-100 ease-linear"
+                        className="h-full bg-white transition-all duration-100 ease-linear shadow-[0_0_15px_rgba(255,255,255,0.8)]"
                         style={{ width: `${progress}%` }}
                     />
                 </div>
 
                 {/* Slot Indicator Grid */}
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
                     {Array.from({ length: TOTAL_SLOTS }).map((_, index) => {
-                        const hasContent = loop?.slots?.[index]?.status === 'booked' ||
-                            (bookedCreatives.length > 0 && index < bookedCreatives.length);
+                        const isBooked = loop?.slots?.[index]?.status?.toLowerCase() === 'booked' || loop?.slots?.[index]?.status === 'BOOKED';
                         return (
                             <button
                                 key={index}
                                 onClick={() => goToSlot(index)}
                                 className={`
-                                    w-8 h-2 rounded-full transition-all duration-300
+                                    w-10 h-1.5 rounded-full transition-all duration-300
                                     ${index === currentSlotIndex
-                                        ? 'bg-white scale-110'
-                                        : hasContent
-                                            ? 'bg-primary/80'
+                                        ? 'bg-white scale-110 shadow-[0_0_10px_white]'
+                                        : isBooked
+                                            ? 'bg-primary shadow-[0_0_8px_theme(colors.primary.DEFAULT)]'
                                             : index < currentSlotIndex
-                                                ? 'bg-white/50'
-                                                : 'bg-white/20'}
+                                                ? 'bg-white/40'
+                                                : 'bg-white/10'}
                                     hover:bg-white/80
                                 `}
-                                title={`Slot ${index + 1}${hasContent ? ' (Booked)' : ''}`}
+                                title={`Slot ${index + 1}${isBooked ? ' (Booked)' : ''}`}
                             />
                         );
                     })}
@@ -255,41 +252,37 @@ function LoopDemoPlayer() {
                 {/* Top Info Bar (shown on hover) */}
                 <div
                     className={`
-                        absolute top-0 left-0 right-0 p-4 
-                        bg-gradient-to-b from-black/80 to-transparent
-                        transition-opacity duration-300
-                        ${showOverlay ? 'opacity-100' : 'opacity-0'}
+                        absolute top-0 left-0 right-0 p-6 
+                        bg-gradient-to-b from-black/90 to-transparent
+                        transition-all duration-500 transform
+                        ${showOverlay ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}
                     `}
                 >
                     <div className="flex items-center justify-between text-white">
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-6">
                             <div className="flex items-center gap-2">
-                                <span className="material-symbols-outlined">tv</span>
-                                <span className="font-medium">
-                                    {screen?.name || 'Demo Screen'}
+                                <div className="size-8 rounded-lg bg-primary flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-white text-xl">tv</span>
+                                </div>
+                                <span className="text-xl font-black tracking-tight">
+                                    {(screen?.name || screen?.screen_id || 'DEMO SCREEN').toUpperCase()}
                                 </span>
                             </div>
                             {store && (
-                                <div className="flex items-center gap-2 text-white/70">
-                                    <span className="material-symbols-outlined text-sm">storefront</span>
-                                    <span className="text-sm">{store.name}</span>
-                                </div>
-                            )}
-                            {bookedCreatives.length > 0 && (
-                                <div className="flex items-center gap-2 text-emerald-400">
-                                    <span className="material-symbols-outlined text-sm">check_circle</span>
-                                    <span className="text-sm">{bookedCreatives.length} Campaign{bookedCreatives.length > 1 ? 's' : ''} Active</span>
+                                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/5">
+                                    <span className="material-symbols-outlined text-sm text-primary">storefront</span>
+                                    <span className="text-sm font-bold">{store.name}</span>
                                 </div>
                             )}
                         </div>
-                        <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-8">
                             <div className="text-right">
-                                <p className="text-xs text-white/60 uppercase tracking-wider">Current Time</p>
-                                <p className="font-mono text-lg">{formatTime(currentTime)}</p>
+                                <p className="text-[10px] text-white/40 font-black uppercase tracking-[0.2em]">Current Time</p>
+                                <p className="font-mono text-xl font-bold">{formatTime(currentTime)}</p>
                             </div>
                             <div className="text-right">
-                                <p className="text-xs text-white/60 uppercase tracking-wider">Loop Progress</p>
-                                <p className="font-mono text-lg">
+                                <p className="text-[10px] text-white/40 font-black uppercase tracking-[0.2em]">Loop Status</p>
+                                <p className="font-mono text-xl font-bold text-primary">
                                     {String(Math.floor((currentSlotIndex * 5 + (progress / 100) * 5))).padStart(2, '0')}s / 60s
                                 </p>
                             </div>
@@ -300,47 +293,50 @@ function LoopDemoPlayer() {
                 {/* Bottom Controls (shown on hover) */}
                 <div
                     className={`
-                        absolute bottom-12 left-0 right-0 px-4
-                        flex items-center justify-center gap-4
-                        transition-opacity duration-300
-                        ${showOverlay ? 'opacity-100' : 'opacity-0'}
+                        absolute bottom-16 left-0 right-0 px-4
+                        flex items-center justify-center gap-6
+                        transition-all duration-500 transform
+                        ${showOverlay ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}
                     `}
                 >
                     <button
                         onClick={() => goToSlot((currentSlotIndex - 1 + TOTAL_SLOTS) % TOTAL_SLOTS)}
-                        className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
+                        className="size-12 rounded-full bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 text-white transition-all flex items-center justify-center hover:scale-110"
                     >
-                        <span className="material-symbols-outlined">skip_previous</span>
+                        <span className="material-symbols-outlined text-3xl">skip_previous</span>
                     </button>
                     <button
                         onClick={togglePlayPause}
-                        className="p-4 rounded-full bg-white text-black hover:bg-white/90 transition-colors shadow-lg"
+                        className="size-20 rounded-full bg-primary text-white hover:bg-primary/90 transition-all shadow-[0_0_30px_rgba(var(--primary-rgb),0.4)] flex items-center justify-center hover:scale-105"
                     >
-                        <span className="material-symbols-outlined text-3xl">
+                        <span className="material-symbols-outlined text-5xl">
                             {isPlaying ? 'pause' : 'play_arrow'}
                         </span>
                     </button>
                     <button
                         onClick={() => goToSlot((currentSlotIndex + 1) % TOTAL_SLOTS)}
-                        className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
+                        className="size-12 rounded-full bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 text-white transition-all flex items-center justify-center hover:scale-110"
                     >
-                        <span className="material-symbols-outlined">skip_next</span>
+                        <span className="material-symbols-outlined text-3xl">skip_next</span>
                     </button>
                 </div>
 
                 {/* Slot Counter Badge */}
-                <div className="absolute top-4 right-4 px-4 py-2 rounded-full bg-black/50 backdrop-blur-sm text-white font-bold">
-                    <span className="text-2xl">{currentSlotIndex + 1}</span>
-                    <span className="text-white/60 text-lg"> / {TOTAL_SLOTS}</span>
+                <div className="absolute top-8 right-8 px-6 py-3 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/10 text-white shadow-2xl">
+                    <p className="text-[10px] text-white/40 font-black uppercase tracking-[0.2em] mb-1">Active Slot</p>
+                    <div className="flex items-baseline gap-1">
+                        <span className="text-4xl font-black text-primary">{currentSlotIndex + 1}</span>
+                        <span className="text-white/40 text-xl font-bold"> / {TOTAL_SLOTS}</span>
+                    </div>
                 </div>
 
                 {/* Exit Button */}
                 <a
                     href="/dashboard"
                     className={`
-                        absolute top-4 left-4 p-2 rounded-full bg-black/50 backdrop-blur-sm 
-                        text-white hover:bg-white/20 transition-all duration-300
-                        ${showOverlay ? 'opacity-100' : 'opacity-0'}
+                        absolute top-8 left-8 size-12 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/10 
+                        text-white hover:bg-primary transition-all duration-500 flex items-center justify-center
+                        transform ${showOverlay ? 'opacity-100' : 'opacity-0 -translate-x-4'}
                     `}
                 >
                     <span className="material-symbols-outlined">close</span>
@@ -350,11 +346,11 @@ function LoopDemoPlayer() {
             {/* 16:9 Aspect Ratio Letterbox */}
             <style>{`
                 @keyframes slideIn {
-                    from { opacity: 0; transform: scale(1.05); }
-                    to { opacity: 1; transform: scale(1); }
+                    from { opacity: 0; transform: scale(1.05) translateY(10px); }
+                    to { opacity: 1; transform: scale(1) translateY(0); }
                 }
                 .animate-in {
-                    animation: slideIn 0.5s ease-out forwards;
+                    animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
                 }
             `}</style>
         </div>

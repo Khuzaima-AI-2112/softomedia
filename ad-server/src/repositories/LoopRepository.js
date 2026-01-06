@@ -5,6 +5,7 @@
  */
 
 import { BaseRepository } from './BaseRepository.js';
+import { schedulingAuditRepository } from './SchedulingAuditRepository.js';
 
 // Business hours configuration
 export const BUSINESS_HOURS = {
@@ -117,11 +118,19 @@ export class LoopRepository extends BaseRepository {
      * @returns {Promise<object>}
      */
     async approveLoop(loopId, userId) {
-        return this.update(loopId, {
+        const result = await this.update(loopId, {
             status: LOOP_STATUS.APPROVED,
             approved_at: new Date().toISOString(),
             approved_by: userId
         });
+
+        await schedulingAuditRepository.logAction('loop_approved', {
+            entity_id: loopId,
+            user_id: userId,
+            timestamp: new Date().toISOString()
+        });
+
+        return result;
     }
 
     /**
@@ -147,7 +156,16 @@ export class LoopRepository extends BaseRepository {
             rejected_at: new Date().toISOString()
         };
 
-        return this.update(loopId, { slots });
+        const result = await this.update(loopId, { slots });
+
+        await schedulingAuditRepository.logAction('slot_rejected', {
+            entity_id: loopId,
+            slot_index: position,
+            reason: reason,
+            timestamp: new Date().toISOString()
+        });
+
+        return result;
     }
 
     /**
@@ -207,7 +225,17 @@ export class LoopRepository extends BaseRepository {
             booked_at: bookingData.booked_at || new Date().toISOString()
         };
 
-        return this.update(loopId, { slots });
+        const result = await this.update(loopId, { slots });
+
+        await schedulingAuditRepository.logAction('slot_booked', {
+            entity_id: loopId,
+            slot_index: position,
+            campaign_id: bookingData.campaign_id,
+            advertiser_id: bookingData.advertiser_id,
+            timestamp: new Date().toISOString()
+        });
+
+        return result;
     }
 
     /**

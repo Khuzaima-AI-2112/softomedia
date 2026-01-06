@@ -42,18 +42,19 @@ class PricingService {
      * @returns {object} Traffic tier info { key, multiplier, label, color }
      */
     getTrafficTier(hour) {
-        if (!this.config) return { key: 'medium', multiplier: 1.0, label: 'Medium', color: '#fbbf24' };
+        const defaultTier = { key: 'medium', multiplier: 1.0, label: 'Medium', color: '#fbbf24' };
+        if (!this.config || !this.config.trafficTiers) return defaultTier;
 
         const tiers = this.config.trafficTiers;
 
         for (const [key, tier] of Object.entries(tiers)) {
-            if (tier.hours.includes(hour)) {
+            if (tier.hours && Array.isArray(tier.hours) && tier.hours.includes(hour)) {
                 return { key, ...tier };
             }
         }
 
         // Default to medium if not found
-        return { key: 'medium', ...tiers.medium };
+        return tiers.medium ? { key: 'medium', ...tiers.medium } : defaultTier;
     }
 
     /**

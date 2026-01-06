@@ -1,4 +1,5 @@
 ﻿import { getFirestore, closeFirestore } from './src/utils/firestore.js';
+import logger from './src/utils/logger.js';
 import {
     userRepository,
     adRepository,
@@ -85,8 +86,8 @@ const seedData = {
         }
     ],
     screens: [
-        { id: 'scr_001_01', screen_id: 'scr_001_01', status: 'online', location_id: 'str_001', store_id: 'str_001', retailer_id: 'ret_001', last_seen: new Date().toISOString(), resolution: '1920x1080' },
-        { id: 'scr_001_02', screen_id: 'scr_001_02', status: 'online', location_id: 'str_001', store_id: 'str_001', retailer_id: 'ret_001', last_seen: new Date().toISOString(), resolution: '1920x1080' }
+        { id: 'scr_001_01', screen_id: 'scr_001_01', name: 'Main Lobby Screen', status: 'online', location_id: 'str_001', store_id: 'str_001', retailer_id: 'ret_001', last_seen: new Date().toISOString(), resolution: '1920x1080' },
+        { id: 'scr_001_02', screen_id: 'scr_001_02', name: 'Aisle 5 Screen', status: 'online', location_id: 'str_001', store_id: 'str_001', retailer_id: 'ret_001', last_seen: new Date().toISOString(), resolution: '1920x1080' }
     ],
     pricing: {
         id: 'global',
@@ -102,81 +103,81 @@ const seedData = {
 
 async function seed() {
     try {
-        console.log('[Seed] Starting Firestore seed...');
+        logger.info('[Seed] Starting Firestore seed...');
 
         // Initialize Firestore
         getFirestore();
 
         // Seed retailers
-        console.log('[Seed] Seeding retailers...');
+        logger.info('[Seed] Seeding retailers...');
         for (const retailer of seedData.retailers) {
             await retailerRepository.create(retailer.id, retailer);
-            console.log(`[Seed] Created retailer: ${retailer.name}`);
+            logger.info(`[Seed] Created retailer: ${retailer.name}`);
         }
 
         // Seed locations
-        console.log('[Seed] Seeding locations...');
+        logger.info('[Seed] Seeding locations...');
         for (const loc of seedData.locations) {
             await locationRepository.create(loc.id, loc);
-            console.log(`[Seed] Created location: ${loc.name}`);
+            logger.info(`[Seed] Created location: ${loc.name}`);
         }
 
         // Seed stores
-        console.log('[Seed] Seeding stores...');
+        logger.info('[Seed] Seeding stores...');
         for (const store of seedData.stores) {
             await StoreRepository.create(store.id, store);
-            console.log(`[Seed] Created store: ${store.name}`);
+            logger.info(`[Seed] Created store: ${store.name}`);
         }
 
         // Seed advertisers
-        console.log('[Seed] Seeding advertisers...');
+        logger.info('[Seed] Seeding advertisers...');
         for (const advertiser of seedData.advertisers) {
             await advertiserRepository.create(advertiser.id, advertiser);
-            console.log(`[Seed] Created advertiser: ${advertiser.name}`);
+            logger.info(`[Seed] Created advertiser: ${advertiser.name}`);
         }
 
         // Seed users
-        console.log('[Seed] Seeding users...');
+        logger.info('[Seed] Seeding users...');
         for (const user of seedData.users) {
             await userRepository.create(user.id, user);
-            console.log(`[Seed] Created user: ${user.email} (${user.role})`);
+            logger.info(`[Seed] Created user: ${user.email} (${user.role})`);
         }
 
         // Seed campaigns
-        console.log('[Seed] Seeding campaigns...');
+        logger.info('[Seed] Seeding campaigns...');
         for (const campaign of seedData.campaigns) {
             await campaignRepository.create(campaign.id, campaign);
-            console.log(`[Seed] Created campaign: ${campaign.name}`);
+            logger.info(`[Seed] Created campaign: ${campaign.name}`);
         }
 
         // Seed media
-        console.log('[Seed] Seeding media assets...');
+        logger.info('[Seed] Seeding media assets...');
         for (const asset of seedData.media) {
             await mediaRepository.create(asset.id, asset);
-            console.log(`[Seed] Created asset: ${asset.filename}`);
+            logger.info(`[Seed] Created asset: ${asset.filename}`);
         }
 
         // Seed playlists
-        console.log('[Seed] Seeding playlists...');
+        logger.info('[Seed] Seeding playlists...');
         for (const playlist of seedData.playlists) {
             await playlistRepository.create(playlist.id, playlist);
-            console.log(`[Seed] Created playlist: ${playlist.name}`);
+            logger.info(`[Seed] Created playlist: ${playlist.name}`);
         }
 
         // Seed pricing
-        console.log('[Seed] Seeding pricing...');
+        logger.info('[Seed] Seeding pricing...');
         await pricingRepository.create(seedData.pricing.id, seedData.pricing);
-        console.log('[Seed] Created global pricing config');
+        logger.info('[Seed] Created global pricing config');
 
         // Seed screens
-        console.log('[Seed] Seeding screens...');
+        logger.info('[Seed] Seeding screens...');
         for (const screen of seedData.screens) {
             await screenRepository.create(screen.id, screen);
-            console.log(`[Seed] Created screen: ${screen.screen_id}`);
+            logger.info(`[Seed] Created screen: ${screen.screen_id}`);
         }
 
         // Generate loops for today
-        console.log('[Seed] Generating loops for today...');
+        logger.info('[Seed] Generating loops for today...');
         const today = new Date().toISOString().split('T')[0];
         for (const screen of seedData.screens) {
             for (let hour = 8; hour < 22; hour++) {
@@ -184,9 +185,9 @@ async function seed() {
                 const slots = Array(12).fill(null).map((_, i) => ({
                     index: i,
                     status: 'available',
-                    campaignId: null,
-                    advertiserId: null,
-                    creativeUrl: null
+                    campaign_id: null,
+                    advertiser_id: null,
+                    creative_url: null
                 }));
 
                 await loopRepository.create(loopId, {
@@ -201,21 +202,19 @@ async function seed() {
                 });
             }
         }
-        console.log('[Seed] Created hourly loops for active screens');
+        logger.info('[Seed] Created hourly loops for active screens');
 
-        console.log('[Seed] ✅ Seed completed successfully!');
+        logger.info('[Seed] ✅ Seed completed successfully!');
 
     } catch (error) {
-        console.error('[Seed] ❌ Seed failed:', error);
+        logger.error('[Seed] ❌ Seed failed:', { error: error.message, stack: error.stack });
         process.exit(1);
     } finally {
         await closeFirestore();
     }
 }
 
-// Run seed if this file is executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-    seed();
-}
+// Just run it
+seed();
 
 export { seed, seedData };

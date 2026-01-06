@@ -15,16 +15,17 @@ import { requestLogger } from './src/utils/logger.js';
 const app = express();
 
 // Environment-based CORS configuration
+const DEV_ORIGINS = ['http://localhost:5173', 'http://localhost:5174'];
 const CORS_ORIGINS = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
-    : []; // Fallback to empty in production, must be explicitly set via env
+    : (process.env.NODE_ENV !== 'production' ? DEV_ORIGINS : []);
 
 const corsOptions = {
     origin: function (origin, callback) {
         // Allow requests with no origin (mobile apps, Postman, etc.)
         if (!origin) return callback(null, true);
 
-        if (CORS_ORIGINS.indexOf(origin) !== -1) {
+        if (CORS_ORIGINS.indexOf(origin) !== -1 || (process.env.NODE_ENV !== 'production' && DEV_ORIGINS.includes(origin))) {
             callback(null, true);
         } else {
             console.warn(`[CORS] Blocked request from origin: ${origin}`);
