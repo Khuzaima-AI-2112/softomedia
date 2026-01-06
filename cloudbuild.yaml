@@ -29,11 +29,11 @@ steps:
       - '-c'
       - |
         # Fetch the live backend URL (fallback to hardcoded if first time)
-        AD_SERVER_URL=$$(gcloud run services describe ${_SERVICE_ADSERVER} --region ${_REGION} --format='value(status.url)' --project $PROJECT_ID 2>/dev/null || echo "https://ad-server-kiieh7nmwa-uc.a.run.app")
-        echo "🔗 Linking frontend to Backend URL: $$AD_SERVER_URL"
+        backend_url=$$(gcloud run services describe ${_SERVICE_ADSERVER} --region ${_REGION} --format='value(status.url)' --project $PROJECT_ID 2>/dev/null || echo "https://ad-server-kiieh7nmwa-uc.a.run.app")
+        echo "🔗 Linking frontend to Backend URL: $$backend_url"
         
         docker build \
-          --build-arg VITE_API_URL=$$AD_SERVER_URL \
+          --build-arg VITE_API_URL=$$backend_url \
           -t ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY}/${_SERVICE_CLIENT}:$BUILD_ID \
           -f client-app/Dockerfile \
           client-app
@@ -120,16 +120,16 @@ steps:
     args:
       - '-c'
       - |
-        AD_SERVER_URL=$$(gcloud run services describe ${_SERVICE_ADSERVER} --region ${_REGION} --format='value(status.url)')
+        backend_url=$$(gcloud run services describe ${_SERVICE_ADSERVER} --region ${_REGION} --format='value(status.url)')
         
-        echo "🚀 Deploying ${_SERVICE_CLIENT} linked to API: $$AD_SERVER_URL..."
+        echo "🚀 Deploying ${_SERVICE_CLIENT} linked to API: $$backend_url..."
         
         gcloud run deploy ${_SERVICE_CLIENT} \
           --image ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY}/${_SERVICE_CLIENT}:$BUILD_ID \
           --region ${_REGION} \
           --platform managed \
           --allow-unauthenticated \
-          --set-env-vars "VITE_API_URL=$$AD_SERVER_URL,BUILD_ID=$BUILD_ID" \
+          --set-env-vars "VITE_API_URL=$$backend_url,BUILD_ID=$BUILD_ID" \
           --labels "version=$BUILD_ID,deployed-by=cloud-build"
     id: 'deploy-client'
     waitFor: ['deploy-adserver', 'push-client-image']
