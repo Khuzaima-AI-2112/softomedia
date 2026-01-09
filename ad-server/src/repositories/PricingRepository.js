@@ -22,6 +22,43 @@ class PricingRepositoryClass extends BaseRepository {
     }
 
     /**
+     * Helper to deeply normalize snake_case keys to camelCase
+     */
+    _normalizeConfig(data) {
+        if (!data) return null;
+
+        const normalized = {};
+
+        // Root level
+        normalized.id = data.id;
+        normalized.baseCPM = data.baseCPM || data.base_cpm || DEFAULT_PRICING.baseCPM;
+        normalized.currency = data.currency || data.currency || DEFAULT_PRICING.currency;
+        normalized.slotDuration = data.slotDuration || data.slot_duration || DEFAULT_PRICING.slotDuration;
+        normalized.slotsPerLoop = data.slotsPerLoop || data.slots_per_loop || DEFAULT_PRICING.slotsPerLoop;
+
+        // Traffic Tiers - ensure nested objects are also handled if necessary, 
+        // but here we mainly need the keys to be low/medium/high
+        const rawTiers = data.trafficTiers || data.traffic_tiers || DEFAULT_PRICING.trafficTiers;
+        normalized.trafficTiers = {};
+
+        for (const [key, val] of Object.entries(rawTiers)) {
+            // Map common snake_case keys just in case
+            const mappedKey = key === 'very_low' ? 'veryLow' : key;
+            normalized.trafficTiers[mappedKey] = {
+                multiplier: val.multiplier ?? 1.0,
+                label: val.label || mappedKey.charAt(0).toUpperCase() + mappedKey.slice(1),
+                color: val.color || '#94a3b8',
+                hours: val.hours || []
+            };
+        }
+
+        normalized.dateOverrides = data.dateOverrides || data.date_overrides || {};
+        normalized.retailerOverrides = data.retailerOverrides || data.retailer_overrides || {};
+
+        return normalized;
+    }
+
+    /**
      * Get current pricing configuration
      * Returns default if none exists
      */
@@ -32,17 +69,7 @@ class PricingRepositoryClass extends BaseRepository {
             return await this.create('global', DEFAULT_PRICING);
         }
 
-        // Normalize snake_case to camelCase for consistency
-        return {
-            id: config.id,
-            baseCPM: config.baseCPM || config.base_cpm || DEFAULT_PRICING.baseCPM,
-            currency: config.currency || DEFAULT_PRICING.currency,
-            slotDuration: config.slotDuration || config.slot_duration || DEFAULT_PRICING.slotDuration,
-            slotsPerLoop: config.slotsPerLoop || config.slots_per_loop || DEFAULT_PRICING.slotsPerLoop,
-            trafficTiers: config.trafficTiers || config.traffic_tiers || DEFAULT_PRICING.trafficTiers,
-            dateOverrides: config.dateOverrides || config.date_overrides || {},
-            retailerOverrides: config.retailerOverrides || config.retailer_overrides || {}
-        };
+        return this._normalizeConfig(config);
     }
 
     /**
@@ -58,10 +85,12 @@ class PricingRepositoryClass extends BaseRepository {
         if (updates.date_overrides !== undefined) { normalizedUpdates.dateOverrides = updates.date_overrides; delete normalizedUpdates.date_overrides; }
         if (updates.retailer_overrides !== undefined) { normalizedUpdates.retailerOverrides = updates.retailer_overrides; delete normalizedUpdates.retailer_overrides; }
 
-        return await this.update('global', {
+        const finalConfig = {
             ...existing,
             ...normalizedUpdates
-        });
+        };
+
+        return await this.update('global', finalConfig);
     }
 
     /**
@@ -86,24 +115,35 @@ class PricingRepositoryClass extends BaseRepository {
     /**
      * Calculate slot price based on hour and screen
      */
-    async calculateSlotPrice(hour, screenId = null) {
+    async calculateSlotPrice(hour, dateStr = null) {
         const config = await this.getConfig();
-        const { baseCPM, trafficTiers } = config;
+        const { baseCPM, trafficTiers, dateOverrides } = config;
 
         // Determine traffic tier for the hour
         let tier = 'medium';
-        for (const [tierName, tierConfig] of Object.entries(trafficTiers)) {
-            if (tierConfig.hours.includes(hour)) {
-                tier = tierName;
-                break;
+
+        // Check for specific date + hour override first
+        if (dateStr && dateOverrides[dateStr]?.hourlyTiers?.[hour]) {
+            tier = dateOverrides[dateStr].hourlyTiers[hour];
+        } else {
+            // Default to global hour-to-tier mapping
+            for (const [tierName, tierConfig] of Object.entries(trafficTiers)) {
+                if (tierConfig.hours.includes(hour)) {
+                    tier = tierName;
+                    break;
+                }
             }
         }
 
         const multiplier = trafficTiers[tier]?.multiplier || 1.0;
+        const dateMultiplier = dateStr ? dateOverrides[dateStr]?.multiplier || 1.0 : 1.0;
+
         return {
-            price: baseCPM * multiplier,
+            price: baseCPM * multiplier * dateMultiplier,
             tier,
-            multiplier
+            multiplier: multiplier * dateMultiplier,
+            trafficMultiplier: multiplier,
+            dateMultiplier
         };
     }
 }

@@ -181,11 +181,24 @@ class ApiService {
     // ============================================
 
     async getPricingConfig() {
-        return apiClient.get('/api/pricing/config');
+        const data = await apiClient.get('/api/pricing/config');
+        return this._normalizePricingConfig(data);
     }
 
     async updatePricingConfig(data) {
-        return apiClient.put('/api/pricing/config', data);
+        const updated = await apiClient.put('/api/pricing/config', data);
+        return this._normalizePricingConfig(updated);
+    }
+
+    _normalizePricingConfig(config) {
+        if (!config) return null;
+        return {
+            ...config,
+            baseCPM: config.baseCPM || config.base_cpm || 15.00,
+            trafficTiers: config.trafficTiers || config.traffic_tiers || {},
+            dateOverrides: config.dateOverrides || config.date_overrides || {},
+            retailerOverrides: config.retailerOverrides || config.retailer_overrides || {}
+        };
     }
 
     async calculatePrice(hour, screenId = null) {

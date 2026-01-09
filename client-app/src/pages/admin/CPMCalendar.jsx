@@ -26,6 +26,8 @@ function CPMCalendar() {
     const [pricingConfig, setPricingConfig] = useState(null);
     const [editMode, setEditMode] = useState(false);
     const [editedBaseCPM, setEditedBaseCPM] = useState(15.00);
+    const [tierEditMode, setTierEditMode] = useState(false);
+    const [editedTiers, setEditedTiers] = useState({});
     const [dateOverride, setDateOverride] = useState(null);
     const [selectedRetailer, setSelectedRetailer] = useState('all');
     const [retailers, setRetailers] = useState([]);
@@ -41,6 +43,7 @@ function CPMCalendar() {
     useEffect(() => {
         if (pricingConfig) {
             setEditedBaseCPM(pricingConfig.baseCPM || 15.00);
+            setEditedTiers(JSON.parse(JSON.stringify(pricingConfig.trafficTiers || {})));
             setDateOverride(pricingConfig.dateOverrides?.[selectedDate] || null);
         }
     }, [selectedDate, pricingConfig]);
@@ -72,6 +75,43 @@ function CPMCalendar() {
         } catch (error) {
             console.error('Failed to update base CPM:', error);
             alert('Update failed');
+        }
+    };
+
+    const handleSaveTiers = async () => {
+        try {
+            const updated = await apiService.updatePricingConfig({ trafficTiers: editedTiers });
+            setPricingConfig(updated);
+            setTierEditMode(false);
+        } catch (error) {
+            console.error('Failed to update traffic tiers:', error);
+            alert('Update failed');
+        }
+    };
+
+    const handleSetHourlyTier = async (hour, tierKey) => {
+        try {
+            const currentOverrides = pricingConfig.dateOverrides || {};
+            const dateOverride = currentOverrides[selectedDate] || { multiplier: 1.0, label: 'Manual' };
+            const hourlyTiers = dateOverride.hourlyTiers || {};
+
+            const updatedHourlyTiers = {
+                ...hourlyTiers,
+                [hour]: tierKey
+            };
+
+            const updatedOverrides = {
+                ...currentOverrides,
+                [selectedDate]: {
+                    ...dateOverride,
+                    hourlyTiers: updatedHourlyTiers
+                }
+            };
+
+            const updated = await apiService.updatePricingConfig({ dateOverrides: updatedOverrides });
+            setPricingConfig(updated);
+        } catch (error) {
+            console.error('Failed to set hourly tier override:', error);
         }
     };
 
@@ -391,7 +431,22 @@ function CPMCalendar() {
                                             {formatHour(hourData.hour)}
                                         </td>
                                         <td className="py-3">
-                                            <TrafficTierBadge tier={hourData.trafficTier.key} size="small" />
+                                            <div className="flex items-center gap-2">
+                                                <select
+                                                    value={hourData.trafficTier.key}
+                                                    onChange={(e) => handleSetHourlyTier(hourData.hour, e.target.value)}
+                                                    className="bg-transparent text-xs border border-slate-200 dark:border-slate-700 rounded px-1 py-0.5 focus:ring-1 focus:ring-primary outline-none"
+                                                >
+                                                    {Object.keys(pricingConfig?.trafficTiers || {}).map(tierKey => (
+                                                        <option key={tierKey} value={tierKey}>
+                                                            {pricingConfig.trafficTiers[tierKey].label}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                {pricingConfig?.dateOverrides?.[selectedDate]?.hourlyTiers?.[hourData.hour] && (
+                                                    <span className="size-1.5 rounded-full bg-blue-500" title="Override Active"></span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="py-3 text-right">
                                             <PriceDisplay price={hourData.averageSlotPrice} size="small" />
@@ -458,9 +513,38 @@ function CPMCalendar() {
 
             {/* Traffic Tier Configuration */}
             <GlassCard>
-                <h3 className="font-bold text-lg mb-4">Traffic Tier Configuration</h3>
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-bold text-lg">Traffic Tier Configuration</h3>
+                    {!tierEditMode ? (
+                        <button
+                            onClick={() => setTierEditMode(true)}
+                            className="text-xs text-primary font-bold hover:underline"
+                        >
+                            Edit Tiers
+                        </button>
+                    ) : (
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={handleSaveTiers}
+                                className="px-3 py-1 text-xs bg-emerald-500 text-white rounded-lg font-bold"
+                            >
+                                Save
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setTierEditMode(false);
+                                    setEditedTiers(JSON.parse(JSON.stringify(pricingConfig.trafficTiers || {})));
+                                }}
+                                className="px-3 py-1 text-xs bg-slate-200 dark:bg-slate-700 rounded-lg font-bold"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    )}
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    {Object.entries(pricingConfig?.trafficTiers || {}).map(([key, tier]) => (
+                    {Object.entries(tierEditMode ? editedTiers : (pricingConfig?.trafficTiers || {})).map(([key, tier]) => (
                         <div
                             key={key}
                             className="p-4 rounded-xl border-2"
@@ -468,9 +552,25 @@ function CPMCalendar() {
                         >
                             <div className="flex items-center justify-between mb-2">
                                 <TrafficTierBadge tier={key} />
-                                <span className="text-lg font-bold" style={{ color: tier?.color }}>
-                                    {tier?.multiplier}x
-                                </span>
+                                {tierEditMode ? (
+                                    <div className="flex items-center gap-1">
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            value={tier?.multiplier}
+                                            onChange={(e) => setEditedTiers({
+                                                ...editedTiers,
+                                                [key]: { ...tier, multiplier: parseFloat(e.target.value) }
+                                            })}
+                                            className="w-16 px-2 py-1 text-sm rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                                        />
+                                        <span className="text-xs text-slate-500">x</span>
+                                    </div>
+                                ) : (
+                                    <span className="text-lg font-bold" style={{ color: tier?.color }}>
+                                        {tier?.multiplier}x
+                                    </span>
+                                )}
                             </div>
                             <p className="text-xs text-slate-500">
                                 Hours: {tier?.hours?.map(h => formatHour(h).replace(':00 ', '')).join(', ') || 'N/A'}

@@ -39,15 +39,21 @@ class PricingService {
     /**
      * Get the traffic tier for a specific hour
      * @param {number} hour - Hour of the day (0-23)
+     * @param {string} date - Optional date for granular overrides
      * @returns {object} Traffic tier info { key, multiplier, label, color }
      */
-    getTrafficTier(hour) {
+    getTrafficTier(hour, date = null) {
         const defaultTier = { key: 'medium', multiplier: 1.0, label: 'Medium', color: '#fbbf24' };
-
-        // Handle both camelCase and snake_case for backward compatibility during migration
         const tiers = this.config?.trafficTiers || this.config?.traffic_tiers;
         if (!tiers) return defaultTier;
 
+        // 1. Check for specific date + hour override
+        if (date && this.config?.dateOverrides?.[date]?.hourlyTiers?.[hour]) {
+            const tierKey = this.config.dateOverrides[date].hourlyTiers[hour];
+            if (tiers[tierKey]) return { key: tierKey, ...tiers[tierKey] };
+        }
+
+        // 2. Default to global hour-to-tier mapping
         for (const [key, tier] of Object.entries(tiers)) {
             if (tier.hours && Array.isArray(tier.hours) && tier.hours.includes(hour)) {
                 return { key, ...tier };
@@ -114,7 +120,7 @@ class PricingService {
 
         const store = this.stores.find(s => s.id === screen.store_id);
         const baseCPM = this.getBaseCPM(screenId, screen.store_id, screen.retailer_id);
-        const trafficTier = this.getTrafficTier(hour);
+        const trafficTier = this.getTrafficTier(hour, date);
         const dateMultiplier = this.getDateMultiplier(date);
 
         // Apply store traffic level bonus
@@ -245,7 +251,7 @@ class PricingService {
         const businessHours = { START: 8, END: 22 };
 
         for (let hour = businessHours.START; hour < businessHours.END; hour++) {
-            const trafficTier = this.getTrafficTier(hour);
+            const trafficTier = this.getTrafficTier(hour, date);
             const dateMultiplier = this.getDateMultiplier(date);
 
             // Calculate average price across all screens
