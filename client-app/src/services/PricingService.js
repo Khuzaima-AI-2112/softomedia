@@ -43,9 +43,10 @@ class PricingService {
      */
     getTrafficTier(hour) {
         const defaultTier = { key: 'medium', multiplier: 1.0, label: 'Medium', color: '#fbbf24' };
-        if (!this.config || !this.config.trafficTiers) return defaultTier;
 
-        const tiers = this.config.trafficTiers;
+        // Handle both camelCase and snake_case for backward compatibility during migration
+        const tiers = this.config?.trafficTiers || this.config?.traffic_tiers;
+        if (!tiers) return defaultTier;
 
         for (const [key, tier] of Object.entries(tiers)) {
             if (tier.hours && Array.isArray(tier.hours) && tier.hours.includes(hour)) {
@@ -85,7 +86,7 @@ class PricingService {
         }
 
         // Return global base CPM
-        return config.baseCPM || 2.50;
+        return config.baseCPM || config.base_cpm || 2.50;
     }
 
     /**
@@ -306,6 +307,9 @@ class PricingService {
      * @returns {string} Formatted price string
      */
     formatPrice(price, currency = 'USD') {
+        if (price === undefined || price === null || isNaN(price)) {
+            return '$0.00';
+        }
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
             currency,
@@ -320,6 +324,9 @@ class PricingService {
      * @returns {string} Formatted impressions string (e.g., "1.2K", "3.5M")
      */
     formatImpressions(impressions) {
+        if (impressions === undefined || impressions === null || isNaN(impressions)) {
+            return '0';
+        }
         if (impressions >= 1000000) {
             return `${(impressions / 1000000).toFixed(1)}M`;
         } else if (impressions >= 1000) {

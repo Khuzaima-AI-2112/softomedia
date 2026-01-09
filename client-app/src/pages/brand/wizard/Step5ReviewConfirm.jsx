@@ -212,7 +212,14 @@ function Step5ReviewConfirm({ data, onConfirm, onPrev }) {
                         {/* Actions */}
                         <div className="space-y-3">
                             <button
-                                onClick={onConfirm}
+                                onClick={() => {
+                                    const checkbox = document.querySelector('input[type="checkbox"]');
+                                    if (checkbox && checkbox.checked) {
+                                        onConfirm();
+                                    } else {
+                                        alert('Please agree to the Terms of Service to proceed.');
+                                    }
+                                }}
                                 className="w-full py-4 rounded-xl bg-gradient-to-r from-primary to-primary-hover text-white font-bold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all flex items-center justify-center gap-2"
                             >
                                 <span className="material-symbols-outlined">check_circle</span>

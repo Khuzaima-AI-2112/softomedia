@@ -3,6 +3,20 @@
 Objectives: Document changes and progress milestones throughout the project lifecycle.
 
 ## Unreleased
+- **Infrastructure**:
+    - **Runtime Configuration Injection**: Decoupled frontend builds from environment-specific URLs using a dynamic `config.js` generator.
+    - **CORS Improvement**: Added support for wildcard `*` in `CORS_ORIGINS` to simplify secure cross-origin communication in cloud environments.
+- **Client App**:
+    - Implemented `entrypoint.sh` for container startup configuration.
+    - Added dynamic config loading in `index.html`.
+    - Resolved persistent "localhost" connection leak in production environments.
+- **Ad Server**:
+    - Guarded `seedDatabase()` against automatic execution in production environments.
+    - Standardized `BaseRepository.create()` to prevent accidental document overwrites.
+    - **Pricing Standardization**: Normalized `PricingRepository` output to camelCase to resolve frontend crashes.
+- **Client App**:
+    - **Pricing Robustness**: Added optional chaining and fallbacks to `CPMCalendar` and `PricingService` to handle legacy data formats gracefully.
+    - **Bug Fix**: Resolved `NaN` display in Pricing Dashboard for base CPM.
 - [Infra] Deployed `ad-server` and `client-app` to Cloud Run (Project: `softomedia-live-2026`).
 - [Refactor] Reverted "Silent Player" telemetry to resolve TDZ crash.
 - [Feat] Added Global Error Handler (`src/middleware/error.js`) and Client Telemetry (`POST /api/telemetry/error`) to `ad-server`.

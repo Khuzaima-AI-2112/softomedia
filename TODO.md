@@ -34,6 +34,11 @@
 - [x] Debug persona switcher navigation timing (implemented `waitForURL`)
 - [x] Update test selectors to `data-testid`
 
+### Pricing Stability Governance (SRE Recommendations)
+- [ ] **Schema Validation**: Introduce Zod or Joi schemas in `PricingRepository.js` to enforce casing at the boundary.
+- [ ] **Linting Policy**: Enable ESLint rules (e.g., `no-unsafe-member-access`) specifically for API-fed state to encourage optional chaining.
+- [ ] **Data Drift Integration Test**: Create a Playwright test that simulates "snake_case" API responses to verify UI resilience.
+
 ### Telemetry & Monitoring (Postponed from Rollout)
 - [ ] **Silent Player Fix**: Implement `useHeartbeat` and `useImpression` in `LoopDemoPlayer.jsx` (Beware TDZ errors, see lessons learned).
 

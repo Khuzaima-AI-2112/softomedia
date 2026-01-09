@@ -4,6 +4,16 @@ Objectives: Document errors, bugs, and mistakes so we do not make them again.
 
 ## Development Lessons
 
+### [2026-01-06] Build-Time vs Runtime Configuration (Vite)
+- **Issue**: Vite "bakes" environment variables into the production bundle at build-time, creating environment-specific binaries.
+- **Root Cause**: Reliance on `import.meta.env` during the compilation phase creates hardcoded strings in the output assets.
+- **Prevention**: Use the "Runtime Configuration Injection" pattern. Generate a dynamic `config.js` script via a container entrypoint and load it in `index.html` BEFORE the main bundle. This enables "build once, deploy many" patterns.
+
+### [2026-01-06] Cloud Build Shell Variable Escaping Conflicts
+- **Issue**: Cloud Build misinterprets `$$SHELL_VAR` if the parser identifies prospective tag patterns before shell execution.
+- **Root Cause**: First-pass tag resolution attempts to match patterns even when designated as shell-escaped.
+- **Prevention**: Use lowercase shell variable names to avoid collision with Cloud Build's uppercase substitution tags. Alternatively, isolate fetch and build logic into discrete steps using standard builder images (e.g., `gcloud` vs `docker`).
+
 ### [2026-01-03] Flexible Validation for Creative Assets
 - **Issue**: Strict 5-second validation blocked users from uploading potentially valid creatives (e.g., 4.9s or 5.1s).
 - **Root Cause**: Hard constraints in UI prevented valid business flows.
@@ -414,10 +424,14 @@ Objectives: Document errors, bugs, and mistakes so we do not make them again.
 - **Root Cause**: Reliance on user reports for client-side issues.
 - **Prevention**: Implement a "Global Error Handler" on the backend to catch unhandled exceptions, and a "Client Telemetry" endpoint (`POST /api/telemetry/error`) to receive reports from `ErrorBoundary`.
 
-### [2026-01-06] Scalability Anti-Patterns (SDLC#9)
-- **Issue**: `BaseRepository.findAll` ignored `limit` option, causing full-table scans and OOM risk.
-- **Root Cause**: Initial implementation focused on feature correctness over query efficiency.
-- **Prevention**: Always apply `.limit()` to Firestore/DB queries when provided. Sequential writes should use `Promise.all()` for parallelism.
+### [2026-01-09] Frontend-Backend Naming Conventions (camelCase vs snake_case)
+- **Issue**: The application crashed with `TypeError: Cannot read properties of undefined (reading 'high')` on the pricing page.
+- **Root Cause**: The backend API (ad-server) returned data with `snake_case` keys (e.g., `traffic_tiers`, `base_cpm`), while the frontend components (client-app) were hardcoded to expect `camelCase` keys (`trafficTiers`, `baseCPM`).
+- **Prevention**: 
+  1. **Standardization**: Enforce a project-wide convention. In this project, the frontend expects `camelCase`. 
+  2. **Normalization Layer**: Implement a normalization layer in the backend repositories or services to ensure consistency regardless of the underlying database schema.
+  3. **Defensive Coding**: In the frontend, use optional chaining (`?.`) and provide sensible fallbacks for all data coming from the API. This prevents "Total Failure" crashes in favor of "Graceful Degradation".
+  4. **Contract Testing**: Implement basic snapshot testing for API responses to detect casing changes early.
 
 ---
 *Note: This file is a permanent project record. Do not delete or purge entries.*

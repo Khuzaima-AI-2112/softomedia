@@ -31,7 +31,18 @@ class PricingRepositoryClass extends BaseRepository {
             // Initialize with defaults
             return await this.create('global', DEFAULT_PRICING);
         }
-        return config;
+
+        // Normalize snake_case to camelCase for consistency
+        return {
+            id: config.id,
+            baseCPM: config.baseCPM || config.base_cpm || DEFAULT_PRICING.baseCPM,
+            currency: config.currency || DEFAULT_PRICING.currency,
+            slotDuration: config.slotDuration || config.slot_duration || DEFAULT_PRICING.slotDuration,
+            slotsPerLoop: config.slotsPerLoop || config.slots_per_loop || DEFAULT_PRICING.slotsPerLoop,
+            trafficTiers: config.trafficTiers || config.traffic_tiers || DEFAULT_PRICING.trafficTiers,
+            dateOverrides: config.dateOverrides || config.date_overrides || {},
+            retailerOverrides: config.retailerOverrides || config.retailer_overrides || {}
+        };
     }
 
     /**
@@ -39,9 +50,17 @@ class PricingRepositoryClass extends BaseRepository {
      */
     async updateConfig(updates) {
         const existing = await this.getConfig();
+
+        // Map any incoming snake_case updates to camelCase
+        const normalizedUpdates = { ...updates };
+        if (updates.base_cpm !== undefined) { normalizedUpdates.baseCPM = updates.base_cpm; delete normalizedUpdates.base_cpm; }
+        if (updates.traffic_tiers !== undefined) { normalizedUpdates.trafficTiers = updates.traffic_tiers; delete normalizedUpdates.traffic_tiers; }
+        if (updates.date_overrides !== undefined) { normalizedUpdates.dateOverrides = updates.date_overrides; delete normalizedUpdates.date_overrides; }
+        if (updates.retailer_overrides !== undefined) { normalizedUpdates.retailerOverrides = updates.retailer_overrides; delete normalizedUpdates.retailer_overrides; }
+
         return await this.update('global', {
             ...existing,
-            ...updates
+            ...normalizedUpdates
         });
     }
 

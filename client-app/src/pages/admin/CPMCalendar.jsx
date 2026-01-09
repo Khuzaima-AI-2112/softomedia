@@ -40,8 +40,8 @@ function CPMCalendar() {
 
     useEffect(() => {
         if (pricingConfig) {
-            setEditedBaseCPM(pricingConfig.base_cpm || 15.00);
-            setDateOverride(pricingConfig.date_overrides?.[selectedDate] || null);
+            setEditedBaseCPM(pricingConfig.baseCPM || 15.00);
+            setDateOverride(pricingConfig.dateOverrides?.[selectedDate] || null);
         }
     }, [selectedDate, pricingConfig]);
 
@@ -56,7 +56,7 @@ function CPMCalendar() {
             setPricingConfig(config);
             setRetailers(retailersData || []);
             setStores(storesData || []);
-            setEditedBaseCPM(config.base_cpm || 15.00);
+            setEditedBaseCPM(config.baseCPM || 15.00);
         } catch (error) {
             console.error('Failed to load pricing data:', error);
         } finally {
@@ -66,7 +66,7 @@ function CPMCalendar() {
 
     const handleSaveBaseCPM = async () => {
         try {
-            const updated = await apiService.updatePricingConfig({ base_cpm: editedBaseCPM });
+            const updated = await apiService.updatePricingConfig({ baseCPM: editedBaseCPM });
             setPricingConfig(updated);
             setEditMode(false);
         } catch (error) {
@@ -77,12 +77,12 @@ function CPMCalendar() {
 
     const handleSetDateOverride = async (multiplier, label) => {
         try {
-            const currentOverrides = pricingConfig.date_overrides || pricingConfig.dateOverrides || {};
+            const currentOverrides = pricingConfig.dateOverrides || {};
             const updatedOverrides = {
                 ...currentOverrides,
                 [selectedDate]: { multiplier, label }
             };
-            const updated = await apiService.updatePricingConfig({ date_overrides: updatedOverrides });
+            const updated = await apiService.updatePricingConfig({ dateOverrides: updatedOverrides });
             setPricingConfig(updated);
         } catch (error) {
             console.error('Failed to set date override:', error);
@@ -91,9 +91,9 @@ function CPMCalendar() {
 
     const handleClearDateOverride = async () => {
         try {
-            const currentOverrides = { ...(pricingConfig.date_overrides || pricingConfig.dateOverrides || {}) };
+            const currentOverrides = { ...(pricingConfig.dateOverrides || {}) };
             delete currentOverrides[selectedDate];
-            const updated = await apiService.updatePricingConfig({ date_overrides: currentOverrides });
+            const updated = await apiService.updatePricingConfig({ dateOverrides: currentOverrides });
             setPricingConfig(updated);
         } catch (error) {
             console.error('Failed to clear date override:', error);
@@ -102,13 +102,13 @@ function CPMCalendar() {
 
     const handleRetailerOverride = async (retailerId, baseCPM) => {
         try {
-            const currentOverrides = { ...(pricingConfig.retailer_overrides || pricingConfig.retailerOverrides || {}) };
+            const currentOverrides = { ...(pricingConfig.retailerOverrides || {}) };
             if (baseCPM === null) {
                 delete currentOverrides[retailerId];
             } else {
-                currentOverrides[retailerId] = { base_cpm: baseCPM };
+                currentOverrides[retailerId] = { baseCPM };
             }
-            const updated = await apiService.updatePricingConfig({ retailer_overrides: currentOverrides });
+            const updated = await apiService.updatePricingConfig({ retailerOverrides: currentOverrides });
             setPricingConfig(updated);
         } catch (error) {
             console.error('Failed to update retailer override:', error);
@@ -135,7 +135,7 @@ function CPMCalendar() {
             days.push({
                 day: d,
                 date: dateStr,
-                hasOverride: !!(pricingConfig?.date_overrides?.[dateStr] || pricingConfig?.dateOverrides?.[dateStr]),
+                hasOverride: !!(pricingConfig?.dateOverrides?.[dateStr]),
                 isSelected: dateStr === selectedDate,
                 isToday: dateStr === new Date().toISOString().split('T')[0]
             });
@@ -213,7 +213,7 @@ function CPMCalendar() {
                             </div>
                         ) : (
                             <>
-                                <PriceDisplay price={pricingConfig.baseCPM} showCPM size="large" />
+                                <PriceDisplay price={pricingConfig.baseCPM || pricingConfig.base_cpm || 15.00} showCPM size="large" />
                                 <button
                                     onClick={() => setEditMode(true)}
                                     className="p-1 text-slate-400 hover:text-primary hover:bg-primary/10 rounded transition-colors"
@@ -228,7 +228,7 @@ function CPMCalendar() {
                 <GlassCard className="border-l-4 border-l-emerald-500">
                     <p className="text-sm font-medium text-slate-500 mb-1">High Traffic Multiplier</p>
                     <p className="text-2xl font-bold text-emerald-500">
-                        {pricingConfig.trafficTiers.high.multiplier}x
+                        {pricingConfig?.trafficTiers?.high?.multiplier || '1.5'}x
                     </p>
                     <p className="text-xs text-slate-400 mt-1">12-1 PM, 5-6 PM</p>
                 </GlassCard>
@@ -412,7 +412,7 @@ function CPMCalendar() {
                 <h3 className="font-bold text-lg mb-4">Retailer Pricing Overrides</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {retailers.map(retailer => {
-                        const override = pricingConfig.retailer_overrides?.[retailer.id];
+                        const override = pricingConfig.retailerOverrides?.[retailer.id];
                         const retailerStores = stores.filter(s => s.retailer_id === retailer.id);
                         return (
                             <div
@@ -435,8 +435,8 @@ function CPMCalendar() {
                                             type="number"
                                             step="0.01"
                                             min="0"
-                                            placeholder={(pricingConfig.base_cpm || 15).toString()}
-                                            value={override?.base_cpm || ''}
+                                            placeholder={(pricingConfig.baseCPM || 15).toString()}
+                                            value={override?.baseCPM || ''}
                                             onChange={(e) => handleRetailerOverride(
                                                 retailer.id,
                                                 e.target.value ? parseFloat(e.target.value) : null
@@ -460,20 +460,20 @@ function CPMCalendar() {
             <GlassCard>
                 <h3 className="font-bold text-lg mb-4">Traffic Tier Configuration</h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    {Object.entries(pricingConfig.traffic_tiers || {}).map(([key, tier]) => (
+                    {Object.entries(pricingConfig?.trafficTiers || {}).map(([key, tier]) => (
                         <div
                             key={key}
                             className="p-4 rounded-xl border-2"
-                            style={{ borderColor: tier.color + '40', backgroundColor: tier.color + '10' }}
+                            style={{ borderColor: tier?.color + '40', backgroundColor: tier?.color + '10' }}
                         >
                             <div className="flex items-center justify-between mb-2">
                                 <TrafficTierBadge tier={key} />
-                                <span className="text-lg font-bold" style={{ color: tier.color }}>
-                                    {tier.multiplier}x
+                                <span className="text-lg font-bold" style={{ color: tier?.color }}>
+                                    {tier?.multiplier}x
                                 </span>
                             </div>
                             <p className="text-xs text-slate-500">
-                                Hours: {tier.hours.map(h => formatHour(h).replace(':00 ', '')).join(', ')}
+                                Hours: {tier?.hours?.map(h => formatHour(h).replace(':00 ', '')).join(', ') || 'N/A'}
                             </p>
                         </div>
                     ))}

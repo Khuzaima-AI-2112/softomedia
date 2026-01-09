@@ -12,6 +12,7 @@ function HamburgerMenu() {
         { label: 'Ad Player', path: '/player', icon: 'play_circle' },
         { label: 'Demo Player', path: '/player/demo', icon: 'slideshow' },
         ...(user?.role === 'admin' ? [
+            { label: 'Overview', path: '/dashboard/admin', icon: 'dashboard' },
             { label: 'Screens', path: '/dashboard/admin/screens', icon: 'monitor' },
             { label: 'Playlists', path: '/dashboard/admin/playlists', icon: 'playlist_play' },
             { label: 'Loops', path: '/dashboard/admin/loops', icon: 'loop' },
@@ -47,6 +48,8 @@ function HamburgerMenu() {
             role: swatch.role,
             linked_entity_id: `entity-${swatch.role}`
         };
+        // Signal the demo role to the backend bypass
+        localStorage.setItem('demo_role', swatch.role);
         login(mockUser, 'demo-token');
         setIsOpen(false);
         navigate(swatch.path);

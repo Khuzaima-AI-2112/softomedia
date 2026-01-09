@@ -202,10 +202,19 @@ const apiClient = new APIClient();
 // Add auth token interceptor
 apiClient.addRequestInterceptor((url, options) => {
     const token = localStorage.getItem('auth_token');
+    const demoRole = localStorage.getItem('demo_role');
+
     if (token) {
         options.headers = {
             ...options.headers,
             'Authorization': `Bearer ${token}`,
+        };
+    }
+
+    if (demoRole) {
+        options.headers = {
+            ...options.headers,
+            'x-demo-role': demoRole,
         };
     }
     return options;
