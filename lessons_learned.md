@@ -433,7 +433,22 @@ Objectives: Document errors, bugs, and mistakes so we do not make them again.
   3. **Defensive Coding**: In the frontend, use optional chaining (`?.`) and provide sensible fallbacks for all data coming from the API. This prevents "Total Failure" crashes in favor of "Graceful Degradation".
   4. **Contract Testing**: Implement basic snapshot testing for API responses to detect casing changes early.
 
+### 2026-01-11: Frontend-Backend State Synchronization with Singletons
+**Issue**: Base CPM update showed correct value in UI header ($12) but incorrect price for hourly slots ($11).
+**Root Cause**: `PricingService` singleton held stale `retailerOverrides` that caused average to be incorrect.
+**Prevention**: 
+- Call `pricingService.init(true)` after any pricing update to force refresh
+- Clear `retailerOverrides` when `baseCPM` changes in backend
+- Add `validateConfiguration()` to detect unusual discount percentages
+
+### 2026-01-11: Hidden Pricing Multipliers Cause Confusion
+**Issue**: "Avg Slot CPM" showed $13.50 when user expected $12.00 for Medium tier.
+**Root Cause**: `storeTrafficMultiplier` (1.25x for high-traffic stores) was applied but NOT visible in UI.
+**Prevention**:
+- **Golden Rule**: If the user can't see it, the user can't debug it
+- Removed hidden `storeTrafficMultiplier` from calculations
+- Created `/pricing-visibility` workflow for future multiplier additions
+- All pricing factors must be visible and editable in Super Admin UI before implementation
+
 ---
 *Note: This file is a permanent project record. Do not delete or purge entries.*
-
-

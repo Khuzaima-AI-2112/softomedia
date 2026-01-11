@@ -9,10 +9,12 @@ class PricingService {
 
     /**
      * Initialize PricingService with data from backend
+     * @param {boolean} forceRefresh - If true, re-fetches all data even if already initialized
      */
-    async init() {
-        if (this.config) return;
+    async init(forceRefresh = false) {
+        if (this.config && !forceRefresh) return;
         try {
+            console.log('[PricingService] Initializing...', { forceRefresh });
             const [configData, screensData, storesData] = await Promise.all([
                 apiService.getPricingConfig(),
                 apiService.getScreens(),
@@ -21,6 +23,11 @@ class PricingService {
             this.config = configData;
             this.screens = screensData;
             this.stores = storesData;
+
+            console.log('[PricingService] Initialized with baseCPM:', this.config?.baseCPM, 'screens:', this.screens?.length, 'stores:', this.stores?.length);
+
+            // Validate configuration after loading
+            this.validateConfiguration();
         } catch (error) {
             console.error('Failed to initialize PricingService:', error);
             // Fallback to defaults
@@ -107,6 +114,13 @@ class PricingService {
 
     /**
      * Calculate the price for a single slot
+     * RULE: Only applies multipliers that are VISIBLE in Super Admin UI
+     * - Base CPM (visible in header)
+     * - Traffic Tier multiplier (visible in dropdown)
+     * - Date Override multiplier (visible in date override section)
+     * 
+     * REMOVED: Store traffic multiplier (was hidden, caused confusion)
+     * 
      * @param {string} screenId 
      * @param {string} date - ISO date string (YYYY-MM-DD)
      * @param {number} hour - Hour of the day (0-23)
@@ -118,19 +132,16 @@ class PricingService {
             return { price: 0, error: 'Screen not found' };
         }
 
-        const store = this.stores.find(s => s.id === screen.store_id);
         const baseCPM = this.getBaseCPM(screenId, screen.store_id, screen.retailer_id);
         const trafficTier = this.getTrafficTier(hour, date);
         const dateMultiplier = this.getDateMultiplier(date);
 
-        // Apply store traffic level bonus
-        let storeTrafficMultiplier = 1.0;
-        if (store?.traffic_level === 'high') storeTrafficMultiplier = 1.25;
-        else if (store?.traffic_level === 'medium') storeTrafficMultiplier = 1.0;
-        else if (store?.traffic_level === 'low') storeTrafficMultiplier = 0.8;
+        // SIMPLIFIED: Only visible multipliers
+        // Formula: Base CPM × Traffic Tier × Date Multiplier
+        const price = baseCPM * trafficTier.multiplier * dateMultiplier;
 
-        // Final price calculation
-        const price = baseCPM * trafficTier.multiplier * dateMultiplier * storeTrafficMultiplier;
+        // DEBUG: Log calculation details
+        console.log(`[PricingService] getSlotPrice: screenId=${screenId}, baseCPM=${baseCPM}, tier=${trafficTier.multiplier}, date=${dateMultiplier}, price=${price.toFixed(2)}`);
 
         return {
             price: Math.round(price * 100) / 100, // Round to 2 decimal places
@@ -138,8 +149,8 @@ class PricingService {
             trafficTier,
             multipliers: {
                 traffic: trafficTier.multiplier,
-                date: dateMultiplier,
-                storeTraffic: storeTrafficMultiplier
+                date: dateMultiplier
+                // NOTE: storeTraffic REMOVED - was hidden from UI
             }
         };
     }
@@ -340,9 +351,115 @@ class PricingService {
         }
         return impressions.toString();
     }
+
+    /**
+     * CRITICAL: Handle global CPM updates with override refresh
+     * @param {object} newConfig 
+     */
+    async updateConfig(newConfig) {
+        if (!newConfig) return;
+
+        console.log('[PricingService] updateConfig called with:', newConfig);
+
+        // If baseCPM changed, must refresh from database to get updated overrides
+        if (newConfig.baseCPM !== undefined &&
+            newConfig.baseCPM !== this.config?.baseCPM) {
+
+            console.log(
+                '[PricingService] Base CPM changed from',
+                this.config?.baseCPM,
+                'to',
+                newConfig.baseCPM,
+                '- forcing full refresh'
+            );
+
+            // Force complete re-initialization to fetch fresh data from DB
+            await this.init(true);
+            return;
+        }
+
+        // For non-CPM updates, safe merge
+        this.config = {
+            ...this.config,
+            ...newConfig
+        };
+
+        // Explicitly update trafficTiers
+        if (newConfig.trafficTiers !== undefined) {
+            this.config.trafficTiers = newConfig.trafficTiers;
+        } else if (newConfig.traffic_tiers !== undefined) {
+            this.config.trafficTiers = newConfig.traffic_tiers;
+        }
+
+        // Explicitly update dateOverrides
+        if (newConfig.dateOverrides !== undefined) {
+            this.config.dateOverrides = newConfig.dateOverrides;
+        } else if (newConfig.date_overrides !== undefined) {
+            this.config.dateOverrides = newConfig.date_overrides;
+        }
+
+        // Explicitly update retailerOverrides
+        if (newConfig.retailerOverrides !== undefined) {
+            this.config.retailerOverrides = newConfig.retailerOverrides;
+        } else if (newConfig.retailer_overrides !== undefined) {
+            this.config.retailerOverrides = newConfig.retailer_overrides;
+        }
+
+        console.log('[PricingService] Config updated:', this.config);
+
+        // Validate after update
+        this.validateConfiguration();
+    }
+
+    /**
+     * CRITICAL: Verify configuration integrity
+     * @returns {boolean} True if configuration is valid
+     */
+    validateConfiguration() {
+        if (!this.config) {
+            console.error('[PricingService] No configuration loaded');
+            return false;
+        }
+
+        const { baseCPM, retailerOverrides } = this.config;
+        const issues = [];
+
+        // Check base CPM is reasonable
+        if (!baseCPM || baseCPM < 0.01 || baseCPM > 1000) {
+            issues.push(`Invalid baseCPM: ${baseCPM}`);
+        }
+
+        // Check for unusual retailer overrides
+        if (retailerOverrides) {
+            Object.entries(retailerOverrides).forEach(([retailerId, override]) => {
+                const overrideValue = override?.baseCPM || override;
+                if (overrideValue && baseCPM) {
+                    const discount = ((baseCPM - overrideValue) / baseCPM) * 100;
+                    if (discount > 50) {
+                        console.warn(
+                            `[PRICING_ALERT] Retailer ${retailerId} has extreme discount: ${discount.toFixed(1)}% (override: $${overrideValue}, base: $${baseCPM})`
+                        );
+                    }
+                }
+            });
+        }
+
+        if (issues.length > 0) {
+            console.error('[PRICING_VALIDATION] Issues detected:', issues);
+            return false;
+        }
+
+        console.log('[PricingService] Configuration validated successfully');
+        return true;
+    }
 }
 
 // Singleton instance
 const pricingService = new PricingService();
+
+// Expose globally for debugging (remove in production)
+if (typeof window !== 'undefined') {
+    window.pricingService = pricingService;
+}
 
 export default pricingService;

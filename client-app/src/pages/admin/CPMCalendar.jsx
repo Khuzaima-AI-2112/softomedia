@@ -5,6 +5,21 @@ import PriceDisplay from '../../components/PriceDisplay';
 import apiService from '../../services/ApiService';
 import pricingService from '../../services/PricingService';
 
+const LayoutTag = ({ name, position = 'top-left' }) => {
+    const posClasses = {
+        'top-left': '-top-3 -left-2',
+        'top-right': '-top-3 -right-2',
+        'bottom-left': '-bottom-3 -left-2',
+        'bottom-right': '-bottom-3 -right-2'
+    };
+
+    return (
+        <div className={`absolute ${posClasses[position]} z-10 bg-slate-800 text-white text-[10px] px-1.5 py-0.5 rounded shadow-sm opacity-60 group-hover:opacity-100 pointer-events-none font-mono uppercase tracking-tighter border border-slate-600 whitespace-nowrap`}>
+            {name}
+        </div>
+    );
+};
+
 // Generate array of business hours (8 AM to 10 PM)
 const getBusinessHours = () => {
     const hours = [];
@@ -22,7 +37,7 @@ const formatHour = (hour) => {
 };
 
 function CPMCalendar() {
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
     const [pricingConfig, setPricingConfig] = useState(null);
     const [editMode, setEditMode] = useState(false);
     const [editedBaseCPM, setEditedBaseCPM] = useState(15.00);
@@ -69,22 +84,47 @@ function CPMCalendar() {
 
     const handleSaveBaseCPM = async () => {
         try {
-            const updated = await apiService.updatePricingConfig({ baseCPM: editedBaseCPM });
-            setPricingConfig(updated);
+            console.log('[CPM_CALENDAR] Save initiated:', { newBaseCPM: editedBaseCPM });
+
+            // Call backend API to update
+            const result = await apiService.updatePricingConfig({ baseCPM: editedBaseCPM });
+
+            console.log('[CPM_CALENDAR] Backend response:', {
+                baseCPM: result.baseCPM,
+                retailerOverrides: result.retailerOverrides,
+                updatedAt: result.updatedAt
+            });
+
+            // CRITICAL: Force refresh of pricing service with new data from database
+            console.log('[CPM_CALENDAR] Forcing pricing service refresh...');
+            await pricingService.init(true);
+
+            // Update local state with fresh data from service
+            const updatedConfig = pricingService.config;
+            setPricingConfig(updatedConfig);
             setEditMode(false);
+
+            console.log('[CPM_CALENDAR] Update complete:', {
+                baseCPM: updatedConfig?.baseCPM,
+                retailerOverrides: Object.keys(updatedConfig?.retailerOverrides || {}).length
+            });
+
         } catch (error) {
-            console.error('Failed to update base CPM:', error);
-            alert('Update failed');
+            console.error('[CPM_CALENDAR] Save failed:', error);
+            alert('Update failed: ' + error.message);
         }
     };
 
     const handleSaveTiers = async () => {
         try {
+            console.log('[CPM_CALENDAR] Saving traffic tiers...');
             const updated = await apiService.updatePricingConfig({ trafficTiers: editedTiers });
-            setPricingConfig(updated);
+            await pricingService.updateConfig(updated);
+            setPricingConfig(pricingService.config);
             setTierEditMode(false);
+            console.log('[CPM_CALENDAR] Tiers saved successfully');
         } catch (error) {
-            console.error('Failed to update traffic tiers:', error);
+            console.error('[CPM_CALENDAR] Failed to update traffic tiers:', error);
             alert('Update failed');
         }
     };
@@ -109,6 +149,7 @@ function CPMCalendar() {
             };
 
             const updated = await apiService.updatePricingConfig({ dateOverrides: updatedOverrides });
+            pricingService.updateConfig(updated);
             setPricingConfig(updated);
         } catch (error) {
             console.error('Failed to set hourly tier override:', error);
@@ -123,6 +164,7 @@ function CPMCalendar() {
                 [selectedDate]: { multiplier, label }
             };
             const updated = await apiService.updatePricingConfig({ dateOverrides: updatedOverrides });
+            pricingService.updateConfig(updated);
             setPricingConfig(updated);
         } catch (error) {
             console.error('Failed to set date override:', error);
@@ -134,6 +176,7 @@ function CPMCalendar() {
             const currentOverrides = { ...(pricingConfig.dateOverrides || {}) };
             delete currentOverrides[selectedDate];
             const updated = await apiService.updatePricingConfig({ dateOverrides: currentOverrides });
+            pricingService.updateConfig(updated);
             setPricingConfig(updated);
         } catch (error) {
             console.error('Failed to clear date override:', error);
@@ -149,6 +192,7 @@ function CPMCalendar() {
                 currentOverrides[retailerId] = { baseCPM };
             }
             const updated = await apiService.updatePricingConfig({ retailerOverrides: currentOverrides });
+            pricingService.updateConfig(updated);
             setPricingConfig(updated);
         } catch (error) {
             console.error('Failed to update retailer override:', error);
@@ -157,7 +201,9 @@ function CPMCalendar() {
 
     // Generate calendar days for current month
     const getCalendarDays = () => {
-        const selected = new Date(selectedDate);
+        // Parse YYYY-MM-DD explicitly to avoid UTC conversion
+        const [y, m, d] = selectedDate.split('-').map(Number);
+        const selected = new Date(y, m - 1, d);
         const year = selected.getFullYear();
         const month = selected.getMonth();
         const firstDay = new Date(year, month, 1);
@@ -177,7 +223,7 @@ function CPMCalendar() {
                 date: dateStr,
                 hasOverride: !!(pricingConfig?.dateOverrides?.[dateStr]),
                 isSelected: dateStr === selectedDate,
-                isToday: dateStr === new Date().toISOString().split('T')[0]
+                isToday: dateStr === new Date().toLocaleDateString('en-CA')
             });
         }
 
@@ -195,10 +241,13 @@ function CPMCalendar() {
     }
 
     const calendarDays = getCalendarDays();
-    const currentMonth = new Date(selectedDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    // Parse selectedDate locally to avoid UTC offset
+    const [selY, selM] = selectedDate.split('-').map(Number);
+    const currentMonth = new Date(selY, selM - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="space-y-8 animate-in fade-in duration-500 relative group/main">
+            <LayoutTag name="main-section" position="top-left" />
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -224,8 +273,10 @@ function CPMCalendar() {
             </div>
 
             {/* Stats Row */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <GlassCard className="border-l-4 border-l-primary">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative group/stats">
+                <LayoutTag name="stats-row" position="top-right" />
+                <GlassCard className="border-l-4 border-l-primary relative group/base">
+                    <LayoutTag name="col:base-cpm" position="bottom-left" />
                     <p className="text-sm font-medium text-slate-500 mb-1">Base CPM</p>
                     <div className="flex items-end justify-between">
                         {editMode ? (
@@ -300,34 +351,38 @@ function CPMCalendar() {
                 </GlassCard>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative group/calendar-row">
+                <LayoutTag name="calendar-details-row" position="top-right" />
                 {/* Calendar */}
-                <GlassCard className="lg:col-span-1">
+                <GlassCard className="lg:col-span-1 relative group/cal">
+                    <LayoutTag name="col:calendar" position="bottom-left" />
                     <h3 className="font-bold text-lg mb-4">{currentMonth}</h3>
 
                     {/* Month navigation */}
                     <div className="flex items-center justify-between mb-4">
                         <button
                             onClick={() => {
-                                const d = new Date(selectedDate);
+                                const [y, m, day] = selectedDate.split('-').map(Number);
+                                const d = new Date(y, m - 1, day);
                                 d.setMonth(d.getMonth() - 1);
-                                setSelectedDate(d.toISOString().split('T')[0]);
+                                setSelectedDate(d.toLocaleDateString('en-CA'));
                             }}
                             className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
                         >
                             <span className="material-symbols-outlined">chevron_left</span>
                         </button>
                         <button
-                            onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
+                            onClick={() => setSelectedDate(new Date().toLocaleDateString('en-CA'))}
                             className="text-sm text-primary hover:underline"
                         >
                             Today
                         </button>
                         <button
                             onClick={() => {
-                                const d = new Date(selectedDate);
+                                const [y, m, day] = selectedDate.split('-').map(Number);
+                                const d = new Date(y, m - 1, day);
                                 d.setMonth(d.getMonth() + 1);
-                                setSelectedDate(d.toISOString().split('T')[0]);
+                                setSelectedDate(d.toLocaleDateString('en-CA'));
                             }}
                             className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
                         >
@@ -370,7 +425,7 @@ function CPMCalendar() {
                     {/* Quick Override Buttons */}
                     <div className="mt-6 space-y-2">
                         <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-                            Quick Override for {new Date(selectedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            Quick Override for {(() => { const [y, m, d] = selectedDate.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); })()}
                         </p>
                         <div className="grid grid-cols-2 gap-2">
                             <button
@@ -402,10 +457,11 @@ function CPMCalendar() {
                 </GlassCard>
 
                 {/* Hourly Breakdown */}
-                <GlassCard className="lg:col-span-2">
+                <GlassCard className="lg:col-span-2 relative group/hourly">
+                    <LayoutTag name="col:hourly-breakdown" position="bottom-right" />
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="font-bold text-lg">
-                            Hourly Pricing - {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                            Hourly Pricing - {(() => { const [y, m, d] = selectedDate.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }); })()}
                         </h3>
                         {dateOverride && (
                             <span className="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
@@ -463,7 +519,8 @@ function CPMCalendar() {
             </div>
 
             {/* Retailer Overrides */}
-            <GlassCard>
+            <GlassCard className="relative group/retailer">
+                <LayoutTag name="retailer-overrides" position="top-left" />
                 <h3 className="font-bold text-lg mb-4">Retailer Pricing Overrides</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {retailers.map(retailer => {
@@ -512,7 +569,8 @@ function CPMCalendar() {
             </GlassCard>
 
             {/* Traffic Tier Configuration */}
-            <GlassCard>
+            <GlassCard className="relative group/tiers">
+                <LayoutTag name="traffic-tiers-config" position="bottom-right" />
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold text-lg">Traffic Tier Configuration</h3>
                     {!tierEditMode ? (

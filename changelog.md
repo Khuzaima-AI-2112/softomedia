@@ -23,6 +23,18 @@ Objectives: Document changes and progress milestones throughout the project life
 - [Feat] Integrated `ErrorBoundary` to report client-side crashes to backend.
 - [Tests] Local regression suite run for health check.
 
+## [2026-01-11] - CPM Pricing Stability & Reactive Updates
+### Fixed
+- **Pricing Synchronization**: Resolved gap where `PricingService` singleton held stale state. Base CPM and Tiers now update table values immediately.
+- **Data Hygiene**: Sanitized `PricingRepository` to prevent `snake_case` pollution in Firestore keys.
+
+### Added
+- **Reactive Pricing Engine**: Implemented synchronous recalculation of "Avg Slot CPM" for all triggers:
+    - Global Base CPM updates
+    - Traffic Tier Multiplier changes
+    - Hourly Tier Override selections
+- **Super Admin Layout Tags**: Added non-overlapping visual labels to `CPMCalendar` to assist with structural debugging.
+
 ## [2026-01-03] - UI & Orchestration Improvements (Sprint 7) - DEPLOYED
 - **Status**: Production Deployment Successful (Build ID: `321ae9ca`...)
 - **Services**: `client-app` and `ad-server` updated on Cloud Run.

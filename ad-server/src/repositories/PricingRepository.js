@@ -74,8 +74,10 @@ class PricingRepositoryClass extends BaseRepository {
 
     /**
      * Update pricing configuration
+     * @param {object} updates - Config updates
+     * @param {boolean} clearOverridesOnBaseCPMChange - If true, clear retailerOverrides when baseCPM changes
      */
-    async updateConfig(updates) {
+    async updateConfig(updates, clearOverridesOnBaseCPMChange = true) {
         const existing = await this.getConfig();
 
         // Map any incoming snake_case updates to camelCase
@@ -85,10 +87,26 @@ class PricingRepositoryClass extends BaseRepository {
         if (updates.date_overrides !== undefined) { normalizedUpdates.dateOverrides = updates.date_overrides; delete normalizedUpdates.date_overrides; }
         if (updates.retailer_overrides !== undefined) { normalizedUpdates.retailerOverrides = updates.retailer_overrides; delete normalizedUpdates.retailer_overrides; }
 
+        // FIX: If baseCPM is changing and clearOverrides is enabled, clear retailerOverrides
+        if (normalizedUpdates.baseCPM !== undefined &&
+            normalizedUpdates.baseCPM !== existing.baseCPM &&
+            clearOverridesOnBaseCPMChange) {
+            console.log('[PricingRepository] baseCPM changed - clearing retailerOverrides to prevent stale data');
+            normalizedUpdates.retailerOverrides = {};
+        }
+
         const finalConfig = {
             ...existing,
-            ...normalizedUpdates
+            ...normalizedUpdates,
+            updatedAt: new Date().toISOString()
         };
+
+        // Cleanup: remove any legacy snake_case keys that might have been merged in
+        // or were already present and now have camelCase equivalents
+        const keysToRemove = ['base_cpm', 'traffic_tiers', 'date_overrides', 'retailer_overrides', 'slot_duration', 'slots_per_loop'];
+        keysToRemove.forEach(key => {
+            if (finalConfig[key] !== undefined) delete finalConfig[key];
+        });
 
         return await this.update('global', finalConfig);
     }
