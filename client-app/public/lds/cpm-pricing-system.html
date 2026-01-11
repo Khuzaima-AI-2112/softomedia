@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPM Pricing System - SoftoMedia</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #ffffff;
+            color: #1e293b;
+            line-height: 1.6;
+            padding: 40px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #0f172a;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 32px 0 16px;
+            color: #1e40af;
+            border-bottom: 2px solid #dbeafe;
+            padding-bottom: 8px;
+        }
+
+        h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 24px 0 12px;
+            color: #334155;
+        }
+
+        p {
+            margin-bottom: 12px;
+        }
+
+        .subtitle {
+            color: #64748b;
+            font-size: 1rem;
+            margin-bottom: 32px;
+        }
+
+        .card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 16px 0;
+        }
+
+        .card-success {
+            background: #f0fdf4;
+            border-color: #86efac;
+        }
+
+        .card-warning {
+            background: #fffbeb;
+            border-color: #fde047;
+        }
+
+        .card-error {
+            background: #fef2f2;
+            border-color: #fca5a5;
+        }
+
+        .card-info {
+            background: #eff6ff;
+            border-color: #93c5fd;
+        }
+
+        .formula {
+            background: #1e293b;
+            color: #f1f5f9;
+            padding: 16px 24px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1rem;
+            margin: 16px 0;
+            text-align: center;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        th {
+            background: #f1f5f9;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #f8fafc;
+        }
+
+        code {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-green {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge-red {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .badge-blue {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        ul {
+            margin: 12px 0 12px 24px;
+        }
+
+        li {
+            margin: 8px 0;
+        }
+
+        .golden-rule {
+            background: linear-gradient(135deg, #fef9c3, #fef3c7);
+            border: 2px solid #f59e0b;
+            padding: 24px;
+            border-radius: 12px;
+            margin: 24px 0;
+            text-align: center;
+        }
+
+        .golden-rule p {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #92400e;
+            margin: 0;
+        }
+
+        .timestamp {
+            color: #94a3b8;
+            font-size: 0.85rem;
+        }
+
+        @media print {
+            body {
+                padding: 20px;
+            }
+
+            .card {
+                break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h1>📊 CPM Pricing System</h1>
+    <p class="subtitle">SoftoMedia Ad Network - Technical Documentation</p>
+    <p class="timestamp">Last Updated: January 11, 2026</p>
+
+    <!-- Section 1: The Formula -->
+    <h2>1. CPM Calculation Formula</h2>
+    <p>The final slot price is calculated using only <strong>visible multipliers</strong> from the Super Admin UI:</p>
+
+    <div class="formula">
+        Slot Price = Base CPM × Traffic Tier × Date Override
+    </div>
+
+    <table>
+        <tr>
+            <th>Factor</th>
+            <th>UI Location</th>
+            <th>Range</th>
+            <th>Example</th>
+        </tr>
+        <tr>
+            <td><strong>Base CPM</strong></td>
+            <td>Header card (pencil icon)</td>
+            <td>$0.01 - $100</td>
+            <td>$12.00</td>
+        </tr>
+        <tr>
+            <td><strong>Traffic Tier</strong></td>
+            <td>Hourly dropdown</td>
+            <td>0.5x - 1.5x</td>
+            <td>1.0x (Medium)</td>
+        </tr>
+        <tr>
+            <td><strong>Date Override</strong></td>
+            <td>Date Override section</td>
+            <td>0.5x - 2.0x</td>
+            <td>1.0x (No override)</td>
+        </tr>
+    </table>
+
+    <h3>Traffic Tier Multipliers</h3>
+    <table>
+        <tr>
+            <th>Tier</th>
+            <th>Multiplier</th>
+            <th>Hours</th>
+            <th>Example ($12 Base)</th>
+        </tr>
+        <tr>
+            <td><span class="badge badge-blue">Very Low</span></td>
+            <td>0.5x</td>
+            <td>8-9 AM, 8-9 PM</td>
+            <td>$6.00</td>
+        </tr>
+        <tr>
+            <td><span class="badge badge-blue">Low</span></td>
+            <td>0.75x</td>
+            <td>10-11 AM, 7 PM</td>
+            <td>$9.00</td>
+        </tr>
+        <tr>
+            <td><span class="badge badge-green">Medium</span></td>
+            <td>1.0x</td>
+            <td>2-4 PM</td>
+            <td>$12.00</td>
+        </tr>
+        <tr>
+            <td><span class="badge badge-green">High</span></td>
+            <td>1.5x</td>
+            <td>12-1 PM, 5-6 PM</td>
+            <td>$18.00</td>
+        </tr>
+    </table>
+
+    <!-- Section 2: The Bug -->
+    <h2>2. The CPM Bug (January 2026)</h2>
+
+    <div class="card card-error">
+        <h3>🐛 Symptom</h3>
+        <p>Setting Base CPM to <strong>$12.00</strong> showed <strong>$11.00</strong> for Medium tier instead of $12.00.
+        </p>
+    </div>
+
+    <h3>Root Causes (Two Issues)</h3>
+
+    <div class="card">
+        <h3>Issue 1: Stale Retailer Overrides</h3>
+        <p><strong>Problem:</strong> Old <code>retailerOverrides</code> in the database were dragging down the average.
+        </p>
+        <p><strong>Math:</strong> <code>(12 + 12 + 12 + 8) ÷ 4 = $11.00</code></p>
+        <p>One screen had a $8.00 override that wasn't cleared when Base CPM changed.</p>
+    </div>
+
+    <div class="card">
+        <h3>Issue 2: Hidden Store Traffic Multiplier</h3>
+        <p><strong>Problem:</strong> A <code>storeTrafficMultiplier</code> (1.25x for high-traffic stores) was applied
+            but NOT visible in the UI.</p>
+        <p><strong>Result:</strong> After fixing Issue 1, Medium showed $13.50 (12 × 1.125 average) instead of $12.00.
+        </p>
+    </div>
+
+    <!-- Section 3: The Fix -->
+    <h2>3. How We Fixed It</h2>
+
+    <div class="card card-success">
+        <h3>✅ Fix 1: Clear Overrides on Base CPM Change</h3>
+        <p>Backend now clears <code>retailerOverrides = {}</code> when Base CPM is updated.</p>
+        <p><strong>File:</strong> <code>ad-server/src/repositories/PricingRepository.js</code></p>
+    </div>
+
+    <div class="card card-success">
+        <h3>✅ Fix 2: Force Refresh After Update</h3>
+        <p>Frontend calls <code>pricingService.init(true)</code> after any pricing update to force a full refresh from
+            the database.</p>
+        <p><strong>File:</strong> <code>client-app/src/services/PricingService.js</code></p>
+    </div>
+
+    <div class="card card-success">
+        <h3>✅ Fix 3: Removed Hidden Multiplier</h3>
+        <p>Removed <code>storeTrafficMultiplier</code> from calculations entirely. Only visible factors are used.</p>
+        <p><strong>Before:</strong> <code>Price = Base × Tier × Date × StoreTraffic</code></p>
+        <p><strong>After:</strong> <code>Price = Base × Tier × Date</code></p>
+    </div>
+
+    <!-- Section 4: The Golden Rule -->
+    <h2>4. Prevention Rules</h2>
+
+    <div class="golden-rule">
+        <p>🏆 THE GOLDEN RULE</p>
+        <p style="font-size: 1.5rem; margin-top: 12px;">"If the user can't see it, the user can't debug it."</p>
+    </div>
+
+    <h3>Rules for Changing CPM</h3>
+    <ul>
+        <li><strong>Always use the Super Admin UI</strong> to change Base CPM - never direct database edits.</li>
+        <li><strong>All overrides are cleared</strong> when Base CPM changes - this is intentional to prevent stale
+            data.</li>
+        <li><strong>Refresh the page</strong> after saving to see updated calculations.</li>
+        <li><strong>Check the console</strong> for <code>[PricingService]</code> logs to verify correct values.</li>
+    </ul>
+
+    <h3>Rules for Adding New Multipliers</h3>
+    <div class="card card-warning">
+        <p><strong>⚠️ Before adding ANY new pricing factor, answer these questions:</strong></p>
+        <ul>
+            <li>Is there a UI element showing this multiplier's current value?</li>
+            <li>Can the Super Admin edit this value directly?</li>
+            <li>Is the multiplier's effect explained in a tooltip or label?</li>
+            <li>Is it documented in <code>docs/CPM_PRICING_MODEL.md</code>?</li>
+        </ul>
+        <p>If ANY answer is "No", do NOT implement the multiplier until the UI is ready.</p>
+    </div>
+
+    <!-- Section 5: Quick Reference -->
+    <h2>5. Quick Reference</h2>
+
+    <table>
+        <tr>
+            <th>Action</th>
+            <th>Expected Result</th>
+        </tr>
+        <tr>
+            <td>Set Base CPM to $10</td>
+            <td>Medium = $10.00, High = $15.00</td>
+        </tr>
+        <tr>
+            <td>Set Base CPM to $12</td>
+            <td>Medium = $12.00, High = $18.00</td>
+        </tr>
+        <tr>
+            <td>Set Base CPM to $15</td>
+            <td>Medium = $15.00, High = $22.50</td>
+        </tr>
+    </table>
+
+    <h3>Related Files</h3>
+    <table>
+        <tr>
+            <th>File</th>
+            <th>Purpose</th>
+        </tr>
+        <tr>
+            <td><code>client-app/src/services/PricingService.js</code></td>
+            <td>Frontend calculation logic</td>
+        </tr>
+        <tr>
+            <td><code>client-app/src/pages/admin/CPMCalendar.jsx</code></td>
+            <td>Super Admin UI</td>
+        </tr>
+        <tr>
+            <td><code>ad-server/src/repositories/PricingRepository.js</code></td>
+            <td>Backend data persistence</td>
+        </tr>
+        <tr>
+            <td><code>.agent/workflows/pricing-visibility.md</code></td>
+            <td>Prevention workflow</td>
+        </tr>
+        <tr>
+            <td><code>docs/CPM_PRICING_MODEL.md</code></td>
+            <td>Formula documentation</td>
+        </tr>
+    </table>
+
+    <div class="card card-info" style="margin-top: 32px;">
+        <p><strong>📋 Workflow Command:</strong> Run <code>/pricing-visibility</code> before implementing any new
+            pricing factor.</p>
+    </div>
+
+    <p style="margin-top: 48px; color: #94a3b8; font-size: 0.85rem; text-align: center;">
+        SoftoMedia Ad Network • Lifecycle Design System • v2026.01.11
+    </p>
+</body>
+
+</html>

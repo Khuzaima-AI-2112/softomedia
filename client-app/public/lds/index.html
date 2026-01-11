@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lifecycle Design System - SoftoMedia</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #ffffff;
+            color: #1e293b;
+            line-height: 1.6;
+            padding: 40px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #64748b;
+            font-size: 1.1rem;
+            margin-bottom: 40px;
+        }
+
+        h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #475569;
+            margin: 32px 0 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 24px;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.2s ease;
+            display: block;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+            border-color: #3b82f6;
+        }
+
+        .card h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1e40af;
+            margin-bottom: 8px;
+        }
+
+        .card p {
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+
+        .card .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-top: 12px;
+        }
+
+        .badge-architecture {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .badge-sre {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge-training {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-pricing {
+            background: #fce7f3;
+            color: #9d174d;
+        }
+
+        .badge-process {
+            background: #e0e7ff;
+            color: #4338ca;
+        }
+
+        .timestamp {
+            color: #94a3b8;
+            font-size: 0.85rem;
+            margin-top: 48px;
+            text-align: center;
+        }
+
+        .header-icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header-icon">📚</div>
+    <h1>Lifecycle Design System</h1>
+    <p class="subtitle">SoftoMedia Ad Network - Technical Documentation Hub</p>
+
+    <h2>📐 Architecture & Design</h2>
+    <div class="grid">
+        <a href="architecture_overview.html" class="card">
+            <h3>Architecture Overview</h3>
+            <p>System architecture, component diagrams, and technology stack overview.</p>
+            <span class="badge badge-architecture">Architecture</span>
+        </a>
+        <a href="evolution.html" class="card">
+            <h3>Platform Evolution</h3>
+            <p>Historical development journey, milestones, and version progression.</p>
+            <span class="badge badge-architecture">Architecture</span>
+        </a>
+        <a href="playlist_architecture_analysis.html" class="card">
+            <h3>Playlist Architecture</h3>
+            <p>Deep dive into playlist system design, data models, and workflows.</p>
+            <span class="badge badge-architecture">Architecture</span>
+        </a>
+    </div>
+
+    <h2>💰 Pricing System</h2>
+    <div class="grid">
+        <a href="cpm-pricing-system.html" class="card">
+            <h3>CPM Pricing System</h3>
+            <p>CPM calculation formula, bug postmortem, and prevention rules.</p>
+            <span class="badge badge-pricing">Pricing</span>
+        </a>
+    </div>
+
+    <h2>🔧 Operations & SRE</h2>
+    <div class="grid">
+        <a href="SRE_INNOVATION_REPORT.html" class="card">
+            <h3>SRE Innovation Report</h3>
+            <p>Site reliability engineering analysis and improvement recommendations.</p>
+            <span class="badge badge-sre">SRE</span>
+        </a>
+        <a href="CMM.html" class="card">
+            <h3>Capability Maturity Model</h3>
+            <p>Process maturity assessment and organizational capability levels.</p>
+            <span class="badge badge-process">Process</span>
+        </a>
+    </div>
+
+    <h2>📖 Training & Guides</h2>
+    <div class="grid">
+        <a href="USER_TRAINING_GUIDE.html" class="card">
+            <h3>User Training Guide</h3>
+            <p>Step-by-step instructions for platform users and administrators.</p>
+            <span class="badge badge-training">Training</span>
+        </a>
+    </div>
+
+    <p class="timestamp">SoftoMedia Ad Network • Lifecycle Design System • Last updated: January 11, 2026</p>
+</body>
+
+</html>
