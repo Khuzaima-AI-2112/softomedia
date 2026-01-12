@@ -11,6 +11,9 @@
 - [x] Create `verify_predeploy.js` script
 - [ ] **Verify Production Release**: Monitor first deploy logs for successful Rules and dynamic CORS injection.
 
+## 🛡️ Security & Vulnerabilities
+- [ ] **Patch High-Severity XSS**: During verification, `/security` identified a high-severity vulnerability in `react-router` (XSS via Open Redirect) within the `client-app`. Run `npm audit fix` or update the dependency in the next cycle.
+
 ## Maintenance & Operations
 - [ ] Implement periodic database synchronization workflow for staging.
 - [ ] Set up automated backup verification using `BackupService.js`.

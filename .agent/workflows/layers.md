@@ -28,5 +28,29 @@ Handles NaN, null, and legacy formats during formatting.
    Get-Content "client-app/src/services/PricingService.js" | Select-String "price === undefined"
    ```
 
+### Layer 1+: Cascading Invalidation (PricingRepository)
+Ensures retailer overrides are cleared when base price changes.
+// turbo
+1b. Verify cascading invalidation:
+   ```powershell
+   Get-Content "ad-server/src/repositories/PricingRepository.js" | Select-String "clearOverridesToPreventGhostPrices"
+   ```
+
+### Layer 2+: Reactive Pulse (CPMCalendar)
+Ensures UI state refreshes immediately after any pricing update.
+// turbo
+2b. Verify pricingService refresh in calendar:
+   ```powershell
+   Get-Content "client-app/src/pages/admin/CPMCalendar.jsx" | Select-String "pricingService.init\(true\)"
+   ```
+
+### Layer 3+: Schema Enforcement (PricingSchema)
+Validates data integrity against Zod definitions.
+// turbo
+3b. Run schema verification:
+   ```powershell
+   node ad-server/scripts/verify_schema.js --local
+   ```
+
 ### Summary Check
-If all greps return matching lines, the 3-layer defense is active and healthy.
+If all greps return matching lines and the schema script passes, the pricing system is highly resilient.

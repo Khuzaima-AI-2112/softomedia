@@ -103,6 +103,57 @@ class PricingService {
     }
 
     /**
+     * Calculate slot price based on base CPM and active multipliers
+     */
+    calculateSlotPrice(hour, date, retailerId = null) {
+        if (!this.config) return null;
+
+        // 1. Determine Base CPM (Check for Retailer Override first)
+        let baseCPM = this.config.baseCPM;
+        if (retailerId && this.config.retailerOverrides?.[retailerId]?.baseCPM) {
+            baseCPM = this.config.retailerOverrides[retailerId].baseCPM;
+            console.log(`[PricingService] Applying Retailer Override for ${retailerId}: $${baseCPM}`);
+        }
+
+        // 2. Get Traffic Tier Multiplier
+        let tierMultiplier = 1.0;
+        const tier = this.getTrafficTier(hour, date); // Use getTrafficTier to get the full tier object
+        if (tier) {
+            tierMultiplier = tier.multiplier;
+        }
+
+        // 3. Get Date Override Multiplier
+        let dateMultiplier = 1.0;
+        const dateKey = this._formatDateKey(date); // Assuming _formatDateKey exists or will be added
+        const dateOverride = this.config.dateOverrides?.[dateKey];
+        if (dateOverride) {
+            dateMultiplier = dateOverride.multiplier;
+        }
+
+        // 4. Calculate Final Price
+        // LAYER 3: Removed hidden multipliers (storeTrafficMultiplier)
+        const finalPrice = baseCPM * tierMultiplier * dateMultiplier;
+
+        // Log calculation details
+        console.log(`[PricingService] Slot Calculation: $${baseCPM} (Base) * ${tierMultiplier}x (Tier: ${tier.key}) * ${dateMultiplier}x (Date: ${dateKey}) = $${finalPrice.toFixed(2)}`);
+
+        return finalPrice;
+    }
+
+    /**
+     * Helper to format date string for consistent key access
+     * @param {string} date - ISO date string (YYYY-MM-DD)
+     * @returns {string} Formatted date key
+     */
+    _formatDateKey(date) {
+        // Ensure date is in YYYY-MM-DD format
+        if (date instanceof Date) {
+            return date.toISOString().split('T')[0];
+        }
+        return date; // Assume it's already in the correct string format
+    }
+
+    /**
      * Get date-specific multiplier for special events/holidays
      * @param {string} date - ISO date string (YYYY-MM-DD)
      * @returns {number} Multiplier (1.0 = no change)

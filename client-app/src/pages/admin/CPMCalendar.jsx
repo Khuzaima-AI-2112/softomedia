@@ -171,6 +171,26 @@ function CPMCalendar() {
         }
     };
 
+    const handleSaveTrafficTier = async (tierKey, updates) => {
+        try {
+            console.log(`[CPM_CALENDAR] Saving tier ${tierKey}...`, updates);
+            const newTiers = { ...pricingConfig.trafficTiers, [tierKey]: { ...pricingConfig.trafficTiers[tierKey], ...updates } };
+            await apiService.updatePricingConfig({ trafficTiers: newTiers });
+
+            // LAYER 2: Secure Reactive Pulse
+            console.log('[CPM_CALENDAR] Refreshing pricing service...');
+            await pricingService.init(true);
+            const updatedConfig = pricingService.getConfig();
+            setPricingConfig(updatedConfig);
+
+            setEditingTier(null);
+            alert('Traffic tier updated successfully');
+        } catch (error) {
+            console.error('Failed to update traffic tier:', error);
+            alert('Failed to update traffic tier');
+        }
+    };
+
     const handleClearDateOverride = async () => {
         try {
             const currentOverrides = { ...(pricingConfig.dateOverrides || {}) };

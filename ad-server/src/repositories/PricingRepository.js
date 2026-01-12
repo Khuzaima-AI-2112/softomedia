@@ -80,18 +80,20 @@ class PricingRepositoryClass extends BaseRepository {
     async updateConfig(updates, clearOverridesOnBaseCPMChange = true) {
         const existing = await this.getConfig();
 
-        // Map any incoming snake_case updates to camelCase
+        // 1. Map any incoming snake_case updates to camelCase
         const normalizedUpdates = { ...updates };
         if (updates.base_cpm !== undefined) { normalizedUpdates.baseCPM = updates.base_cpm; delete normalizedUpdates.base_cpm; }
         if (updates.traffic_tiers !== undefined) { normalizedUpdates.trafficTiers = updates.traffic_tiers; delete normalizedUpdates.traffic_tiers; }
         if (updates.date_overrides !== undefined) { normalizedUpdates.dateOverrides = updates.date_overrides; delete normalizedUpdates.date_overrides; }
         if (updates.retailer_overrides !== undefined) { normalizedUpdates.retailerOverrides = updates.retailer_overrides; delete normalizedUpdates.retailer_overrides; }
 
-        // FIX: If baseCPM is changing and clearOverrides is enabled, clear retailerOverrides
-        if (normalizedUpdates.baseCPM !== undefined &&
-            normalizedUpdates.baseCPM !== existing.baseCPM &&
-            clearOverridesOnBaseCPMChange) {
-            console.log('[PricingRepository] baseCPM changed - clearing retailerOverrides to prevent stale data');
+        // 2. LAYER 1: Cascading Invalidation
+        // If baseCPM is changing and clearOverrides is enabled, clear retailerOverrides
+        const baseCPMChanged = normalizedUpdates.baseCPM !== undefined &&
+            Number(normalizedUpdates.baseCPM) !== Number(existing.baseCPM);
+
+        if (baseCPMChanged && clearOverridesOnBaseCPMChange) {
+            console.log(`[PricingRepository] baseCPM changed from ${existing.baseCPM} to ${normalizedUpdates.baseCPM} - clearing retailerOverrides to prevent ghost prices`);
             normalizedUpdates.retailerOverrides = {};
         }
 
@@ -101,14 +103,14 @@ class PricingRepositoryClass extends BaseRepository {
             updatedAt: new Date().toISOString()
         };
 
-        // Cleanup: remove any legacy snake_case keys that might have been merged in
-        // or were already present and now have camelCase equivalents
+        // 3. Cleanup: ensure strict camelCase normalization
         const keysToRemove = ['base_cpm', 'traffic_tiers', 'date_overrides', 'retailer_overrides', 'slot_duration', 'slots_per_loop'];
         keysToRemove.forEach(key => {
             if (finalConfig[key] !== undefined) delete finalConfig[key];
         });
 
-        return await this.update('global', finalConfig);
+        const result = await this.update('global', finalConfig);
+        return this._normalizeConfig(result); // Return normalized to ensure UI gets camelCase
     }
 
     /**

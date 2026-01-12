@@ -1,0 +1,77 @@
+---
+description: Execute all verification workflows and test suites in a single master test
+---
+
+# Master Verification Workflow (/bigtest)
+
+This workflow aggregates all critical system health checks, security audits, pricing governance, and automated test suites to ensure 100% production-readiness.
+
+## Phase 1: Environment & Project Context
+// turbo
+1. **Check Cloud Project**:
+   ```powershell
+   gcloud config get-value project
+   ```
+   *Expected: softomedia-live-2026*
+
+## Phase 2: Security Audit (/security)
+// turbo
+2. **Dependency & Secret Audit**:
+   ```powershell
+   npm audit --audit-level=high
+   Get-ChildItem -Recurse -Include *.js,*.jsx,*.json,*.yaml -Exclude node_modules,dist | Select-String "JWT_SECRET|API_KEY|PRIVATE_KEY|password"
+   ```
+
+## Phase 3: Operational Hygiene (/hygiene)
+// turbo
+3. **Linting & Log Sanitation**:
+   ```powershell
+   npm run lint
+   Get-ChildItem -Path "ad-server/src", "client-app/src" -Recurse -Include *.js,*.jsx | Select-String "console\.log"
+   ```
+
+## Phase 4: Smoke Test (/smoke-test)
+// turbo
+4. **Liveness & Config Integrity**:
+   ```powershell
+   node verify_predeploy.js
+   ```
+
+## Phase 5: Pricing Governance (/schema, /parity)
+// turbo
+5. **Schema Enforcement**:
+   ```powershell
+   node ad-server/scripts/verify_schema.js --local
+   ```
+// turbo
+6. **Environment Parity**:
+   ```powershell
+   node ad-server/scripts/parity_audit.js
+   ```
+
+## Phase 6: Defense-in-Depth (/layers)
+// turbo
+7. **Verify Pricing Layers**:
+   ```powershell
+   # Layer 1: Normalization
+   Get-Content "ad-server/src/repositories/PricingRepository.js" | Select-String "baseCPM"
+   # Layer 2: Frontend Resilience
+   Get-Content "client-app/src/pages/admin/CPMCalendar.jsx" | Select-String "pricingConfig?\."
+   # Layer 3: Robust Formatting
+   Get-Content "client-app/src/services/PricingService.js" | Select-String "price === undefined"
+   ```
+
+## Phase 7: Automated Testing (Unit & E2E)
+// turbo
+8. **Backend Unit Tests**:
+   ```powershell
+   cd ad-server; npm run test
+   ```
+// turbo
+9. **Integration / E2E Tests**:
+   ```powershell
+   npm run test:e2e
+   ```
+
+## Summary
+If every phase green-lights, the system is verified for security, hygiene, stability, and production-readiness.

@@ -495,5 +495,15 @@ Objectives: Document changes and progress milestones throughout the project life
 - **Verification Data**: Seeded detailed "Prime Time" ads for 07:00 PM to facilitate immediate test verification.
 - **Observability**: Enhanced `TODO.md` with a detailed mapping of the final 19 failures and surgical fix instructions.
 
+## [2026-01-12] - CMP Pricing Cloud Synchronization
+### Fixed
+- **Retailer Override Sync**: Implemented cascading clearing of `retailerOverrides` when global `baseCPM` changes to prevent stale anchors.
+- **Hidden Multiplier Removal**: Stripped legacy `storeTrafficMultiplier` from the pricing engine to ensure 100% calculation transparency.
+- **Frontend State Pulse**: Fixed bug where the Pricing Dashboard showed stale values after a configuration save by forcing a `PricingService` re-initialization.
+
+### Added
+- **SRE Incident Report**: Created `incidents/2026-01-12-cmp-cloud-discrepancy.md` detailing the root causes and cross-environment discrepancies.
+- **Pricing Stability Governance**: Added new standards for "WYSIWYP" pricing in `lessons_learned.md`.
+
 ---
 *Note: This file is a permanent project record. Do not delete or purge entries.*

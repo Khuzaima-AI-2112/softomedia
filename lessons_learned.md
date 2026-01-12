@@ -450,5 +450,33 @@ Objectives: Document errors, bugs, and mistakes so we do not make them again.
 - Created `/pricing-visibility` workflow for future multiplier additions
 - All pricing factors must be visible and editable in Super Admin UI before implementation
 
+### [2026-01-12] Ghost Base CPM & Retailer Override Synchronization
+- **Issue**: Pricing calculations in the cloud were anchored to stale retailer overrides, causing a $1.00 - $1.50 mismatch between UI header ($12) and slot prices ($11).
+- **Root Cause**:
+    1. **State Invalidation Gap**: Global `baseCPM` updates did not automatically clear specific `retailerOverrides` in the database, leading to "zombie" prices from early testing.
+    2. **Hidden Multipliers**: Legacy `storeTrafficMultiplier` (1.25x) was active in calculation logic but hidden from UI, making it impossible for users to debug discrepancies.
+    3. **Singleton Stale-out**: `PricingService` singleton in the frontend failed to refresh internal state after API updates.
+- **Resolution Implementation**:
+    1. **Cascading Invalidation**: Hardened `PricingRepository.updateConfig` to explicitly clear `retailerOverrides` when `baseCPM` changes.
+    2. **Zod Schema Governance**: Introduced `PricingSchema.js` to enforce strict data types and valid multiplier ranges (0.5x - 2.0x).
+    3. **Reactive Pulse**: Instrumented `CPMCalendar.jsx` to force `pricingService.init(true)` on every save operation.
+- **Prevention**:
+    1. **Cascading Invalidation**: Repositories must clear dependent overrides when global anchor values (like base pricing) change.
+    2. **WYSIWYP Principle**: "What You See Is What You Price." All multipliers must be visible in the Super Admin UI.
+    3. **Reactive Pulse**: Force `init(true)` on all service singletons after state-changing API operations.
+
+## [2026-01-12] - CMP Pricing Resilience Hardening
+### Fixed
+- **Retailer Override Sync**: Hardened `PricingRepository` with explicit `clearOverridesOnBaseCPMChange` logic to eliminate "ghost" prices.
+- **Hidden Multiplier Removal**: Stripped legacy `storeTrafficMultiplier` from the pricing engine; implemented explicit calculation logging for 100% transparency.
+- **Frontend State Pulse**: Refactored `CPMCalendar` to force `PricingService` re-initialization on every save (Base CPM, Tiers, Overrides).
+
+### Added
+- **Governance Workflows**: 
+    - `/schema`: Automated Zod validation for pricing configuration.
+    - `/parity`: Environment audit tool to detect drift between local and cloud.
+- **SRE Tooling**: Created `scripts/verify_schema.js` and `scripts/parity_audit.js` for CI/CD and manual audits.
+- **SRE Incident Report**: Finalized `incidents/2026-01-12-cmp-cloud-discrepancy.md`.
+
 ---
 *Note: This file is a permanent project record. Do not delete or purge entries.*

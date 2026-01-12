@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Workflows & Command History - SoftoMedia</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #ffffff;
+            color: #1e293b;
+            line-height: 1.6;
+            padding: 40px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #0f172a;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 32px 0 16px;
+            color: #1e40af;
+            border-bottom: 2px solid #dbeafe;
+            padding-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #64748b;
+            font-size: 1rem;
+            margin-bottom: 32px;
+        }
+
+        .timeline {
+            position: relative;
+            padding: 20px 0;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 20px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #e2e8f0;
+        }
+
+        .event {
+            position: relative;
+            padding-left: 60px;
+            margin-bottom: 40px;
+        }
+
+        .event::before {
+            content: '';
+            position: absolute;
+            left: 11px;
+            top: 5px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #3b82f6;
+            border: 4px solid #ffffff;
+            box-shadow: 0 0 0 2px #3b82f6;
+            z-index: 1;
+        }
+
+        .date {
+            font-weight: 700;
+            color: #1e40af;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        .card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .command-tag {
+            display: inline-block;
+            background: #1e293b;
+            color: #f1f5f9;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+        }
+
+        .workflow-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+
+        .workflow-desc {
+            color: #64748b;
+            font-size: 0.95rem;
+            margin-bottom: 16px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+
+        .badge-new {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge-updated {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .timestamp {
+            color: #94a3b8;
+            font-size: 0.85rem;
+            text-align: center;
+            margin-top: 60px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🤖 Agent Workflows & Commands</h1>
+    <p class="subtitle">SoftoMedia Ad Network - Knowledge Synthesis Repository</p>
+
+    <div class="timeline">
+        <!-- Jan 12 Update -->
+        <div class="event">
+            <div class="date">January 12, 2026</div>
+            <div class="card">
+                <div style="margin-bottom: 24px;">
+                    <span class="badge badge-new">New Command</span>
+                    <span class="command-tag">/bigtest</span>
+                    <div class="workflow-title">Master Verification Workflow</div>
+                    <p class="workflow-desc">Composite command aggregating <code>/schema</code>, <code>/parity</code>,
+                        <code>/layers</code>, and all automated test suites (Backend Unit + Playwright E2E).</p>
+                </div>
+
+                <div style="margin-bottom: 24px;">
+                    <span class="badge badge-new">New Command</span>
+                    <span class="command-tag">/schema</span>
+                    <div class="workflow-title">Pricing Schema Enforcement</div>
+                    <p class="workflow-desc">Enforces Zod-based data integrity on the global pricing configuration.
+                        Protects the network against invalid multipliers or malformed pricing payloads.</p>
+                </div>
+
+                <div style="margin-bottom: 24px;">
+                    <span class="badge badge-new">New Command</span>
+                    <span class="command-tag">/parity</span>
+                    <div class="workflow-title">Environment Parity Audit</div>
+                    <p class="workflow-desc">Identifies "drift" between local and Cloud Run configurations. Specifically
+                        targets snake_case vs camelCase inconsistencies and persistent retailer overrides.</p>
+                </div>
+
+                <div style="margin-bottom: 0;">
+                    <span class="badge badge-updated">Updated Command</span>
+                    <span class="command-tag">/layers</span>
+                    <div class="workflow-title">Hardened 3-Layer Defense</div>
+                    <p class="workflow-desc">Expanded to include automated checks for "Cascading Invalidation" (Layer
+                        1+) and "Reactive Pulse" state refreshes (Layer 2+).</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Jan 11 Entry -->
+        <div class="event">
+            <div class="date">January 11, 2026</div>
+            <div class="card">
+                <div style="margin-bottom: 24px;">
+                    <span class="badge badge-new">New Command</span>
+                    <span class="command-tag">/pricing-visibility</span>
+                    <div class="workflow-title">Pricing Visibility Audit</div>
+                    <p class="workflow-desc">Ensures 100% UI transparency for all pricing multipliers. Encapsulates
+                        "What You See Is What You Price" (WYSIWYP) governance.</p>
+                </div>
+
+                <div style="margin-bottom: 0;">
+                    <span class="badge badge-new">New Command</span>
+                    <span class="command-tag">/cloudproject</span>
+                    <div class="workflow-title">Cloud Project Governance</div>
+                    <p class="workflow-desc">Automated context check to ensure all SRE operations are strictly targeted
+                        at <code>softomedia-live-2026</code>.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Jan 10 Entry -->
+        <div class="event">
+            <div class="date">January 10, 2026</div>
+            <div class="card">
+                <span class="command-tag">/sdlc</span>
+                <div class="workflow-title">SDLC Process Orchestration</div>
+                <p class="workflow-desc">Automated execution of numbered SDLC stages (#1 - #12) to ensure
+                    production-readiness across Firestore, Cloud Run, and Secret Manager.</p>
+            </div>
+        </div>
+    </div>
+
+    <p class="timestamp">
+        SoftoMedia Ad Network • Lifecycle Design System • v2026.01.12
+    </p>
+</body>
+
+</html>
