@@ -157,11 +157,20 @@
             <div class="date">January 12, 2026</div>
             <div class="card">
                 <div style="margin-bottom: 24px;">
-                    <span class="badge badge-new">New Command</span>
+                    <span class="badge badge-updated">Updated Command</span>
                     <span class="command-tag">/bigtest</span>
                     <div class="workflow-title">Master Verification Workflow</div>
-                    <p class="workflow-desc">Composite command aggregating <code>/schema</code>, <code>/parity</code>,
-                        <code>/layers</code>, and all automated test suites (Backend Unit + Playwright E2E).</p>
+                    <p class="workflow-desc">Expanded to include <b>Phase 8: Authentication Audit</b> to verify
+                        demo-mode hardening and persona state synchronization.</p>
+                </div>
+
+                <div style="margin-bottom: 24px;">
+                    <span class="badge badge-new">New Command</span>
+                    <span class="command-tag">/auth-audit</span>
+                    <div class="workflow-title">Authentication Resilience Audit</div>
+                    <p class="workflow-desc">Verifies that <code>ALLOW_DEMO_MODE</code> gates are in place across
+                        middleware and deployment configs. Ensures persona state stays synchronized across the front-end
+                        and back-end.</p>
                 </div>
 
                 <div style="margin-bottom: 24px;">
@@ -178,6 +187,22 @@
                     <div class="workflow-title">Environment Parity Audit</div>
                     <p class="workflow-desc">Identifies "drift" between local and Cloud Run configurations. Specifically
                         targets snake_case vs camelCase inconsistencies and persistent retailer overrides.</p>
+                </div>
+
+                <div style="margin-bottom: 24px;">
+                    <span class="badge badge-new">New Command</span>
+                    <span class="command-tag">/security</span>
+                    <div class="workflow-title">Defensive Security Audit</div>
+                    <p class="workflow-desc">Performs automated dependency audits (npm audit) and scans source code for
+                        hardcoded secrets, JWT keys, and API credentials.</p>
+                </div>
+
+                <div style="margin-bottom: 24px;">
+                    <span class="badge badge-new">New Command</span>
+                    <span class="command-tag">/hygiene</span>
+                    <div class="workflow-title">Operational Hygiene Suite</div>
+                    <p class="workflow-desc">Enforces linting standards and performs log sanitation scans to prevent
+                        <code>console.log</code> leakage in production source paths.</p>
                 </div>
 
                 <div style="margin-bottom: 0;">

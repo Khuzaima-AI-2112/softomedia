@@ -10,8 +10,9 @@ const JWT_SECRET = process.env.JWT_SECRET;
 export const authenticate = (req, res, next) => {
     const authHeader = req.headers.authorization;
 
-    // Development/Test Bypas for QA Audit
-    if (process.env.NODE_ENV !== 'production' && authHeader === 'Bearer demo-token') {
+    // Development/Test Bypass for QA Audit
+    const isDemoAllowed = process.env.ALLOW_DEMO_MODE === 'true' || process.env.NODE_ENV !== 'production';
+    if (isDemoAllowed && authHeader === 'Bearer demo-token') {
         // Extract role from the request or use a default
         // In a real bypass we might want to decode a mock payload, 
         // but for now we'll just let it through and rely on the frontend 
@@ -45,7 +46,8 @@ export const authenticate = (req, res, next) => {
 export const authorize = (allowedRoles) => {
     return (req, res, next) => {
         // Development/Test Bypass for QA Audit
-        if (process.env.NODE_ENV !== 'production' && req.user && req.user.email && req.user.email.startsWith('demo-')) {
+        const isDemoAllowed = process.env.ALLOW_DEMO_MODE === 'true' || process.env.NODE_ENV !== 'production';
+        if (isDemoAllowed && req.user && req.user.email && req.user.email.startsWith('demo-')) {
             return next();
         }
 

@@ -73,5 +73,12 @@ This workflow aggregates all critical system health checks, security audits, pri
    npm run test:e2e
    ```
 
+## Phase 8: Authentication Audit (/auth-audit)
+// turbo
+10. **Verify Auth Resilience**:
+    ```powershell
+    /auth-audit
+    ```
+
 ## Summary
 If every phase green-lights, the system is verified for security, hygiene, stability, and production-readiness.

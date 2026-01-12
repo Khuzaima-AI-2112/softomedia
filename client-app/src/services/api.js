@@ -202,7 +202,8 @@ const apiClient = new APIClient();
 // Add auth token interceptor
 apiClient.addRequestInterceptor((url, options) => {
     const token = localStorage.getItem('auth_token');
-    const demoRole = localStorage.getItem('demo_role');
+    // Robust persona detection: use demo_role OR active_persona as fallback
+    const demoRole = localStorage.getItem('demo_role') || localStorage.getItem('active_persona');
 
     if (token) {
         options.headers = {

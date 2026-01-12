@@ -478,5 +478,20 @@ Objectives: Document errors, bugs, and mistakes so we do not make them again.
 - **SRE Tooling**: Created `scripts/verify_schema.js` and `scripts/parity_audit.js` for CI/CD and manual audits.
 - **SRE Incident Report**: Finalized `incidents/2026-01-12-cmp-cloud-discrepancy.md`.
 
+### [2026-01-12] PowerShell vs Bash: Liveness & Smoke Testing
+- **Issue**: Standard `curl` and `sh` commands in workflows fail when executed in local Windows developer shells (PowerShell).
+- **Root Cause**: PowerShell has different syntax for web requests and Boolean logic.
+- **Prevention**: Use `Invoke-RestMethod` for API health checks and ensure local verification scripts (`verify_predeploy.js`) are environment-aware.
+
+### [2026-01-12] Proactive Security Auditing (Five Nines Requirement)
+- **Issue**: High-severity vulnerabilities (e.g., `react-router` XSS) can remain undetected in standard CI/CD pipelines without explicit security phases.
+- **Root Cause**: Reliance on build success and unit tests alone does not catch supply chain risks.
+- **Prevention**: Integrate `npm audit` and secret scanning as a mandatory FIRST phase in the `/bigtest` suite. This prevents pushing compromised dependencies to production.
+
+### [2026-01-12] Persona Switcher and Authorization Header Consistency
+- **Issue**: Administrative API calls (e.g., updating CPM) failed with "Authorization header required" after using the Persona Switcher.
+- **Root Cause**: The Persona Switcher updated the UI role but did not set an `auth_token` in `localStorage`, causing the `apiClient` to omit the required `Authorization` header.
+- **Prevention**: Ensure that `AuthContext.setPersona` automatically initializes a `demo-token` for demo environments to enable backend authorization bypass. Consistent auth state must be maintained across all role transitions.
+
 ---
 *Note: This file is a permanent project record. Do not delete or purge entries.*

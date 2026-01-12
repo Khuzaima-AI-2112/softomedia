@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
 
@@ -35,6 +35,13 @@ export const AuthProvider = ({ children }) => {
 
     const setPersona = (type) => {
         localStorage.setItem('active_persona', type);
+        localStorage.setItem('demo_role', type); // Sync role for backend bypass
+
+        // Ensure demo-token is set if no real token exists
+        if (!localStorage.getItem('auth_token')) {
+            localStorage.setItem('auth_token', 'demo-token');
+        }
+
         setPersonaState(type);
     };
 

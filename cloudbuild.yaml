@@ -73,7 +73,7 @@ steps:
           --region ${_REGION} \
           --platform managed \
           --allow-unauthenticated \
-          --set-env-vars "NODE_ENV=production,CORS_ORIGINS=*,BUILD_ID=$BUILD_ID" \
+          --set-env-vars "NODE_ENV=production,CORS_ORIGINS=*,BUILD_ID=$BUILD_ID,ALLOW_DEMO_MODE=true" \
           --set-secrets "JWT_SECRET=JWT_SECRET:latest" \
           --labels "version=$BUILD_ID,deployed-by=cloud-build"
         

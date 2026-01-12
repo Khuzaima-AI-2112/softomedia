@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import GlassCard from '../../components/GlassCard';
 import TrafficTierBadge from '../../components/TrafficTierBadge';
 import PriceDisplay from '../../components/PriceDisplay';
@@ -14,7 +14,7 @@ const LayoutTag = ({ name, position = 'top-left' }) => {
     };
 
     return (
-        <div className={`absolute ${posClasses[position]} z-10 bg-slate-800 text-white text-[10px] px-1.5 py-0.5 rounded shadow-sm opacity-60 group-hover:opacity-100 pointer-events-none font-mono uppercase tracking-tighter border border-slate-600 whitespace-nowrap`}>
+        <div className={`absolute ${posClasses[position]} z - 10 bg - slate - 800 text - white text - [10px] px - 1.5 py - 0.5 rounded shadow - sm opacity - 60 group - hover: opacity - 100 pointer - events - none font - mono uppercase tracking - tighter border border - slate - 600 whitespace - nowrap`}>
             {name}
         </div>
     );
@@ -33,7 +33,7 @@ const getBusinessHours = () => {
 const formatHour = (hour) => {
     const suffix = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-    return `${displayHour}:00 ${suffix}`;
+    return `${displayHour}:00 ${suffix} `;
 };
 
 function CPMCalendar() {
@@ -48,6 +48,7 @@ function CPMCalendar() {
     const [retailers, setRetailers] = useState([]);
     const [stores, setStores] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [editingTier, setEditingTier] = useState(null);
 
     const businessHours = useMemo(() => getBusinessHours(), []);
 
@@ -237,7 +238,7 @@ function CPMCalendar() {
 
         // Add days of month
         for (let d = 1; d <= lastDay.getDate(); d++) {
-            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const dateStr = `${year} -${String(month + 1).padStart(2, '0')} -${String(d).padStart(2, '0')} `;
             days.push({
                 day: d,
                 date: dateStr,
@@ -427,12 +428,12 @@ function CPMCalendar() {
                                 onClick={() => day && setSelectedDate(day.date)}
                                 disabled={!day}
                                 className={`
-                                    aspect-square flex items-center justify-center text-sm rounded-lg relative
+aspect - square flex items - center justify - center text - sm rounded - lg relative
                                     ${!day ? 'invisible' : ''}
                                     ${day?.isSelected ? 'bg-primary text-white font-bold' : ''}
                                     ${day?.isToday && !day?.isSelected ? 'ring-2 ring-primary' : ''}
                                     ${day && !day.isSelected ? 'hover:bg-slate-100 dark:hover:bg-slate-800' : ''}
-                                `}
+`}
                             >
                                 {day?.day}
                                 {day?.hasOverride && (

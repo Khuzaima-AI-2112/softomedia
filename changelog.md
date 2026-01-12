@@ -495,15 +495,31 @@ Objectives: Document changes and progress milestones throughout the project life
 - **Verification Data**: Seeded detailed "Prime Time" ads for 07:00 PM to facilitate immediate test verification.
 - **Observability**: Enhanced `TODO.md` with a detailed mapping of the final 19 failures and surgical fix instructions.
 
-## [2026-01-12] - CMP Pricing Cloud Synchronization
+## [2026-01-12] - SRE Operational Hardening & Pricing Sync
+### Added
+- **SRE Operational Workflows**:
+    - `/security`: Defensive dependency audits and secret scanning.
+    - `/hygiene`: Linting enforcement and log sanitation.
+    - `/smoke-test`: Pre-deployment liveness and configuration checks.
+- **Enhanced /bigtest Suite**: Reorganized the master verification suite into a 7-phase "Security-First" pipeline.
+- **SRE Tooling**: Added `scripts/verify_schema.js` and `scripts/parity_audit.js` for CI/CD.
+- **Documentation**: Updated `CLI_GUIDE.html` with new operational command center.
+
 ### Fixed
 - **Retailer Override Sync**: Implemented cascading clearing of `retailerOverrides` when global `baseCPM` changes to prevent stale anchors.
 - **Hidden Multiplier Removal**: Stripped legacy `storeTrafficMultiplier` from the pricing engine to ensure 100% calculation transparency.
 - **Frontend State Pulse**: Fixed bug where the Pricing Dashboard showed stale values after a configuration save by forcing a `PricingService` re-initialization.
 
-### Added
-- **SRE Incident Report**: Created `incidents/2026-01-12-cmp-cloud-discrepancy.md` detailing the root causes and cross-environment discrepancies.
-- **Pricing Stability Governance**: Added new standards for "WYSIWYP" pricing in `lessons_learned.md`.
+### Security
+- **React-Router Audit**: Logged high-severity XSS vulnerability in `client-app` for immediate follow-up.
+
+### Deployed
+- **Production Rollout**: Successfully deployed `ad-server` and `client-app` to Cloud Run via `/build`.
+- **Health Verified**: Both services verified healthy on [softomedia-live-2026](https://client-app-kiieh7nmwa-uc.a.run.app).
+
+### [2026-01-12] - Persona Authorization Consistency
+- **Fixed**: Resolved "Authorization header required" error when switching personas. Switch now automatically sets a `demo-token` to enable backend authorization bypass for administrative actions.
+- **Incident Report**: Created `incidents/2026-01-12-auth-header-missing.md` documenting the root cause and resolution.
 
 ---
 *Note: This file is a permanent project record. Do not delete or purge entries.*

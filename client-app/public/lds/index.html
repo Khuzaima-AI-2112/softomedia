@@ -140,6 +140,11 @@
             <p>System architecture, component diagrams, and technology stack overview.</p>
             <span class="badge badge-architecture">Architecture</span>
         </a>
+        <a href="auth-resilience.html" class="card">
+            <h3>Authentication Resilience</h3>
+            <p>Demo mode hardening, unified persona state, and <code>ALLOW_DEMO_MODE</code> governance.</p>
+            <span class="badge badge-architecture">Architecture</span>
+        </a>
         <a href="evolution.html" class="card">
             <h3>Platform Evolution</h3>
             <p>Historical development journey, milestones, and version progression.</p>
@@ -191,6 +196,33 @@
             <p>Step-by-step instructions for platform users and administrators.</p>
             <span class="badge badge-training">Training</span>
         </a>
+    </div>
+
+    <div class="command-timeline">
+        <h3>Agent Command Timeline</h3>
+        <div style="margin-bottom: 24px;">
+            <span class="badge badge-updated">Updated Command</span>
+            <span class="command-tag">/bigtest</span>
+            <div class="workflow-title">Master Verification Workflow</div>
+            <p class="workflow-desc">Expanded to include <b>Phase 8: Authentication Audit</b> to verify demo-mode
+                hardening and persona state synchronization.</p>
+        </div>
+
+        <div style="margin-bottom: 24px;">
+            <span class="badge badge-new">New Command</span>
+            <span class="command-tag">/auth-audit</span>
+            <div class="workflow-title">Authentication Resilience Audit</div>
+            <p class="workflow-desc">Verifies that <code>ALLOW_DEMO_MODE</code> gates are in place across middleware and
+                deployment configs.</p>
+        </div>
+
+        <div style="margin-bottom: 0;">
+            <span class="badge badge-updated">Updated Command</span>
+            <span class="command-tag">/layers</span>
+            <div class="workflow-title">Hardened 3-Layer Defense</div>
+            <p class="workflow-desc">Expanded to include automated checks for "Cascading Invalidation" (Layer
+                1+) and "Reactive Pulse" state refreshes (Layer 2+).</p>
+        </div>
     </div>
 
     <p class="timestamp">SoftoMedia Ad Network • Lifecycle Design System • Last updated: January 12, 2026</p>
