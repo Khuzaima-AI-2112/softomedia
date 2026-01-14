@@ -192,7 +192,7 @@
 <body>
     <h1>📊 CPM Pricing System</h1>
     <p class="subtitle">SoftoMedia Ad Network - Technical Documentation</p>
-    <p class="timestamp">Last Updated: January 11, 2026</p>
+    <p class="timestamp">Last Updated: January 14, 2026</p>
 
     <!-- Section 1: The Formula -->
     <h2>1. CPM Calculation Formula</h2>
@@ -296,7 +296,8 @@
     <div class="card card-success">
         <h3>✅ Fix 1: Cascading Invalidation (Layer 1+)</h3>
         <p>Backend repository now enforces <code>clearOverridesOnBaseCPMChange = true</code>. This automatically purges
-            <code>retailerOverrides</code> whenever the global base price is modified.</p>
+            <code>retailerOverrides</code> whenever the global base price is modified.
+        </p>
         <p><strong>File:</strong> <code>ad-server/src/repositories/PricingRepository.js</code></p>
     </div>
 
@@ -313,10 +314,10 @@
         <p><strong>Standard:</strong> WYSIWYP (What You See Is What You Price).</p>
     </div>
 
-    <div class="card card-info">
-        <h3>🛡️ Fix 4: Schema Governance</h3>
-        <p>Introduced Zod-based schema enforcement to validate pricing data integrity across environments.</p>
-        <p><strong>Command:</strong> <code>/schema</code></p>
+    <h3>🛡️ Fix 4: Schema Governance</h3>
+    <p>Introduced Zod-based schema enforcement to validate pricing data integrity across environments.</p>
+    <p><strong>Versioning:</strong> Schema changes are tracked via <code>schemaVersion</code>.</p>
+    <p><strong>Command:</strong> <code>/schema</code></p>
     </div>
 
     <!-- Section 4: The Golden Rule -->

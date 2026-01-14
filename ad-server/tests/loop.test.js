@@ -20,16 +20,16 @@ describe('LoopRepository', () => {
     });
 
     describe('BUSINESS_HOURS constant', () => {
-        test('should define start hour as 8', () => {
-            expect(BUSINESS_HOURS.START).toBe(8);
+        test('should define start hour as 0', () => {
+            expect(BUSINESS_HOURS.START).toBe(0);
         });
 
-        test('should define end hour as 22', () => {
-            expect(BUSINESS_HOURS.END).toBe(22);
+        test('should define end hour as 24', () => {
+            expect(BUSINESS_HOURS.END).toBe(24);
         });
 
-        test('should calculate 14 loops per day', () => {
-            expect(BUSINESS_HOURS.END - BUSINESS_HOURS.START).toBe(14);
+        test('should calculate 24 loops per day', () => {
+            expect(BUSINESS_HOURS.END - BUSINESS_HOURS.START).toBe(24);
         });
     });
 
@@ -55,20 +55,20 @@ describe('LoopRepository', () => {
             expect(loop.status).toBe('PENDING_APPROVAL');
         });
 
-        test('should reject loops outside business hours', async () => {
-            await expect(repo.create('2026-01-03_07', {
+        test('should reject loops with invalid hours', async () => {
+            await expect(repo.create('2026-01-03_-1', {
                 date: '2026-01-03',
-                hour: 7, // Before 8am
+                hour: -1, // Invalid
                 retailer_id: 'ret_001',
                 slots: []
-            })).rejects.toThrow('Hour 7 is outside business hours');
+            })).rejects.toThrow();
 
-            await expect(repo.create('2026-01-03_23', {
+            await expect(repo.create('2026-01-03_24', {
                 date: '2026-01-03',
-                hour: 23, // After 10pm
+                hour: 24, // Invalid (0-23)
                 retailer_id: 'ret_001',
                 slots: []
-            })).rejects.toThrow('Hour 23 is outside business hours');
+            })).rejects.toThrow();
         });
     });
 

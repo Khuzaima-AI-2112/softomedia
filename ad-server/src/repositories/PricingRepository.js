@@ -5,6 +5,7 @@ import { BaseRepository } from './BaseRepository.js';
 
 // Default pricing config
 const DEFAULT_PRICING = {
+    schemaVersion: 1,
     baseCPM: 15.00,
     currency: 'USD',
     slotDuration: 5,
@@ -31,6 +32,7 @@ class PricingRepositoryClass extends BaseRepository {
 
         // Root level
         normalized.id = data.id;
+        normalized.schemaVersion = data.schemaVersion || data.schema_version || 1;
         normalized.baseCPM = data.baseCPM || data.base_cpm || DEFAULT_PRICING.baseCPM;
         normalized.currency = data.currency || data.currency || DEFAULT_PRICING.currency;
         normalized.slotDuration = data.slotDuration || data.slot_duration || DEFAULT_PRICING.slotDuration;
