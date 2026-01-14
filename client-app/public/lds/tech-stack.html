@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Technology Stack | SoftoMedia</title>
+    <!-- Tufte CSS via CDN for reliability and high-quality typography -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tufte-css/1.8.0/tufte.min.css" />
+    <style>
+        body {
+            width: 90%;
+            max-width: 1200px;
+            padding-left: 5%;
+        }
+
+        section {
+            padding: 2rem 0;
+            border-bottom: 1px solid #efefef;
+        }
+
+        .category-title {
+            color: #1e40af;
+            font-weight: 700;
+            margin-top: 2rem;
+        }
+
+        .stack-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+
+        .stack-item {
+            background: #f8fafc;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .stack-item h3 {
+            margin-top: 0;
+            font-size: 1.2rem;
+            color: #0f172a;
+        }
+
+        .stack-item ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .stack-item li {
+            margin-bottom: 0.5rem;
+            font-size: 0.95rem;
+        }
+
+        .stack-item li strong {
+            color: #334155;
+        }
+
+        .tag {
+            display: inline-block;
+            background: #e2e8f0;
+            color: #475569;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            margin-right: 4px;
+            margin-bottom: 4px;
+        }
+
+        footer {
+            margin-top: 4rem;
+            padding: 2rem 0;
+            border-top: 1px solid #e2e8f0;
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+    </style>
+</head>
+
+<body>
+    <article>
+        <h1>Technology Stack</h1>
+        <p class="subtitle">A comprehensive overview of the SoftoMedia Ad Network technical ecosystem.</p>
+
+        <section>
+            <h2>Core Philosophy</h2>
+            <p>
+                Our stack is chosen for <strong>scalability</strong>, <strong>maintainability</strong>, and
+                <strong>developer velocity</strong>.
+                We leverage managed cloud services to minimize infrastructure overhead while maintaining a robust,
+                containerized application layer.
+                <span class="marginnote">
+                    All core components are strictly versioned and subject to automated quality gates during the build
+                    process.
+                </span>
+            </p>
+        </section>
+
+        <section>
+            <h2 class="category-title">Frontend Architecture</h2>
+            <div class="stack-grid">
+                <div class="stack-item">
+                    <h3>React Ecosystem</h3>
+                    <ul>
+                        <li><strong>Framework:</strong> React 18</li>
+                        <li><strong>Build Tool:</strong> Vite 5</li>
+                        <li><strong>Routing:</strong> React Router 6</li>
+                        <li><strong>Icons:</strong> Lucide React</li>
+                    </ul>
+                </div>
+                <div class="stack-item">
+                    <h3>Styling & Design</h3>
+                    <ul>
+                        <li><strong>Engine:</strong> Tailwind CSS 4</li>
+                        <li><strong>Processing:</strong> PostCSS & Autoprefixer</li>
+                        <li><strong>Design System:</strong> Lifecycle Design System (LDS)</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="category-title">Backend Architecture</h2>
+            <div class="stack-grid">
+                <div class="stack-item">
+                    <h3>Runtime & API</h3>
+                    <ul>
+                        <li><strong>Runtime:</strong> Node.js</li>
+                        <li><strong>Framework:</strong> Express</li>
+                        <li><strong>Language:</strong> Modern JavaScript (ESM)</li>
+                        <li><strong>Compression:</strong> Gzip (compression)</li>
+                    </ul>
+                </div>
+                <div class="stack-item">
+                    <h3>Security & Data</h3>
+                    <ul>
+                        <li><strong>Auth:</strong> JWT & bcryptjs</li>
+                        <li><strong>Validation:</strong> Zod & Express Validator</li>
+                        <li><strong>Logging:</strong> Winston</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="category-title">Infrastructure & Cloud</h2>
+            <div class="stack-grid">
+                <div class="stack-item">
+                    <h3>Google Cloud (GCP)</h3>
+                    <ul>
+                        <li><strong>Project:</strong> softomedia-live-2026</li>
+                        <li><strong>Database:</strong> Cloud Firestore</li>
+                        <li><strong>Storage:</strong> Cloud Storage (Media Assets)</li>
+                    </ul>
+                </div>
+                <div class="stack-item">
+                    <h3>Deployment</h3>
+                    <ul>
+                        <li><strong>Containerization:</strong> Docker</li>
+                        <li><strong>CI/CD:</strong> Google Cloud Build</li>
+                        <li><strong>Hosting:</strong> Cloud Run (Serverless)</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="category-title">Verification & Quality</h2>
+            <div class="stack-grid">
+                <div class="stack-item">
+                    <h3>Testing Frameworks</h3>
+                    <ul>
+                        <li><strong>E2E Testing:</strong> Playwright</li>
+                        <li><strong>Unit/Integration:</strong> Vitest (FE) / Jest (BE)</li>
+                        <li><strong>Maturity:</strong> Capability Maturity Model (CMM)</li>
+                    </ul>
+                </div>
+                <div class="stack-item">
+                    <h3>Governance</h3>
+                    <ul>
+                        <li><strong>Linting:</strong> ESLint</li>
+                        <li><strong>Hardening:</strong> Phase 8 Auth Audit</li>
+                        <li><strong>Schema:</strong> Firestore Schema Enforcement</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <p>Confidential Architectural Document | SoftoMedia Live 2026</p>
+            <p>Last Refreshed: January 14, 2026</p>
+        </footer>
+    </article>
+</body>
+
+</html>

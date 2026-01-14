@@ -17,6 +17,7 @@ const CPMCalendar = lazy(() => import('./pages/admin/CPMCalendar'));
 const UserManagement = lazy(() => import('./pages/admin/UserManagement'));
 const RetailerManagement = lazy(() => import('./pages/admin/RetailerManagement'));
 const AdvertiserManagement = lazy(() => import('./pages/admin/AdvertiserManagement'));
+const BusinessHoursManagement = lazy(() => import('./pages/admin/BusinessHoursManagement'));
 const BrandDashboard = lazy(() => import('./pages/brand/BrandDashboard'));
 const BrandCampaignWizard = lazy(() => import('./pages/brand/BrandCampaignWizard'));
 const RetailerDashboard = lazy(() => import('./pages/retailer/RetailerDashboard'));
@@ -49,6 +50,7 @@ function App() {
                             <Route path="admin/pricing" element={<CPMCalendar />} />
                             <Route path="admin/users" element={<UserManagement />} />
                             <Route path="admin/retailers" element={<RetailerManagement />} />
+                            <Route path="admin/hours" element={<BusinessHoursManagement />} />
                             <Route path="admin/advertisers" element={<AdvertiserManagement />} />
                             <Route path="brand" element={<BrandDashboard />} />
                             <Route path="brand/campaign/new" element={<BrandCampaignWizard />} />

@@ -2,6 +2,13 @@
 
 Objectives: Document changes and progress milestones throughout the project lifecycle.
 
+## [2026-01-14] - Lifecycle Design System Enhancement
+### Added
+- **Tech Stack Documentation**: Created `tech-stack.html` providing a comprehensive full-stack overview (React, Node.js, GCP, Verification).
+- **LDS Index Integration**: Linked the new Tech Stack page in the Architecture section of the LDS hub.
+- **Visual Scannability**: Implemented a card-based layout for technology categories using Tufte-inspired typography.
+
+
 ## Unreleased
 - **Infrastructure**:
     - **Runtime Configuration Injection**: Decoupled frontend builds from environment-specific URLs using a dynamic `config.js` generator.
@@ -11,6 +18,11 @@ Objectives: Document changes and progress milestones throughout the project life
     - Added dynamic config loading in `index.html`.
     - Resolved persistent "localhost" connection leak in production environments.
 - **Ad Server**:
+    - **Business Hours Management**: Implemented a robust system for store schedules:
+        - Created `BusinessHoursRepository` and `SpecialHoursRepository` for Firestore persistence.
+        - Implemented `BusinessHoursService` for effective hour calculation with date-specific overrides.
+        - Added API endpoints for daily effective hours, weekly defaults, and overrides.
+        - Enforced strict time validation (`open < close`) and holiday support.
     - Guarded `seedDatabase()` against automatic execution in production environments.
     - Standardized `BaseRepository.create()` to prevent accidental document overwrites.
     - **Pricing Standardization**: Normalized `PricingRepository` output to camelCase to resolve frontend crashes.

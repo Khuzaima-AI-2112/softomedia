@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Schema - SoftoMedia</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #ffffff;
+            color: #1e293b;
+            line-height: 1.6;
+            padding: 40px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #0f172a;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 32px 0 16px;
+            color: #1e40af;
+            border-bottom: 2px solid #dbeafe;
+            padding-bottom: 8px;
+        }
+
+        h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 24px 0 12px;
+            color: #334155;
+        }
+
+        p {
+            margin-bottom: 12px;
+        }
+
+        .subtitle {
+            color: #64748b;
+            font-size: 1rem;
+            margin-bottom: 32px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0 32px;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        th {
+            background: #f1f5f9;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #f8fafc;
+        }
+
+        code {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .timestamp {
+            color: #94a3b8;
+            font-size: 0.85rem;
+            margin-top: 48px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🗄️ Database Schema</h1>
+    <p class="subtitle">SoftoMedia Ad Network - Technical Documentation</p>
+    <p class="timestamp">Last Updated: January 14, 2026</p>
+
+    <h2>Overview</h2>
+    <p>The system uses <strong>Firestore</strong> with a flat collection structure. Cross-references are maintained using document IDs string references.</p>
+
+    <h2>Core Collections</h2>
+
+    <h3>retailers</h3>
+    <table>
+        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+        <tr><td><code>id</code></td><td>String</td><td>Unique retailer ID (e.g., <code>ret_001</code>)</td></tr>
+        <tr><td><code>name</code></td><td>String</td><td>Full name of the retailer</td></tr>
+        <tr><td><code>logo</code></td><td>String</td><td>Emoji or URL to logo</td></tr>
+        <tr><td><code>contact_email</code></td><td>String</td><td>Administrative contact</td></tr>
+        <tr><td><code>status</code></td><td>String</td><td><code>active</code>, <code>inactive</code></td></tr>
+    </table>
+
+    <h3>locations</h3>
+    <table>
+        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+        <tr><td><code>id</code></td><td>String</td><td>Region ID (e.g., <code>loc_downtown</code>)</td></tr>
+        <tr><td><code>name</code></td><td>String</td><td>Display name</td></tr>
+        <tr><td><code>type</code></td><td>String</td><td><code>region</code>, <code>district</code>, etc.</td></tr>
+    </table>
+
+    <h3>stores</h3>
+    <table>
+        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+        <tr><td><code>id</code></td><td>String</td><td>Store ID (e.g., <code>str_001</code>)</td></tr>
+        <tr><td><code>retailer_id</code></td><td>String</td><td>Reference to <code>retailers</code></td></tr>
+        <tr><td><code>location_id</code></td><td>String</td><td>Reference to <code>locations</code></td></tr>
+        <tr><td><code>name</code></td><td>String</td><td>Store display name</td></tr>
+        <tr><td><code>screen_count</code></td><td>Number</td><td>Number of active screens</td></tr>
+        <tr><td><code>traffic_level</code></td><td>String</td><td><code>high</code>, <code>medium</code>, <code>low</code></td></tr>
+    </table>
+
+    <h3>screens</h3>
+    <table>
+        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+        <tr><td><code>id</code></td><td>String</td><td>Unique ID (e.g., <code>scr_001_01</code>)</td></tr>
+        <tr><td><code>screen_id</code></td><td>String</td><td>Hardware serial or ID</td></tr>
+        <tr><td><code>status</code></td><td>String</td><td><code>online</code>, <code>offline</code></td></tr>
+        <tr><td><code>store_id</code></td><td>String</td><td>Reference to <code>stores</code></td></tr>
+        <tr><td><code>last_seen</code></td><td>String</td><td>ISO Timestamp of last heartbeat</td></tr>
+    </table>
+
+    <h2>Advertising & Content</h2>
+
+    <h3>campaigns</h3>
+    <table>
+        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+        <tr><td><code>id</code></td><td>String</td><td>Campaign ID (e.g., <code>cmp_001</code>)</td></tr>
+        <tr><td><code>advertiser_id</code></td><td>String</td><td>Reference to <code>advertisers</code></td></tr>
+        <tr><td><code>name</code></td><td>String</td><td>Campaign name</td></tr>
+        <tr><td><code>status</code></td><td>String</td><td><code>live</code>, <code>paused</code>, <code>completed</code></td></tr>
+        <tr><td><code>creative_url</code></td><td>String</td><td>Primary asset URL</td></tr>
+        <tr><td><code>budget</code></td><td>Number</td><td>Campaign budget</td></tr>
+        <tr><td><code>spent</code></td><td>Number</td><td>Actual spend to date</td></tr>
+    </table>
+
+    <h3>media</h3>
+    <table>
+        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+        <tr><td><code>id</code></td><td>String</td><td>Asset ID (e.g., <code>asset_001</code>)</td></tr>
+        <tr><td><code>file_type</code></td><td>String</td><td><code>image</code>, <code>video</code></td></tr>
+        <tr><td><code>duration</code></td><td>Number</td><td>Playback duration in seconds</td></tr>
+        <tr><td><code>url</code></td><td>String</td><td>Storage URL</td></tr>
+    </table>
+
+    <h2>Pricing & Operations</h2>
+
+    <h3>pricing_config</h3>
+    <table>
+        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+        <tr><td><code>id</code></td><td>String</td><td>Always <code>global</code></td></tr>
+        <tr><td><code>baseCPM</code></td><td>Number</td><td>Anchor price per 1000 impressions</td></tr>
+        <tr><td><code>trafficTiers</code></td><td>Map</td><td>Tiers with multipliers and hour mappings</td></tr>
+        <tr><td><code>dateOverrides</code></td><td>Map</td><td>Date-specific multipliers</td></tr>
+        <tr><td><code>retailerOverrides</code></td><td>Map</td><td>Retailer-specific adjustments</td></tr>
+    </table>
+
+    <h3>loops</h3>
+    <table>
+        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+        <tr><td><code>id</code></td><td>String</td><td>Format: <code>{screen_id}_{date}_{hour}</code></td></tr>
+        <tr><td><code>screen_id</code></td><td>String</td><td>Reference to <code>screens</code></td></tr>
+        <tr><td><code>date</code></td><td>String</td><td>YYYY-MM-DD</td></tr>
+        <tr><td><code>hour</code></td><td>Number</td><td>0-23</td></tr>
+        <tr><td><code>slots</code></td><td>Array</td><td>12 slots with booking metadata</td></tr>
+    </table>
+
+    <p style="margin-top: 48px; color: #94a3b8; font-size: 0.85rem; text-align: center;">
+        SoftoMedia Ad Network • Lifecycle Design System • v2026.01.14
+    </p>
+</body>
+
+</html>

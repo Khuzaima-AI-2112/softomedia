@@ -7,11 +7,11 @@
 import { BaseRepository } from './BaseRepository.js';
 import { schedulingAuditRepository } from './SchedulingAuditRepository.js';
 
-// Business hours configuration
+// Business hours configuration (Base range, can be overridden by store settings)
 export const BUSINESS_HOURS = {
-    START: 8,   // 8:00 AM
-    END: 22,    // 10:00 PM (22:00)
-    get TOTAL_LOOPS() { return this.END - this.START; } // 14 loops
+    START: 0,   // support all hours
+    END: 24,
+    get TOTAL_LOOPS() { return this.END - this.START; }
 };
 
 // Valid loop statuses

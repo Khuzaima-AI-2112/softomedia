@@ -39,6 +39,26 @@ class ApiService {
         return apiClient.get(`/api/stores/${id}`);
     }
 
+    async getEffectiveHours(storeId, date) {
+        return apiClient.get(`/api/stores/${storeId}/hours?date=${date}`);
+    }
+
+    async getWeeklyHours(storeId) {
+        return apiClient.get(`/api/stores/${storeId}/weekly-hours`);
+    }
+
+    async updateWeeklyHours(storeId, weeklyHours) {
+        return apiClient.put(`/api/stores/${storeId}/weekly-hours`, { weekly_hours: weeklyHours });
+    }
+
+    async updateSpecialHours(storeId, date, hoursData) {
+        return apiClient.put(`/api/stores/${storeId}/special-hours`, { date, ...hoursData });
+    }
+
+    async listSpecialHours(storeId) {
+        return apiClient.get(`/api/stores/${storeId}/special-hours`);
+    }
+
     // ============================================
     // SCREENS
     // ============================================
@@ -139,19 +159,19 @@ class ApiService {
         if (filters.date) params.append('date', filters.date);
         if (filters.screenId) params.append('screenId', filters.screenId);
         if (filters.retailerId) params.append('retailerId', filters.retailerId);
+        if (filters.locationId) params.append('location_id', filters.locationId);
+        if (filters.location_id) params.append('location_id', filters.location_id);
 
         const queryString = params.toString();
         if (queryString) url += `?${queryString}`;
 
-        const data = await apiClient.get(url);
-        // Backend returns { loops: [], business_hours: {} }
-        return data.loops || data;
+        return apiClient.get(url);
     }
 
     async getLoopByParams(screenId, date, hour) {
         const data = await apiClient.get(`/api/loops?screenId=${screenId}&date=${date}&hour=${hour}`);
-        const loops = data.loops || data;
-        return Array.isArray(loops) ? loops[0] : loops;
+        const loops = data.loops || (Array.isArray(data) ? data : []);
+        return loops[0];
     }
 
     async getLoop(id) {
@@ -167,9 +187,7 @@ class ApiService {
     }
 
     async getLoopsByDate(date) {
-        const data = await apiClient.get(`/api/loops?date=${date}`);
-        // Backend returns { loops: [], business_hours: {} }
-        return data.loops || data;
+        return apiClient.get(`/api/loops?date=${date}`);
     }
 
     async generateLoops(data) {

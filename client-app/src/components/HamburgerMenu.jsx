@@ -20,6 +20,7 @@ function HamburgerMenu() {
             { label: 'Pricing', path: '/dashboard/admin/pricing', icon: 'attach_money' },
             { label: 'Users', path: '/dashboard/admin/users', icon: 'people' },
             { label: 'Retailers', path: '/dashboard/admin/retailers', icon: 'storefront' },
+            { label: 'Business Hours', path: '/dashboard/admin/hours', icon: 'schedule' },
             { label: 'Advertisers', path: '/dashboard/admin/advertisers', icon: 'campaign' },
             { label: 'Network Map', path: '/dashboard/admin/map', icon: 'map' },
             { label: 'System Health', path: '/dashboard/health', icon: 'health_metrics' }

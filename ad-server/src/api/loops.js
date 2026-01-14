@@ -7,6 +7,7 @@
 import express from 'express';
 import { loopRepository, BUSINESS_HOURS } from '../repositories/LoopRepository.js';
 import { loopGenerationService } from '../services/LoopGenerationService.js';
+import { BusinessHoursService } from '../services/BusinessHoursService.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -14,28 +15,49 @@ const router = express.Router();
 /**
  * GET /api/loops
  * List loops with optional filters
- * Query params: date, retailer_id, status
+ * Query params: date, retailer_id, location_id, status
  */
 router.get('/', async (req, res) => {
     try {
-        const { date, retailer_id, status } = req.query;
+        const { date, retailer_id, location_id, status } = req.query;
 
         let loops;
         if (date) {
             loops = await loopRepository.findByDate(date);
+            if (location_id) {
+                loops = loops.filter(l => l.location_id === location_id);
+            }
         } else {
             const where = [];
             if (retailer_id) where.push(['retailer_id', '==', retailer_id]);
+            if (location_id) where.push(['location_id', '==', location_id]);
             if (status) where.push(['status', '==', status]);
             loops = await loopRepository.findAll({ where });
+        }
+
+        // Determine dynamic business hours for UI
+        let startHour = 8;
+        let endHour = 22;
+        let isClosed = false;
+
+        if (date && location_id) {
+            const effective = await BusinessHoursService.getEffectiveHours(location_id, date);
+            if (effective.is_closed) {
+                isClosed = true;
+            } else {
+                startHour = parseInt(effective.open_time.split(':')[0], 10);
+                endHour = parseInt(effective.close_time.split(':')[0], 10);
+                if (endHour === 0) endHour = 24;
+            }
         }
 
         res.json({
             loops,
             business_hours: {
-                start: BUSINESS_HOURS.START,
-                end: BUSINESS_HOURS.END,
-                total_loops: BUSINESS_HOURS.TOTAL_LOOPS
+                start: startHour,
+                end: endHour,
+                is_closed: isClosed,
+                total_loops: isClosed ? 0 : (endHour - startHour)
             }
         });
     } catch (error) {

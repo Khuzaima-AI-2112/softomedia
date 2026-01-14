@@ -6,17 +6,8 @@ import { PriceSummary } from '../../../components/PriceDisplay';
 import apiService from '../../../services/ApiService';
 import pricingService from '../../../services/PricingService';
 
-// Constants for business hours (matching backend)
-const BUSINESS_HOURS = { START: 8, END: 22 };
-
-// Generate business hours array
-const getBusinessHours = () => {
-    const hours = [];
-    for (let h = BUSINESS_HOURS.START; h < BUSINESS_HOURS.END; h++) {
-        hours.push(h);
-    }
-    return hours;
-};
+// Constants for fallback business hours
+const FALLBACK_HOURS = { START: 8, END: 22 };
 
 const formatHour = (hour) => {
     const suffix = hour >= 12 ? 'PM' : 'AM';
@@ -25,13 +16,28 @@ const formatHour = (hour) => {
 };
 
 function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
-    const [selectedDate, setSelectedDate] = useState(data.dateRange?.start || new Date().toISOString().split('T')[0]);
+    const getLocalISO = (date = new Date()) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const [selectedDate, setSelectedDate] = useState(data.dateRange?.start || getLocalISO());
     const [expandedHour, setExpandedHour] = useState(null);
     const [selections, setSelections] = useState(data.selectedSlots || []);
     const [loading, setLoading] = useState(true);
     const [loops, setLoops] = useState([]);
+    const [businessHoursRange, setBusinessHoursRange] = useState({ start: 8, end: 22, is_closed: false });
 
-    const businessHours = useMemo(() => getBusinessHours(), []);
+    const businessHours = useMemo(() => {
+        if (businessHoursRange.is_closed) return [];
+        const hours = [];
+        for (let h = businessHoursRange.start; h < businessHoursRange.end; h++) {
+            hours.push(h);
+        }
+        return hours;
+    }, [businessHoursRange]);
 
     useEffect(() => {
         const init = async () => {
@@ -46,15 +52,32 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
     const loadLoops = async () => {
         try {
             // Get loops for selected screens and date from backend
-            const activeLoops = await apiService.getLoops({
+            // In a real app, locationId would be part of data.selectedStores[0]
+            const locationId = (data.selectedStores || [])[0];
+
+            const response = await apiService.getLoops({
                 date: selectedDate,
+                location_id: locationId,
                 screenId: (data.selectedScreens || []).join(',')
             });
 
-            // Fill in missing loops (if no loop exists in DB yet, create local placeholders)
+            // Handle both response formats (legacy array vs new object with business_hours)
+            const activeLoops = Array.isArray(response) ? response : (response.loops || []);
+            const newRange = response.business_hours || FALLBACK_HOURS;
+
+            setBusinessHoursRange(newRange);
+
+            const hoursList = [];
+            if (!newRange.is_closed) {
+                for (let h = newRange.start; h < newRange.end; h++) {
+                    hoursList.push(h);
+                }
+            }
+
+            // Fill in missing loops
             const allLoops = [];
             (data.selectedScreens || []).forEach(screenId => {
-                businessHours.forEach(hour => {
+                hoursList.forEach(hour => {
                     const existingLoop = activeLoops.find(l => l.screen_id === screenId && l.hour === hour);
                     if (existingLoop) {
                         allLoops.push(existingLoop);
@@ -191,11 +214,11 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
             const date = new Date(startDate);
             date.setDate(date.getDate() + i);
             days.push({
-                date: date.toISOString().split('T')[0],
+                date: getLocalISO(date),
                 dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
                 dayNum: date.getDate(),
-                isToday: date.toISOString().split('T')[0] === new Date().toISOString().split('T')[0],
-                isSelected: date.toISOString().split('T')[0] === selectedDate
+                isToday: getLocalISO(date) === getLocalISO(),
+                isSelected: getLocalISO(date) === selectedDate
             });
         }
         return days;
@@ -259,88 +282,101 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
             </div>
 
             {/* Hourly Slots Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {businessHours.map(hour => {
-                    const summary = getHourSummary(hour);
-                    const isExpanded = expandedHour === hour;
+            {businessHoursRange.is_closed ? (
+                <GlassCard className="flex flex-col items-center justify-center py-16 text-center">
+                    <div className="size-16 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center mb-4">
+                        <span className="material-symbols-outlined text-red-500 text-3xl">storefront</span>
+                    </div>
+                    <h3 className="text-xl font-bold mb-2">Store is Closed</h3>
+                    <p className="text-slate-500 max-w-md">
+                        This location is closed on {new Date(selectedDate + 'T00:00:00').toLocaleDateString(undefined, { dateStyle: 'long' })}.
+                        Please select another date for your campaign.
+                    </p>
+                </GlassCard>
+            ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {businessHours.map(hour => {
+                        const summary = getHourSummary(hour);
+                        const isExpanded = expandedHour === hour;
 
-                    return (
-                        <GlassCard
-                            key={hour}
-                            className={`cursor-pointer transition-all ${isExpanded ? 'lg:col-span-2 ring-2 ring-primary' : ''}`}
-                        >
-                            {/* Hour Header */}
-                            <div
-                                className="flex items-center justify-between"
-                                onClick={() => setExpandedHour(isExpanded ? null : hour)}
+                        return (
+                            <GlassCard
+                                key={hour}
+                                className={`cursor-pointer transition-all ${isExpanded ? 'lg:col-span-2 ring-2 ring-primary' : ''}`}
                             >
-                                <div className="flex items-center gap-4">
-                                    <div className="size-10 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-mono font-bold text-sm">
-                                        {formatHour(hour).replace(':00 ', '').replace(' ', '')}
+                                {/* Hour Header */}
+                                <div
+                                    className="flex items-center justify-between"
+                                    onClick={() => setExpandedHour(isExpanded ? null : hour)}
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="size-10 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-mono font-bold text-sm">
+                                            {formatHour(hour).replace(':00 ', '').replace(' ', '')}
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold">{formatHour(hour)}</p>
+                                            <p className="text-xs text-slate-500">
+                                                {summary.availableSlots}/{summary.totalSlots} slots available
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="font-semibold">{formatHour(hour)}</p>
-                                        <p className="text-xs text-slate-500">
-                                            {summary.availableSlots}/{summary.totalSlots} slots available
-                                        </p>
+                                    <div className="flex items-center gap-3">
+                                        <TrafficTierBadge tier={summary.trafficTier.key} size="small" />
+                                        <span className="text-sm font-bold text-primary">
+                                            {pricingService.formatPrice(summary.avgPrice)}
+                                        </span>
+                                        <span className="material-symbols-outlined text-slate-400 transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(180deg)' : '' }}>
+                                            expand_more
+                                        </span>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                    <TrafficTierBadge tier={summary.trafficTier.key} size="small" />
-                                    <span className="text-sm font-bold text-primary">
-                                        {pricingService.formatPrice(summary.avgPrice)}
-                                    </span>
-                                    <span className="material-symbols-outlined text-slate-400 transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(180deg)' : '' }}>
-                                        expand_more
-                                    </span>
-                                </div>
-                            </div>
 
-                            {/* Expanded View - Show slots for each screen */}
-                            {isExpanded && (
-                                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
-                                    {loopsByHour[hour]?.map(loop => {
-                                        const screen = pricingService.screens.find(s => s.id === loop.screen_id);
-                                        const pricing = pricingService.getSlotPrice(loop.screen_id, selectedDate, hour);
-                                        const loopSelections = getLoopSelections(loop.id);
+                                {/* Expanded View - Show slots for each screen */}
+                                {isExpanded && (
+                                    <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
+                                        {loopsByHour[hour]?.map(loop => {
+                                            const screen = pricingService.screens.find(s => s.id === loop.screen_id);
+                                            const pricing = pricingService.getSlotPrice(loop.screen_id, selectedDate, hour);
+                                            const loopSelections = getLoopSelections(loop.id);
 
-                                        return (
-                                            <div key={loop.id} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                                                <div className="flex items-center justify-between mb-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="material-symbols-outlined text-slate-400">tv</span>
-                                                        <span className="font-medium text-sm">{screen?.name || loop.screen_id}</span>
+                                            return (
+                                                <div key={loop.id} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="material-symbols-outlined text-slate-400">tv</span>
+                                                            <span className="font-medium text-sm">{screen?.name || loop.screen_id}</span>
+                                                        </div>
+                                                        <span className="text-xs text-slate-500">
+                                                            {loop.slots.filter(s => s.status !== 'available').length}/12 booked
+                                                        </span>
                                                     </div>
-                                                    <span className="text-xs text-slate-500">
-                                                        {loop.slots.filter(s => s.status !== 'available').length}/12 booked
-                                                    </span>
+
+                                                    <SlotGrid
+                                                        slots={loop.slots}
+                                                        trafficTier={summary.trafficTier}
+                                                        pricePerSlot={pricing.price}
+                                                        selectedSlots={loopSelections}
+                                                        onSlotClick={(index) => handleSlotToggle(loop.id, index)}
+                                                    />
+
+                                                    {loop.slots.filter(s => s.status === 'available').length === 12 && (
+                                                        <div className="mt-3">
+                                                            <BookFullLoopButton
+                                                                onClick={() => handleBookFullLoop(loop.id)}
+                                                                pricePerSlot={pricing.price}
+                                                            />
+                                                        </div>
+                                                    )}
                                                 </div>
-
-                                                <SlotGrid
-                                                    slots={loop.slots}
-                                                    trafficTier={summary.trafficTier}
-                                                    pricePerSlot={pricing.price}
-                                                    selectedSlots={loopSelections}
-                                                    onSlotClick={(index) => handleSlotToggle(loop.id, index)}
-                                                />
-
-                                                {loop.slots.filter(s => s.status === 'available').length === 12 && (
-                                                    <div className="mt-3">
-                                                        <BookFullLoopButton
-                                                            onClick={() => handleBookFullLoop(loop.id)}
-                                                            pricePerSlot={pricing.price}
-                                                        />
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </GlassCard>
-                    );
-                })}
-            </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </GlassCard>
+                        );
+                    })}
+                </div>
+            )}
 
             {/* Selection Summary (Sticky Footer) */}
             <div className="sticky bottom-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-lg rounded-t-2xl border-t border-slate-200 dark:border-slate-700 p-4 -mx-4 mt-8">

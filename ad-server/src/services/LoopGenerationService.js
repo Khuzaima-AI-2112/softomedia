@@ -7,6 +7,7 @@
 
 import { loopRepository, BUSINESS_HOURS, LOOP_STATUS } from '../repositories/LoopRepository.js';
 import { campaignRepository } from '../repositories/CampaignRepository.js';
+import { BusinessHoursService } from './BusinessHoursService.js';
 import logger from '../utils/logger.js';
 
 // Slot configuration
@@ -28,24 +29,42 @@ export class LoopGenerationService {
      * Generate all loops for a target date (D-1 scheduling)
      * @param {string} targetDate - Format: YYYY-MM-DD
      * @param {string} retailerId - Target retailer
-     * @param {string} locationId - Target location
+     * @param {string} locationId - Target location (store_id)
      * @returns {Promise<Array>} Generated loops
      */
     async generateDailyLoops(targetDate, retailerId, locationId) {
         const loops = [];
 
+        // Fetch effective hours for this store/date
+        const effectiveHours = await BusinessHoursService.getEffectiveHours(locationId, targetDate);
+
+        let startHour = 8;
+        let endHour = 22;
+
+        if (effectiveHours && !effectiveHours.is_closed) {
+            startHour = parseInt(effectiveHours.open_time.split(':')[0], 10);
+            endHour = parseInt(effectiveHours.close_time.split(':')[0], 10);
+            // Handle case where closing is at 00:00 or later
+            if (endHour === 0) endHour = 24;
+        }
+
         logger.info(`[LoopGeneration] Starting D-1 generation for ${targetDate}`, {
             retailerId,
             locationId,
-            businessHours: `${BUSINESS_HOURS.START}:00 - ${BUSINESS_HOURS.END}:00`
+            range: `${startHour}:00 - ${endHour}:00`,
+            isClosed: effectiveHours?.is_closed
         });
+
+        if (effectiveHours?.is_closed) {
+            return [];
+        }
 
         // Get available campaigns for this retailer/location
         const campaigns = await this.getAvailableCampaigns(retailerId, locationId, targetDate);
 
         // Generate loop for each business hour (PARALLELIZED)
         const hourPromises = [];
-        for (let hour = BUSINESS_HOURS.START; hour < BUSINESS_HOURS.END; hour++) {
+        for (let hour = startHour; hour < endHour; hour++) {
             hourPromises.push(this.generateHourlyLoop(targetDate, hour, retailerId, locationId, campaigns));
         }
 

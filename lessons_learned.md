@@ -2,6 +2,17 @@
 
 Objectives: Document errors, bugs, and mistakes so we do not make them again.
 
+## [2026-01-14] Tufte-inspired Documentation Aesthetics
+- **Issue**: Standard documentation can feel generic and overwhelming when presenting dense technical stacks.
+- **Root Cause**: Reliance on default browser typography and lacks clear visual hierarchy.
+- **Prevention**: Leverage Tufte CSS for high-quality typography and side-notes (marginnotes). This provides a premium, academic feel that suits architectural documentation. Use grid layouts for "stack cards" to make categories (FE, BE, Infra) easily scannable.
+
+
+## [2026-01-14] Effective Hours Calculation with Temporal Overrides
+- **Issue**: Managing multiple schedules (default vs special) can lead to logic errors or incorrect "store closed" states.
+- **Root Cause**: Reliance on complex UI logic instead of a centralized backend "Effective Hours" calculator.
+- **Prevention**: Implement a centralized `getEffectiveHours()` service that prioritizes overrides (special hours) before falling back to defaults. Standardize on 24-hour HH:mm format for times to simplify comparison logic (`open < close`). Always return a consistent object type regardless of whether the source is 'default' or 'special' to reduce frontend branching.
+
 ## Development Lessons
 
 ### [2026-01-06] Build-Time vs Runtime Configuration (Vite)

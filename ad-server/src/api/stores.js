@@ -3,6 +3,7 @@
 
 import express from 'express';
 import StoreRepository from '../repositories/StoreRepository.js';
+import { BusinessHoursService } from '../services/BusinessHoursService.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -99,6 +100,84 @@ router.delete('/:id', authenticate, async (req, res) => {
     } catch (error) {
         console.error('Failed to delete store:', error);
         res.status(500).json({ error: 'Failed to delete store' });
+    }
+});
+
+/**
+ * GET /api/stores/:id/hours
+ * Get effective hours for a specific date
+ */
+router.get('/:id/hours', async (req, res) => {
+    try {
+        const { date } = req.query;
+        if (!date) {
+            return res.status(400).json({ error: 'Date query parameter is required (YYYY-MM-DD)' });
+        }
+        const hours = await BusinessHoursService.getEffectiveHours(req.params.id, date);
+        res.json(hours);
+    } catch (error) {
+        console.error('Failed to fetch effective hours:', error);
+        res.status(500).json({ error: 'Failed to fetch effective hours' });
+    }
+});
+
+/**
+ * GET /api/stores/:id/weekly-hours
+ * Get default weekly schedule
+ */
+router.get('/:id/weekly-hours', async (req, res) => {
+    try {
+        const hours = await BusinessHoursService.getWeeklyHours(req.params.id);
+        res.json(hours);
+    } catch (error) {
+        console.error('Failed to fetch weekly hours:', error);
+        res.status(500).json({ error: 'Failed to fetch weekly hours' });
+    }
+});
+
+/**
+ * PUT /api/stores/:id/weekly-hours
+ * Update default weekly schedule
+ */
+router.put('/:id/weekly-hours', authenticate, async (req, res) => {
+    try {
+        const hours = await BusinessHoursService.updateWeeklyHours(req.params.id, req.body.weekly_hours);
+        res.json(hours);
+    } catch (error) {
+        console.error('Failed to update weekly hours:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+/**
+ * PUT /api/stores/:id/special-hours
+ * Update special hours for a date
+ */
+router.put('/:id/special-hours', authenticate, async (req, res) => {
+    try {
+        const { date, ...hoursData } = req.body;
+        if (!date) {
+            return res.status(400).json({ error: 'Date is required' });
+        }
+        const hours = await BusinessHoursService.updateSpecialHours(req.params.id, date, hoursData);
+        res.json(hours);
+    } catch (error) {
+        console.error('Failed to update special hours:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+/**
+ * GET /api/stores/:id/special-hours
+ * Get all special hours for a store
+ */
+router.get('/:id/special-hours', async (req, res) => {
+    try {
+        const hours = await BusinessHoursService.listSpecialHours(req.params.id);
+        res.json(hours);
+    } catch (error) {
+        console.error('Failed to fetch special hours list:', error);
+        res.status(500).json({ error: 'Failed to fetch special hours list' });
     }
 });
 
