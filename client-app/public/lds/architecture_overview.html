@@ -198,12 +198,14 @@
             <h3>Ad Server (Backend)</h3>
             <p>
                 A Node.js/Express service responsible for business logic, security, and scheduling.
-                It implements a <span class="component">Repository Pattern</span> for data access and a dedicated
-                <span class="component">Loop Generation Service</span> for D-1 scheduling.
+                It implements a <span class="component">Repository Pattern</span> with a built-in <span
+                    class="component">Resilience Engine</span> (Circuit Breakers) for data access.
+                Scheduling is managed by the <span class="component">Loop Generation Service</span> and centralized
+                <span class="component">BusinessHoursService</span>.
             </p>
             <span class="marginnote">
-                Key Dependencies: <code>@google-cloud/firestore</code>, <code>jsonwebtoken</code>, <code>multer</code>
-                (for asset uploads).
+                Key Dependencies: <code>@google-cloud/firestore</code>, <code>jsonwebtoken</code>, <code>zod</code>
+                (Validation).
             </span>
 
             <h3>Client App (Frontend)</h3>
@@ -236,7 +238,7 @@
 
         <footer>
             <p>Confidential Architectural Document | SoftoMedia Live 2026</p>
-            <p>Revision: 1.0.0 | Date: 2026-01-02</p>
+            <p>Revision: 1.1.0 | Date: 2026-01-14</p>
         </footer>
     </article>
 </body>

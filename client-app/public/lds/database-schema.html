@@ -101,93 +101,358 @@
     <p class="timestamp">Last Updated: January 14, 2026</p>
 
     <h2>Overview</h2>
-    <p>The system uses <strong>Firestore</strong> with a flat collection structure. Cross-references are maintained using document IDs string references.</p>
+    <p>The system uses <strong>Firestore</strong> with a flat collection structure. Cross-references are maintained
+        using document IDs string references.</p>
 
     <h2>Core Collections</h2>
 
     <h3>retailers</h3>
     <table>
-        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-        <tr><td><code>id</code></td><td>String</td><td>Unique retailer ID (e.g., <code>ret_001</code>)</td></tr>
-        <tr><td><code>name</code></td><td>String</td><td>Full name of the retailer</td></tr>
-        <tr><td><code>logo</code></td><td>String</td><td>Emoji or URL to logo</td></tr>
-        <tr><td><code>contact_email</code></td><td>String</td><td>Administrative contact</td></tr>
-        <tr><td><code>status</code></td><td>String</td><td><code>active</code>, <code>inactive</code></td></tr>
+        <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Description</th>
+        </tr>
+        <tr>
+            <td><code>id</code></td>
+            <td>String</td>
+            <td>Unique retailer ID (e.g., <code>ret_001</code>)</td>
+        </tr>
+        <tr>
+            <td><code>name</code></td>
+            <td>String</td>
+            <td>Full name of the retailer</td>
+        </tr>
+        <tr>
+            <td><code>logo</code></td>
+            <td>String</td>
+            <td>Emoji or URL to logo</td>
+        </tr>
+        <tr>
+            <td><code>contact_email</code></td>
+            <td>String</td>
+            <td>Administrative contact</td>
+        </tr>
+        <tr>
+            <td><code>status</code></td>
+            <td>String</td>
+            <td><code>active</code>, <code>inactive</code></td>
+        </tr>
     </table>
 
     <h3>locations</h3>
     <table>
-        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-        <tr><td><code>id</code></td><td>String</td><td>Region ID (e.g., <code>loc_downtown</code>)</td></tr>
-        <tr><td><code>name</code></td><td>String</td><td>Display name</td></tr>
-        <tr><td><code>type</code></td><td>String</td><td><code>region</code>, <code>district</code>, etc.</td></tr>
+        <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Description</th>
+        </tr>
+        <tr>
+            <td><code>id</code></td>
+            <td>String</td>
+            <td>Region ID (e.g., <code>loc_downtown</code>)</td>
+        </tr>
+        <tr>
+            <td><code>name</code></td>
+            <td>String</td>
+            <td>Display name</td>
+        </tr>
+        <tr>
+            <td><code>type</code></td>
+            <td>String</td>
+            <td><code>region</code>, <code>district</code>, etc.</td>
+        </tr>
     </table>
 
     <h3>stores</h3>
     <table>
-        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-        <tr><td><code>id</code></td><td>String</td><td>Store ID (e.g., <code>str_001</code>)</td></tr>
-        <tr><td><code>retailer_id</code></td><td>String</td><td>Reference to <code>retailers</code></td></tr>
-        <tr><td><code>location_id</code></td><td>String</td><td>Reference to <code>locations</code></td></tr>
-        <tr><td><code>name</code></td><td>String</td><td>Store display name</td></tr>
-        <tr><td><code>screen_count</code></td><td>Number</td><td>Number of active screens</td></tr>
-        <tr><td><code>traffic_level</code></td><td>String</td><td><code>high</code>, <code>medium</code>, <code>low</code></td></tr>
+        <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Description</th>
+        </tr>
+        <tr>
+            <td><code>id</code></td>
+            <td>String</td>
+            <td>Store ID (e.g., <code>str_001</code>)</td>
+        </tr>
+        <tr>
+            <td><code>retailer_id</code></td>
+            <td>String</td>
+            <td>Reference to <code>retailers</code></td>
+        </tr>
+        <tr>
+            <td><code>location_id</code></td>
+            <td>String</td>
+            <td>Reference to <code>locations</code></td>
+        </tr>
+        <tr>
+            <td><code>name</code></td>
+            <td>String</td>
+            <td>Store display name</td>
+        </tr>
+        <tr>
+            <td><code>screen_count</code></td>
+            <td>Number</td>
+            <td>Number of active screens</td>
+        </tr>
+        <tr>
+            <td><code>traffic_level</code></td>
+            <td>String</td>
+            <td><code>high</code>, <code>medium</code>, <code>low</code></td>
+        </tr>
     </table>
 
     <h3>screens</h3>
     <table>
-        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-        <tr><td><code>id</code></td><td>String</td><td>Unique ID (e.g., <code>scr_001_01</code>)</td></tr>
-        <tr><td><code>screen_id</code></td><td>String</td><td>Hardware serial or ID</td></tr>
-        <tr><td><code>status</code></td><td>String</td><td><code>online</code>, <code>offline</code></td></tr>
-        <tr><td><code>store_id</code></td><td>String</td><td>Reference to <code>stores</code></td></tr>
-        <tr><td><code>last_seen</code></td><td>String</td><td>ISO Timestamp of last heartbeat</td></tr>
+        <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Description</th>
+        </tr>
+        <tr>
+            <td><code>id</code></td>
+            <td>String</td>
+            <td>Unique ID (e.g., <code>scr_001_01</code>)</td>
+        </tr>
+        <tr>
+            <td><code>screen_id</code></td>
+            <td>String</td>
+            <td>Hardware serial or ID</td>
+        </tr>
+        <tr>
+            <td><code>status</code></td>
+            <td>String</td>
+            <td><code>online</code>, <code>offline</code></td>
+        </tr>
+        <tr>
+            <td><code>store_id</code></td>
+            <td>String</td>
+            <td>Reference to <code>stores</code></td>
+        </tr>
+        <tr>
+            <td><code>last_seen</code></td>
+            <td>String</td>
+            <td>ISO Timestamp of last heartbeat</td>
+        </tr>
     </table>
 
     <h2>Advertising & Content</h2>
 
     <h3>campaigns</h3>
     <table>
-        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-        <tr><td><code>id</code></td><td>String</td><td>Campaign ID (e.g., <code>cmp_001</code>)</td></tr>
-        <tr><td><code>advertiser_id</code></td><td>String</td><td>Reference to <code>advertisers</code></td></tr>
-        <tr><td><code>name</code></td><td>String</td><td>Campaign name</td></tr>
-        <tr><td><code>status</code></td><td>String</td><td><code>live</code>, <code>paused</code>, <code>completed</code></td></tr>
-        <tr><td><code>creative_url</code></td><td>String</td><td>Primary asset URL</td></tr>
-        <tr><td><code>budget</code></td><td>Number</td><td>Campaign budget</td></tr>
-        <tr><td><code>spent</code></td><td>Number</td><td>Actual spend to date</td></tr>
+        <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Description</th>
+        </tr>
+        <tr>
+            <td><code>id</code></td>
+            <td>String</td>
+            <td>Campaign ID (e.g., <code>cmp_001</code>)</td>
+        </tr>
+        <tr>
+            <td><code>advertiser_id</code></td>
+            <td>String</td>
+            <td>Reference to <code>advertisers</code></td>
+        </tr>
+        <tr>
+            <td><code>name</code></td>
+            <td>String</td>
+            <td>Campaign name</td>
+        </tr>
+        <tr>
+            <td><code>status</code></td>
+            <td>String</td>
+            <td><code>live</code>, <code>paused</code>, <code>completed</code></td>
+        </tr>
+        <tr>
+            <td><code>creative_url</code></td>
+            <td>String</td>
+            <td>Primary asset URL</td>
+        </tr>
+        <tr>
+            <td><code>budget</code></td>
+            <td>Number</td>
+            <td>Campaign budget</td>
+        </tr>
+        <tr>
+            <td><code>spent</code></td>
+            <td>Number</td>
+            <td>Actual spend to date</td>
+        </tr>
     </table>
 
     <h3>media</h3>
     <table>
-        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-        <tr><td><code>id</code></td><td>String</td><td>Asset ID (e.g., <code>asset_001</code>)</td></tr>
-        <tr><td><code>file_type</code></td><td>String</td><td><code>image</code>, <code>video</code></td></tr>
-        <tr><td><code>duration</code></td><td>Number</td><td>Playback duration in seconds</td></tr>
-        <tr><td><code>url</code></td><td>String</td><td>Storage URL</td></tr>
+        <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Description</th>
+        </tr>
+        <tr>
+            <td><code>id</code></td>
+            <td>String</td>
+            <td>Asset ID (e.g., <code>asset_001</code>)</td>
+        </tr>
+        <tr>
+            <td><code>file_type</code></td>
+            <td>String</td>
+            <td><code>image</code>, <code>video</code></td>
+        </tr>
+        <tr>
+            <td><code>duration</code></td>
+            <td>Number</td>
+            <td>Playback duration in seconds</td>
+        </tr>
+        <tr>
+            <td><code>url</code></td>
+            <td>String</td>
+            <td>Storage URL</td>
+        </tr>
     </table>
 
     <h2>Pricing & Operations</h2>
 
+    <h3>business_hours</h3>
+    <table>
+        <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Description</th>
+        </tr>
+        <tr>
+            <td><code>id</code></td>
+            <td>String</td>
+            <td>Store ID (e.g., <code>str_001</code>)</td>
+        </tr>
+        <tr>
+            <td><code>weekly_hours</code></td>
+            <td>Array</td>
+            <td>7 objects: <code>{ day_of_week, open, close, is_closed }</code></td>
+        </tr>
+        <tr>
+            <td><code>updated_at</code></td>
+            <td>String</td>
+            <td>ISO Timestamp</td>
+        </tr>
+    </table>
+
+    <h3>special_hours</h3>
+    <table>
+        <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Description</th>
+        </tr>
+        <tr>
+            <td><code>id</code></td>
+            <td>String</td>
+            <td>Composite: <code>{store_id}_{YYYY-MM-DD}</code></td>
+        </tr>
+        <tr>
+            <td><code>store_id</code></td>
+            <td>String</td>
+            <td>Reference to <code>stores</code></td>
+        </tr>
+        <tr>
+            <td><code>date</code></td>
+            <td>String</td>
+            <td>YYYY-MM-DD</td>
+        </tr>
+        <tr>
+            <td><code>open_time</code></td>
+            <td>String</td>
+            <td>HH:mm (24h)</td>
+        </tr>
+        <tr>
+            <td><code>close_time</code></td>
+            <td>String</td>
+            <td>HH:mm (24h)</td>
+        </tr>
+        <tr>
+            <td><code>is_closed</code></td>
+            <td>Boolean</td>
+            <td>Full day closure flag</td>
+        </tr>
+        <tr>
+            <td><code>reason</code></td>
+            <td>String</td>
+            <td>e.g., "Holiday", "Inventory"</td>
+        </tr>
+    </table>
+
     <h3>pricing_config</h3>
     <table>
-        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-        <tr><td><code>id</code></td><td>String</td><td>Always <code>global</code></td></tr>
-        <tr><td><code>schemaVersion</code></td><td>Number</td><td>Schema version (e.g., 1)</td></tr>
-        <tr><td><code>baseCPM</code></td><td>Number</td><td>Anchor price per 1000 impressions</td></tr>
-        <tr><td><code>trafficTiers</code></td><td>Map&lt;String, Object&gt;</td><td>Keyed by tier name (e.g. 'high'). Contains multiplier, label, color, hours.</td></tr>
-        <tr><td><code>dateOverrides</code></td><td>Map&lt;String, Object&gt;</td><td>Keyed by YYYY-MM-DD. Contains multiplier, label, optional hourlyTiers.</td></tr>
-        <tr><td><code>retailerOverrides</code></td><td>Map&lt;String, Object&gt;</td><td>Retailer-specific adjustments</td></tr>
+        <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Description</th>
+        </tr>
+        <tr>
+            <td><code>id</code></td>
+            <td>String</td>
+            <td>Always <code>global</code></td>
+        </tr>
+        <tr>
+            <td><code>schemaVersion</code></td>
+            <td>Number</td>
+            <td>Schema version (e.g., 1)</td>
+        </tr>
+        <tr>
+            <td><code>baseCPM</code></td>
+            <td>Number</td>
+            <td>Anchor price per 1000 impressions</td>
+        </tr>
+        <tr>
+            <td><code>trafficTiers</code></td>
+            <td>Map&lt;String, Object&gt;</td>
+            <td>Keyed by tier name (e.g. 'high'). Contains multiplier, label, color, hours.</td>
+        </tr>
+        <tr>
+            <td><code>dateOverrides</code></td>
+            <td>Map&lt;String, Object&gt;</td>
+            <td>Keyed by YYYY-MM-DD. Contains multiplier, label, optional hourlyTiers.</td>
+        </tr>
+        <tr>
+            <td><code>retailerOverrides</code></td>
+            <td>Map&lt;String, Object&gt;</td>
+            <td>Retailer-specific adjustments</td>
+        </tr>
     </table>
 
     <h3>loops</h3>
     <table>
-        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-        <tr><td><code>id</code></td><td>String</td><td>Format: <code>{screen_id}_{date}_{hour}</code></td></tr>
-        <tr><td><code>screen_id</code></td><td>String</td><td>Reference to <code>screens</code></td></tr>
-        <tr><td><code>date</code></td><td>String</td><td>YYYY-MM-DD</td></tr>
-        <tr><td><code>hour</code></td><td>Number</td><td>0-23</td></tr>
-        <tr><td><code>slots</code></td><td>Array</td><td>12 slots with booking metadata</td></tr>
+        <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Description</th>
+        </tr>
+        <tr>
+            <td><code>id</code></td>
+            <td>String</td>
+            <td>Format: <code>{screen_id}_{date}_{hour}</code></td>
+        </tr>
+        <tr>
+            <td><code>screen_id</code></td>
+            <td>String</td>
+            <td>Reference to <code>screens</code></td>
+        </tr>
+        <tr>
+            <td><code>date</code></td>
+            <td>String</td>
+            <td>YYYY-MM-DD</td>
+        </tr>
+        <tr>
+            <td><code>hour</code></td>
+            <td>Number</td>
+            <td>0-23</td>
+        </tr>
+        <tr>
+            <td><code>slots</code></td>
+            <td>Array</td>
+            <td>12 slots with booking metadata</td>
+        </tr>
     </table>
 
     <p style="margin-top: 48px; color: #94a3b8; font-size: 0.85rem; text-align: center;">

@@ -2,6 +2,18 @@
 
 Objectives: Document changes and progress milestones throughout the project lifecycle.
 
+## [2026-01-14] - Schema Governance & Verification Stabilization (Deployed v1)
+### Fixed
+- **Pricing Schema**: Resolved Zod v4 syntax incompatibility in `PricingSchema.js` by standardizing on `z.record(z.string(), schema)`.
+- **Unit Tests**:
+    - **LoopRepository**: Updated tests to support 24-hour business cycle (0-24) matching recent logic changes.
+    - **BusinessHours**: Refactored to use `unstable_mockModule` for proper service isolation during testing.
+- **Coverage**: Added `PricingRepository.test.js` suite, raising branch coverage from 46% to 54% (passing threshold).
+
+### Added
+- **Schema Versioning**: Implemented `schemaVersion: 1` in `PricingConfig` to support future migrations.
+- **Documentation**: Updated `database-schema.html` and `cpm-pricing-system.html` with explicit referencing of schema versioning.
+
 ## [2026-01-14] - Lifecycle Design System Enhancement
 ### Added
 - **Tech Stack Documentation**: Created `tech-stack.html` providing a comprehensive full-stack overview (React, Node.js, GCP, Verification).

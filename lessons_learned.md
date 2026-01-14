@@ -13,6 +13,24 @@ Objectives: Document errors, bugs, and mistakes so we do not make them again.
 - **Root Cause**: Reliance on complex UI logic instead of a centralized backend "Effective Hours" calculator.
 - **Prevention**: Implement a centralized `getEffectiveHours()` service that prioritizes overrides (special hours) before falling back to defaults. Standardize on 24-hour HH:mm format for times to simplify comparison logic (`open < close`). Always return a consistent object type regardless of whether the source is 'default' or 'special' to reduce frontend branching.
 
+## [2026-01-14] Zod v4 Record Syntax Trap
+- **Issue**: Pricing schema verification failed with "Invalid key in record" despite logically valid JSON.
+- **Root Cause**: Zod v4+ requires explicit key schema arguments (`z.record(z.string(), Value)`) which differs from v3 behavior where `z.record(Value)` implied string keys.
+- **Prevention**: Always explicitly define both Key and Value schemas when using Zod's `z.record()`. Treat "implied defaults" as deprecated behavior to ensure forward compatibility.
+
+## [2026-01-14] Mocking ES Modules in Jest
+- **Issue**: Tests using `unstable_mockModule` failed to isolate service state, leading to database connection attempts during unit tests.
+- **Root Cause**: ES Modules are evaluated asynchronously. Importing the module under test *before* the mock is fully registered bypasses the mock entirely.
+- **Prevention**: Follow the strict 3-step ESM mock pattern:
+  1. Define mocks using `jest.unstable_mockModule` *before* any imports.
+  2. Use dynamic `await import()` for the module under test *inside* the `beforeAll` or test scope.
+  3. Ensure the mocked module path matches the import path exactly (including extensions).
+
+## [2026-01-14] Branch Coverage vs Line Coverage
+- **Issue**: High line coverage (88%) still resulted in CI failure due to low branch coverage (46%).
+- **Root Cause**: Tests covered the "Happy Path" lines but missed complex conditional logic (e.g., date overrides, missing config fallbacks).
+- **Prevention**: Measure Branch Coverage as the primary metric for logic-heavy repositories (Strategy Pattern). Write specific test cases for every `if/else`, `??` fallback, and optional chain `?.` in the code.
+
 ## Development Lessons
 
 ### [2026-01-06] Build-Time vs Runtime Configuration (Vite)
