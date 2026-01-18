@@ -45,12 +45,28 @@ function CPMCalendar() {
     const [editedTiers, setEditedTiers] = useState({});
     const [dateOverride, setDateOverride] = useState(null);
     const [selectedRetailer, setSelectedRetailer] = useState('all');
+    const [selectedStore, setSelectedStore] = useState(null);
     const [retailers, setRetailers] = useState([]);
     const [stores, setStores] = useState([]);
     const [loading, setLoading] = useState(true);
     const [editingTier, setEditingTier] = useState(null);
+    const [storeHours, setStoreHours] = useState(null);
 
-    const businessHours = useMemo(() => getBusinessHours(), []);
+    // Filter stores based on selected retailer
+    const filteredStores = useMemo(() => {
+        if (selectedRetailer === 'all') return stores;
+        return stores.filter(s => s.retailer_id === selectedRetailer);
+    }, [selectedRetailer, stores]);
+
+    useEffect(() => {
+        if (filteredStores.length > 0 && !selectedStore) {
+            setSelectedStore(filteredStores[0]);
+        } else if (filteredStores.length > 0 && selectedStore) {
+            // Verify selected store is still valid for retailer
+            const exists = filteredStores.find(s => s.id === selectedStore.id);
+            if (!exists) setSelectedStore(filteredStores[0]);
+        }
+    }, [filteredStores]);
 
     useEffect(() => {
         loadData();
@@ -63,6 +79,22 @@ function CPMCalendar() {
             setDateOverride(pricingConfig.dateOverrides?.[selectedDate] || null);
         }
     }, [selectedDate, pricingConfig]);
+
+    useEffect(() => {
+        const fetchStoreHours = async () => {
+            if (selectedStore && selectedDate) {
+                try {
+                    const hours = await apiService.getEffectiveHours(selectedStore.id, selectedDate);
+                    setStoreHours(hours);
+                } catch (error) {
+                    console.error('Failed to fetch effective hours:', error);
+                    // Fallback default
+                    setStoreHours({ open_time: '08:00', close_time: '22:00', is_closed: false });
+                }
+            }
+        };
+        fetchStoreHours();
+    }, [selectedStore, selectedDate]);
 
     const loadData = async () => {
         setLoading(true);
@@ -253,9 +285,22 @@ function CPMCalendar() {
 
     const dailySummary = useMemo(() => {
         if (!pricingConfig) return { totalScreens: 0, hourlyBreakdown: [] };
-        // We use the existing pricingService assuming it can handle the new config or we update it
-        return pricingService.getDailyPricingSummary(selectedDate);
-    }, [selectedDate, pricingConfig]);
+
+        // Calculate range based on store hours
+        let range = null;
+        if (storeHours && !storeHours.is_closed) {
+            const startStr = storeHours.open_time.split(':')[0];
+            const endStr = storeHours.close_time.split(':')[0];
+            range = {
+                START: parseInt(startStr),
+                END: parseInt(endStr)
+            };
+        } else if (storeHours && storeHours.is_closed) {
+            range = { START: 0, END: 0 }; // Closed
+        }
+
+        return pricingService.getDailyPricingSummary(selectedDate, range);
+    }, [selectedDate, pricingConfig, storeHours]);
 
     if (!pricingConfig) {
         return <div className="animate-pulse">Loading pricing configuration...</div>;
@@ -282,12 +327,27 @@ function CPMCalendar() {
                 <div className="flex items-center gap-3">
                     <select
                         value={selectedRetailer}
-                        onChange={(e) => setSelectedRetailer(e.target.value)}
-                        className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                        onChange={(e) => {
+                            setSelectedRetailer(e.target.value);
+                            setSelectedStore(null); // Reset store when retailer changes
+                        }}
+                        className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-primary outline-none"
                     >
                         <option value="all">All Retailers</option>
                         {retailers.map(r => (
                             <option key={r.id} value={r.id}>{r.name}</option>
+                        ))}
+                    </select>
+
+                    <select
+                        value={selectedStore?.id || ''}
+                        onChange={(e) => setSelectedStore(stores.find(s => s.id === e.target.value))}
+                        disabled={!stores.length}
+                        className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-primary outline-none"
+                    >
+                        {filteredStores.length === 0 ? <option>No Stores</option> : null}
+                        {filteredStores.map(s => (
+                            <option key={s.id} value={s.id}>{s.name} ({s.city})</option>
                         ))}
                     </select>
                 </div>
@@ -481,9 +541,21 @@ aspect - square flex items - center justify - center text - sm rounded - lg rela
                 <GlassCard className="lg:col-span-2 relative group/hourly">
                     <LayoutTag name="col:hourly-breakdown" position="bottom-right" />
                     <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-bold text-lg">
-                            Hourly Pricing - {(() => { const [y, m, d] = selectedDate.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }); })()}
-                        </h3>
+                        <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-lg">
+                                Hourly Pricing - {(() => { const [y, m, d] = selectedDate.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }); })()}
+                            </h3>
+                            {storeHours?.is_closed && (
+                                <span className="text-xs px-2 py-1 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 font-bold">
+                                    CLOSED
+                                </span>
+                            )}
+                            {!storeHours?.is_closed && storeHours && (
+                                <span className="text-xs px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500">
+                                    {storeHours.open_time} - {storeHours.close_time}
+                                </span>
+                            )}
+                        </div>
                         {dateOverride && (
                             <span className="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
                                 {dateOverride.label}: {dateOverride.multiplier}x multiplier
@@ -491,51 +563,67 @@ aspect - square flex items - center justify - center text - sm rounded - lg rela
                         )}
                     </div>
 
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead>
-                                <tr className="border-b border-slate-100 dark:border-slate-800">
-                                    <th className="pb-3 text-xs font-bold text-slate-400 uppercase tracking-wider">Hour</th>
-                                    <th className="pb-3 text-xs font-bold text-slate-400 uppercase tracking-wider">Traffic Tier</th>
-                                    <th className="pb-3 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Avg Slot CPM</th>
-                                    <th className="pb-3 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Est. Impressions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                                {dailySummary.hourlyBreakdown.map((hourData) => (
-                                    <tr key={hourData.hour} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                                        <td className="py-3 font-mono text-sm">
-                                            {formatHour(hourData.hour)}
-                                        </td>
-                                        <td className="py-3">
-                                            <div className="flex items-center gap-2">
-                                                <select
-                                                    value={hourData.trafficTier.key}
-                                                    onChange={(e) => handleSetHourlyTier(hourData.hour, e.target.value)}
-                                                    className="bg-transparent text-xs border border-slate-200 dark:border-slate-700 rounded px-1 py-0.5 focus:ring-1 focus:ring-primary outline-none"
-                                                >
-                                                    {Object.keys(pricingConfig?.trafficTiers || {}).map(tierKey => (
-                                                        <option key={tierKey} value={tierKey}>
-                                                            {pricingConfig.trafficTiers[tierKey].label}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                                {pricingConfig?.dateOverrides?.[selectedDate]?.hourlyTiers?.[hourData.hour] && (
-                                                    <span className="size-1.5 rounded-full bg-blue-500" title="Override Active"></span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="py-3 text-right">
-                                            <PriceDisplay price={hourData.averageSlotPrice} size="small" />
-                                        </td>
-                                        <td className="py-3 text-right text-sm text-slate-600 dark:text-slate-400">
-                                            {pricingService.formatImpressions(hourData.totalEstimatedImpressions)}
-                                        </td>
+                    {storeHours?.is_closed ? (
+                        <div className="flex flex-col items-center justify-center h-48 text-slate-400">
+                            <span className="material-symbols-outlined text-4xl mb-2">store_off</span>
+                            <p className="font-medium">Store Is Closed</p>
+                            <p className="text-xs">No active pricing slots for this date.</p>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                                        <th className="pb-3 text-xs font-bold text-slate-400 uppercase tracking-wider">Hour</th>
+                                        <th className="pb-3 text-xs font-bold text-slate-400 uppercase tracking-wider">Traffic Tier</th>
+                                        <th className="pb-3 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Avg Slot CPM</th>
+                                        <th className="pb-3 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Est. Impressions</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                                    {dailySummary.hourlyBreakdown.length > 0 ? (
+                                        dailySummary.hourlyBreakdown.map((hourData) => (
+                                            <tr key={hourData.hour} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                                                <td className="py-3 font-mono text-sm">
+                                                    {formatHour(hourData.hour)}
+                                                </td>
+                                                <td className="py-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <select
+                                                            value={hourData.trafficTier.key}
+                                                            onChange={(e) => handleSetHourlyTier(hourData.hour, e.target.value)}
+                                                            className="bg-transparent text-xs border border-slate-200 dark:border-slate-700 rounded px-1 py-0.5 focus:ring-1 focus:ring-primary outline-none"
+                                                        >
+                                                            {Object.keys(pricingConfig?.trafficTiers || {}).map(tierKey => (
+                                                                <option key={tierKey} value={tierKey}>
+                                                                    {pricingConfig.trafficTiers[tierKey].label}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                        {pricingConfig?.dateOverrides?.[selectedDate]?.hourlyTiers?.[hourData.hour] && (
+                                                            <span className="size-1.5 rounded-full bg-blue-500" title="Override Active"></span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="py-3 text-right">
+                                                    <PriceDisplay price={hourData.averageSlotPrice} size="small" />
+                                                </td>
+                                                <td className="py-3 text-right text-sm text-slate-600 dark:text-slate-400">
+                                                    {pricingService.formatImpressions(hourData.totalEstimatedImpressions)}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan="4" className="py-8 text-center text-slate-400 text-sm">
+                                                No active hours configured for this day.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </GlassCard>
             </div>
 

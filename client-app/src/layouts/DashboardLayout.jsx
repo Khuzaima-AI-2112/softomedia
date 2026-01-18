@@ -4,6 +4,7 @@ import HamburgerMenu from '../components/HamburgerMenu';
 import PersonaSwitcher from '../components/PersonaSwitcher';
 import { useAuth } from '../contexts/AuthContext';
 import ErrorBoundary from '../components/ErrorBoundary';
+import SafeWidgetLoader from '../components/SafeWidgetLoader';
 
 function DashboardLayout() {
     const { persona, loading } = useAuth();
@@ -52,6 +53,9 @@ function DashboardLayout() {
                     <Outlet />
                 </ErrorBoundary>
             </main>
+
+            {/* AI Assistant (Ghost Layer) */}
+            <SafeWidgetLoader />
         </div>
     );
 }

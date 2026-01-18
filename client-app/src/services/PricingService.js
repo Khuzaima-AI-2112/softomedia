@@ -306,11 +306,12 @@ class PricingService {
      * @param {string} date 
      * @returns {object} Summary with hourly breakdown
      */
-    getDailyPricingSummary(date) {
+    getDailyPricingSummary(date, businessHoursRange = null) {
         const screens = this.screens;
         const hours = [];
 
-        const businessHours = { START: 8, END: 22 };
+        // Use provided range or default to 8-22
+        const businessHours = businessHoursRange || { START: 8, END: 22 };
 
         for (let hour = businessHours.START; hour < businessHours.END; hour++) {
             const trafficTier = this.getTrafficTier(hour, date);
