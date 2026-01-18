@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1768425363930" clover="3.2.0">
-  <project timestamp="1768425363930" name="All files">
-    <metrics statements="273" coveredstatements="195" conditionals="201" coveredconditionals="109" methods="68" coveredmethods="39" elements="542" coveredelements="343" complexity="0" loc="273" ncloc="273" packages="4" files="9" classes="9"/>
+<coverage generated="1768762243973" clover="3.2.0">
+  <project timestamp="1768762243973" name="All files">
+    <metrics statements="273" coveredstatements="195" conditionals="201" coveredconditionals="107" methods="68" coveredmethods="39" elements="542" coveredelements="341" complexity="0" loc="273" ncloc="273" packages="4" files="9" classes="9"/>
     <package name="api">
       <metrics statements="9" coveredstatements="8" conditionals="6" coveredconditionals="4" methods="2" coveredmethods="2"/>
       <file name="health.js" path="C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\ad-server\src\api\health.js">
@@ -18,7 +18,7 @@
       </file>
     </package>
     <package name="repositories">
-      <metrics statements="171" coveredstatements="118" conditionals="143" coveredconditionals="70" methods="45" coveredmethods="26"/>
+      <metrics statements="171" coveredstatements="118" conditionals="143" coveredconditionals="68" methods="45" coveredmethods="26"/>
       <file name="BaseRepository.js" path="C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\ad-server\src\repositories\BaseRepository.js">
         <metrics statements="64" coveredstatements="34" conditionals="42" coveredconditionals="16" methods="19" coveredmethods="10"/>
         <line num="9" count="2" type="stmt"/>
@@ -138,13 +138,13 @@
         <line num="254" count="1" type="stmt"/>
       </file>
       <file name="PricingRepository.js" path="C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\ad-server\src\repositories\PricingRepository.js">
-        <metrics statements="54" coveredstatements="49" conditionals="68" coveredconditionals="40" methods="8" coveredmethods="6"/>
+        <metrics statements="54" coveredstatements="49" conditionals="68" coveredconditionals="38" methods="8" coveredmethods="6"/>
         <line num="7" count="1" type="stmt"/>
         <line num="22" count="1" type="stmt"/>
         <line num="29" count="8" type="cond" truecount="1" falsecount="1"/>
         <line num="31" count="8" type="stmt"/>
         <line num="34" count="8" type="stmt"/>
-        <line num="35" count="8" type="cond" truecount="3" falsecount="0"/>
+        <line num="35" count="8" type="cond" truecount="1" falsecount="2"/>
         <line num="36" count="8" type="cond" truecount="1" falsecount="2"/>
         <line num="37" count="8" type="cond" truecount="1" falsecount="2"/>
         <line num="38" count="8" type="cond" truecount="1" falsecount="2"/>
