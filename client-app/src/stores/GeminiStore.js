@@ -1,5 +1,6 @@
 
 import { create } from 'zustand';
+import { API_URL } from '../config';
 
 /**
  * GeminiStore (Ghost State)
@@ -50,11 +51,10 @@ const useGeminiStore = create((set, get) => ({
         const { steps } = get();
 
         try {
-            // Determine API URL (assuming localhost:8080 for dev based on package.json/index.js)
-            // In a real setup, this might come from env var
-            const API_URL = 'http://localhost:8080/ghost-api/analyze';
+            // Use centralized API URL
+            const apiUrl = `${API_URL}/ghost-api/analyze`;
 
-            const response = await fetch(API_URL, {
+            const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ steps, persona: get().currentPersona })

@@ -30,26 +30,40 @@ function AdminOverview() {
     const loadData = async () => {
         try {
             setLoading(true);
-            await pricingService.init();
 
+            // Safely initialize services
+            try {
+                await pricingService.init();
+            } catch (err) {
+                console.error('[AdminOverview] PricingService init failed:', err);
+            }
+
+            // Fetch data with error handling for each request to prevent one failure from breaking everything
             const [allRetailers, allAdvertisers, allScreens, allLoops, allUsers] = await Promise.all([
-                apiService.getRetailers(),
-                apiService.getAdvertisers(),
-                apiService.getScreens(),
-                apiService.getLoops(),
-                apiService.getUsers()
+                apiService.getRetailers().catch(() => []),
+                apiService.getAdvertisers().catch(() => []),
+                apiService.getScreens().catch(() => []),
+                apiService.getLoops().catch(() => []),
+                apiService.getUsers().catch(() => [])
             ]);
 
-            setRetailers(allRetailers.slice(0, 4));
-            setAdvertisers(allAdvertisers.slice(0, 4));
+            // Ensure we have arrays before slicing/filtering
+            const safeRetailers = Array.isArray(allRetailers) ? allRetailers : [];
+            const safeAdvertisers = Array.isArray(allAdvertisers) ? allAdvertisers : [];
+            const safeScreens = Array.isArray(allScreens) ? allScreens : [];
+            const safeLoops = Array.isArray(allLoops) ? allLoops : [];
+            const safeUsers = Array.isArray(allUsers) ? allUsers : [];
+
+            setRetailers(safeRetailers.slice(0, 4));
+            setAdvertisers(safeAdvertisers.slice(0, 4));
 
             setStats({
-                retailers: allRetailers.length,
-                advertisers: allAdvertisers.length,
-                activeScreens: allScreens.filter(s => s.status === 'online').length,
-                totalScreens: allScreens.length,
-                pendingLoops: allLoops.filter(l => l.status === 'PENDING_APPROVAL').length,
-                totalUsers: allUsers.length
+                retailers: safeRetailers.length,
+                advertisers: safeAdvertisers.length,
+                activeScreens: safeScreens.filter(s => s.status === 'online').length,
+                totalScreens: safeScreens.length,
+                pendingLoops: safeLoops.filter(l => l.status === 'PENDING_APPROVAL').length,
+                totalUsers: safeUsers.length
             });
         } catch (error) {
             console.error('Failed to load admin overview data:', error);
