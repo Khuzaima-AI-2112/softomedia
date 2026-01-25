@@ -13,6 +13,7 @@ import compression from 'compression';
 import { requestLogger } from './src/utils/logger.js';
 
 const app = express();
+app.set('trust proxy', 1); // Trust first proxy (Cloud Run Load Balancer)
 
 // Environment-based CORS configuration
 const DEV_ORIGINS = ['http://localhost:5173', 'http://localhost:5174'];
