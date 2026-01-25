@@ -12,7 +12,7 @@ steps:
         node verify_predeploy.js
         
         echo "🔐 Verifying Secrets..."
-        for SECRET in JWT_SECRET; do
+        for SECRET in JWT_SECRET GEMINI_API_KEY; do
           if ! gcloud secrets describe "$$SECRET" --project=$PROJECT_ID &>/dev/null; then
             echo "ERROR: Secret '$$SECRET' not found in Secret Manager"
             exit 1
@@ -74,7 +74,7 @@ steps:
           --platform managed \
           --allow-unauthenticated \
           --set-env-vars "NODE_ENV=production,CORS_ORIGINS=*,BUILD_ID=$BUILD_ID,ALLOW_DEMO_MODE=true" \
-          --set-secrets "JWT_SECRET=JWT_SECRET:latest" \
+          --set-secrets "JWT_SECRET=JWT_SECRET:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest" \
           --labels "version=$BUILD_ID,deployed-by=cloud-build"
         
         SERVICE_URL=$$(gcloud run services describe ${_SERVICE_ADSERVER} --region ${_REGION} --format='value(status.url)')
