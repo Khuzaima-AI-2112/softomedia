@@ -1,3 +1,4 @@
+/* global pricingService */
 /**
  * CPM Pricing Diagnostic Script
  * Run this in browser console to diagnose pricing calculation issues

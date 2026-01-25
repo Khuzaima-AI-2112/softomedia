@@ -3,7 +3,6 @@
  * Visual indicator for traffic tier levels
  */
 
-import React from 'react';
 
 const tierStyles = {
     veryLow: {

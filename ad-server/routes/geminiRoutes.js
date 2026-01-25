@@ -31,7 +31,7 @@ router.post('/analyze', async (req, res) => {
         // Steps structure: { url, note, timestamp, image (base64) }
         
         const promptParts = [
-            { text: "You are an expert AdTech support engineering assistant. You are analyzing a user's walkthrough of their AdManager dashboard to debug an issue. The user has provided screenshots and notes for each step of their workflow.\n\n" }
+            { text: 'You are an expert AdTech support engineering assistant. You are analyzing a user\'s walkthrough of their AdManager dashboard to debug an issue. The user has provided screenshots and notes for each step of their workflow.\n\n' }
         ];
 
         steps.forEach((step, index) => {
@@ -51,7 +51,7 @@ router.post('/analyze', async (req, res) => {
             }
         });
 
-        promptParts.push({ text: "\n\nBased on the sequence above, please analyze the user's issue. Explain what might be going wrong with the calculations or state based on the visual evidence and their notes. Provide actionable debugging steps." });
+        promptParts.push({ text: '\n\nBased on the sequence above, please analyze the user\'s issue. Explain what might be going wrong with the calculations or state based on the visual evidence and their notes. Provide actionable debugging steps.' });
 
         const reqContent = {
             contents: [

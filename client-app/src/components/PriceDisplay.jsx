@@ -3,7 +3,6 @@
  * Consistent price formatting with CPM and impression display
  */
 
-import React from 'react';
 import pricingService from '../services/PricingService';
 
 function PriceDisplay({

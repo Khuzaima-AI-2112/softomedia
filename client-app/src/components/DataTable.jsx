@@ -1,4 +1,3 @@
-import React from 'react';
 
 const DataTable = ({ columns, data, loading, emptyMessage = 'No data available' }) => {
     if (loading) {

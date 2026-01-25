@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -23,7 +23,8 @@ function HamburgerMenu() {
             { label: 'Business Hours', path: '/dashboard/admin/hours', icon: 'schedule' },
             { label: 'Advertisers', path: '/dashboard/admin/advertisers', icon: 'campaign' },
             { label: 'Network Map', path: '/dashboard/admin/map', icon: 'map' },
-            { label: 'System Health', path: '/dashboard/health', icon: 'health_metrics' }
+            { label: 'System Health', path: '/dashboard/health', icon: 'health_metrics' },
+            { label: 'Ticket Index', path: '/dashboard/tickets', icon: 'history_edu' }
         ] : []),
         ...(user?.role === 'retailer' ? [
             { label: 'Schedule Manager', path: '/dashboard/retailer/schedule', icon: 'calendar_today' },

@@ -1,4 +1,3 @@
-import React from 'react';
 
 const GlassChart = ({ title, height = '200px', children }) => {
     return (

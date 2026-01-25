@@ -1,4 +1,3 @@
-import React from 'react';
 
 const KPICard = ({ label, value, trend, icon, color = 'text-primary', description }) => {
     return (

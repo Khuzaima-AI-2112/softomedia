@@ -2,9 +2,22 @@
 description: Execute all verification workflows and test suites in a single master test
 ---
 
-# Master Verification Workflow (/bigtest)
+# Master Verification Workflow (/bigtest) - ANALYTICAL MODE
 
-This workflow aggregates all critical system health checks, security audits, pricing governance, and automated test suites to ensure 100% production-readiness.
+This workflow executes all verification protocols in a **READ-ONLY** capacity. 
+
+**STRICT RULE**: If any step fails, **DO NOT FIX IT**. 
+Instead, you must stop and generate an **SRE Incident Report**.
+
+## Failure Protocol
+If a failure occurs in any phase:
+1. **STOP** execution.
+2. **ANALYZE** the error log.
+3. **CREATE** a report file: `sre-reports/report-[TIMESTAMP].md`.
+4. **DOCUMENT**:
+   - **Root Cause**: What exactly failed?
+   - **Impact**: What is broken?
+   - **Proposed Fix**: How should it be fixed? (Do not implement it).
 
 ## Phase 1: Environment & Project Context
 // turbo
@@ -81,4 +94,4 @@ This workflow aggregates all critical system health checks, security audits, pri
     ```
 
 ## Summary
-If every phase green-lights, the system is verified for security, hygiene, stability, and production-readiness.
+This run was purely analytical. If failures were found, consult the generated SRE Report in `sre-reports/`. DO NOT APPLY FIXES AUTOMATICALLY.

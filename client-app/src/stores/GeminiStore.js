@@ -13,6 +13,9 @@ const useGeminiStore = create((set, get) => ({
     response: null,
     isAnalyzing: false,
     error: null,
+    currentPersona: 'CRM_buyer_persona', // Default persona
+    sessionCount: 0,
+    dailyCount: 0,
 
     // Actions
     toggleOpen: () => set((state) => ({ isOpen: !state.isOpen })),
@@ -40,6 +43,8 @@ const useGeminiStore = create((set, get) => ({
         // Placeholder for UI feedback
     },
 
+    setPersona: (persona) => set({ currentPersona: persona }),
+
     submitQuery: async () => {
         set({ isRecording: false, isAnalyzing: true, error: null });
         const { steps } = get();
@@ -52,7 +57,7 @@ const useGeminiStore = create((set, get) => ({
             const response = await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ steps })
+                body: JSON.stringify({ steps, persona: get().currentPersona })
             });
 
             if (!response.ok) {
@@ -61,7 +66,12 @@ const useGeminiStore = create((set, get) => ({
             }
 
             const data = await response.json();
-            set({ response: data.answer, isAnalyzing: false });
+            set((state) => ({
+                response: data.answer,
+                isAnalyzing: false,
+                sessionCount: state.sessionCount + 1,
+                dailyCount: data.usage?.daily || state.dailyCount
+            }));
 
         } catch (err) {
             console.error('[GeminiStore] Analysis failed:', err);

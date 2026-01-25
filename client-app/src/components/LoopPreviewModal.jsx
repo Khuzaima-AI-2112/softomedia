@@ -4,7 +4,7 @@
  * Allows approve/reject of individual ads
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import StatusBadge from './StatusBadge';
 import { API_URL } from '../config';
 

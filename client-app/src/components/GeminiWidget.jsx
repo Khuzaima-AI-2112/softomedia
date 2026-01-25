@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import useGeminiStore from '../stores/GeminiStore';
 import { captureScreen } from '../services/SnapshotService';
@@ -72,10 +72,26 @@ const GeminiWidget = () => {
 
                     {/* Header */}
                     <div className="p-4 border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800/80 flex justify-between items-center">
-                        <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                            <span className="material-symbols-outlined text-primary">psychology</span>
-                            Context Assistant
-                        </h3>
+                        <div className="flex flex-col gap-1">
+                            <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary">psychology</span>
+                                Context Assistant
+                            </h3>
+                            <div className="flex gap-1 ml-7">
+                                <button
+                                    onClick={() => useGeminiStore.getState().setPersona('CRM_buyer_persona')}
+                                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${useGeminiStore.getState().currentPersona === 'CRM_buyer_persona' ? 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900/40 dark:border-blue-700 dark:text-blue-300' : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:border-slate-700'}`}
+                                >
+                                    Buyer
+                                </button>
+                                <button
+                                    onClick={() => useGeminiStore.getState().setPersona('software_tester_persona')}
+                                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${useGeminiStore.getState().currentPersona === 'software_tester_persona' ? 'bg-purple-100 border-purple-300 text-purple-700 dark:bg-purple-900/40 dark:border-purple-700 dark:text-purple-300' : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:border-slate-700'}`}
+                                >
+                                    Tester
+                                </button>
+                            </div>
+                        </div>
                         <button onClick={toggleOpen} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
                             <span className="material-symbols-outlined">close</span>
                         </button>
@@ -89,7 +105,7 @@ const GeminiWidget = () => {
                             <div className="absolute inset-0 bg-white/90 dark:bg-slate-900/90 z-10 flex flex-col items-center justify-center p-6 text-center">
                                 <span className="material-symbols-outlined text-4xl text-primary animate-pulse mb-4">memory</span>
                                 <h4 className="font-bold text-slate-800 dark:text-white">Analyzing Context...</h4>
-                                <p className="text-sm text-slate-500 mt-2">I'm reviewing your screenshots and notes to identify the issue.</p>
+                                <p className="text-sm text-slate-500 mt-2">I&apos;m reviewing your screenshots and notes to identify the issue.</p>
                             </div>
                         )}
 
@@ -102,7 +118,7 @@ const GeminiWidget = () => {
                                 <div>
                                     <h4 className="font-semibold text-slate-900 dark:text-white">Start a Walkthrough</h4>
                                     <p className="text-sm text-slate-500 mt-1 px-4">
-                                        Navigate through the app and record up to 3 steps. I'll analyze the context to debug your issue.
+                                        Navigate through the app and record up to 3 steps. I&apos;ll analyze the context to debug your issue.
                                     </p>
                                 </div>
                                 <button
@@ -241,6 +257,15 @@ const GeminiWidget = () => {
                                 </button>
                             </div>
                         )}
+
+                        {/* Usage Stats */}
+                        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-[10px] text-slate-400 font-mono">
+                            <div>
+                                <span className="font-bold text-primary">API Usage: </span>
+                                Session {useGeminiStore.getState().sessionCount} | Daily {useGeminiStore.getState().dailyCount}
+                            </div>
+                            <div>v2.0-flash</div>
+                        </div>
 
                     </div>
                 </div>

@@ -3,7 +3,7 @@
  * Part of the advertiser campaign booking wizard
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import GlassCard from '../../../components/GlassCard';
 
 // Demo creative URLs for quick selection

@@ -1,6 +1,5 @@
 import { render, screen } from '@testing-library/react';
 import GlassCard from './GlassCard';
-import React from 'react';
 import { expect, test } from 'vitest'; // Keeping these for now but fixing path
 
 test('GlassCard renders children', () => {

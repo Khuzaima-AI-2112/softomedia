@@ -3,7 +3,6 @@
  * 12-slot grid visualization for loop booking
  */
 
-import React from 'react';
 import TrafficTierBadge from './TrafficTierBadge';
 import { PriceInline } from './PriceDisplay';
 

@@ -3,7 +3,6 @@
  * Part of the advertiser campaign booking wizard (5-step flow)
  */
 
-import React from 'react';
 import GlassCard from '../../../components/GlassCard';
 
 const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {

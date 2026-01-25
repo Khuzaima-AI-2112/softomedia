@@ -26,7 +26,7 @@ class BusinessHoursRepositoryClass extends BaseRepository {
      */
     async updateDefaultHours(storeId, weeklyHours) {
         // Find existing to replace or update
-        const existing = await this.getDefaultHours(storeId);
+        // const existing = await this.getDefaultHours(storeId); // Unused
 
         // This implementation keeps it simple - for a real production environment
         // we might want a transaction to delete and recreate.

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import apiService from '../../../services/ApiService';
 
 const Step1LocationScreen = ({ data, updateData, onNext }) => {

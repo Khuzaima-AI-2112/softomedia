@@ -2,7 +2,7 @@
 import logger from './src/utils/logger.js';
 import {
     userRepository,
-    adRepository,
+    // adRepository,
     screenRepository,
     retailerRepository,
     advertiserRepository,
@@ -116,7 +116,7 @@ async function seed() {
 
         const stats = { created: 0, skipped: 0, failed: 0 };
 
-        async function safeCreate(repo, id, data, name) {
+        const safeCreate = async (repo, id, data, name) => {
             try {
                 await repo.create(id, data);
                 logger.info(`[Seed] ✅ Created ${name}: ${id}`);
@@ -130,7 +130,7 @@ async function seed() {
                     stats.failed++;
                 }
             }
-        }
+        };
 
         // Seed retailers
         logger.info('[Seed] Seeding retailers...');

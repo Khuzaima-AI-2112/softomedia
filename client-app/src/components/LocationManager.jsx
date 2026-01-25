@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import GlassCard from './GlassCard';
 import StatusBadge from './StatusBadge';
 import apiService from '../services/ApiService';

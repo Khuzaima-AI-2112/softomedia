@@ -26,6 +26,8 @@ const ScheduleCalendar = lazy(() => import('./pages/retailer/ScheduleCalendar'))
 const ScheduleHistory = lazy(() => import('./pages/retailer/ScheduleHistory'));
 const TechOpsDashboard = lazy(() => import('./pages/tech/TechOpsDashboard'));
 const Health = lazy(() => import('./pages/Health'));
+const TicketDashboard = lazy(() => import('./components/TicketDashboard'));
+const TicketDetail = lazy(() => import('./components/TicketDetail'));
 
 
 function App() {
@@ -60,6 +62,8 @@ function App() {
                             <Route path="retailer/history" element={<ScheduleHistory />} />
                             <Route path="tech" element={<TechOpsDashboard />} />
                             <Route path="health" element={<Health />} />
+                            <Route path="tickets" element={<TicketDashboard />} />
+                            <Route path="tickets/:id" element={<TicketDetail />} />
                         </Route>
                         <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     </Routes>

@@ -1,0 +1,183 @@
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\scripts\capture_screenshots.js[24m[0m
+[0m  [2m13:7[22m  [33mwarning[39m  'TIMEOUT' is assigned a value but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\ApprovalActions.jsx[24m[0m
+[0m  [2m6:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\CampaignApprovalList.jsx[24m[0m
+[0m  [2m3:8[22m  [33mwarning[39m  'StatusBadge' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\DataTable.jsx[24m[0m
+[0m  [2m1:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\GeminiWidget.jsx[24m[0m
+[0m  [2m2:8[22m   [33mwarning[39m  'React' is defined but never used   [2mno-unused-vars[22m[0m
+[0m  [2m2:27[22m  [33mwarning[39m  'useRef' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\GlassCard.jsx[24m[0m
+[0m  [2m1:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\GlassCard.test.jsx[24m[0m
+[0m  [2m3:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\GlassChart.jsx[24m[0m
+[0m  [2m1:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\HamburgerMenu.jsx[24m[0m
+[0m  [2m1:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\KPICard.jsx[24m[0m
+[0m  [2m1:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\LocationManager.jsx[24m[0m
+[0m  [2m1:8[22m   [33mwarning[39m  'React' is defined but never used          [2mno-unused-vars[22m[0m
+[0m  [2m8:13[22m  [33mwarning[39m  'user' is assigned a value but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\LoopPreview.jsx[24m[0m
+[0m  [2m1:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\LoopPreviewModal.jsx[24m[0m
+[0m  [2m7:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\PersonaSwitcher.jsx[24m[0m
+[0m  [2m1:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\PriceDisplay.jsx[24m[0m
+[0m  [2m6:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\SlotGrid.jsx[24m[0m
+[0m  [2m6:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\StatusBadge.jsx[24m[0m
+[0m  [2m1:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\SupportTicketModal.jsx[24m[0m
+[0m  [2m1:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\TicketDashboard.jsx[24m[0m
+[0m  [2m1:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\TicketDetail.jsx[24m[0m
+[0m  [2m1:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\TrafficTierBadge.jsx[24m[0m
+[0m  [2m6:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\contexts\AuthContext.jsx[24m[0m
+[0m  [2m63:14[22m  [33mwarning[39m  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  [2mreact-refresh/only-export-components[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\Health.jsx[24m[0m
+[0m  [2m1:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\Login.jsx[24m[0m
+[0m  [2m1:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\LoopDemoPlayer.jsx[24m[0m
+[0m   [2m1:8[22m  [33mwarning[39m  'React' is defined but never used                                                                            [2mno-unused-vars[22m[0m
+[0m   [2m7:7[22m  [33mwarning[39m  'LOOP_DURATION' is assigned a value but never used                                                           [2mno-unused-vars[22m[0m
+[0m  [2m38:8[22m  [33mwarning[39m  React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array  [2mreact-hooks/exhaustive-deps[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\Player.jsx[24m[0m
+[0m    [2m1:8[22m   [33mwarning[39m  'React' is defined but never used                                                                                 [2mno-unused-vars[22m[0m
+[0m   [2m25:12[22m  [33mwarning[39m  'screenData' is assigned a value but never used                                                                   [2mno-unused-vars[22m[0m
+[0m   [2m25:24[22m  [33mwarning[39m  'setScreenData' is assigned a value but never used                                                                [2mno-unused-vars[22m[0m
+[0m   [2m39:49[22m  [33mwarning[39m  'screenId' is defined but never used. Allowed unused args must match /^_/u                                        [2mno-unused-vars[22m[0m
+[0m  [2m197:8[22m   [33mwarning[39m  React Hook useEffect has a missing dependency: 'sendTelemetry'. Either include it or remove the dependency array  [2mreact-hooks/exhaustive-deps[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\AdvertiserManagement.jsx[24m[0m
+[0m   [2m1:8[22m   [33mwarning[39m  'React' is defined but never used             [2mno-unused-vars[22m[0m
+[0m  [2m19:12[22m  [33mwarning[39m  'loading' is assigned a value but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\BusinessHoursManagement.jsx[24m[0m
+[0m  [2m1:8[22m  [33mwarning[39m  'React' is defined but never used        [2mno-unused-vars[22m[0m
+[0m  [2m3:8[22m  [33mwarning[39m  'StatusBadge' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\CPMCalendar.jsx[24m[0m
+[0m   [2m24:7[22m   [33mwarning[39m  'getBusinessHours' is assigned a value but never used                                                             [2mno-unused-vars[22m[0m
+[0m   [2m51:12[22m  [33mwarning[39m  'loading' is assigned a value but never used                                                                      [2mno-unused-vars[22m[0m
+[0m   [2m52:12[22m  [33mwarning[39m  'editingTier' is assigned a value but never used                                                                  [2mno-unused-vars[22m[0m
+[0m   [2m69:8[22m   [33mwarning[39m  React Hook useEffect has a missing dependency: 'selectedStore'. Either include it or remove the dependency array  [2mreact-hooks/exhaustive-deps[22m[0m
+[0m  [2m207:11[22m  [33mwarning[39m  'handleSaveTrafficTier' is assigned a value but never used                                                        [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\LoopAnalytics.jsx[24m[0m
+[0m  [2m10:10[22m  [33mwarning[39m  'API_URL' is defined but never used                                                                                [2mno-unused-vars[22m[0m
+[0m  [2m58:8[22m   [33mwarning[39m  React Hook useEffect has a missing dependency: 'fetchAnalytics'. Either include it or remove the dependency array  [2mreact-hooks/exhaustive-deps[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\LoopBuilder.jsx[24m[0m
+[0m  [2m27:8[22m  [33mwarning[39m  React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array  [2mreact-hooks/exhaustive-deps[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\LoopManagement.jsx[24m[0m
+[0m   [2m4:8[22m  [33mwarning[39m  'StatusBadge' is defined but never used                                                                        [2mno-unused-vars[22m[0m
+[0m  [2m56:8[22m  [33mwarning[39m  React Hook useEffect has a missing dependency: 'fetchLoops'. Either include it or remove the dependency array  [2mreact-hooks/exhaustive-deps[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\NetworkMap.jsx[24m[0m
+[0m  [2m1:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\Overview.jsx[24m[0m
+[0m   [2m1:8[22m   [33mwarning[39m  'React' is defined but never used             [2mno-unused-vars[22m[0m
+[0m  [2m21:12[22m  [33mwarning[39m  'loading' is assigned a value but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\PlaylistEditor.jsx[24m[0m
+[0m  [2m1:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\PlaylistManagement.jsx[24m[0m
+[0m  [2m1:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\RetailerManagement.jsx[24m[0m
+[0m   [2m1:8[22m   [33mwarning[39m  'React' is defined but never used             [2mno-unused-vars[22m[0m
+[0m  [2m11:12[22m  [33mwarning[39m  'loading' is assigned a value but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\ScreenManagement.jsx[24m[0m
+[0m  [2m1:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\UserManagement.jsx[24m[0m
+[0m   [2m1:8[22m   [33mwarning[39m  'React' is defined but never used             [2mno-unused-vars[22m[0m
+[0m  [2m19:12[22m  [33mwarning[39m  'loading' is assigned a value but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\brand\BrandDashboard.jsx[24m[0m
+[0m   [2m1:8[22m   [33mwarning[39m  'React' is defined but never used             [2mno-unused-vars[22m[0m
+[0m  [2m12:12[22m  [33mwarning[39m  'loading' is assigned a value but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\brand\wizard\Step1LocationScreen.jsx[24m[0m
+[0m   [2m1:8[22m   [33mwarning[39m  'React' is defined but never used                              [2mno-unused-vars[22m[0m
+[0m  [2m75:11[22m  [33mwarning[39m  'selectAllScreensForStore' is assigned a value but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\brand\wizard\Step2ScheduleUpload.jsx[24m[0m
+[0m  [2m6:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\brand\wizard\Step3LoopSlotSelection.jsx[24m[0m
+[0m   [2m1:8[22m  [33mwarning[39m  'React' is defined but never used                                                                             [2mno-unused-vars[22m[0m
+[0m  [2m50:8[22m  [33mwarning[39m  React Hook useEffect has a missing dependency: 'loadLoops'. Either include it or remove the dependency array  [2mreact-hooks/exhaustive-deps[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\brand\wizard\Step3ReviewDistribution.jsx[24m[0m
+[0m   [2m1:8[22m   [33mwarning[39m  'React' is defined but never used           [2mno-unused-vars[22m[0m
+[0m  [2m39:62[22m  [33mwarning[39m  'error' is assigned a value but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\brand\wizard\Step4CreativeUpload.jsx[24m[0m
+[0m  [2m6:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\brand\wizard\Step5ReviewConfirm.jsx[24m[0m
+[0m    [2m1:8[22m   [33mwarning[39m  'React' is defined but never used              [2mno-unused-vars[22m[0m
+[0m    [2m4:10[22m  [33mwarning[39m  'PriceSummary' is defined but never used       [2mno-unused-vars[22m[0m
+[0m    [2m5:8[22m   [33mwarning[39m  'TrafficTierBadge' is defined but never used   [2mno-unused-vars[22m[0m
+[0m    [2m6:8[22m   [33mwarning[39m  'apiService' is defined but never used         [2mno-unused-vars[22m[0m
+[0m   [2m10:11[22m  [33mwarning[39m  'navigate' is assigned a value but never used  [2mno-unused-vars[22m[0m
+[0m  [2m136:43[22m  [33mwarning[39m  'tier' is assigned a value but never used      [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\retailer\RetailerDashboard.jsx[24m[0m
+[0m  [2m1:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\retailer\ScheduleCalendar.jsx[24m[0m
+[0m  [2m62:8[22m  [33mwarning[39m  React Hook useEffect has a missing dependency: 'fetchLoops'. Either include it or remove the dependency array  [2mreact-hooks/exhaustive-deps[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\retailer\ScheduleHistory.jsx[24m[0m
+[0m  [2m1:8[22m  [33mwarning[39m  'React' is defined but never used  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\retailer\ScheduleManager.jsx[24m[0m
+[0m   [2m1:8[22m   [33mwarning[39m  'React' is defined but never used                                                                                  [2mno-unused-vars[22m[0m
+[0m  [2m10:12[22m  [33mwarning[39m  'isLoading' is assigned a value but never used                                                                     [2mno-unused-vars[22m[0m
+[0m  [2m14:8[22m   [33mwarning[39m  React Hook useEffect has a missing dependency: 'fetchLocations'. Either include it or remove the dependency array  [2mreact-hooks/exhaustive-deps[22m[0m
+[0m[0m
+[0m[33m[1m✖ 80 problems (0 errors, 80 warnings)[22m[39m[0m
+[0m[33m[1m[22m[39m[0m

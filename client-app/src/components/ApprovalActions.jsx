@@ -3,7 +3,7 @@
  * Used in retailer validation workflows
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import GlassCard from './GlassCard';
 
 function ApprovalActions({

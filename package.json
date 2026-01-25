@@ -11,6 +11,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
+    "lint": "cd ad-server && npm run lint && cd ../client-app && npm run lint",
     "db:seed": "cd ad-server && npm run seed"
   },
   "keywords": [],

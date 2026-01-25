@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import GlassCard from '../../components/GlassCard';
 import LoopPreview from '../../components/LoopPreview';
 import { API_URL } from '../../config';
