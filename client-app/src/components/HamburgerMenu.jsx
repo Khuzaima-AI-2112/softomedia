@@ -11,7 +11,7 @@ function HamburgerMenu() {
         { label: 'Dashboard', path: `/dashboard/${user?.role || 'admin'}`, icon: 'dashboard' },
         { label: 'Ad Player', path: '/player', icon: 'play_circle' },
         { label: 'Demo Player', path: '/player/demo', icon: 'slideshow' },
-        ...(user?.role === 'admin' ? [
+        ...(user?.role === 'admin' || user?.role === 'super_admin' ? [
             { label: 'Overview', path: '/dashboard/admin', icon: 'dashboard' },
             { label: 'Screens', path: '/dashboard/admin/screens', icon: 'monitor' },
             { label: 'Playlists', path: '/dashboard/admin/playlists', icon: 'playlist_play' },
@@ -24,7 +24,8 @@ function HamburgerMenu() {
             { label: 'Advertisers', path: '/dashboard/admin/advertisers', icon: 'campaign' },
             { label: 'Network Map', path: '/dashboard/admin/map', icon: 'map' },
             { label: 'System Health', path: '/dashboard/health', icon: 'health_metrics' },
-            { label: 'Ticket Index', path: '/dashboard/tickets', icon: 'history_edu' }
+            { label: 'Ticket Index', path: '/dashboard/tickets', icon: 'history_edu' },
+            { label: 'AI Log', path: '/dashboard/admin/ai-log', icon: 'psychology' }
         ] : []),
         ...(user?.role === 'retailer' ? [
             { label: 'Schedule Manager', path: '/dashboard/retailer/schedule', icon: 'calendar_today' },

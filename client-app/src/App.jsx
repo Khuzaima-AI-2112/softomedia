@@ -28,6 +28,7 @@ const TechOpsDashboard = lazy(() => import('./pages/tech/TechOpsDashboard'));
 const Health = lazy(() => import('./pages/Health'));
 const TicketDashboard = lazy(() => import('./components/TicketDashboard'));
 const TicketDetail = lazy(() => import('./components/TicketDetail'));
+const AILog = lazy(() => import('./pages/admin/AILog'));
 
 
 function App() {
@@ -54,6 +55,7 @@ function App() {
                             <Route path="admin/retailers" element={<RetailerManagement />} />
                             <Route path="admin/hours" element={<BusinessHoursManagement />} />
                             <Route path="admin/advertisers" element={<AdvertiserManagement />} />
+                            <Route path="admin/ai-log" element={<AILog />} />
                             <Route path="brand" element={<BrandDashboard />} />
                             <Route path="brand/campaign/new" element={<BrandCampaignWizard />} />
                             <Route path="retailer" element={<RetailerDashboard />} />

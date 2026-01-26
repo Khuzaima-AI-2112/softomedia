@@ -3,7 +3,8 @@ import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import useGeminiStore from '../stores/GeminiStore';
 import { captureScreen } from '../services/SnapshotService';
-import ReactMarkdown from 'react-markdown'; // Ensure this is installed or handle if not
+import ReactMarkdown from 'react-markdown';
+import StarRating from './StarRating';
 
 /**
  * GeminiWidget (The Observer)
@@ -15,7 +16,11 @@ const GeminiWidget = () => {
         isOpen, toggleOpen,
         isRecording, startRecording, cancelRecording,
         steps, addStep,
-        isAnalyzing, response, error
+        isAnalyzing, response, error,
+        currentTicketId, hasRated, submitRating,
+        // Conversation state
+        messages, isFollowUp, followUpText, setFollowUpText,
+        continueConversation, startNewConversation
     } = useGeminiStore();
 
     // Local State (Input)
@@ -218,18 +223,124 @@ const GeminiWidget = () => {
                             </div>
                         )}
 
-                        {/* MODE: RESULT */}
-                        {response && (
+                        {/* MODE: RESULT / CONVERSATION */}
+                        {(response || messages.length > 0) && !isRecording && !isFollowUp && (
                             <div className="space-y-4">
-                                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800 prose prose-sm dark:prose-invert max-w-none">
-                                    <ReactMarkdown>{response}</ReactMarkdown>
+                                {/* Conversation History */}
+                                {messages.length > 0 && (
+                                    <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar">
+                                        {messages.map((msg, idx) => (
+                                            <div
+                                                key={idx}
+                                                className={`p-3 rounded-lg ${
+                                                    msg.role === 'user'
+                                                        ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 ml-4'
+                                                        : 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 mr-4'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className={`material-symbols-outlined text-sm ${msg.role === 'user' ? 'text-blue-600' : 'text-green-600'}`}>
+                                                        {msg.role === 'user' ? 'person' : 'smart_toy'}
+                                                    </span>
+                                                    <span className="text-[10px] font-semibold uppercase text-slate-500">
+                                                        {msg.role === 'user' ? 'You' : 'Gemini'}
+                                                    </span>
+                                                </div>
+                                                {msg.role === 'assistant' ? (
+                                                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                                                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-sm text-slate-700 dark:text-slate-300">
+                                                        {msg.steps ? (
+                                                            <span className="flex items-center gap-1">
+                                                                <span className="material-symbols-outlined text-xs">image</span>
+                                                                {msg.steps.length} screenshot(s): {msg.content}
+                                                            </span>
+                                                        ) : msg.content}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Latest Response (if no conversation history) */}
+                                {messages.length === 0 && response && (
+                                    <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800 prose prose-sm dark:prose-invert max-w-none">
+                                        <ReactMarkdown>{response}</ReactMarkdown>
+                                    </div>
+                                )}
+
+                                {/* Rating Component */}
+                                {currentTicketId && !hasRated && (
+                                    <StarRating
+                                        onSubmit={submitRating}
+                                        disabled={hasRated}
+                                    />
+                                )}
+
+                                {/* Conversation Actions */}
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={continueConversation}
+                                        className="flex-1 py-2 bg-primary text-white text-sm font-medium rounded hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <span className="material-symbols-outlined text-sm">chat</span>
+                                        Continue Conversation
+                                    </button>
+                                    <button
+                                        onClick={startNewConversation}
+                                        className="flex-1 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-sm flex items-center justify-center gap-2"
+                                    >
+                                        <span className="material-symbols-outlined text-sm">add</span>
+                                        New Conversation
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={startRecording} // Restart
-                                    className="w-full py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded hover:bg-slate-200 transition-colors text-sm"
-                                >
-                                    Start New Session
-                                </button>
+                            </div>
+                        )}
+
+                        {/* MODE: FOLLOW-UP */}
+                        {isFollowUp && (
+                            <div className="space-y-4">
+                                {/* Mini conversation history */}
+                                {messages.length > 0 && (
+                                    <div className="text-xs text-slate-500 flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-sm">history</span>
+                                        {messages.length} messages in this conversation
+                                    </div>
+                                )}
+
+                                {/* Follow-up input */}
+                                <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border-2 border-primary/20">
+                                    <label className="block text-xs font-semibold text-primary mb-2 flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-sm">chat</span>
+                                        Follow-up Question
+                                    </label>
+                                    <textarea
+                                        value={followUpText}
+                                        onChange={(e) => setFollowUpText(e.target.value)}
+                                        placeholder="Ask a follow-up question..."
+                                        className="w-full p-2 text-sm border rounded bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 focus:outline-none focus:border-primary resize-none h-24"
+                                        autoFocus
+                                    />
+                                    <div className="flex gap-2 mt-2">
+                                        <button
+                                            onClick={() => useGeminiStore.getState().cancelRecording()}
+                                            className="flex-1 py-2 text-sm text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={handleFinish}
+                                            disabled={!followUpText.trim()}
+                                            className="flex-1 py-2 bg-primary text-white text-sm font-medium rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                        >
+                                            <span className="material-symbols-outlined text-sm">send</span>
+                                            Send
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         )}
 

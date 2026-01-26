@@ -17,13 +17,52 @@ const useGeminiStore = create((set, get) => ({
     currentPersona: 'CRM_buyer_persona', // Default persona
     sessionCount: 0,
     dailyCount: 0,
+    // Rating state
+    currentTicketId: null,
+    hasRated: false,
+    // Conversation state
+    conversationId: null,
+    messages: [], // Array<{ role: 'user'|'assistant', content: string, timestamp: string, steps?: array }>
+    isFollowUp: false,
+    followUpText: '',
 
     // Actions
     toggleOpen: () => set((state) => ({ isOpen: !state.isOpen })),
 
-    startRecording: () => set({ isRecording: true, steps: [], response: null, error: null }),
+    startRecording: () => set({
+        isRecording: true,
+        steps: [],
+        response: null,
+        error: null,
+        currentTicketId: null,
+        hasRated: false,
+        isFollowUp: false,
+        followUpText: ''
+    }),
 
-    cancelRecording: () => set({ isRecording: false, steps: [] }),
+    cancelRecording: () => set({ isRecording: false, steps: [], isFollowUp: false, followUpText: '' }),
+
+    // Conversation actions
+    startNewConversation: () => set({
+        isRecording: true,
+        steps: [],
+        response: null,
+        error: null,
+        currentTicketId: null,
+        hasRated: false,
+        conversationId: null,
+        messages: [],
+        isFollowUp: false,
+        followUpText: ''
+    }),
+
+    continueConversation: () => set({
+        isFollowUp: true,
+        followUpText: '',
+        hasRated: false
+    }),
+
+    setFollowUpText: (text) => set({ followUpText: text }),
 
     addStep: (stepData) => {
         const currentSteps = get().steps;
@@ -48,16 +87,37 @@ const useGeminiStore = create((set, get) => ({
 
     submitQuery: async () => {
         set({ isRecording: false, isAnalyzing: true, error: null });
-        const { steps } = get();
+        const { steps, conversationId, messages, currentPersona, isFollowUp, followUpText } = get();
 
         try {
             // Use centralized API URL
             const apiUrl = `${API_URL}/ghost-api/analyze`;
 
+            // Build user message for conversation history
+            const userMessage = {
+                role: 'user',
+                content: isFollowUp ? followUpText : (steps[0]?.note || 'Analysis request'),
+                timestamp: new Date().toISOString(),
+                steps: isFollowUp ? null : steps
+            };
+
+            // Build request payload
+            const payload = {
+                steps: isFollowUp ? [] : steps,
+                persona: currentPersona,
+                conversationId: conversationId,
+                // Include previous messages for context (text only, no images)
+                conversationHistory: messages.map(m => ({
+                    role: m.role,
+                    content: m.role === 'user' ? (m.steps ? `[Screenshots + Note: ${m.content}]` : m.content) : m.content
+                })),
+                followUpText: isFollowUp ? followUpText : null
+            };
+
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ steps, persona: get().currentPersona })
+                body: JSON.stringify(payload)
             });
 
             if (!response.ok) {
@@ -66,16 +126,61 @@ const useGeminiStore = create((set, get) => ({
             }
 
             const data = await response.json();
+
+            // Build assistant message
+            const assistantMessage = {
+                role: 'assistant',
+                content: data.answer,
+                timestamp: new Date().toISOString(),
+                ticketId: data.ticketId
+            };
+
             set((state) => ({
                 response: data.answer,
                 isAnalyzing: false,
                 sessionCount: state.sessionCount + 1,
-                dailyCount: data.usage?.daily || state.dailyCount
+                dailyCount: data.usage?.daily || state.dailyCount,
+                currentTicketId: data.ticketId || null,
+                hasRated: false,
+                // Update conversation state
+                conversationId: data.conversationId || state.conversationId || `conv-${Date.now()}`,
+                messages: [...state.messages, userMessage, assistantMessage],
+                isFollowUp: false,
+                followUpText: ''
             }));
 
         } catch (err) {
             console.error('[GeminiStore] Analysis failed:', err);
             set({ error: err.message || 'Failed to connect to the Ghost Brain.', isAnalyzing: false });
+        }
+    },
+
+    submitRating: async ({ rating, feedback }) => {
+        const { currentTicketId } = get();
+        if (!currentTicketId) {
+            console.warn('[GeminiStore] No ticket ID to rate');
+            return false;
+        }
+
+        try {
+            const apiUrl = `${API_URL}/ghost-api/tickets/${currentTicketId}/rate`;
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rating, feedback })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Rating failed: ${response.status}`);
+            }
+
+            set({ hasRated: true });
+            console.log(`[GeminiStore] Rated ticket ${currentTicketId}: ${rating} stars`);
+            return true;
+
+        } catch (err) {
+            console.error('[GeminiStore] Rating failed:', err);
+            return false;
         }
     },
 }));
