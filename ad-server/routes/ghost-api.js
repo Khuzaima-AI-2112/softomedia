@@ -56,7 +56,7 @@ const incrementUsage = () => {
 let aiModel = null;
 try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    aiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    aiModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 } catch (error) {
     console.error('[Ghost-AI] Failed to initialize GoogleGenerativeAI client:', error.message);
     // We don't crash, we just leave aiModel null. Routes will handle it.
