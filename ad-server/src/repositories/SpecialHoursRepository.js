@@ -33,11 +33,29 @@ class SpecialHoursRepositoryClass extends BaseRepository {
      */
     async updateSpecialHours(storeId, date, hoursData) {
         const id = hoursData.id || `spec_${storeId}_${date}`;
-        return this.update(id, {
-            ...hoursData,
-            store_id: storeId,
-            date: date
-        });
+        // CRITICAL FIX: Use set with merge: true (upsert) instead of update
+        // update() fails if document doesn't exist, set() creates it
+        if (this.collection) {
+            await this.breaker.execute(() => this.collection.doc(id).set({
+                ...hoursData,
+                store_id: storeId,
+                date: date,
+                updated_at: new Date().toISOString()
+            }, { merge: true }));
+
+            // Update memory cache as well
+            const existing = await this.findById(id) || {};
+            const finalData = { ...existing, ...hoursData, store_id: storeId, date: date };
+            MOCK_STORAGE[this.collectionName].set(id, finalData);
+            return finalData;
+        } else {
+            // Fallback to memory
+            return this.update(id, {
+                ...hoursData,
+                store_id: storeId,
+                date: date
+            });
+        }
     }
 
     /**
