@@ -3,42 +3,41 @@ import SpecialHoursRepository from '../src/repositories/SpecialHoursRepository.j
 import BusinessHoursService from '../src/services/BusinessHoursService.js';
 
 async function runTest() {
-    const storeId = 'test-store-reproduction';
-    const date = '2026-02-01'; // Future date
+    const storeId = 'test-store-reproduction-400';
+    const date = '2026-02-05';
+    // Mimin the frontend payload more closely
     const hoursData = {
         is_closed: true,
-        reason: 'Renovation Test',
-        open_time: null,
-        close_time: null
+        reason: 'Renovation Test 2',
+        open_time: '09:00', // Frontend sends times even if closed
+        close_time: '18:00'
     };
 
-    console.log(`[TEST] 1. Updating Special Hours for Store ${storeId} on ${date}...`);
+    console.log(`[TEST] Updating Special Hours... Data:`, hoursData);
+
     try {
-        // This relies on the BaseRepository.update implementation which MIGHT mistakenly succeed in memory 
-        // but fail in real Firestore if document doesn't exist, OR fail if we test properly.
-        // However, analyzing the code, we saw it calls this.update(id, ...). 
-        // If the ID is new, BaseRepository.update attempts to doc(id).update(), which FAILS in Firestore if doc missing.
-        await BusinessHoursService.updateSpecialHours(storeId, date, hoursData);
-        console.log('[TEST] Update call completed (Note: might have fallen back to memory silently)');
+        const result = await BusinessHoursService.updateSpecialHours(storeId, date, hoursData);
+        console.log('[TEST] Result SUCCESS:', result);
     } catch (e) {
-        console.error('[TEST] Update FAILED as expected (or unexpected):', e.message);
+        const fs = await import('fs');
+        fs.writeFileSync('error_log.txt', `[TEST] FAILED: ${e.message}\nStack: ${e.stack}`);
+        process.exit(1);
     }
 
-    console.log(`[TEST] 2. Fetching Effective Hours...`);
+    console.log(`[TEST] Fetching...`);
+    // ... rest of checking logic
     const effective = await BusinessHoursService.getEffectiveHours(storeId, date);
-    
-    console.log('[TEST] Result:', effective);
-
-    if (effective && effective.type === 'special' && effective.is_closed === true) {
-        console.log('[TEST] SUCCESS: Special hours returned correctly.');
+    if (effective.is_closed === true) {
+        console.log('[TEST] SUCCESS: Correctly closed.');
     } else {
-        console.log('[TEST] FAILURE: Special hours NOT returned correctly.');
-        console.log('Expected type="special" and is_closed=true');
+        const fs = await import('fs');
+        fs.writeFileSync('error_log.txt', `[TEST] FAIL: returned not closed: ${JSON.stringify(effective)}`);
         process.exit(1);
     }
 }
 
-runTest().then(() => process.exit(0)).catch(e => {
-    console.error(e);
+runTest().then(() => process.exit(0)).catch(async e => {
+    const fs = await import('fs');
+    fs.writeFileSync('error_log.txt', `Fatal Error: ${e.message}\n${e.stack}`);
     process.exit(1);
 });

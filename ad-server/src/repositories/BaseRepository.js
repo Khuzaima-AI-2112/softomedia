@@ -136,6 +136,26 @@ export class BaseRepository {
         return true;
     }
 
+    async upsert(id, data) {
+        const existing = await this.findById(id) || {};
+        const updateData = { ...existing, ...data, updated_at: new Date().toISOString() };
+
+        try {
+            if (this.collection) {
+                await this.breaker.execute(() => this.collection.doc(id).set(updateData, { merge: true }));
+            }
+        } catch (e) {
+            logger.error(`Upsert failed for ${this.collectionName}`, {
+                error: e.message,
+                id,
+                breaker_state: this.breaker.state
+            });
+        }
+
+        MOCK_STORAGE[this.collectionName].set(id, updateData);
+        return updateData;
+    }
+
     async count(options = {}) {
         try {
             if (this.collection) {

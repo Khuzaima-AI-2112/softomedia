@@ -86,6 +86,41 @@ check(
     'client-app/.eslintrc.cjs not found'
 );
 
+// Check 7: No Hardcoded Absolute Paths (Safeguard)
+function scanForAbsolutePaths(dir) {
+    let found = false;
+    const files = fs.readdirSync(dir);
+
+    for (const file of files) {
+        if (file.startsWith('node_modules') || file.startsWith('.')) continue;
+
+        const fullPath = path.join(dir, file);
+        const stat = fs.statSync(fullPath);
+
+        if (stat.isDirectory()) {
+            if (scanForAbsolutePaths(fullPath)) found = true;
+        } else if (file.endsWith('.js')) {
+            const content = fs.readFileSync(fullPath, 'utf8');
+            // Look for C:\Users or /Users/ (mac/linux home)
+            if (/C:\\Users/i.test(content) || /\/Users\//.test(content)) {
+                // Allow our own verification script to have it (false positive prevention)
+                if (file === 'verify_predeploy.js') continue;
+
+                check(
+                    `No Hardcoded Paths in ${file}`,
+                    false,
+                    `Found hardcoded absolute path in ${fullPath}`
+                );
+                found = true;
+            }
+        }
+    }
+    return found;
+}
+
+console.log('Scanning for hardcoded absolute paths...');
+scanForAbsolutePaths(path.join(__dirname, 'ad-server'));
+
 // Print results
 console.log('─'.repeat(50));
 checks.forEach(c => {

@@ -13,9 +13,14 @@ const bucketName = 'softomedia-live-2026-reports'; // We will auto-create if nee
 // Helper to log errors
 const logError = (err) => {
     const msg = `[${new Date().toISOString()}] ${err.stack || err}\n`;
-    // Log to Artifact Directory for visibility
-    const logPath = 'C:\\Users\\ChrisFro\\.gemini\\antigravity\\brain\\b58dba75-a627-46f6-9f07-c3a52398c151\\server-debug.log';
+    // FIX: Use relative path (logs directory) instead of hardcoded user path
+    const logDir = path.join(process.cwd(), 'logs');
+    const logPath = path.join(logDir, 'server-debug.log');
+
     try {
+        if (!fs.existsSync(logDir)) {
+            fs.mkdirSync(logDir, { recursive: true });
+        }
         fs.appendFileSync(logPath, msg);
     } catch (e) {
         console.error('[Ghost-AI] Failed to write to log file:', e);
@@ -210,12 +215,23 @@ router.post('/analyze', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('[Ghost-AI] Execution Error:', error);
+        // Log FULL error details (not just message)
+        console.error('[Ghost-AI] DETAILED ERROR:', {
+            message: error.message,
+            name: error.name,
+            code: error.code,
+            status: error.status,
+            stack: error.stack,
+            fullError: JSON.stringify(error, Object.getOwnPropertyNames(error), 2)
+        });
+
         logError(error);
+
         // Fail Open/Silent - Return generic error (but include details for debugging now)
         res.status(500).json({
             error: 'I encountered a ghost in the machine. Please try again.',
-            debug: error.message
+            debug: error.message,
+            errorType: error.name || 'UnknownError'
         });
     }
 });
