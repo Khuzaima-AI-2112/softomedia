@@ -202,7 +202,12 @@ function Step5ReviewConfirm({ data, onConfirm, onPrev }) {
                         {/* Terms */}
                         <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 mb-4">
                             <label className="flex items-start gap-2 cursor-pointer">
-                                <input type="checkbox" className="mt-1 accent-primary" defaultChecked />
+                                <input
+                                    type="checkbox"
+                                    data-testid="terms-checkbox"
+                                    className="mt-1 accent-primary"
+                                    defaultChecked
+                                />
                                 <span className="text-xs text-slate-500">
                                     I agree to the <a href="#" className="text-primary hover:underline">Terms of Service</a> and <a href="#" className="text-primary hover:underline">Advertising Policy</a>
                                 </span>
@@ -213,13 +218,14 @@ function Step5ReviewConfirm({ data, onConfirm, onPrev }) {
                         <div className="space-y-3">
                             <button
                                 onClick={() => {
-                                    const checkbox = document.querySelector('input[type="checkbox"]');
+                                    const checkbox = document.querySelector('input[data-testid="terms-checkbox"]');
                                     if (checkbox && checkbox.checked) {
                                         onConfirm();
                                     } else {
                                         alert('Please agree to the Terms of Service to proceed.');
                                     }
                                 }}
+                                data-testid="confirm-booking-btn"
                                 className="w-full py-4 rounded-xl bg-gradient-to-r from-primary to-primary-hover text-white font-bold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all flex items-center justify-center gap-2"
                             >
                                 <span className="material-symbols-outlined">check_circle</span>

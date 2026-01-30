@@ -5,8 +5,20 @@
       "origin": "http://localhost:5173",
       "localStorage": [
         {
+          "name": "demo_role",
+          "value": "brand"
+        },
+        {
+          "name": "auth_token",
+          "value": "demo-token"
+        },
+        {
           "name": "active_persona",
           "value": "brand"
+        },
+        {
+          "name": "auth_user",
+          "value": "{\"id\":\"user-brand\",\"email\":\"brand@softomedia.com\",\"name\":\"Test Brand\",\"role\":\"brand\"}"
         }
       ]
     }

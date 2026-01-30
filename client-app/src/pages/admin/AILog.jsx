@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import GlassCard from '../../components/GlassCard';
 import AILogAnalytics from '../../components/AILogAnalytics';
 import { API_URL } from '../../config';
+import useGeminiStore from '../../stores/GeminiStore';
 
 const PERSONAS = [
     { value: 'all', label: 'All Personas' },
@@ -9,7 +10,17 @@ const PERSONAS = [
     { value: 'software_tester_persona', label: 'Tester' }
 ];
 
+const AVAILABLE_MODELS = [
+    { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (Stable)' },
+    { value: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash (Exp)' },
+    { value: 'gemini-2.0-pro-exp', label: 'Gemini 2.0 Pro (Exp)' },
+    { value: 'gemini-2.0-flash-thinking-exp', label: 'Gemini 2.0 Flash Thinking' },
+];
+
 function AILog() {
+    // Store Connection
+    const { currentModel, setModel, customInstructions, setCustomInstruction } = useGeminiStore();
+
     const [logs, setLogs] = useState([]);
     const [totals, setTotals] = useState({ totalCost: 0, totalTokens: 0, totalConversations: 0 });
     const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
@@ -17,6 +28,11 @@ function AILog() {
     const [expandedLog, setExpandedLog] = useState(null);
     const [expandedDetails, setExpandedDetails] = useState(null);
     const [showAnalytics, setShowAnalytics] = useState(false);
+
+    // Config UI State
+    const [showConfig, setShowConfig] = useState(false);
+    const [editingPersona, setEditingPersona] = useState('CRM_buyer_persona');
+    const [instructionText, setInstructionText] = useState('');
 
     // Filters
     const [filters, setFilters] = useState({
@@ -30,6 +46,13 @@ function AILog() {
     useEffect(() => {
         loadLogs();
     }, [pagination.page, filters]);
+
+    // Initialize instruction text when opening editor
+    useEffect(() => {
+        if (showConfig) {
+            setInstructionText(customInstructions[editingPersona] || '');
+        }
+    }, [showConfig, editingPersona, customInstructions]);
 
     const loadLogs = async () => {
         try {
@@ -91,6 +114,11 @@ function AILog() {
             maxRating: '',
             persona: 'all'
         });
+    };
+
+    const saveInstruction = () => {
+        setCustomInstruction(editingPersona, instructionText);
+        // Optional: Add visual feedback
     };
 
     const exportCSV = () => {
@@ -157,12 +185,21 @@ function AILog() {
                 </div>
                 <div className="flex gap-2">
                     <button
+                        onClick={() => setShowConfig(!showConfig)}
+                        className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${showConfig
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50'
+                            }`}
+                    >
+                        <span className="material-symbols-outlined text-lg">settings</span>
+                        Configure Model
+                    </button>
+                    <button
                         onClick={() => setShowAnalytics(!showAnalytics)}
-                        className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
-                            showAnalytics
-                                ? 'bg-primary text-white'
-                                : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50'
-                        }`}
+                        className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${showAnalytics
+                            ? 'bg-primary text-white'
+                            : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50'
+                            }`}
                     >
                         <span className="material-symbols-outlined text-lg">analytics</span>
                         Analytics
@@ -176,6 +213,86 @@ function AILog() {
                     </button>
                 </div>
             </div>
+
+            {/* Configuration Panel */}
+            {showConfig && (
+                <GlassCard className="p-6 bg-slate-50 dark:bg-slate-900/50 border-2 border-slate-200 dark:border-slate-700">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {/* Model Selector */}
+                        <div>
+                            <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary">model_training</span>
+                                Active Model
+                            </h3>
+                            <div className="space-y-2">
+                                {AVAILABLE_MODELS.map(model => (
+                                    <label key={model.value} className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer hover:border-primary transition-colors">
+                                        <input
+                                            type="radio"
+                                            name="ai-model"
+                                            checked={currentModel === model.value}
+                                            onChange={() => setModel(model.value)}
+                                            className="accent-primary"
+                                        />
+                                        <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                            {model.label}
+                                        </div>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Instruction Editor */}
+                        <div className="md:col-span-2">
+                            <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-2 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary">edit_note</span>
+                                    System Instructions (Persona)
+                                </div>
+                                <div className="flex gap-1">
+                                    <button
+                                        onClick={() => setEditingPersona('CRM_buyer_persona')}
+                                        className={`text-xs px-2 py-1 rounded ${editingPersona === 'CRM_buyer_persona' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-100'}`}
+                                    >
+                                        Buyer
+                                    </button>
+                                    <button
+                                        onClick={() => setEditingPersona('software_tester_persona')}
+                                        className={`text-xs px-2 py-1 rounded ${editingPersona === 'software_tester_persona' ? 'bg-purple-100 text-purple-700 font-bold' : 'text-slate-500 hover:bg-slate-100'}`}
+                                    >
+                                        Tester
+                                    </button>
+                                </div>
+                            </h3>
+                            <div className="space-y-2">
+                                <textarea
+                                    value={instructionText}
+                                    onChange={(e) => setInstructionText(e.target.value)}
+                                    placeholder={`Enter custom system instructions for the ${editingPersona === 'CRM_buyer_persona' ? 'Buyer' : 'Tester'} bot...`}
+                                    className="w-full h-40 p-3 text-sm font-mono border rounded-lg bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:outline-none focus:border-primary"
+                                />
+                                <div className="flex justify-end gap-2">
+                                    <button
+                                        onClick={() => setInstructionText('')}
+                                        className="text-xs text-slate-400 hover:text-slate-600 px-3 py-1"
+                                    >
+                                        Clear
+                                    </button>
+                                    <button
+                                        onClick={saveInstruction}
+                                        className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded hover:bg-black transition-colors"
+                                    >
+                                        Save Instructions
+                                    </button>
+                                </div>
+                                <p className="text-[10px] text-slate-400">
+                                    * These instructions will override the default server-side persona files. Clear and save to revert.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </GlassCard>
+            )}
 
             {/* Analytics Panel */}
             {showAnalytics && <AILogAnalytics />}
@@ -298,11 +415,10 @@ function AILog() {
                                                 <div className="text-xs text-slate-400 font-mono">{log.id.slice(0, 20)}...</div>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                                                    log.persona === 'CRM_buyer_persona'
-                                                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                                                        : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
-                                                }`}>
+                                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${log.persona === 'CRM_buyer_persona'
+                                                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                                                    : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                                                    }`}>
                                                     {log.persona === 'CRM_buyer_persona' ? 'Buyer' : 'Tester'}
                                                 </span>
                                             </td>
@@ -343,8 +459,15 @@ function AILog() {
                                                                             />
                                                                         )}
                                                                         <div className="flex-1 min-w-0">
-                                                                            <div className="text-xs text-slate-400 font-mono">{step.url}</div>
-                                                                            <div className="text-sm text-slate-700 dark:text-slate-300">{step.note}</div>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="text-xs text-slate-400 font-mono">{step.url}</span>
+                                                                                {step.pageTitle && (
+                                                                                    <span className="text-xs px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 text-slate-500">
+                                                                                        {step.pageTitle}
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                            <div className="text-sm text-slate-700 dark:text-slate-300 mt-1">{step.note}</div>
                                                                         </div>
                                                                     </div>
                                                                 ))}
@@ -364,7 +487,7 @@ function AILog() {
                                                             <div>
                                                                 <h4 className="text-xs font-semibold text-slate-500 uppercase mb-2">User Feedback</h4>
                                                                 <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800 text-sm text-amber-800 dark:text-amber-200">
-                                                                    "{expandedDetails.ratingFeedback}"
+                                                                    &quot;{expandedDetails.ratingFeedback}&quot;
                                                                 </div>
                                                             </div>
                                                         )}

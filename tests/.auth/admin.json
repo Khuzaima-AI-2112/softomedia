@@ -5,8 +5,20 @@
       "origin": "http://localhost:5173",
       "localStorage": [
         {
+          "name": "demo_role",
+          "value": "admin"
+        },
+        {
+          "name": "auth_token",
+          "value": "demo-token"
+        },
+        {
           "name": "active_persona",
           "value": "admin"
+        },
+        {
+          "name": "auth_user",
+          "value": "{\"id\":\"user-admin\",\"email\":\"admin@softomedia.com\",\"name\":\"Test Admin\",\"role\":\"admin\"}"
         }
       ]
     }

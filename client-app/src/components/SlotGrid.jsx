@@ -88,6 +88,7 @@ function SlotGrid({
                             transition-all duration-150
                             ${getSlotStyle(slot, index)}
                         `}
+                        data-testid={`slot-${index}`}
                         title={
                             slot.status === 'booked'
                                 ? `Booked${slot.advertiserId ? ` by ${slot.advertiserId}` : ''}`
@@ -162,6 +163,7 @@ export function BookFullLoopButton({ onClick, pricePerSlot, disabled = false }) 
             type="button"
             onClick={onClick}
             disabled={disabled}
+            data-testid="book-full-loop-btn"
             className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-primary to-primary-hover text-white font-bold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
         >
             <span className="material-symbols-outlined">all_inclusive</span>

@@ -522,5 +522,19 @@ Objectives: Document errors, bugs, and mistakes so we do not make them again.
 - **Root Cause**: The Persona Switcher updated the UI role but did not set an `auth_token` in `localStorage`, causing the `apiClient` to omit the required `Authorization` header.
 - **Prevention**: Ensure that `AuthContext.setPersona` automatically initializes a `demo-token` for demo environments to enable backend authorization bypass. Consistent auth state must be maintained across all role transitions.
 
+### [2026-01-30] E2E Test Infrastructure: Auth Setup and Selector Consistency
+- **Issue**: E2E tests failed en masse (72/228) due to two root causes: (1) incomplete auth injection in `global.setup.js`, (2) selector mismatches where tests expected `data-testid` values that didn't exist in components.
+- **Root Cause**:
+    1. **Auth Gap**: `global.setup.js` only set `localStorage.active_persona` but the app (`AuthContext.jsx`) also requires `auth_token`, `auth_user`, and `demo_role`.
+    2. **Selector Drift**: Test files used hardcoded IDs like `kpi-card-total-active` but actual component (`KPICard.jsx`) generates dynamic IDs like `kpi-card-active-campaigns`.
+- **Resolution**:
+    1. Updated `global.setup.js` to inject complete auth state matching `AuthContext.jsx` requirements.
+    2. Updated test selectors to match actual component implementations or use flexible partial matches (`[data-testid^="store-"]`).
+- **Prevention** (New Agent Skills):
+    1. **`test-driven-developer`**: Proactively add `data-testid` when creating components, generate test stubs alongside.
+    2. **`test-id-guardian`**: Validate that test selectors exist in components before running E2E tests.
+    3. **`test-auth-guardian`**: Validate that auth setup matches app requirements.
+    4. **`/validate-testids` workflow**: Run before E2E tests to catch issues early.
+
 ---
 *Note: This file is a permanent project record. Do not delete or purge entries.*

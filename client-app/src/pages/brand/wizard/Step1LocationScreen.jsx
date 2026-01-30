@@ -24,8 +24,9 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
             setRetailers(retailersData);
             setStores(storesData);
             setScreens(screensData);
+            console.log(`[Diagnostic] Loaded ${retailersData.length} retailers, ${storesData.length} stores, ${screensData.length} screens`);
         } catch (error) {
-            console.error('Failed to load wizard data:', error);
+            console.error('[Diagnostic] Failed to load wizard data:', error);
         } finally {
             setLoading(false);
         }
@@ -265,7 +266,7 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
                     <button
                         onClick={onNext}
                         disabled={selectedScreenCount === 0}
-                        data-testid="wizard-next-step"
+                        data-testid="step-1-next-btn"
                         className="px-8 py-3 rounded-lg bg-primary hover:bg-primary/90 text-white font-bold shadow-lg shadow-primary/30 transition-all flex items-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <span>Next Step</span>

@@ -100,6 +100,7 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
                         <button
                             key={creative.id}
                             onClick={() => handleSelectDemo(creative.url)}
+                            data-testid={`demo-creative-${creative.id}`}
                             className={`
                                 relative group overflow-hidden rounded-xl border-2 transition-all
                                 ${selectedCreative === creative.url
@@ -140,6 +141,7 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
                 <div className="flex gap-3">
                     <input
                         type="url"
+                        data-testid="custom-creative-url-input"
                         value={customUrl}
                         onChange={(e) => setCustomUrl(e.target.value)}
                         placeholder="https://example.com/your-creative.jpg"
@@ -187,6 +189,7 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
                 <button
                     onClick={handleContinue}
                     disabled={!selectedCreative}
+                    data-testid="wizard-next-step"
                     className="px-8 py-3 rounded-xl bg-primary text-white font-bold shadow-lg shadow-primary/25 hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
                 >
                     Continue

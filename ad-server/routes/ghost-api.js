@@ -69,27 +69,45 @@ const calculateCost = (inputTokens, outputTokens) => {
     return parseFloat((inputCost + outputCost).toFixed(6));
 };
 
-// Initialize SDK (Lazy load logic could be here, but top level is fine for now)
-// We use the Safety Harness pattern: initialization failure shouldn't crash app start
-let aiModel = null;
+// Initialize SDK
+let genAI = null;
 try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    aiModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 } catch (error) {
     console.error('[Ghost-AI] Failed to initialize GoogleGenerativeAI client:', error.message);
-    // We don't crash, we just leave aiModel null. Routes will handle it.
 }
+
+// Allowed Models (2.x / 3.x series only)
+const ALLOWED_MODELS = [
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-exp',
+    'gemini-2.0-pro-exp',
+    'gemini-2.0-flash-thinking-exp'
+];
+
+const DEFAULT_MODEL = 'gemini-2.0-flash';
 
 // Apply Guardrails to ALL routes in this router
 router.use(guardrails);
 
 router.post('/analyze', async (req, res) => {
     try {
-        if (!aiModel) {
+        if (!genAI) {
             return res.status(503).json({ error: 'AI Service currently unavailable (Initialization Failed)' });
         }
 
-        const { steps, persona, conversationId, conversationHistory, followUpText } = req.body;
+        const {
+            steps,
+            persona,
+            conversationId,
+            conversationHistory,
+            followUpText,
+            model,
+            systemInstruction // Custom override
+        } = req.body;
+
+        // Model Selection & Validation
+        const selectedModel = ALLOWED_MODELS.includes(model) ? model : DEFAULT_MODEL;
 
         // Check if this is a follow-up or initial query
         const isFollowUp = !!(followUpText && conversationHistory?.length > 0);
@@ -104,14 +122,26 @@ router.post('/analyze', async (req, res) => {
         const safePersona = ALLOWED_PERSONAS.includes(persona) ? persona : 'CRM_buyer_persona';
 
         let personality = 'You are an expert AdTech support engineering assistant.';
-        try {
-            const personalityPath = path.join(process.cwd(), 'config', `${safePersona}.md`);
-            if (fs.existsSync(personalityPath)) {
-                personality = fs.readFileSync(personalityPath, 'utf-8');
+
+        // Use custom instruction if provided, otherwise load from file
+        if (systemInstruction && typeof systemInstruction === 'string' && systemInstruction.trim().length > 0) {
+            personality = systemInstruction;
+        } else {
+            try {
+                const personalityPath = path.join(process.cwd(), 'config', `${safePersona}.md`);
+                if (fs.existsSync(personalityPath)) {
+                    personality = fs.readFileSync(personalityPath, 'utf-8');
+                }
+            } catch (e) {
+                console.warn('[Ghost-AI] Failed to load personality:', e);
             }
-        } catch (e) {
-            console.warn('[Ghost-AI] Failed to load personality:', e);
         }
+
+        // Initialize Model for this request
+        const aiModel = genAI.getGenerativeModel({
+            model: selectedModel,
+            systemInstruction: personality
+        });
 
         // --- CONSTRUCT PROMPT ---
         const contentParts = [];
@@ -119,7 +149,8 @@ router.post('/analyze', async (req, res) => {
         if (isFollowUp) {
             // Follow-up mode: Include conversation history
             const promptParts = [
-                personality,
+                // Personality is handled by systemInstruction now, but we keep context in prompt for history if needed
+                // actually systemInstruction is better for persona.
                 '\n--- CONVERSATION HISTORY ---',
                 ...conversationHistory.map(msg =>
                     `${msg.role.toUpperCase()}: ${msg.content}`
@@ -132,7 +163,7 @@ router.post('/analyze', async (req, res) => {
         } else {
             // Initial query mode with screenshots
             const promptParts = [
-                personality,
+                // Personality via systemInstruction
                 'Analyze this user walkthrough.',
                 'Identify anomalies in the state, calculations, or UI logic based on the screenshots and notes.',
                 'Ignore visual artifacts unrelated to data.'
@@ -141,7 +172,8 @@ router.post('/analyze', async (req, res) => {
 
             // Process steps into parts (Text + Image)
             for (const [index, step] of steps.entries()) {
-                contentParts.push({ text: `\n\n--- STEP ${index + 1} ---\nURL: ${step.url}\nUser Note: "${step.note || 'No note'}"\n` });
+                const pageInfo = step.pageTitle ? ` (Page: "${step.pageTitle}")` : '';
+                contentParts.push({ text: `\n\n--- STEP ${index + 1}${pageInfo} ---\nURL: ${step.url}\nUser Note: "${step.note || 'No note'}"\n` });
 
                 if (step.image) {
                     // Strip header if present
@@ -458,7 +490,7 @@ router.get('/admin/stats', async (req, res) => {
                 stats.dailyUsage[day].cost += ticket.cost || 0;
 
             } catch (e) {
-                console.warn(`[Ghost-AI] Failed to parse ticket for stats:`, e.message);
+                console.warn('[Ghost-AI] Failed to parse ticket for stats:', e.message);
             }
         }
 

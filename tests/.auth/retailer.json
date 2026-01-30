@@ -5,8 +5,20 @@
       "origin": "http://localhost:5173",
       "localStorage": [
         {
+          "name": "demo_role",
+          "value": "retailer"
+        },
+        {
+          "name": "auth_token",
+          "value": "demo-token"
+        },
+        {
           "name": "active_persona",
           "value": "retailer"
+        },
+        {
+          "name": "auth_user",
+          "value": "{\"id\":\"user-retailer\",\"email\":\"retailer@softomedia.com\",\"name\":\"Test Retailer\",\"role\":\"retailer\"}"
         }
       ]
     }

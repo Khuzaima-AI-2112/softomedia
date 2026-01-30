@@ -15,6 +15,10 @@ const useGeminiStore = create((set, get) => ({
     isAnalyzing: false,
     error: null,
     currentPersona: 'CRM_buyer_persona', // Default persona
+    // New State for Multi-Model & Custom Persona
+    currentModel: 'gemini-2.0-flash',
+    customInstructions: {}, // { personaKey: "instruction text" }
+
     sessionCount: 0,
     dailyCount: 0,
     // Rating state
@@ -85,9 +89,19 @@ const useGeminiStore = create((set, get) => ({
 
     setPersona: (persona) => set({ currentPersona: persona }),
 
+    // New Actions
+    setModel: (model) => set({ currentModel: model }),
+
+    setCustomInstruction: (persona, instruction) => set((state) => ({
+        customInstructions: {
+            ...state.customInstructions,
+            [persona]: instruction
+        }
+    })),
+
     submitQuery: async () => {
         set({ isRecording: false, isAnalyzing: true, error: null });
-        const { steps, conversationId, messages, currentPersona, isFollowUp, followUpText } = get();
+        const { steps, conversationId, messages, currentPersona, isFollowUp, followUpText, currentModel, customInstructions } = get();
 
         try {
             // Use centralized API URL
@@ -111,7 +125,10 @@ const useGeminiStore = create((set, get) => ({
                     role: m.role,
                     content: m.role === 'user' ? (m.steps ? `[Screenshots + Note: ${m.content}]` : m.content) : m.content
                 })),
-                followUpText: isFollowUp ? followUpText : null
+                followUpText: isFollowUp ? followUpText : null,
+                // New Fields
+                model: currentModel,
+                systemInstruction: customInstructions[currentPersona] || null
             };
 
             const response = await fetch(apiUrl, {

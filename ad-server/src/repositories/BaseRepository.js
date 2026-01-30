@@ -8,6 +8,10 @@ import { CircuitBreaker } from '../utils/ResilienceUtility.js';
 // In-memory store for fallback
 const MOCK_STORAGE = {};
 
+export const clearMockStorage = () => {
+    Object.keys(MOCK_STORAGE).forEach(key => delete MOCK_STORAGE[key]);
+};
+
 export class BaseRepository {
     constructor(collectionName) {
         this.collectionName = collectionName;

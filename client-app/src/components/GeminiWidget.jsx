@@ -41,6 +41,7 @@ const GeminiWidget = () => {
         // 2. Add to Store
         addStep({
             url: window.location.pathname,
+            pageTitle: document.title, // CAPTURE PAGE TITLE
             note: currentNote || 'No specific note provided.',
             image: image,
             capturedAt: new Date().toISOString()
@@ -232,11 +233,10 @@ const GeminiWidget = () => {
                                         {messages.map((msg, idx) => (
                                             <div
                                                 key={idx}
-                                                className={`p-3 rounded-lg ${
-                                                    msg.role === 'user'
+                                                className={`p-3 rounded-lg ${msg.role === 'user'
                                                         ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 ml-4'
                                                         : 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 mr-4'
-                                                }`}
+                                                    }`}
                                             >
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <span className={`material-symbols-outlined text-sm ${msg.role === 'user' ? 'text-blue-600' : 'text-green-600'}`}>
@@ -375,7 +375,7 @@ const GeminiWidget = () => {
                                 <span className="font-bold text-primary">API Usage: </span>
                                 Session {useGeminiStore.getState().sessionCount} | Daily {useGeminiStore.getState().dailyCount}
                             </div>
-                            <div>v2.0-flash</div>
+                            <div>{useGeminiStore.getState().currentModel}</div>
                         </div>
 
                     </div>

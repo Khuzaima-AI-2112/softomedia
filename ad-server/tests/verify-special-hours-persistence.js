@@ -13,7 +13,7 @@ async function runTest() {
         close_time: '18:00'
     };
 
-    console.log(`[TEST] Updating Special Hours... Data:`, hoursData);
+    console.log('[TEST] Updating Special Hours... Data:', hoursData);
 
     try {
         const result = await BusinessHoursService.updateSpecialHours(storeId, date, hoursData);
@@ -24,7 +24,7 @@ async function runTest() {
         process.exit(1);
     }
 
-    console.log(`[TEST] Fetching...`);
+    console.log('[TEST] Fetching...');
     // ... rest of checking logic
     const effective = await BusinessHoursService.getEffectiveHours(storeId, date);
     if (effective.is_closed === true) {

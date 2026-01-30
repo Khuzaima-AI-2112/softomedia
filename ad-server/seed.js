@@ -91,8 +91,8 @@ const seedData = {
     ],
     pricing: {
         id: 'global',
-        base_cpm: 2.50,
-        traffic_tiers: {
+        baseCPM: 2.50,
+        trafficTiers: {
             veryLow: { multiplier: 0.5, label: 'Very Low', color: '#94a3b8', hours: [8, 9, 20, 21] },
             low: { multiplier: 0.75, label: 'Low', color: '#60a5fa', hours: [10, 11, 19] },
             medium: { multiplier: 1.0, label: 'Medium', color: '#fbbf24', hours: [14, 15, 16] },

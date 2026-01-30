@@ -17,7 +17,7 @@ const DEFAULT_PRICING = {
     }
 };
 
-class PricingRepositoryClass extends BaseRepository {
+export class PricingRepositoryClass extends BaseRepository {
     constructor() {
         super('pricing_config');
     }

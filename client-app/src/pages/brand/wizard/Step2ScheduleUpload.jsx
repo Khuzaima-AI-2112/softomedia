@@ -16,7 +16,11 @@ const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
 
     const duration = getDuration();
 
+    // Diagnostic logging for E2E debugging
+    console.log(`[Diagnostic] Step 2 Render. Duration: ${duration}, campaignName: ${data.campaignName}`, data.dateRange);
+
     const handleContinue = () => {
+        console.log('[Diagnostic] Step 2 Continue clicked. Name:', data.campaignName);
         if (!data.campaignName) {
             updateData({ campaignName: 'Untitled Campaign' });
         }
@@ -49,6 +53,7 @@ const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
                     </h3>
                     <input
                         type="text"
+                        data-testid="campaign-name-input"
                         value={data.campaignName || ''}
                         onChange={(e) => updateData({ campaignName: e.target.value })}
                         placeholder="e.g., Summer Sale 2026"
@@ -69,6 +74,7 @@ const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-slate-400">$</span>
                         <input
                             type="number"
+                            data-testid="campaign-budget-input"
                             value={data.budget || 1000}
                             onChange={(e) => updateData({ budget: parseInt(e.target.value) || 0 })}
                             min="100"
@@ -93,6 +99,7 @@ const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
                         <label className="block text-sm font-medium mb-2">Start Date</label>
                         <input
                             type="date"
+                            data-testid="campaign-start-date-input"
                             value={data.dateRange?.start || ''}
                             onChange={(e) => updateData({
                                 dateRange: { ...data.dateRange, start: e.target.value }
@@ -105,6 +112,7 @@ const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
                         <label className="block text-sm font-medium mb-2">End Date</label>
                         <input
                             type="date"
+                            data-testid="campaign-end-date-input"
                             value={data.dateRange?.end || ''}
                             onChange={(e) => updateData({
                                 dateRange: { ...data.dateRange, end: e.target.value }
@@ -158,6 +166,7 @@ const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
                         <button
                             onClick={handleContinue}
                             disabled={duration < 1}
+                            data-testid="step-2-next-btn"
                             className="px-8 py-3 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold shadow-lg shadow-primary/30 transition-all flex items-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <span>Select Time Slots</span>

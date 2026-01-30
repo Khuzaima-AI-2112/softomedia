@@ -20,9 +20,18 @@ async function globalSetup(config) {
         // Navigate to base URL
         await page.goto(baseURL);
 
-        // Inject persona into localStorage
+        // Inject complete auth state into localStorage
         await page.evaluate((p) => {
+            const mockUser = {
+                id: `user-${p}`,
+                email: `${p}@softomedia.com`,
+                name: `Test ${p.charAt(0).toUpperCase() + p.slice(1)}`,
+                role: p
+            };
             localStorage.setItem('active_persona', p);
+            localStorage.setItem('demo_role', p);
+            localStorage.setItem('auth_token', 'demo-token');
+            localStorage.setItem('auth_user', JSON.stringify(mockUser));
         }, persona);
 
         // Save storage state

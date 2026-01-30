@@ -1,0 +1,102 @@
+
+> client-app@0.0.0 lint
+> eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 50
+
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\scripts\capture_screenshots.js
+  13:7  warning  'TIMEOUT' is assigned a value but never used  no-unused-vars
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\AILogAnalytics.jsx
+   12:8   warning  React Hook useEffect has a missing dependency: 'loadStats'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  140:60  warning  'idx' is defined but never used. Allowed unused args must match /^_/u                                         no-unused-vars
+  174:60  warning  'idx' is defined but never used. Allowed unused args must match /^_/u                                         no-unused-vars
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\CampaignApprovalList.jsx
+  3:8  warning  'StatusBadge' is defined but never used  no-unused-vars
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\GeminiWidget.jsx
+  2:20  warning  'useRef' is defined but never used  no-unused-vars
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\components\LocationManager.jsx
+  8:13  warning  'user' is assigned a value but never used  no-unused-vars
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\contexts\AuthContext.jsx
+  63:14  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\LoopDemoPlayer.jsx
+   7:7  warning  'LOOP_DURATION' is assigned a value but never used                                                           no-unused-vars
+  38:8  warning  React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\Player.jsx
+   25:12  warning  'screenData' is assigned a value but never used                                                                   no-unused-vars
+   25:24  warning  'setScreenData' is assigned a value but never used                                                                no-unused-vars
+   39:49  warning  'screenId' is defined but never used. Allowed unused args must match /^_/u                                        no-unused-vars
+  197:8   warning  React Hook useEffect has a missing dependency: 'sendTelemetry'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\AILog.jsx
+    1:31   warning  'useMemo' is defined but never used                                                                          no-unused-vars
+   32:8    warning  React Hook useEffect has a missing dependency: 'loadLogs'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  367:69   error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                              react/no-unescaped-entities
+  367:102  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                              react/no-unescaped-entities
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\AdvertiserManagement.jsx
+  19:12  warning  'loading' is assigned a value but never used  no-unused-vars
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\BusinessHoursManagement.jsx
+  3:8  warning  'StatusBadge' is defined but never used  no-unused-vars
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\CPMCalendar.jsx
+   24:7   warning  'getBusinessHours' is assigned a value but never used                                                             no-unused-vars
+   51:12  warning  'loading' is assigned a value but never used                                                                      no-unused-vars
+   52:12  warning  'editingTier' is assigned a value but never used                                                                  no-unused-vars
+   69:8   warning  React Hook useEffect has a missing dependency: 'selectedStore'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  207:11  warning  'handleSaveTrafficTier' is assigned a value but never used                                                        no-unused-vars
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\LoopAnalytics.jsx
+  10:10  warning  'API_URL' is defined but never used                                                                                no-unused-vars
+  58:8   warning  React Hook useEffect has a missing dependency: 'fetchAnalytics'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\LoopBuilder.jsx
+  27:8  warning  React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\LoopManagement.jsx
+   4:8  warning  'StatusBadge' is defined but never used                                                                        no-unused-vars
+  56:8  warning  React Hook useEffect has a missing dependency: 'fetchLoops'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\Overview.jsx
+  21:12  warning  'loading' is assigned a value but never used  no-unused-vars
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\RetailerManagement.jsx
+  11:12  warning  'loading' is assigned a value but never used  no-unused-vars
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\admin\UserManagement.jsx
+  19:12  warning  'loading' is assigned a value but never used  no-unused-vars
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\brand\BrandDashboard.jsx
+  12:12  warning  'loading' is assigned a value but never used  no-unused-vars
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\brand\wizard\Step1LocationScreen.jsx
+  75:11  warning  'selectAllScreensForStore' is assigned a value but never used  no-unused-vars
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\brand\wizard\Step3LoopSlotSelection.jsx
+  50:8  warning  React Hook useEffect has a missing dependency: 'loadLoops'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\brand\wizard\Step3ReviewDistribution.jsx
+  39:62  warning  'error' is assigned a value but never used  no-unused-vars
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\brand\wizard\Step5ReviewConfirm.jsx
+    4:10  warning  'PriceSummary' is defined but never used       no-unused-vars
+    5:8   warning  'TrafficTierBadge' is defined but never used   no-unused-vars
+    6:8   warning  'apiService' is defined but never used         no-unused-vars
+   10:11  warning  'navigate' is assigned a value but never used  no-unused-vars
+  136:43  warning  'tier' is assigned a value but never used      no-unused-vars
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\retailer\ScheduleCalendar.jsx
+  62:8  warning  React Hook useEffect has a missing dependency: 'fetchLoops'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\client-app\src\pages\retailer\ScheduleManager.jsx
+  10:12  warning  'isLoading' is assigned a value but never used                                                                     no-unused-vars
+  14:8   warning  React Hook useEffect has a missing dependency: 'fetchLocations'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+??? 45 problems (2 errors, 43 warnings)
+
