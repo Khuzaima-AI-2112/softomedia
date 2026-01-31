@@ -5,6 +5,7 @@ import logger from '../utils/logger.js';
  * Catches all unhandled errors, logs them via structured logging,
  * and returns a safe JSON response to the client.
  */
+// eslint-disable-next-line no-unused-vars
 export const errorHandler = (err, req, res, next) => {
     // 1. Log the error with full context
     logger.error('Unhandled Exception', {

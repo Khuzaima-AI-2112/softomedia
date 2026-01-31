@@ -41,8 +41,8 @@ test.describe('Loop Analytics - Sprint 5', () => {
                 contentType: 'application/json',
                 body: JSON.stringify({
                     summary: {
-                        totalImpressions: 4500,
-                        avgDeliveryRate: 95.5,
+                        totalLoops: 154,
+                        avgIntegrityScore: 98.2,
                         fullDeliveryCount: 12,
                         partialCount: 2
                     },
@@ -55,15 +55,15 @@ test.describe('Loop Analytics - Sprint 5', () => {
     test('Admin can navigate to Loop Analytics', async ({ page }) => {
         await page.goto('/dashboard/admin/analytics');
         await expect(page.getByText('Loop Analytics')).toBeVisible();
-        await expect(page.getByText('Proof-of-play')).toBeVisible();
+        await expect(page.getByText('Playlist integrity')).toBeVisible();
     });
 
     test('Analytics shows summary stats', async ({ page }) => {
         await page.goto('/dashboard/admin/analytics');
 
         // Check for stat cards
-        await expect(page.locator('[data-testid="total-impressions"]')).toBeVisible();
-        await expect(page.locator('[data-testid="avg-delivery-rate"]')).toBeVisible();
+        await expect(page.locator('[data-testid="total-loops"]')).toBeVisible();
+        await expect(page.locator('[data-testid="avg-integrity-score"]')).toBeVisible();
         await expect(page.locator('[data-testid="full-delivery-count"]')).toBeVisible();
         await expect(page.locator('[data-testid="partial-delivery-count"]')).toBeVisible();
     });
@@ -99,7 +99,7 @@ test.describe('Loop Analytics - Sprint 5', () => {
         await page.goto('/dashboard/admin/analytics');
 
         // Legend should be visible
-        await expect(page.getByText('>95%')).toBeVisible();
+        await expect(page.getByText('>99%')).toBeVisible();
         await expect(page.getByText('80-95%')).toBeVisible();
         await expect(page.getByText('<80%')).toBeVisible();
     });

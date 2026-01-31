@@ -11,16 +11,21 @@ const router = express.Router();
  */
 router.post('/register', authenticate, async (req, res) => {
     try {
-        const { screen_id, resolution, user_agent } = req.body;
+        const { screen_id, resolution, user_agent, retailer_id, store_id } = req.body;
         if (!screen_id) return res.status(400).json({ error: 'screen_id required' });
 
-        const screen = await screenRepository.create(screen_id, {
+        const screenData = {
             screen_id,
             resolution,
             user_agent,
             status: 'ONLINE',
             last_seen: new Date().toISOString()
-        });
+        };
+
+        if (retailer_id) screenData.retailer_id = retailer_id;
+        if (store_id) screenData.location_id = store_id;
+
+        const screen = await screenRepository.create(screen_id, screenData);
 
         res.json(screen);
     } catch (error) {

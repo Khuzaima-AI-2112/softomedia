@@ -28,18 +28,16 @@ const getBusinessHours = () => {
     return hours;
 };
 
-// 🔶 Mock analytics data (in production, fetch from API)
+// 🔶 Mock analytics data (Loop Integrity Model)
 const generateMockAnalytics = (date) => {
     const hours = getBusinessHours();
     return hours.map(hour => ({
         hour,
         date,
-        loopId: `${date}_${hour}_loc_downtown`,
-        totalSlots: 12,
-        playedSlots: Math.floor(Math.random() * 4) + 9, // 9-12 played
-        impressions: Math.floor(Math.random() * 500) + 100,
-        deliveryRate: (Math.random() * 15 + 85).toFixed(1), // 85-100%
-        status: Math.random() > 0.1 ? 'DELIVERED' : 'PARTIAL'
+        // Pivot: Track completions instead of slot plays
+        loopCompletions: Math.floor(Math.random() * 20) + 40, // 40-60 loops/hour
+        integrityScore: (Math.random() * 5 + 95).toFixed(1), // 95-100%
+        status: Math.random() > 0.05 ? 'DELIVERED' : 'PARTIAL'
     }));
 };
 
@@ -75,9 +73,10 @@ function LoopAnalytics() {
     };
 
     // Calculate summary stats
-    const totalImpressions = analytics.reduce((sum, a) => sum + a.impressions, 0);
-    const avgDeliveryRate = analytics.length > 0
-        ? (analytics.reduce((sum, a) => sum + parseFloat(a.deliveryRate), 0) / analytics.length).toFixed(1)
+    const totalLoops = analytics.reduce((sum, a) => sum + a.loopCompletions, 0);
+    // Average Integrity Score
+    const avgIntegrity = analytics.length > 0
+        ? (analytics.reduce((sum, a) => sum + parseFloat(a.integrityScore), 0) / analytics.length).toFixed(1)
         : 0;
     const fullDeliveryCount = analytics.filter(a => a.status === 'DELIVERED').length;
     const partialCount = analytics.filter(a => a.status === 'PARTIAL').length;
@@ -91,7 +90,7 @@ function LoopAnalytics() {
                         Loop Analytics
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400">
-                        Proof-of-play monitoring and delivery metrics
+                        Playlist integrity monitoring and cycle verification
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -115,18 +114,18 @@ function LoopAnalytics() {
             {/* Summary Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <GlassCard className="border-l-4 border-l-primary">
-                    <p className="text-sm font-medium text-slate-500 mb-1">Total Impressions</p>
-                    <p className="text-3xl font-bold text-slate-900 dark:text-white" data-testid="total-impressions">
-                        {totalImpressions.toLocaleString()}
+                    <p className="text-sm font-medium text-slate-500 mb-1">Loop Completions</p>
+                    <p className="text-3xl font-bold text-slate-900 dark:text-white" data-testid="total-loops">
+                        {totalLoops.toLocaleString()}
                     </p>
-                    <p className="text-xs text-slate-400 mt-1">Proof-of-play events</p>
+                    <p className="text-xs text-slate-400 mt-1">Full cycles verified</p>
                 </GlassCard>
                 <GlassCard className="border-l-4 border-l-emerald-500">
-                    <p className="text-sm font-medium text-slate-500 mb-1">Avg Delivery Rate</p>
-                    <p className="text-3xl font-bold text-emerald-500" data-testid="avg-delivery-rate">
-                        {avgDeliveryRate}%
+                    <p className="text-sm font-medium text-slate-500 mb-1">Integrity Score</p>
+                    <p className="text-3xl font-bold text-emerald-500" data-testid="avg-integrity-score">
+                        {avgIntegrity}%
                     </p>
-                    <p className="text-xs text-slate-400 mt-1">Across all loops</p>
+                    <p className="text-xs text-slate-400 mt-1">Playlist adherence</p>
                 </GlassCard>
                 <GlassCard className="border-l-4 border-l-blue-500">
                     <p className="text-sm font-medium text-slate-500 mb-1">Full Delivery</p>
@@ -153,7 +152,7 @@ function LoopAnalytics() {
                     </h3>
                     <div className="flex items-center gap-4 text-xs">
                         <span className="flex items-center gap-1">
-                            <span className="w-3 h-3 rounded-full bg-emerald-500"></span> &gt;95%
+                            <span className="w-3 h-3 rounded-full bg-emerald-500"></span> &gt;99%
                         </span>
                         <span className="flex items-center gap-1">
                             <span className="w-3 h-3 rounded-full bg-amber-500"></span> 80-95%
@@ -171,8 +170,8 @@ function LoopAnalytics() {
                 ) : (
                     <div className="space-y-2" data-testid="hourly-chart">
                         {analytics.map(item => {
-                            const rate = parseFloat(item.deliveryRate);
-                            const barColor = rate >= 95 ? 'bg-emerald-500' : rate >= 80 ? 'bg-amber-500' : 'bg-red-500';
+                            const rate = parseFloat(item.integrityScore);
+                            const barColor = rate >= 99 ? 'bg-emerald-500' : rate >= 95 ? 'bg-amber-500' : 'bg-red-500';
 
                             return (
                                 <button
@@ -193,18 +192,18 @@ function LoopAnalytics() {
                                     <div className="flex-1 h-8 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                                         <div
                                             className={`h-full ${barColor} transition-all duration-500 flex items-center justify-end pr-3`}
-                                            style={{ width: `${item.deliveryRate}%` }}
+                                            style={{ width: `${item.integrityScore}%` }}
                                         >
                                             <span className="text-white text-xs font-bold">
-                                                {item.deliveryRate}%
+                                                {item.integrityScore}%
                                             </span>
                                         </div>
                                     </div>
 
                                     {/* Stats */}
                                     <div className="w-24 text-right text-sm">
-                                        <span className="font-bold">{item.impressions}</span>
-                                        <span className="text-slate-400 ml-1">imp</span>
+                                        <span className="font-bold">{item.loopCompletions}</span>
+                                        <span className="text-slate-400 ml-1">cycles</span>
                                     </div>
 
                                     {/* Status */}

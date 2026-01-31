@@ -1,5 +1,5 @@
 
-import SpecialHoursRepository from '../src/repositories/SpecialHoursRepository.js';
+
 import BusinessHoursService from '../src/services/BusinessHoursService.js';
 
 async function runTest() {

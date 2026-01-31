@@ -56,7 +56,7 @@ test.describe('Loop Management - Sprint 2', () => {
                 route.fulfill({
                     status: 200,
                     contentType: 'application/json',
-                    body: JSON.stringify({ loops, business_hours: { start: 8, end: 22 } })
+                    body: JSON.stringify(loops)
                 });
             } else if (route.request().url().match(/\/api\/loops\/[^/]+$/)) {
                 // Mock single loop fetch
@@ -77,6 +77,16 @@ test.describe('Loop Management - Sprint 2', () => {
                             status: 'PENDING'
                         }))
                     })
+                });
+            } else if (url.includes('/api/assets')) {
+                // Mock assets for picker
+                route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify([
+                        { id: 'asset_001', name: 'Mock Asset 1', type: 'image', thumbnail: '📦' },
+                        { id: 'asset_002', name: 'Mock Asset 2', type: 'video', thumbnail: '🎬' }
+                    ])
                 });
             } else {
                 route.continue();

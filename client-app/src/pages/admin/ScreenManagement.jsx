@@ -5,31 +5,39 @@ import apiService from '../../services/ApiService';
 
 function ScreenManagement() {
     const [screens, setScreens] = useState([]);
+    const [retailers, setRetailers] = useState([]);
+    const [stores, setStores] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
-    const [newScreen, setNewScreen] = useState({ screen_id: '', resolution: '1920x1080', user_agent: 'Manual Admin Entry' });
+    const [newScreen, setNewScreen] = useState({ screen_id: '', resolution: '1920x1080', user_agent: 'Manual Admin Entry', retailer_id: '', store_id: '' });
 
-    const fetchScreens = async () => {
+    const loadData = async () => {
         setLoading(true);
         try {
-            const data = await apiService.getScreens();
-            setScreens(data || []);
+            const [screensData, retailersData, storesData] = await Promise.all([
+                apiService.getScreens(),
+                apiService.getRetailers(),
+                apiService.getStores()
+            ]);
+            setScreens(screensData || []);
+            setRetailers(retailersData || []);
+            setStores(storesData || []);
         } catch (error) {
-            console.error('Failed to fetch screens:', error);
+            console.error('Failed to fetch data:', error);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchScreens();
+        loadData();
     }, []);
 
     const handleDelete = async (id) => {
         if (!confirm('Are you sure you want to delete this screen? This action cannot be undone.')) return;
         try {
             await apiService.deleteScreen(id);
-            await fetchScreens();
+            await loadData();
         } catch (error) {
             console.error('Failed to delete screen:', error);
             alert('Failed to delete screen');
@@ -41,8 +49,8 @@ function ScreenManagement() {
         try {
             await apiService.registerScreen(newScreen);
             setShowAddModal(false);
-            setNewScreen({ screen_id: '', resolution: '1920x1080', user_agent: 'Manual Admin Entry' }); // Reset
-            await fetchScreens(); // Refresh list
+            setNewScreen({ screen_id: '', resolution: '1920x1080', user_agent: 'Manual Admin Entry', retailer_id: '', store_id: '' }); // Reset
+            await loadData(); // Refresh list
         } catch (error) {
             console.error('Failed to create screen:', error);
         }
@@ -128,6 +136,37 @@ function ScreenManagement() {
                                     value={newScreen.screen_id}
                                     onChange={e => setNewScreen({ ...newScreen, screen_id: e.target.value })}
                                 />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Retailer</label>
+                                    <select
+                                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
+                                        value={newScreen.retailer_id}
+                                        onChange={e => setNewScreen({ ...newScreen, retailer_id: e.target.value, store_id: '' })}
+                                    >
+                                        <option value="">Select Retailer...</option>
+                                        {retailers.map(r => (
+                                            <option key={r.id} value={r.id}>{r.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Store</label>
+                                    <select
+                                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
+                                        value={newScreen.store_id}
+                                        onChange={e => setNewScreen({ ...newScreen, store_id: e.target.value })}
+                                        disabled={!newScreen.retailer_id}
+                                    >
+                                        <option value="">Select Store...</option>
+                                        {stores
+                                            .filter(s => s.retailer_id === newScreen.retailer_id)
+                                            .map(s => (
+                                                <option key={s.id} value={s.id}>{s.name} ({s.city})</option>
+                                            ))}
+                                    </select>
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium mb-1">Resolution</label>

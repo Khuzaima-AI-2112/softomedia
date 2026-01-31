@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">32.55% </span>
+                <span class="strong">13.95% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>14/43</span>
+                <span class='fraction'>6/43</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">16.66% </span>
+                <span class="strong">8.33% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>4/24</span>
+                <span class='fraction'>2/24</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">42.85% </span>
+                <span class="strong">14.28% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>3/7</span>
+                <span class='fraction'>1/7</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">35.89% </span>
+                <span class="strong">15.38% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>14/39</span>
+                <span class='fraction'>6/39</span>
             </div>
         
             
@@ -218,42 +218,42 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">14x</span>
-<span class="cline-any cline-yes">14x</span>
-<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">14x</span>
-<span class="cline-any cline-yes">14x</span>
-<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">27x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">27x</span>
-<span class="cline-any cline-yes">27x</span>
-<span class="cline-any cline-yes">27x</span>
-<span class="cline-any cline-yes">27x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">27x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">27x</span>
-<span class="cline-any cline-yes">27x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -334,8 +334,8 @@ export class CircuitBreaker {
         this.lastFailureTime = null;
     }
 &nbsp;
-    async execute(fn) {
-        <span class="missing-if-branch" title="if path not taken" >I</span>if (this.state === 'OPEN') {
+<span class="fstat-no" title="function not covered" >    as</span>ync execute(fn) {
+<span class="cstat-no" title="statement not covered" >        if (this.state === 'OPEN') {</span>
             const now = <span class="cstat-no" title="statement not covered" >Date.now();</span>
 <span class="cstat-no" title="statement not covered" >            if (now - this.lastFailureTime &gt; this.resetTimeoutMs) {</span>
 <span class="cstat-no" title="statement not covered" >                this.state = 'HALF_OPEN';</span>
@@ -345,22 +345,22 @@ export class CircuitBreaker {
             }
         }
 &nbsp;
-        try {
-            const result = await fn();
-            this.onSuccess();
-            return result;
+<span class="cstat-no" title="statement not covered" >        try {</span>
+            const result = <span class="cstat-no" title="statement not covered" >await fn();</span>
+<span class="cstat-no" title="statement not covered" >            this.onSuccess();</span>
+<span class="cstat-no" title="statement not covered" >            return result;</span>
         } catch (error) {
 <span class="cstat-no" title="statement not covered" >            this.onFailure(error);</span>
 <span class="cstat-no" title="statement not covered" >            throw error;</span>
         }
     }
 &nbsp;
-    onSuccess() {
-        <span class="missing-if-branch" title="if path not taken" >I</span>if (this.state !== 'CLOSED') {
+<span class="fstat-no" title="function not covered" >    on</span>Success() {
+<span class="cstat-no" title="statement not covered" >        if (this.state !== 'CLOSED') {</span>
 <span class="cstat-no" title="statement not covered" >            logger.info(`Circuit Breaker [${this.name}] restored to CLOSED`);</span>
         }
-        this.failures = 0;
-        this.state = 'CLOSED';
+<span class="cstat-no" title="statement not covered" >        this.failures = 0;</span>
+<span class="cstat-no" title="statement not covered" >        this.state = 'CLOSED';</span>
     }
 &nbsp;
 <span class="fstat-no" title="function not covered" >    on</span>Failure(error) {
@@ -391,7 +391,7 @@ export class CircuitBreaker {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-01-30T20:28:17.665Z
+                at 2026-01-31T15:17:03.215Z
             </div>
         <script src="../prettify.js"></script>
         <script>

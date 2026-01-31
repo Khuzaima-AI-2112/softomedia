@@ -93,7 +93,7 @@ router.post('/:id/book', async (req, res) => {
             if (!loop) continue;
 
             // Book the slot
-            const updatedLoop = await loopRepository.bookSlot(loopId, slotIndex, {
+            await loopRepository.bookSlot(loopId, slotIndex, {
                 campaign_id: id,
                 advertiser_id: campaign.advertiser_id,
                 creative_url: creativeUrl || campaign.creative_url,

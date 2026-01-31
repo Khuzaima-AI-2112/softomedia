@@ -17,7 +17,7 @@ async function listModels() {
             console.log('🔍 Testing Gemini 1.5 Flash...');
             const model15 = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
             const result15 = await model15.generateContent('Hello');
-            console.log('✅ gemini-1.5-flash IS working.');
+            console.log('✅ gemini-1.5-flash IS working. Response:', result15.response.text());
         } catch (e2) {
             console.error('❌ gemini-1.5-flash failed:', e2.message);
         }

@@ -1,7 +1,6 @@
 import { PricingConfigSchema } from '../src/schemas/PricingSchema.js';
 import { Firestore } from '@google-cloud/firestore';
-import fs from 'fs';
-import path from 'path';
+
 
 /**
  * Verify Pricing Schema

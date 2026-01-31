@@ -148,13 +148,13 @@ function AdminOverview() {
 
             {/* Stats Row */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <GlassCard className="border-l-4 border-l-primary">
+                <GlassCard className="border-l-4 border-l-primary" data-testid="stat-card-retailers">
                     <p className="text-sm font-medium text-slate-500 mb-1 leading-none">Retailers</p>
-                    <p className="text-3xl font-bold text-slate-900 dark:text-white">{stats.retailers}</p>
+                    <p className="text-3xl font-bold text-slate-900 dark:text-white" data-testid="stat-value-retailers">{stats.retailers}</p>
                 </GlassCard>
-                <GlassCard className="border-l-4 border-l-amber-500">
+                <GlassCard className="border-l-4 border-l-amber-500" data-testid="stat-card-advertisers">
                     <p className="text-sm font-medium text-slate-500 mb-1 leading-none">Advertisers</p>
-                    <p className="text-3xl font-bold text-slate-900 dark:text-white">{stats.advertisers}</p>
+                    <p className="text-3xl font-bold text-slate-900 dark:text-white" data-testid="stat-value-advertisers">{stats.advertisers}</p>
                 </GlassCard>
                 <GlassCard className="border-l-4 border-l-emerald-500">
                     <p className="text-sm font-medium text-slate-500 mb-1 leading-none">Screens Online</p>

@@ -8,7 +8,7 @@ async function testVertex() {
         const vertex_ai = new VertexAI({ project: 'softomedia-live-2026', location: 'us-central1' });
         const model = 'gemini-1.5-flash-001';
 
-        console.log(`✓ Initialized VertexAI for project softomedia-live-2026`);
+        console.log('✓ Initialized VertexAI for project softomedia-live-2026');
 
         const generativeModel = vertex_ai.preview.getGenerativeModel({
             model: model,

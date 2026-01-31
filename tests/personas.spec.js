@@ -80,29 +80,24 @@ test.describe('Brand Campaign Wizard E2E', () => {
         });
 
         // Consolidated Mocks using specific globs
+        // Consolidated Mocks using Unified Registry
+        const { mockRetailers, mockStores, mockScreens, mockPricing } = require('./mocks/brand.mock');
+
         await page.route(/\/api\/retailers/, route => route.fulfill({
             status: 200, contentType: 'application/json',
-            body: JSON.stringify([{ id: 'ret_001', name: 'Retailer1', logo: '🏬' }])
+            body: JSON.stringify(mockRetailers)
         }));
         await page.route(/\/api\/stores/, route => route.fulfill({
             status: 200, contentType: 'application/json',
-            body: JSON.stringify([{ id: 'store_001', name: 'Store1', retailer_id: 'ret_001', address: '123 Main St' }])
+            body: JSON.stringify(mockStores)
         }));
         await page.route(/\/api\/screens/, route => route.fulfill({
             status: 200, contentType: 'application/json',
-            body: JSON.stringify([{ id: 'scr_001', name: 'Screen1', store_id: 'store_001', status: 'online', resolution: '1920x1080', orientation: 'landscape' }])
+            body: JSON.stringify(mockScreens)
         }));
         await page.route(/\/api\/pricing\/config/, route => route.fulfill({
             status: 200, contentType: 'application/json',
-            body: JSON.stringify({
-                baseCPM: 15.00,
-                traffic_tiers: {
-                    veryLow: { multiplier: 0.5, label: 'Very Low', color: '#94a3b8', hours: [8, 9, 20, 21] },
-                    low: { multiplier: 0.75, label: 'Low', color: '#60a5fa', hours: [10, 11, 19] },
-                    medium: { multiplier: 1.0, label: 'Medium', color: '#fbbf24', hours: [14, 15, 16] },
-                    high: { multiplier: 1.5, label: 'High', color: '#22c55e', hours: [12, 13, 17, 18] }
-                }
-            })
+            body: JSON.stringify(mockPricing)
         }));
         await page.route(/\/api\/loops/, route => route.fulfill({
             status: 200, contentType: 'application/json',
@@ -133,11 +128,22 @@ test.describe('Brand Campaign Wizard E2E', () => {
     });
 
     test('should complete Step 1: Location & Screen', async ({ page }) => {
-        await page.locator('[data-testid^="store-"]').first().click({ force: true });
-        await page.locator('[data-testid^="screen-"]').first().waitFor({ state: 'visible' });
-        await page.locator('[data-testid^="screen-"]').first().click({ force: true });
-        await page.locator('[data-testid="step-1-next-btn"]').click({ force: true });
-        await expect(page.locator('[data-testid="campaign-name-input"]')).toBeVisible({ timeout: 10000 });
+        // Wait for store and select it
+        const storeCard = page.locator('[data-testid^="store-"]').first();
+        await storeCard.waitFor({ state: 'visible' });
+        await storeCard.click();
+
+        // Wait for screens to load and select one
+        const screenCard = page.locator('[data-testid^="screen-"]').first();
+        await screenCard.waitFor({ state: 'visible' });
+        await screenCard.click();
+
+        // Critical: Wait for Next button to be enabled before clicking
+        const nextBtn = page.locator('[data-testid="step-1-next-btn"]');
+        await expect(nextBtn).toBeEnabled();
+        await nextBtn.click();
+
+        await expect(page.locator('[data-testid="campaign-name-input"]')).toBeVisible();
     });
 
     test('should complete Step 2: Schedule & Budget', async ({ page }) => {
