@@ -98,7 +98,8 @@ function AdminOverview() {
         { label: 'Advertisers', icon: 'campaign', path: '/dashboard/admin/advertisers', color: 'rose' },
         { label: 'Demo Player', icon: 'slideshow', path: '/player/demo', color: 'purple' },
         { label: 'Store Hours', icon: 'schedule', path: '/dashboard/admin/hours', color: 'indigo' },
-        { label: 'Network Map', icon: 'map', path: '/dashboard/admin/map', color: 'cyan' }
+        { label: 'Network Map', icon: 'map', path: '/dashboard/admin/map', color: 'cyan' },
+        { label: 'Screens', icon: 'monitor', path: '/dashboard/admin/screens', color: 'slate' }
     ];
 
     return (

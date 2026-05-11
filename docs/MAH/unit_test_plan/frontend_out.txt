@@ -1,0 +1,22 @@
+
+[7m[1m[36m RUN [39m[22m[27m [36mv1.6.1[39m [90mC:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/client-app[39m
+
+[90mstdout[2m | src\config.js:10:13[22m[39m
+[Config] API_URL: http://localhost:8080
+
+ [32m✓[39m src/services/api.test.js[2m > [22mAPIClient[2m > [22mmakes a successful GET request
+ [32m✓[39m src/services/api.test.js[2m > [22mAPIClient[2m > [22mhandles non-OK responses with custom APIError
+ [32m✓[39m src/services/api.test.js[2m > [22mAPIClient[2m > [22mretries on specific status codes
+ [32m✓[39m src/services/api.test.js[2m > [22mAPIClient[2m > [22mattaches auth token from localStorage if present
+ [32m✓[39m src/hooks/useAsyncAction.test.js[2m > [22museAsyncAction[2m > [22minitial state is correct
+ [32m✓[39m src/hooks/useAsyncAction.test.js[2m > [22museAsyncAction[2m > [22mmanages loading and success state
+ [32m✓[39m src/hooks/useAsyncAction.test.js[2m > [22museAsyncAction[2m > [22mhandles errors
+ [32m✓[39m src/hooks/useAsyncAction.test.js[2m > [22museAsyncAction[2m > [22mcalls onSuccess callback
+ [32m✓[39m src/components/GlassCard.test.jsx[2m > [22mGlassCard renders children
+ [32m✓[39m src/components/GlassCard.test.jsx[2m > [22mGlassCard applies custom className
+
+[2m Test Files [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[32m10 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (11)[39m
+[2m   Start at [22m 16:55:53
+[2m   Duration [22m 2.91s[2m (transform 122ms, setup 1ms, collect 1.08s, tests 78ms, environment 4.78s, prepare 857ms)[22m
+

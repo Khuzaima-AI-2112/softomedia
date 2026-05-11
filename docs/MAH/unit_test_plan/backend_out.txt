@@ -1,0 +1,238 @@
+(node:18364) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS tests/BusinessHours.test.js
+  BusinessHoursService
+    √ should return default hours when no special hours exist (18 ms)
+    √ should return special hours as override (2 ms)
+    √ should validate that open_time < close_time (17 ms)
+    √ should return closed status if no default or special hours found (1 ms)
+
+  console.log
+    [PricingRepository] baseCPM changed from 15 to 25 - clearing retailerOverrides to prevent ghost prices
+
+      at PricingRepositoryClass.log [as updateConfig] (src/repositories/PricingRepository.js:98:21)
+
+  console.log
+    [PricingRepository] baseCPM changed from 15 to 20 - clearing retailerOverrides to prevent ghost prices
+
+      at PricingRepositoryClass.log [as updateConfig] (src/repositories/PricingRepository.js:98:21)
+
+  console.log
+    [PricingRepository] baseCPM changed from 15 to 20 - clearing retailerOverrides to prevent ghost prices
+
+      at PricingRepositoryClass.log [as updateConfig] (src/repositories/PricingRepository.js:98:21)
+
+  console.log
+    [PricingRepository] baseCPM changed from 15 to 20 - clearing retailerOverrides to prevent ghost prices
+
+      at PricingRepositoryClass.log [as updateConfig] (src/repositories/PricingRepository.js:98:21)
+
+(node:6880) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS tests/PricingRepository.test.js
+  PricingRepository
+    getConfig
+      √ should return default config if none exists (19 ms)
+      √ should return normalized config if exists (1 ms)
+      √ should merge defaults for missing fields (2 ms)
+    updateConfig
+      √ should update config and normalize snake_case keys (65 ms)
+      √ should clear retailerOverrides if baseCPM changes (4 ms)
+      √ should preserve retailerOverrides if baseCPM unchanged (1 ms)
+      √ should not clear retailerOverrides if flag is false (1 ms)
+    calculateSlotPrice
+      √ should calculate price based on traffic tier (1 ms)
+      √ should apply date overrides (1 ms)
+      √ should use hourly tier override from dateOverrides (1 ms)
+      √ should fall back to medium tier if hour not found (1 ms)
+    Schema Parity
+      √ should handle both snake_case and camelCase inputs (3 ms)
+      √ should always output camelCase keys (1 ms)
+
+[33mwarn[39m: Retry attempt 1 for function {"environment":"test","error":"fail","nextDelayMs":34,"project_id":"softomedia-live-2026","service":"ad-server","timestamp":"2026-03-07T21:55:51.551Z"}
+(node:14556) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:16296) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS tests/loop.test.js
+  LoopRepository
+    BUSINESS_HOURS constant
+      √ should define start hour as 0 (12 ms)
+      √ should define end hour as 24
+      √ should calculate 24 loops per day
+    create
+      √ should create a loop with 12 slots (2 ms)
+      √ should reject loops with invalid hours (14 ms)
+    findByDateAndHour
+      √ should find loop by date and hour (1 ms)
+    findPendingByRetailer
+      √ should return only pending loops for retailer (1 ms)
+    approveLoop
+      √ should change status to APPROVED (1 ms)
+    rejectSlot
+      √ should mark specific slot as rejected (1 ms)
+    replaceSlot
+      √ should replace rejected slot with new asset (1 ms)
+
+[33mwarn[39m: Retry attempt 1 for function {"environment":"test","error":"fail","nextDelayMs":92,"project_id":"softomedia-live-2026","service":"ad-server","timestamp":"2026-03-07T21:55:51.598Z"}
+[31merror[39m: Circuit Breaker [test] tripped to OPEN {"environment":"test","error":"fail","failures":2,"project_id":"softomedia-live-2026","service":"ad-server","timestamp":"2026-03-07T21:55:51.722Z"}
+PASS tests/resilience.test.js
+  ResilienceUtility
+    withRetry
+      √ retries on failure and eventually succeeds (58 ms)
+      √ throws after max retries (118 ms)
+    CircuitBreaker
+      √ trips after threshold failures (7 ms)
+      √ blocks execution when OPEN (2 ms)
+
+(node:3796) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:18424) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS tests/health.test.js
+  Health API
+    √ GET /api/health/v2 returns healthy status (49 ms)
+    √ GET /api/health/v2 returns degraded if breaker is open (8 ms)
+
+  console.log
+    [Ghost-AI] Archived ticket: ticket-1772920551911-m2mr6frwl
+
+      at log (routes/ghost-api.js:234:31)
+
+  console.error
+    [Ghost-AI] DETAILED ERROR: {
+      message: 'API Key Invalid',
+      name: 'Error',
+      code: undefined,
+      status: undefined,
+      stack: 'Error: API Key Invalid\n' +
+        '    at Object.<anonymous> (C:\\Users\\ChrisFro\\Desktop\\EmoGini\\softomedia-live2026\\ad-server\\tests\\ghost-api.test.js:128:51)\n' +
+        '    at Promise.then.completed (C:\\Users\\ChrisFro\\Desktop\\EmoGini\\softomedia-live2026\\ad-server\\node_modules\\jest-circus\\build\\utils.js:298:28)\n' +
+        '    at new Promise (<anonymous>)\n' +
+        '    at callAsyncCircusFn (C:\\Users\\ChrisFro\\Desktop\\EmoGini\\softomedia-live2026\\ad-server\\node_modules\\jest-circus\\build\\utils.js:231:10)\n' +
+        '    at _callCircusTest (C:\\Users\\ChrisFro\\Desktop\\EmoGini\\softomedia-live2026\\ad-server\\node_modules\\jest-circus\\build\\run.js:316:40)\n' +
+        '    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n' +
+        '    at _runTest (C:\\Users\\ChrisFro\\Desktop\\EmoGini\\softomedia-live2026\\ad-server\\node_modules\\jest-circus\\build\\run.js:252:3)\n' +
+        '    at _runTestsForDescribeBlock (C:\\Users\\ChrisFro\\Desktop\\EmoGini\\softomedia-live2026\\ad-server\\node_modules\\jest-circus\\build\\run.js:126:9)\n' +
+        '    at _runTestsForDescribeBlock (C:\\Users\\ChrisFro\\Desktop\\EmoGini\\softomedia-live2026\\ad-server\\node_modules\\jest-circus\\build\\run.js:121:9)\n' +
+        '    at _runTestsForDescribeBlock (C:\\Users\\ChrisFro\\Desktop\\EmoGini\\softomedia-live2026\\ad-server\\node_modules\\jest-circus\\build\\run.js:121:9)\n' +
+        '    at run (C:\\Users\\ChrisFro\\Desktop\\EmoGini\\softomedia-live2026\\ad-server\\node_modules\\jest-circus\\build\\run.js:71:3)\n' +
+        '    at runAndTransformResultsToJestFormat (C:\\Users\\ChrisFro\\Desktop\\EmoGini\\softomedia-live2026\\ad-server\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapterInit.js:122:21)\n' +
+        '    at jestAdapter (C:\\Users\\ChrisFro\\Desktop\\EmoGini\\softomedia-live2026\\ad-server\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapter.js:79:19)\n' +
+        '    at runTestInternal (C:\\Users\\ChrisFro\\Desktop\\EmoGini\\softomedia-live2026\\ad-server\\node_modules\\jest-runner\\build\\runTest.js:367:16)\n' +
+        '    at runTest (C:\\Users\\ChrisFro\\Desktop\\EmoGini\\softomedia-live2026\\ad-server\\node_modules\\jest-runner\\build\\runTest.js:444:34)\n' +
+        '    at Object.worker (C:\\Users\\ChrisFro\\Desktop\\EmoGini\\softomedia-live2026\\ad-server\\node_modules\\jest-runner\\build\\testWorker.js:106:12)',
+      fullError: '{\n' +
+        '  "stack": "Error: API Key Invalid\\n    at Object.<anonymous> (C:\\\\Users\\\\ChrisFro\\\\Desktop\\\\EmoGini\\\\softomedia-live2026\\\\ad-server\\\\tests\\\\ghost-api.test.js:128:51)\\n    at Promise.then.completed (C:\\\\Users\\\\ChrisFro\\\\Desktop\\\\EmoGini\\\\softomedia-live2026\\\\ad-server\\\\node_modules\\\\jest-circus\\\\build\\\\utils.js:298:28)\\n    at new Promise (<anonymous>)\\n    at callAsyncCircusFn (C:\\\\Users\\\\ChrisFro\\\\Desktop\\\\EmoGini\\\\softomedia-live2026\\\\ad-server\\\\node_modules\\\\jest-circus\\\\build\\\\utils.js:231:10)\\n    at _callCircusTest (C:\\\\Users\\\\ChrisFro\\\\Desktop\\\\EmoGini\\\\softomedia-live2026\\\\ad-server\\\\node_modules\\\\jest-circus\\\\build\\\\run.js:316:40)\\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)\\n    at _runTest (C:\\\\Users\\\\ChrisFro\\\\Desktop\\\\EmoGini\\\\softomedia-live2026\\\\ad-server\\\\node_modules\\\\jest-circus\\\\build\\\\run.js:252:3)\\n    at _runTestsForDescribeBlock (C:\\\\Users\\\\ChrisFro\\\\Desktop\\\\EmoGini\\\\softomedia-live2026\\\\ad-server\\\\node_modules\\\\jest-circus\\\\build\\\\run.js:126:9)\\n    at _runTestsForDescribeBlock (C:\\\\Users\\\\ChrisFro\\\\Desktop\\\\EmoGini\\\\softomedia-live2026\\\\ad-server\\\\node_modules\\\\jest-circus\\\\build\\\\run.js:121:9)\\n    at _runTestsForDescribeBlock (C:\\\\Users\\\\ChrisFro\\\\Desktop\\\\EmoGini\\\\softomedia-live2026\\\\ad-server\\\\node_modules\\\\jest-circus\\\\build\\\\run.js:121:9)\\n    at run (C:\\\\Users\\\\ChrisFro\\\\Desktop\\\\EmoGini\\\\softomedia-live2026\\\\ad-server\\\\node_modules\\\\jest-circus\\\\build\\\\run.js:71:3)\\n    at runAndTransformResultsToJestFormat (C:\\\\Users\\\\ChrisFro\\\\Desktop\\\\EmoGini\\\\softomedia-live2026\\\\ad-server\\\\node_modules\\\\jest-circus\\\\build\\\\legacy-code-todo-rewrite\\\\jestAdapterInit.js:122:21)\\n    at jestAdapter (C:\\\\Users\\\\ChrisFro\\\\Desktop\\\\EmoGini\\\\softomedia-live2026\\\\ad-server\\\\node_modules\\\\jest-circus\\\\build\\\\legacy-code-todo-rewrite\\\\jestAdapter.js:79:19)\\n    at runTestInternal (C:\\\\Users\\\\ChrisFro\\\\Desktop\\\\EmoGini\\\\softomedia-live2026\\\\ad-server\\\\node_modules\\\\jest-runner\\\\build\\\\runTest.js:367:16)\\n    at runTest (C:\\\\Users\\\\ChrisFro\\\\Desktop\\\\EmoGini\\\\softomedia-live2026\\\\ad-server\\\\node_modules\\\\jest-runner\\\\build\\\\runTest.js:444:34)\\n    at Object.worker (C:\\\\Users\\\\ChrisFro\\\\Desktop\\\\EmoGini\\\\softomedia-live2026\\\\ad-server\\\\node_modules\\\\jest-runner\\\\build\\\\testWorker.js:106:12)",\n' +
+        '  "message": "API Key Invalid"\n' +
+        '}'
+    }
+
+    [0m [90m 249 |[39m     } [36mcatch[39m (error) {
+     [90m 250 |[39m         [90m// Log FULL error details (not just message)[39m
+    [31m[1m>[22m[39m[90m 251 |[39m         console[33m.[39merror([32m'[Ghost-AI] DETAILED ERROR:'[39m[33m,[39m {
+     [90m     |[39m                 [31m[1m^[22m[39m
+     [90m 252 |[39m             message[33m:[39m error[33m.[39mmessage[33m,[39m
+     [90m 253 |[39m             name[33m:[39m error[33m.[39mname[33m,[39m
+     [90m 254 |[39m             code[33m:[39m error[33m.[39mcode[33m,[39m[0m
+
+      at error (routes/ghost-api.js:251:17)
+
+(node:18124) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+  console.log
+    [Ghost-AI] Archived ticket: ticket-1772920552010-nutlt02pn
+
+      at log (routes/ghost-api.js:234:31)
+
+  console.log
+    [Ghost-AI] Archived ticket: ticket-1772920552018-pcn8v0jsx
+
+      at log (routes/ghost-api.js:234:31)
+
+  console.error
+    [Ghost-AI] List Error: Error: Storage unavailable
+        at Object.<anonymous> (C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\ad-server\tests\ghost-api.test.js:190:50)
+        at Promise.then.completed (C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\ad-server\node_modules\jest-circus\build\utils.js:298:28)
+        at new Promise (<anonymous>)
+        at callAsyncCircusFn (C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\ad-server\node_modules\jest-circus\build\utils.js:231:10)
+        at _callCircusTest (C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\ad-server\node_modules\jest-circus\build\run.js:316:40)
+        at processTicksAndRejections (node:internal/process/task_queues:103:5)
+        at _runTest (C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\ad-server\node_modules\jest-circus\build\run.js:252:3)
+        at _runTestsForDescribeBlock (C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\ad-server\node_modules\jest-circus\build\run.js:126:9)
+        at _runTestsForDescribeBlock (C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\ad-server\node_modules\jest-circus\build\run.js:121:9)
+        at _runTestsForDescribeBlock (C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\ad-server\node_modules\jest-circus\build\run.js:121:9)
+        at run (C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\ad-server\node_modules\jest-circus\build\run.js:71:3)
+        at runAndTransformResultsToJestFormat (C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\ad-server\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
+        at jestAdapter (C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\ad-server\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
+        at runTestInternal (C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\ad-server\node_modules\jest-runner\build\runTest.js:367:16)
+        at runTest (C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\ad-server\node_modules\jest-runner\build\runTest.js:444:34)
+        at Object.worker (C:\Users\ChrisFro\Desktop\EmoGini\softomedia-live2026\ad-server\node_modules\jest-runner\build\testWorker.js:106:12)
+
+    [0m [90m 286 |[39m         res[33m.[39mjson(tickets)[33m;[39m
+     [90m 287 |[39m     } [36mcatch[39m (error) {
+    [31m[1m>[22m[39m[90m 288 |[39m         console[33m.[39merror([32m'[Ghost-AI] List Error:'[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                 [31m[1m^[22m[39m
+     [90m 289 |[39m         res[33m.[39mstatus([35m500[39m)[33m.[39mjson({ error[33m:[39m [32m'Failed to list tickets'[39m })[33m;[39m
+     [90m 290 |[39m     }
+     [90m 291 |[39m })[33m;[39m[0m
+
+      at error (routes/ghost-api.js:288:17)
+
+  console.log
+    [Ghost-AI] Ticket ticket-123 rated: 5 stars
+
+      at log (routes/ghost-api.js:341:17)
+
+PASS tests/ghost-api.test.js
+  Ghost AI API
+    POST /analyze
+      √ returns 400 when steps are missing (65 ms)
+      √ returns 200 with valid input (76 ms)
+      √ returns 500 when generateContent throws an error (23 ms)
+      √ handles follow-up conversations without requiring steps (8 ms)
+      √ uses default persona when invalid persona provided (8 ms)
+    GET /tickets
+      √ returns list of tickets (8 ms)
+      √ returns 500 when storage fails (14 ms)
+    GET /tickets/:id
+      √ returns ticket by id (7 ms)
+      √ returns 404 when ticket not found (6 ms)
+    POST /tickets/:id/rate
+      √ saves rating successfully (8 ms)
+      √ returns 400 for invalid rating (6 ms)
+      √ returns 404 when ticket not found (5 ms)
+
+PASS tests/schedules.test.js
+  Schedule API
+    GET /api/schedules/preview
+      √ should return 400 if storeId or date is missing (216 ms)
+      √ should return preview with business hours for open store (168 ms)
+      √ should handle closed stores correctly (164 ms)
+
+-------------------------------|---------|----------|---------|---------|------------------------------------------------------------------------------
+File                           | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                                                            
+-------------------------------|---------|----------|---------|---------|------------------------------------------------------------------------------
+All files                      |   63.43 |    55.69 |   58.88 |   65.98 |                                                                              
+ routes                        |   56.33 |    39.83 |   55.55 |   57.84 |                                                                              
+  ghost-api.js                 |   56.33 |    39.83 |   55.55 |   57.84 | 22,26,41-45,53,77,96,128,136,180-181,235,284,305-306,345-347,355-435,441-521 
+ src/api                       |   84.37 |    83.33 |      80 |   83.33 |                                                                              
+  health.js                    |      90 |    66.66 |     100 |   88.88 | 39                                                                           
+  schedules.js                 |   81.81 |      100 |   66.66 |   80.95 | 54-55,66-90                                                                  
+ src/repositories              |   62.38 |    61.22 |   59.18 |   67.95 |                                                                              
+  BaseRepository.js            |   48.86 |     41.3 |   56.52 |      50 | 47,76-90,102-103,128-185                                                     
+  LoopRepository.js            |   58.49 |    42.42 |   53.33 |   64.58 | 14,101-109,149,184,205-250                                                   
+  PricingRepository.js         |   82.81 |    83.82 |      75 |   94.44 | 122-134                                                                      
+  SchedulingAuditRepository.js |      80 |      100 |   66.66 |      80 | 24                                                                           
+ src/services                  |   66.66 |    64.28 |   44.44 |   65.38 |                                                                              
+  BusinessHoursService.js      |   66.66 |    64.28 |   44.44 |   65.38 | 54-62,72-85,92                                                               
+ src/utils                     |   81.48 |    73.52 |   66.66 |      82 |                                                                              
+  ResilienceUtility.js         |   88.37 |       75 |   85.71 |   89.74 | 62-63,81,101                                                                 
+  logger.js                    |   54.54 |       70 |       0 |   54.54 | 42-54                                                                        
+-------------------------------|---------|----------|---------|---------|------------------------------------------------------------------------------
+Test Suites: 7 passed, 7 total
+Tests:       48 passed, 48 total
+Snapshots:   0 total
+Time:        3.362 s, estimated 4 s
+Ran all test suites.
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?
