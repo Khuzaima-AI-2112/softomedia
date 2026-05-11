@@ -63,4 +63,18 @@ router.put('/:id', async (req, res) => {
     }
 });
 
+/**
+ * DELETE /api/advertisers/:id
+ * Soft delete an advertiser
+ */
+router.delete('/:id', async (req, res) => {
+    try {
+        const advertiser = await advertiserRepository.update(req.params.id, { status: 'inactive' });
+        res.json({ message: 'Advertiser deleted', id: req.params.id });
+    } catch (error) {
+        logger.error('Failed to delete advertiser:', error);
+        res.status(500).json({ error: 'Failed to delete advertiser' });
+    }
+});
+
 export default router;

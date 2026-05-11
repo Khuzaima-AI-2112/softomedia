@@ -84,6 +84,20 @@ export const usersAPI = {
         return response.json();
     },
 
+    create: async (userData) => {
+        const response = await authFetch(`${API_URL}/api/users`, {
+            method: 'POST',
+            body: JSON.stringify(userData),
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to create user');
+        }
+
+        return response.json();
+    },
+
     list: async (role = null, status = null) => {
         const params = new URLSearchParams();
         if (role) params.append('role', role);
@@ -108,6 +122,19 @@ export const usersAPI = {
         const data = await response.json();
         setAuthToken(data.token);
         return data;
+    },
+
+    delete: async (userId) => {
+        const response = await authFetch(`${API_URL}/api/users/${userId}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to delete user');
+        }
+
+        return response.json();
     },
 };
 

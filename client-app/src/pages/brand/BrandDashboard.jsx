@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { dashboardAPI } from '../../services/api';
+import { useNavigate } from 'react-router-dom';
+import useCampaignStore from '../../stores/useCampaignStore';
 import CampaignUploadDrawer from '../../components/CampaignUploadDrawer';
 import ScheduleTimeline from '../../components/ScheduleTimeline';
 import HamburgerMenu from '../../components/HamburgerMenu';
 
 function BrandDashboard() {
     const { user } = useAuth();
+    const navigate = useNavigate();
+    const { setEditMode, setCampaignData } = useCampaignStore();
     const [loading, setLoading] = useState(true);
     const [dashboardData, setDashboardData] = useState(null);
     const [error, setError] = useState(null);
@@ -163,6 +167,7 @@ function BrandDashboard() {
                                     <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280' }}>Status</th>
                                     <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280' }}>Impressions</th>
                                     <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280' }}>Duration</th>
+                                    <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280' }}>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -174,15 +179,38 @@ function BrandDashboard() {
                                                 padding: '0.25rem 0.75rem',
                                                 borderRadius: '999px',
                                                 fontSize: '0.75rem',
-                                                backgroundColor: campaign.status === 'active' ? '#d1fae5' : '#fee2e2',
-                                                color: campaign.status === 'active' ? '#065f46' : '#991b1b',
+                                                backgroundColor: campaign.status === 'live' || campaign.status === 'active' ? '#d1fae5' :
+                                                    campaign.status === 'pending' || campaign.status === 'scheduled' ? '#fef3c7' :
+                                                        campaign.status === 'completed' ? '#f3f4f6' : '#fee2e2',
+                                                color: campaign.status === 'live' || campaign.status === 'active' ? '#065f46' :
+                                                    campaign.status === 'pending' || campaign.status === 'scheduled' ? '#92400e' :
+                                                        campaign.status === 'completed' ? '#374151' : '#991b1b',
                                                 fontWeight: '500'
                                             }}>
-                                                {campaign.status}
+                                                {(campaign.status || 'unknown').toUpperCase()}
                                             </span>
                                         </td>
                                         <td style={{ padding: '0.75rem' }}>{(campaign.impressions || 0).toLocaleString()}</td>
                                         <td style={{ padding: '0.75rem' }}>{campaign.duration}s</td>
+                                        <td style={{ padding: '0.75rem' }}>
+                                            <button
+                                                onClick={() => {
+                                                    setEditMode(true);
+                                                    setCampaignData(campaign);
+                                                    navigate(`/brand/campaign/${campaign.id}/edit`);
+                                                }}
+                                                style={{
+                                                    padding: '0.25rem 0.5rem',
+                                                    fontSize: '0.75rem',
+                                                    backgroundColor: '#f3f4f6',
+                                                    border: '1px solid #d1d5db',
+                                                    borderRadius: '0.25rem',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                Edit
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>

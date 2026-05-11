@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
-import { API_URL } from '../../config';
+import apiClient from '../../services/api';
 
 function TechOpsDashboard() {
     const [stats, setStats] = useState({ total: 0, online: 0, offline: 0, screens: [] });
@@ -15,11 +15,16 @@ function TechOpsDashboard() {
 
     const fetchStatus = async () => {
         try {
-            const res = await fetch(`${API_URL}/api/monitoring/status`);
-            if (res.ok) {
-                const data = await res.json();
-                setStats(data);
-            }
+            const data = await apiClient.get('/api/monitoring/status');
+            // Normalize counts to be case-insensitive to handle seeded 'online' strings vs 'ONLINE'
+            const onlineCount = data.screens.filter(s => s.status?.toUpperCase() === 'ONLINE').length;
+            const offlineCount = data.screens.filter(s => s.status?.toUpperCase() === 'OFFLINE').length;
+
+            setStats({
+                ...data,
+                online: onlineCount,
+                offline: offlineCount
+            });
         } catch (error) {
             console.error('Failed to fetch screen status', error);
         } finally {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { dashboardAPI } from '../../services/api.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import GlassCard from '../../components/GlassCard';
@@ -15,22 +16,47 @@ function RetailerDashboard() {
     const [earnings, setEarnings] = useState(0);
     const [screenData, setScreenData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [isReporting, setIsReporting] = useState(false);
+    const [issueText, setIssueText] = useState('');
+    const [reportStatus, setReportStatus] = useState('');
+
+    // For BUG-19: Context Selector
+    const [retailers, setRetailers] = useState([]);
+    const [selectedRetailerId, setSelectedRetailerId] = useState('');
+
+    const navigate = useNavigate();
 
     useEffect(() => {
-        if (user?.linked_entity_id) {
-            fetchRetailerData();
+        if (user?.role === 'admin') {
+            import('../../services/ApiService').then(module => {
+                module.default.getRetailers().then(data => {
+                    const list = data.retailers || data || [];
+                    setRetailers(list);
+                    if (list.length > 0 && !selectedRetailerId) {
+                        setSelectedRetailerId(list[0].id);
+                    }
+                }).catch(err => console.error(err));
+            });
+        } else if (user?.linked_entity_id && !selectedRetailerId) {
+            setSelectedRetailerId(user.linked_entity_id);
         }
     }, [user]);
 
-    const fetchRetailerData = async () => {
-        if (!user?.linked_entity_id) return;
+    useEffect(() => {
+        if (selectedRetailerId) {
+            fetchRetailerData(selectedRetailerId);
+        }
+    }, [selectedRetailerId]);
+
+    const fetchRetailerData = async (retailerId) => {
+        if (!retailerId) return;
 
         setLoading(true);
         try {
-            const data = await dashboardAPI.getRetailerDashboard(user.linked_entity_id);
+            const data = await dashboardAPI.getRetailerDashboard(retailerId);
 
             setSystemStatus(data.system_status || 'offline');
-            setEarnings(data.earnings.current_month || 0);
+            setEarnings(data.earnings?.current_month || 0); // safe navigation
             setScreenData(data.screen);
         } catch (error) {
             console.error('Failed to fetch retailer data:', error);
@@ -40,15 +66,42 @@ function RetailerDashboard() {
         }
     };
 
-    // Toggle status for demo purposes
-    const toggleStatus = () => {
-        setSystemStatus(prev => prev === 'online' ? 'offline' : 'online');
+    // Fix BUG-15: Connect/Disconnect stub replaced by Restart Simulation
+    const handleRestartScreen = () => {
+        setSystemStatus('restarting');
+        setTimeout(() => setSystemStatus('online'), 3000); // simulate reboot delay
+    };
+
+    const submitReport = () => {
+        if (!issueText) return;
+        setReportStatus('submitting');
+        setTimeout(() => {
+            setReportStatus('success');
+            setTimeout(() => {
+                setIsReporting(false);
+                setIssueText('');
+                setReportStatus('');
+            }, 2000);
+        }, 1000);
     };
 
     return (
         <>
             <HamburgerMenu />
             <div className="dashboard-ui" style={{ padding: 'var(--space-6)', maxWidth: '800px', margin: '0 auto' }}>
+                {user?.role === 'admin' && (
+                    <div style={{ marginBottom: '1rem', background: '#e0e7ff', padding: '1rem', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
+                        <label style={{ fontWeight: 'bold', marginRight: '1rem', color: '#3730A3' }}>Super Admin View:</label>
+                        <select
+                            value={selectedRetailerId}
+                            onChange={(e) => setSelectedRetailerId(e.target.value)}
+                            style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #C7D2FE', background: 'white' }}
+                        >
+                            <option value="">-- Select Retailer --</option>
+                            {retailers.map(r => <option key={r.id} value={r.id}>{r.name || r.id}</option>)}
+                        </select>
+                    </div>
+                )}
                 {/* Simplified Navigation Helper */}
                 <div style={{ marginBottom: 'var(--space-6)' }}>
                     <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 'var(--font-bold)', marginBottom: 'var(--space-2)' }}>
@@ -154,14 +207,57 @@ function RetailerDashboard() {
                         >
                             View Earnings Details
                         </button>
+                        <button
+                            onClick={() => navigate('/retailer/dashboard/schedule')}
+                            style={{
+                                marginTop: 'var(--space-6)',
+                                padding: 'var(--space-4) var(--space-8)',
+                                fontSize: 'var(--text-base)',
+                                fontWeight: 'var(--font-semibold)',
+                                color: 'white',
+                                backgroundColor: 'var(--color-primary)',
+                                border: 'none',
+                                borderRadius: 'var(--radius-md)',
+                                cursor: 'pointer',
+                                display: 'block',
+                                width: '100%',
+                            }}
+                        >
+                            View Tomorrow&apos;s Schedule
+                        </button>
                     </GlassCard>
+                )}
+
+                {/* Report Issue Modal */}
+                {isReporting && (
+                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+                        <div style={{ background: 'white', padding: '2rem', borderRadius: '8px', maxWidth: '400px', width: '100%' }}>
+                            <h3 style={{ marginBottom: '1rem', fontSize: '1.2rem', fontWeight: 'bold' }}>Report an Issue</h3>
+                            <textarea
+                                value={issueText}
+                                onChange={e => setIssueText(e.target.value)}
+                                placeholder="Describe your issue..."
+                                style={{ width: '100%', height: '100px', padding: '0.5rem', marginBottom: '1rem', border: '1px solid #ccc', borderRadius: '4px' }}
+                                disabled={reportStatus === 'submitting' || reportStatus === 'success'}
+                            />
+                            {reportStatus === 'success' ? (
+                                <div style={{ color: 'green', fontWeight: 'bold', marginBottom: '1rem' }}>Report submitted successfully!</div>
+                            ) : null}
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                                <button onClick={() => setIsReporting(false)} disabled={reportStatus !== ''} style={{ padding: '0.5rem 1rem' }}>Cancel</button>
+                                <button onClick={submitReport} disabled={!issueText || reportStatus !== ''} style={{ padding: '0.5rem 1rem', background: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '4px' }}>
+                                    {reportStatus === 'submitting' ? 'Submitting...' : 'Submit'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 )}
 
                 {/* Troubleshoot Section - State 18 */}
                 {systemStatus === 'offline' && (
                     <GlassCard>
                         <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-6)', textAlign: 'center' }}>
-                            Quick Troubleshooting
+                            Needs Action
                         </h3>
 
                         {/* Three Large Tappable Buttons for Mobile */}
@@ -198,7 +294,7 @@ function RetailerDashboard() {
                             </button>
 
                             <button
-                                onClick={() => alert('Check if:\n• TV is plugged in\n• Power strip is on\n• No tripped breakers')}
+                                onClick={handleRestartScreen}
                                 style={{
                                     padding: 'var(--space-6)',
                                     fontSize: 'var(--text-base)',
@@ -212,29 +308,16 @@ function RetailerDashboard() {
                                     transition: 'all var(--transition-fast)',
                                     minHeight: '80px',
                                 }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.borderColor = 'var(--color-primary)';
-                                    e.currentTarget.style.backgroundColor = 'white';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.borderColor = 'var(--color-border)';
-                                    e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
-                                }}
                             >
-                                <div style={{ fontSize: 'var(--text-2xl)', marginBottom: 'var(--space-2)' }}>🔌</div>
-                                <div style={{ fontWeight: 'var(--font-semibold)' }}>Is the TV unplugged?</div>
+                                <div style={{ fontSize: 'var(--text-2xl)', marginBottom: 'var(--space-2)' }}>🔄</div>
+                                <div style={{ fontWeight: 'var(--font-semibold)' }}>Restart System</div>
                                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
-                                    Tap to see power connection guide
+                                    Attempt to reestablish remote connection
                                 </div>
                             </button>
 
                             <button
-                                onClick={() => {
-                                    const issue = prompt('Tell us what you see:');
-                                    if (issue) {
-                                        alert(`Report submitted!\n\nYour Issue: ${issue}\n\nOur support team has been notified and will contact you shortly.`);
-                                    }
-                                }}
+                                onClick={() => setIsReporting(true)}
                                 style={{
                                     padding: 'var(--space-6)',
                                     fontSize: 'var(--text-base)',
@@ -247,14 +330,6 @@ function RetailerDashboard() {
                                     textAlign: 'left',
                                     transition: 'all var(--transition-base)',
                                     minHeight: '80px',
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.transform = 'translateY(-2px)';
-                                    e.currentTarget.style.boxShadow = 'var(--shadow-lg)';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                    e.currentTarget.style.boxShadow = 'none';
                                 }}
                             >
                                 <div style={{ fontSize: 'var(--text-2xl)', marginBottom: 'var(--space-2)' }}>📝</div>
@@ -302,7 +377,7 @@ function RetailerDashboard() {
                         </p>
                         <p style={{ fontSize: 'var(--text-sm)', lineHeight: '1.6' }}>
                             You earn 40% of advertising revenue generated from your screen.
-                            For every ad impression displayed, you receive a share of the advertiser's payment.
+                            For every ad impression displayed, you receive a share of the advertiser&apos;s payment.
                             Earnings are calculated monthly and paid out automatically.
                         </p>
                     </div>

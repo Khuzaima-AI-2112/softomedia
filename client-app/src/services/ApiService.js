@@ -26,6 +26,10 @@ class ApiService {
         return apiClient.put(`/api/retailers/${id}`, data);
     }
 
+    async deleteRetailer(id) {
+        return apiClient.delete(`/api/retailers/${id}`);
+    }
+
     // ============================================
     // STORES
     // ============================================
@@ -37,6 +41,10 @@ class ApiService {
 
     async getStore(id) {
         return apiClient.get(`/api/stores/${id}`);
+    }
+
+    async createStore(data) {
+        return apiClient.post('/api/stores', data);
     }
 
     async getEffectiveHours(storeId, date) {
@@ -98,6 +106,10 @@ class ApiService {
 
     async updateAdvertiser(id, data) {
         return apiClient.put(`/api/advertisers/${id}`, data);
+    }
+
+    async deleteAdvertiser(id) {
+        return apiClient.delete(`/api/advertisers/${id}`);
     }
 
     // ============================================

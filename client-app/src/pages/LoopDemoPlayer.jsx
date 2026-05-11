@@ -37,12 +37,14 @@ function LoopDemoPlayer() {
         loadData();
     }, [searchParams]);
 
+    const [allLoops, setAllLoops] = useState([]);
+    const [currentHourIndex, setCurrentHourIndex] = useState(0);
+
     const loadData = async () => {
         try {
             setLoading(true);
             const screenId = searchParams.get('screen');
             const date = searchParams.get('date') || new Date().toISOString().split('T')[0];
-            const hour = parseInt(searchParams.get('hour') || new Date().getHours());
 
             // 1. Get campaigns for general demo content
             const allCampaigns = await apiService.getCampaigns();
@@ -64,15 +66,26 @@ function LoopDemoPlayer() {
             if (targetScreen) {
                 setScreen(targetScreen);
 
-                // Fetch store and loop in parallel
+                // Fetch store and all loops for the day in parallel
                 const storeId = targetScreen.store_id || targetScreen.storeId;
-                const [storeData, loopData] = await Promise.all([
+                const [storeData, loopsData] = await Promise.all([
                     storeId ? apiService.getStore(storeId) : Promise.resolve(null),
-                    apiService.getLoopByParams(targetScreen.id || targetScreen.screen_id, date, hour)
+                    apiService.getLoops({ screenId: targetScreen.id || targetScreen.screen_id, date })
                 ]);
 
                 setStore(storeData);
-                setLoop(loopData);
+                const dailyLoops = loopsData.loops || (Array.isArray(loopsData) ? loopsData : []);
+                setAllLoops(dailyLoops);
+
+                // Find starting hour if specified, or default to current hour, or first available
+                const paramHour = searchParams.get('hour');
+                const defaultHour = parseInt(paramHour || new Date().getHours());
+                let startIndex = dailyLoops.findIndex(l => l.hour === defaultHour);
+                if (startIndex === -1 && dailyLoops.length > 0) startIndex = 0;
+                else if (startIndex === -1) startIndex = 0;
+
+                setCurrentHourIndex(startIndex);
+                setLoop(dailyLoops[startIndex] || null);
             }
         } catch (error) {
             console.error('Failed to load player data:', error);
@@ -89,7 +102,7 @@ function LoopDemoPlayer() {
         return () => clearInterval(timeInterval);
     }, []);
 
-    // Handle slot progression
+    // Handle slot progression and full-day cycle
     useEffect(() => {
         if (!isPlaying || loading) return;
 
@@ -103,7 +116,19 @@ function LoopDemoPlayer() {
 
         // Slot transition
         intervalRef.current = setInterval(() => {
-            setCurrentSlotIndex(prev => (prev + 1) % TOTAL_SLOTS);
+            setCurrentSlotIndex(prev => {
+                const nextIndex = prev + 1;
+                // Full-day cycle: if we finish this loop, advance to the next hour's loop
+                if (nextIndex >= TOTAL_SLOTS) {
+                    if (allLoops.length > 0) {
+                        const nextHour = (currentHourIndex + 1) % allLoops.length;
+                        setCurrentHourIndex(nextHour);
+                        setLoop(allLoops[nextHour]);
+                    }
+                    return 0;
+                }
+                return nextIndex;
+            });
             setProgress(0);
         }, SLOT_DURATION);
 
@@ -111,7 +136,7 @@ function LoopDemoPlayer() {
             if (intervalRef.current) clearInterval(intervalRef.current);
             if (progressRef.current) clearInterval(progressRef.current);
         };
-    }, [isPlaying, loading]);
+    }, [isPlaying, loading, allLoops, currentHourIndex]);
 
     const slotContent = useMemo(() => {
         // First check if loop has specific booked content for this slot

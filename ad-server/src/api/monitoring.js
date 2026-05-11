@@ -68,8 +68,8 @@ router.get('/status', async (req, res) => {
 
         const stats = {
             total: screens.length,
-            online: screens.filter(s => s.status === 'ONLINE').length,
-            offline: screens.filter(s => s.status === 'OFFLINE').length,
+            online: screens.filter(s => s.status?.toUpperCase() === 'ONLINE').length,
+            offline: screens.filter(s => s.status?.toUpperCase() === 'OFFLINE').length,
             screens: screens.map(s => ({
                 id: s.id,
                 status: s.status,

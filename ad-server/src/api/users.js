@@ -10,6 +10,7 @@ import {
     sendInvitationEmail,
     sanitizeUser
 } from '../utils/helpers.js';
+import { userRepository } from '../repositories/UserRepository.js';
 
 const router = express.Router();
 const firestore = new Firestore();
@@ -249,6 +250,54 @@ router.post('/accept-invitation', async (req, res) => {
 });
 
 /**
+ * POST /api/users
+ * Direct creation of user (by Admin/SuperAdmin)
+ */
+router.post('/', requireAuth, requireRole(['admin', 'superadmin']), async (req, res) => {
+    try {
+        const { email, role, name, linked_entity_id } = req.body;
+
+        if (!email || !role || !name) {
+            return res.status(400).json({ error: 'Missing required fields: email, role, name' });
+        }
+
+        const normalizeRole = role === 'advertiser' ? 'brand' : role;
+
+        if (!['retailer', 'brand', 'admin', 'superadmin', 'contentmanager'].includes(normalizeRole)) {
+            return res.status(400).json({ error: 'Invalid role' });
+        }
+
+        if (normalizeRole === 'brand' && !linked_entity_id) {
+            return res.status(400).json({ error: 'Role advertiser requires linked_entity_id' });
+        }
+
+        const existing = await userRepository.findByEmail(email);
+        if (existing) {
+            return res.status(409).json({ error: 'User with this email already exists' });
+        }
+
+        const newDocRef = firestore.collection('users').doc();
+        const userData = {
+            email,
+            role: normalizeRole,
+            name,
+            linked_entity_id: linked_entity_id || null,
+            status: 'active',
+            password_hash: '',
+            last_login: null
+        };
+
+        const createdUser = await userRepository.create(newDocRef.id, userData);
+
+        res.status(201).json(sanitizeUser(createdUser));
+
+    } catch (error) {
+        console.error('Create user error:', error);
+        res.status(500).json({ error: 'Failed to create user' });
+    }
+});
+
+/**
  * GET /api/users
  * List all users with optional role filtering
  * Auth: Admin only
@@ -340,6 +389,34 @@ router.get('/:userId', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Get user error:', error);
         res.status(500).json({ error: 'Failed to fetch user' });
+    }
+});
+
+/**
+ * DELETE /api/users/:userId
+ * Soft delete a user
+ * Auth: Admin only
+ */
+router.delete('/:userId', requireAuth, requireRole(['admin', 'superadmin']), async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        // Ensure user exists
+        const userDoc = await firestore.collection('users').doc(userId).get();
+        if (!userDoc.exists) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Soft delete: update status to inactive
+        await firestore.collection('users').doc(userId).update({
+            status: 'inactive',
+            updated_at: new Date().toISOString()
+        });
+
+        res.json({ message: 'User deleted successfully', id: userId });
+    } catch (error) {
+        console.error('Delete user error:', error);
+        res.status(500).json({ error: 'Failed to delete user' });
     }
 });
 
