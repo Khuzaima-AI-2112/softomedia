@@ -3,3 +3,4 @@
 // All components MUST import from this file
 
 export const API_URL = 'https://ad-server-jjrrgubjxq-uc.a.run.app';
+export const MAPS_API_KEY = import.meta.env.VITE_MAPS_API_KEY || '';

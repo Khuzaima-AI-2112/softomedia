@@ -1,9 +1,10 @@
 import React from 'react';
-import { Outlet, useNavigate, Link } from 'react-router-dom';
+import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Monitor, Users, Settings, LogOut } from 'lucide-react';
 
 function DashboardLayout() {
     const navigate = useNavigate();
+    const location = useLocation();
     const role = localStorage.getItem('softomedia_role') || 'admin';
 
     const handleLogout = () => {
@@ -83,8 +84,17 @@ function DashboardLayout() {
 
             {/* Main Content */}
             <main style={{ flex: 1, overflow: 'auto' }}>
-                <header style={{ backgroundColor: 'white', padding: '1rem 2rem', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
-                    <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827' }}>Overview</h2>
+                <header style={{ backgroundColor: 'white', padding: '1rem 2rem', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <button
+                        onClick={() => navigate(-1)}
+                        title="Go Back"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#6b7280', padding: '0.25rem' }}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5" /><path d="m12 19-7-7 7-7" /></svg>
+                    </button>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', margin: 0 }}>
+                        {location.pathname.split('/').pop().charAt(0).toUpperCase() + location.pathname.split('/').pop().slice(1) || 'Overview'}
+                    </h2>
                 </header>
                 <div style={{ padding: '2rem' }}>
                     <Outlet />

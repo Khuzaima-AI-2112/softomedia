@@ -4,6 +4,9 @@ import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import SlideDrawer from '../../components/SlideDrawer';
 import '../../design-tokens.css';
+import { Trash2 } from 'lucide-react';
+
+import useUsersStore from '../../stores/useUsersStore.js';
 
 /**
  * UserManagement - State 17: User Management Tables (Admin CRM)
@@ -11,24 +14,26 @@ import '../../design-tokens.css';
  */
 function UserManagement() {
     const [activeTab, setActiveTab] = useState('retailers'); // 'retailers', 'brands', 'admins'
-    const [users, setUsers] = useState([]);
+
+    // Add back form state
     const [inviteDrawerOpen, setInviteDrawerOpen] = useState(false);
     const [inviteForm, setInviteForm] = useState({
         name: '',
         email: '',
+        role: 'retailer',
         businessName: '',
+        linked_entity_id: ''
     });
+
+    const { users, fetchUsers, createUser, deleteUser } = useUsersStore();
 
     useEffect(() => {
         fetchUsers(activeTab);
-    }, [activeTab]);
+    }, [activeTab, fetchUsers]);
 
-    const fetchUsers = async (type) => {
-        try {
-            const data = await usersAPI.list(type, null);
-            setUsers(data.users || []);
-        } catch (error) {
-            console.error('Failed to fetch users:', error);
+    const handleDelete = async (userId, userEmail) => {
+        if (window.confirm(`Are you sure you want to delete user ${userEmail}?`)) {
+            await deleteUser(userId);
         }
     };
 
@@ -36,26 +41,24 @@ function UserManagement() {
         e.preventDefault();
 
         try {
-            await usersAPI.invite(
-                inviteForm.email,
-                activeTab === 'retailers' ? 'retailer' : activeTab === 'brands' ? 'brand' : 'admin',
-                inviteForm.name,
-                inviteForm.businessName
-            );
+            await createUser({
+                email: inviteForm.email,
+                role: inviteForm.role,
+                name: inviteForm.name,
+                linked_entity_id: inviteForm.linked_entity_id || null
+            });
 
-            alert(`Invitation sent to ${inviteForm.email}\n\nThey will receive an email to set up their account.`);
+            alert(`User created: ${inviteForm.email}`);
 
             // Reset form and close drawer
-            setInviteForm({ name: '', email: '', businessName: '' });
+            setInviteForm({ name: '', email: '', role: 'retailer', businessName: '', linked_entity_id: '' });
             setInviteDrawerOpen(false);
-
-            // Refresh user list
-            fetchUsers(activeTab);
         } catch (error) {
-            console.error('Invitation failed:', error);
-            alert('Failed to send invitation: ' + error.message);
+            console.error('Creation failed:', error);
+            alert('Failed to create user: ' + error.message);
         }
     };
+
 
     const getInviteButtonText = () => {
         return activeTab === 'retailers' ? 'Invite New Retailer' :
@@ -199,6 +202,31 @@ function UserManagement() {
                                         >
                                             View
                                         </button>
+                                        <button
+                                            onClick={() => handleDelete(user.id, user.email)}
+                                            style={{
+                                                padding: 'var(--space-2) var(--space-3)',
+                                                marginLeft: 'var(--space-2)',
+                                                fontSize: 'var(--text-xs)',
+                                                color: 'var(--color-danger, #ef4444)',
+                                                backgroundColor: 'transparent',
+                                                border: '1px solid var(--color-danger, #ef4444)',
+                                                borderRadius: 'var(--radius-md)',
+                                                cursor: 'pointer',
+                                                transition: 'all var(--transition-fast)',
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.backgroundColor = 'var(--color-danger, #ef4444)';
+                                                e.currentTarget.style.color = 'white';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.backgroundColor = 'transparent';
+                                                e.currentTarget.style.color = 'var(--color-danger, #ef4444)';
+                                            }}
+                                            title="Delete User"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
@@ -268,31 +296,48 @@ function UserManagement() {
                         />
                     </div>
 
-                    <div style={{ marginBottom: 'var(--space-8)' }}>
+                    <div style={{ marginBottom: 'var(--space-6)' }}>
                         <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-2)' }}>
-                            {activeTab === 'retailers' ? 'Business Name *' : activeTab === 'brands' ? 'Company Name *' : 'Role *'}
+                            Role *
                         </label>
-                        <input
-                            type="text"
-                            required
-                            value={inviteForm.businessName}
-                            onChange={(e) => setInviteForm({ ...inviteForm, businessName: e.target.value })}
-                            placeholder={activeTab === 'retailers' ? 'Pizza Hut Downtown' : activeTab === 'brands' ? 'Coca-Cola' : 'Admin'}
+                        <select
+                            value={inviteForm.role}
+                            onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value })}
                             style={{
-                                width: '100%',
-                                padding: 'var(--space-3)',
-                                fontSize: 'var(--text-base)',
-                                border: '1px solid var(--color-border)',
-                                borderRadius: 'var(--radius-md)',
-                                outline: 'none',
+                                width: '100%', padding: 'var(--space-3)',
+                                fontSize: 'var(--text-base)', border: '1px solid var(--color-border)',
+                                borderRadius: 'var(--radius-md)', outline: 'none', marginBottom: 'var(--space-4)'
                             }}
-                            onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-primary)'; }}
-                            onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
-                        />
-                        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
-                            An email invitation will be sent to set up their password
-                        </p>
+                        >
+                            <option value="retailer">Retailer</option>
+                            <option value="brand">Brand</option>
+                            <option value="advertiser">Advertiser</option>
+                            <option value="admin">Admin</option>
+                        </select>
                     </div>
+
+                    {inviteForm.role === 'advertiser' && (
+                        <div style={{ marginBottom: 'var(--space-6)' }}>
+                            <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-2)' }}>
+                                Assign to Advertiser (Entity ID) *
+                            </label>
+                            <input
+                                type="text"
+                                required
+                                value={inviteForm.linked_entity_id}
+                                onChange={(e) => setInviteForm({ ...inviteForm, linked_entity_id: e.target.value })}
+                                placeholder="Entity ID"
+                                style={{
+                                    width: '100%', padding: 'var(--space-3)',
+                                    fontSize: 'var(--text-base)', border: '1px solid var(--color-border)',
+                                    borderRadius: 'var(--radius-md)', outline: 'none'
+                                }}
+                            />
+                            {inviteForm.role === 'advertiser' && !inviteForm.linked_entity_id && (
+                                <p style={{ color: 'red', fontSize: '12px', marginTop: '4px' }}>Role = 'advertiser' requires linked entity id (FK)</p>
+                            )}
+                        </div>
+                    )}
 
                     <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end' }}>
                         <button
@@ -313,27 +358,30 @@ function UserManagement() {
                         </button>
                         <button
                             type="submit"
+                            disabled={inviteForm.role === 'advertiser' && !inviteForm.linked_entity_id}
                             style={{
                                 padding: 'var(--space-3) var(--space-8)',
                                 fontSize: 'var(--text-base)',
                                 fontWeight: 'var(--font-semibold)',
                                 color: 'white',
-                                backgroundColor: 'var(--color-primary)',
+                                backgroundColor: (inviteForm.role === 'advertiser' && !inviteForm.linked_entity_id) ? '#ccc' : 'var(--color-primary)',
                                 border: 'none',
                                 borderRadius: 'var(--radius-md)',
-                                cursor: 'pointer',
+                                cursor: (inviteForm.role === 'advertiser' && !inviteForm.linked_entity_id) ? 'not-allowed' : 'pointer',
                                 transition: 'all var(--transition-base)',
                             }}
                             onMouseEnter={(e) => {
+                                if (inviteForm.role === 'advertiser' && !inviteForm.linked_entity_id) return;
                                 e.currentTarget.style.transform = 'translateY(-2px)';
                                 e.currentTarget.style.boxShadow = 'var(--shadow-lg)';
                             }}
                             onMouseLeave={(e) => {
+                                if (inviteForm.role === 'advertiser' && !inviteForm.linked_entity_id) return;
                                 e.currentTarget.style.transform = 'translateY(0)';
                                 e.currentTarget.style.boxShadow = 'none';
                             }}
                         >
-                            Send Invitation
+                            Create User
                         </button>
                     </div>
                 </form>

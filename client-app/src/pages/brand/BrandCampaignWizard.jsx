@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import useCampaignStore from '../../stores/useCampaignStore';
 import Step1LocationScreen from './wizard/Step1LocationScreen';
 import Step2ScheduleUpload from './wizard/Step2ScheduleUpload';
 import Step3LoopSlotSelection from './wizard/Step3LoopSlotSelection';
@@ -41,6 +42,25 @@ const BrandCampaignWizard = () => {
         totalImpressions: 0
     });
 
+    const { editMode, campaignData, reset } = useCampaignStore();
+    const { id } = useParams();
+
+    useEffect(() => {
+        if (editMode && campaignData) {
+            setWizardData(prev => ({
+                ...prev,
+                campaignName: campaignData.title || campaignData.name || '',
+                creativeDuration: campaignData.duration || 5,
+                // Prefill other attributes if needed
+            }));
+        }
+
+        return () => {
+            // reset when leaving
+            reset();
+        };
+    }, [editMode, campaignData, reset]);
+
     console.log(`[Diagnostic] Wizard Step: ${currentStep}`, {
         stores: wizardData.selectedStores.length,
         screens: wizardData.selectedScreens.length,
@@ -62,7 +82,7 @@ const BrandCampaignWizard = () => {
     const handleConfirm = async () => {
         try {
             // Create campaign in backend
-            const campaignData = {
+            const campaignPayload = {
                 advertiser_id: 'adv_001', // Demo - would come from auth context
                 name: wizardData.campaignName || 'New Campaign',
                 creative_url: wizardData.creativeUrl,
@@ -73,20 +93,25 @@ const BrandCampaignWizard = () => {
                 status: 'pending'
             };
 
-            const campaign = await apiService.createCampaign(campaignData);
+            if (editMode && campaignData?.id) {
+                // Dummy update call for edit
+                await apiService.updateCampaignStatus(campaignData.id, 'pending');
+            } else {
+                const campaign = await apiService.createCampaign(campaignPayload);
 
-            // Book selected slots via the unified endpoint
-            const slotMappings = wizardData.selectedSlots.map(slot => ({
-                loopId: slot.loopId,
-                slotIndex: slot.slotIndex,
-                creativeUrl: wizardData.creativeUrl,
-                advertiser_id: 'adv_001'
-            }));
+                // Book selected slots via the unified endpoint
+                const slotMappings = wizardData.selectedSlots.map(slot => ({
+                    loopId: slot.loopId,
+                    slotIndex: slot.slotIndex,
+                    creativeUrl: wizardData.creativeUrl,
+                    advertiser_id: 'adv_001'
+                }));
 
-            await apiService.bookSlots(campaign.id, slotMappings);
+                await apiService.bookSlots(campaign.id, slotMappings);
+            }
 
             // Navigate back to dashboard
-            navigate('/dashboard/brand');
+            navigate('/brand/dashboard');
         } catch (error) {
             console.error('Failed to book campaign:', error);
             alert('An error occurred while booking your campaign. Please try again.');

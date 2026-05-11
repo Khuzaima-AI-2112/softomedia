@@ -4,8 +4,11 @@ import TrafficTierBadge from '../../components/TrafficTierBadge';
 import PriceDisplay from '../../components/PriceDisplay';
 import apiService from '../../services/ApiService';
 import pricingService from '../../services/PricingService';
+import { authAPI } from '../../services/authAPI';
 
-const LayoutTag = ({ name, position = 'top-left' }) => {
+const LayoutTag = ({ name, position = 'top-left', isVisible = false }) => {
+    if (!isVisible) return null;
+
     const posClasses = {
         'top-left': '-top-3 -left-2',
         'top-right': '-top-3 -right-2',
@@ -38,6 +41,12 @@ const formatHour = (hour) => {
 
 function CPMCalendar() {
     const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
+    const [showSectionLabels, setShowSectionLabels] = useState(false);
+
+    // Auth Check
+    const currentUser = useMemo(() => authAPI.getCurrentUser(), []);
+    const isSuperAdmin = currentUser?.role === 'superadmin';
+
     const [pricingConfig, setPricingConfig] = useState(null);
     const [editMode, setEditMode] = useState(false);
     const [editedBaseCPM, setEditedBaseCPM] = useState(15.00);
@@ -313,7 +322,7 @@ function CPMCalendar() {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 relative group/main">
-            <LayoutTag name="main-section" position="top-left" />
+            <LayoutTag name="main-section" position="top-left" isVisible={showSectionLabels} />
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -324,6 +333,18 @@ function CPMCalendar() {
                         Manage CPM pricing, traffic tiers, and date overrides
                     </p>
                 </div>
+                {isSuperAdmin && (
+                    <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg">
+                        <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Overlay Labels</span>
+                        <button
+                            data-testid="overlay-toggle"
+                            onClick={() => setShowSectionLabels(!showSectionLabels)}
+                            className={`w-9 h-5 rounded-full relative transition-colors ${showSectionLabels ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-600'}`}
+                        >
+                            <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${showSectionLabels ? 'translate-x-4' : 'translate-x-0'}`} />
+                        </button>
+                    </div>
+                )}
                 <div className="flex items-center gap-3">
                     <select
                         value={selectedRetailer}
@@ -355,9 +376,9 @@ function CPMCalendar() {
 
             {/* Stats Row */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative group/stats">
-                <LayoutTag name="stats-row" position="top-right" />
+                <LayoutTag name="stats-row" position="top-right" isVisible={showSectionLabels} />
                 <GlassCard className="border-l-4 border-l-primary relative group/base">
-                    <LayoutTag name="col:base-cpm" position="bottom-left" />
+                    <LayoutTag name="col:base-cpm" position="bottom-left" isVisible={showSectionLabels} />
                     <p className="text-sm font-medium text-slate-500 mb-1">Base CPM</p>
                     <div className="flex items-end justify-between">
                         {editMode ? (
@@ -433,10 +454,10 @@ function CPMCalendar() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative group/calendar-row">
-                <LayoutTag name="calendar-details-row" position="top-right" />
+                <LayoutTag name="calendar-details-row" position="top-right" isVisible={showSectionLabels} />
                 {/* Calendar */}
                 <GlassCard className="lg:col-span-1 relative group/cal">
-                    <LayoutTag name="col:calendar" position="bottom-left" />
+                    <LayoutTag name="col:calendar" position="bottom-left" isVisible={showSectionLabels} />
                     <h3 className="font-bold text-lg mb-4">{currentMonth}</h3>
 
                     {/* Month navigation */}
@@ -539,7 +560,7 @@ aspect - square flex items - center justify - center text - sm rounded - lg rela
 
                 {/* Hourly Breakdown */}
                 <GlassCard className="lg:col-span-2 relative group/hourly">
-                    <LayoutTag name="col:hourly-breakdown" position="bottom-right" />
+                    <LayoutTag name="col:hourly-breakdown" position="bottom-right" isVisible={showSectionLabels} />
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
                             <h3 className="font-bold text-lg">
@@ -629,7 +650,7 @@ aspect - square flex items - center justify - center text - sm rounded - lg rela
 
             {/* Retailer Overrides */}
             <GlassCard className="relative group/retailer">
-                <LayoutTag name="retailer-overrides" position="top-left" />
+                <LayoutTag name="retailer-overrides" position="top-left" isVisible={showSectionLabels} />
                 <h3 className="font-bold text-lg mb-4">Retailer Pricing Overrides</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {retailers.map(retailer => {
@@ -679,7 +700,7 @@ aspect - square flex items - center justify - center text - sm rounded - lg rela
 
             {/* Traffic Tier Configuration */}
             <GlassCard className="relative group/tiers">
-                <LayoutTag name="traffic-tiers-config" position="bottom-right" />
+                <LayoutTag name="traffic-tiers-config" position="bottom-right" isVisible={showSectionLabels} />
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold text-lg">Traffic Tier Configuration</h3>
                     {!tierEditMode ? (

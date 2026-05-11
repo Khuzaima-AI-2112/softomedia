@@ -63,4 +63,18 @@ router.put('/:id', async (req, res) => {
     }
 });
 
+/**
+ * DELETE /api/retailers/:id
+ * Soft delete a retailer
+ */
+router.delete('/:id', async (req, res) => {
+    try {
+        const retailer = await retailerRepository.update(req.params.id, { status: 'inactive' });
+        res.json({ message: 'Retailer deleted', id: req.params.id });
+    } catch (error) {
+        logger.error('Failed to delete retailer:', error);
+        res.status(500).json({ error: 'Failed to delete retailer' });
+    }
+});
+
 export default router;

@@ -11,7 +11,10 @@ import UserManagement from './pages/admin/UserManagement';
 import ScreenManagement from './pages/admin/ScreenManagement';
 import RetailerDashboard from './pages/retailer/RetailerDashboard';
 import BrandDashboard from './pages/brand/BrandDashboard';
+import BrandCampaignWizard from './pages/brand/BrandCampaignWizard';
 import CampaignReport from './pages/CampaignReport';
+import ScheduleCalendar from './pages/retailer/ScheduleCalendar';
+import DashboardLayout from './layouts/DashboardLayout';
 
 // Protected Route wrapper
 function ProtectedRoute({ children, allowedRoles = [] }) {
@@ -59,26 +62,28 @@ function App() {
                             path="/dashboard"
                             element={
                                 <ProtectedRoute>
-                                    <Overview />
+                                    <DashboardLayout />
                                 </ProtectedRoute>
                             }
-                        />
-                        <Route
-                            path="/dashboard/users"
-                            element={
-                                <ProtectedRoute allowedRoles={['admin']}>
-                                    <UserManagement />
-                                </ProtectedRoute>
-                            }
-                        />
-                        <Route
-                            path="/dashboard/screens"
-                            element={
-                                <ProtectedRoute allowedRoles={['admin']}>
-                                    <ScreenManagement />
-                                </ProtectedRoute>
-                            }
-                        />
+                        >
+                            <Route index element={<Overview />} />
+                            <Route
+                                path="users"
+                                element={
+                                    <ProtectedRoute allowedRoles={['admin']}>
+                                        <UserManagement />
+                                    </ProtectedRoute>
+                                }
+                            />
+                            <Route
+                                path="screens"
+                                element={
+                                    <ProtectedRoute allowedRoles={['admin', 'location']}>
+                                        <ScreenManagement />
+                                    </ProtectedRoute>
+                                }
+                            />
+                        </Route>
 
                         {/* Protected Routes - Retailer */}
                         <Route
@@ -89,6 +94,16 @@ function App() {
                                 </ProtectedRoute>
                             }
                         />
+                        <Route
+                            path="/retailer/dashboard/schedule"
+                            element={
+                                <ProtectedRoute allowedRoles={['retailer', 'admin']}>
+                                    <DashboardLayout />
+                                </ProtectedRoute>
+                            }
+                        >
+                            <Route index element={<ScheduleCalendar />} />
+                        </Route>
 
                         {/* Protected Routes - Brand */}
                         <Route
@@ -96,6 +111,14 @@ function App() {
                             element={
                                 <ProtectedRoute allowedRoles={['brand', 'admin']}>
                                     <BrandDashboard />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route
+                            path="/brand/campaign/:id/edit"
+                            element={
+                                <ProtectedRoute allowedRoles={['brand', 'admin']}>
+                                    <BrandCampaignWizard />
                                 </ProtectedRoute>
                             }
                         />

@@ -103,7 +103,9 @@ const seedData = {
 
 async function seed() {
     try {
-        logger.info('[Seed] Starting Firestore seed...');
+        logger.info('[Seed] Starting Firestore seed... clearing mock storage');
+        const { clearMockStorage } = await import('./src/repositories/BaseRepository.js');
+        clearMockStorage();
 
         // Initialize Firestore
         getFirestore();
