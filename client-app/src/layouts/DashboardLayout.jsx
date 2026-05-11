@@ -1,61 +1,95 @@
 import React from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import HamburgerMenu from '../components/HamburgerMenu';
-import PersonaSwitcher from '../components/PersonaSwitcher';
-import { useAuth } from '../contexts/AuthContext';
-import ErrorBoundary from '../components/ErrorBoundary';
-import SafeWidgetLoader from '../components/SafeWidgetLoader';
+import { Outlet, useNavigate, Link } from 'react-router-dom';
+import { LayoutDashboard, Monitor, Users, Settings, LogOut } from 'lucide-react';
 
 function DashboardLayout() {
-    const { persona, loading } = useAuth();
-    const location = useLocation();
     const navigate = useNavigate();
+    const role = localStorage.getItem('softomedia_role') || 'admin';
 
-    // Role-based routing: Ensure the URL matches the persona
-    React.useEffect(() => {
-        if (!loading && persona && location.pathname === '/dashboard') {
-            // Default landing redirect
-            navigate(`/dashboard/${persona}`, { replace: true });
-        }
-    }, [persona, loading, location.pathname, navigate]);
-
-    if (loading) return null;
+    const handleLogout = () => {
+        localStorage.removeItem('softomedia_token');
+        localStorage.removeItem('softomedia_role');
+        navigate('/login');
+    };
 
     return (
-        <div className={`min-h-screen bg-slate-50 dark:bg-background-dark text-slate-900 dark:text-white relative ${!loading ? 'main-content-loaded' : ''}`}>
-            <HamburgerMenu />
-
-            <header className="sticky top-0 z-50 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-background-dark/90 backdrop-blur-md px-6 py-3 lg:px-10">
-                <div className="flex items-center gap-4">
-                    <div className="size-8 text-primary">
-                        <span className="material-symbols-outlined text-[32px]">campaign</span>
-                    </div>
-                    <h2 className="text-lg font-bold leading-tight tracking-tight">AdManager</h2>
-                    <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-2"></div>
-                    <PersonaSwitcher />
+        <div style={{ display: 'flex', height: '100vh', backgroundColor: '#f3f4f6' }}>
+            {/* Sidebar */}
+            <aside style={{
+                width: '250px',
+                backgroundColor: '#1f2937',
+                color: 'white',
+                display: 'flex',
+                flexDirection: 'column'
+            }}>
+                <div style={{ padding: '1.5rem', borderBottom: '1px solid #374151' }}>
+                    <h1 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>SoftoMedia</h1>
+                    <span style={{ fontSize: '0.75rem', color: '#9ca3af', textTransform: 'uppercase' }}>{role} Portal</span>
                 </div>
 
-                <div className="flex items-center gap-6">
-                    <div className="hidden md:flex flex-col items-end">
-                        <span className="text-xs font-bold uppercase tracking-wider text-primary">
-                            {persona?.toUpperCase()} MODE
-                        </span>
-                        <span className="text-[10px] text-slate-500">Live Infrastructure</span>
-                    </div>
-                    <div className="size-10 rounded-full bg-slate-200 bg-center bg-cover border-2 border-primary/20"
-                        style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuDIf29faZUdAOHSrg73fRjKadBDM-5EF4bdvDm-PKmuZoalok9AQizOwZuVz5uBc4NbonpQN_sNa7vx4QBd9jrnL0ypn9aE8vWXv2HMxhcYKBQ9LcU8KHbn8HuP8uBNIAH3Pni-9WiJbvI1eyOIfEcdBJg3tpNx83COxh59IADm3lfD3Fe50jUVrtQ_Qnuhlbsrl1FNX0A04o61JShF8tGClqhrGqQQxeJYVxsl5Sf6FQAV1Wc10SAg9W5j_cdaGPa4OgeHezI4MA")' }}>
-                    </div>
-                </div>
-            </header>
+                <nav style={{ flex: 1, padding: '1rem' }}>
+                    <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <li>
+                            <Link to="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', color: '#e5e7eb', textDecoration: 'none', borderRadius: '0.375rem', backgroundColor: '#374151' }}>
+                                <LayoutDashboard size={20} />
+                                Dashboard
+                            </Link>
+                        </li>
+                        {role === 'admin' && (
+                            <li>
+                                <Link to="/dashboard/users" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', color: '#9ca3af', textDecoration: 'none' }}>
+                                    <Users size={20} />
+                                    Users
+                                </Link>
+                            </li>
+                        )}
+                        {(role === 'admin' || role === 'location') && (
+                            <li>
+                                <Link to="/dashboard/screens" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', color: '#9ca3af', textDecoration: 'none' }}>
+                                    <Monitor size={20} />
+                                    Screens
+                                </Link>
+                            </li>
+                        )}
+                        <li>
+                            <Link to="/dashboard/settings" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', color: '#9ca3af', textDecoration: 'none' }}>
+                                <Settings size={20} />
+                                Settings
+                            </Link>
+                        </li>
+                    </ul>
+                </nav>
 
-            <main className="p-4 lg:p-10 max-w-[1440px] mx-auto">
-                <ErrorBoundary>
+                <div style={{ padding: '1rem', borderTop: '1px solid #374151' }}>
+                    <button
+                        onClick={handleLogout}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            width: '100%',
+                            padding: '0.75rem',
+                            backgroundColor: 'transparent',
+                            border: 'none',
+                            color: '#ef4444',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        <LogOut size={20} />
+                        Sign Out
+                    </button>
+                </div>
+            </aside>
+
+            {/* Main Content */}
+            <main style={{ flex: 1, overflow: 'auto' }}>
+                <header style={{ backgroundColor: 'white', padding: '1rem 2rem', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827' }}>Overview</h2>
+                </header>
+                <div style={{ padding: '2rem' }}>
                     <Outlet />
-                </ErrorBoundary>
+                </div>
             </main>
-
-            {/* AI Assistant (Ghost Layer) */}
-            <SafeWidgetLoader />
         </div>
     );
 }

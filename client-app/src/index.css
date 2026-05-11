@@ -1,50 +1,8 @@
-@import "tailwindcss";
-
-@theme {
-  --color-primary: #3b82f6;
-  --color-secondary: #64748b;
-  --color-surface-light: #f8fafc;
-  --color-surface-dark: #1e293b;
-}
-
-:root {
-  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: #1f2937;
-  background-color: #ffffff;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+/* Import Industrial Premium Design System */
+@import './design-tokens.css';
 
 body {
   margin: 0;
-  display: flex;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
-#root {
-  width: 100%;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-table {
-  width: 100%;
-}
-
-button {
-  transition: opacity 0.2s, transform 0.1s;
-}
-
-button:active {
-  transform: scale(0.98);
+  padding: 0;
+  overflow: hidden;
 }

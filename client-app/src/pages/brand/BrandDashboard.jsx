@@ -1,228 +1,219 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import KPICard from '../../components/KPICard';
-import DataTable from '../../components/DataTable';
-import GlassCard from '../../components/GlassCard';
-import apiService from '../../services/ApiService';
-import pricingService from '../../services/PricingService';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { dashboardAPI } from '../../services/api';
+import CampaignUploadDrawer from '../../components/CampaignUploadDrawer';
+import ScheduleTimeline from '../../components/ScheduleTimeline';
+import HamburgerMenu from '../../components/HamburgerMenu';
 
-const BrandDashboard = () => {
-    const navigate = useNavigate();
-    const [campaigns, setCampaigns] = useState([]);
+function BrandDashboard() {
+    const { user } = useAuth();
     const [loading, setLoading] = useState(true);
-    const [stats, setStats] = useState({
-        active: 0,
-        screens: 0,
-        impressions: 0,
-        spent: 0
-    });
+    const [dashboardData, setDashboardData] = useState(null);
+    const [error, setError] = useState(null);
+    const [isUploadOpen, setIsUploadOpen] = useState(false);
+    const [showTimeline, setShowTimeline] = useState(false);
 
     useEffect(() => {
-        loadData();
-    }, []);
+        const fetchDashboard = async () => {
+            try {
+                setLoading(true);
+                const data = await dashboardAPI.getBrandDashboard(user?.linked_entity_id);
+                setDashboardData(data);
+            } catch (err) {
+                setError(err.message);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    const loadData = async () => {
+        if (user?.linked_entity_id) {
+            fetchDashboard();
+        }
+    }, [user]);
+
+    if (loading) {
+        return (
+            <div style={{ padding: '2rem', textAlign: 'center' }}>
+                <h2>Loading dashboard...</h2>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div style={{ padding: '2rem', textAlign: 'center', color: '#ef4444' }}>
+                <h2>Error loading dashboard</h2>
+                <p>{error}</p>
+            </div>
+        );
+    }
+
+    const { summary, campaigns = [], credits = 0 } = dashboardData || {};
+
+    const fetchDashboardData = async () => {
         try {
             setLoading(true);
-            await pricingService.init();
-
-            // Get campaigns for this advertiser (demo: use ALL for now, or filter if backend supports it)
-            const [allCampaigns, allScreens] = await Promise.all([
-                apiService.getCampaigns(),
-                apiService.getScreens()
-            ]);
-
-            setCampaigns(allCampaigns);
-
-            // Calculate stats (case-insensitive for robustness)
-            const liveCampaigns = allCampaigns.filter(c => c.status?.toLowerCase() === 'live');
-            const totalSpent = allCampaigns.reduce((sum, c) => sum + (c.spent || 0), 0);
-            const totalImpressions = allCampaigns.reduce((sum, c) => sum + (c.impressions || 0), 0);
-            const onlineScreens = allScreens.filter(s => s.status?.toLowerCase() === 'online' || s.status === 'ACTIVE').length;
-
-            setStats({
-                active: liveCampaigns.length,
-                screens: onlineScreens,
-                impressions: totalImpressions,
-                spent: totalSpent
-            });
-        } catch (error) {
-            console.error('Failed to load dashboard data:', error);
+            const data = await dashboardAPI.getBrandDashboard(user?.linked_entity_id);
+            setDashboardData(data);
+        } catch (err) {
+            setError(err.message);
         } finally {
             setLoading(false);
         }
     };
 
-    const kpis = [
-        { label: 'Active Campaigns', value: String(stats.active), trend: '+1', icon: 'campaign', color: 'text-primary' },
-        { label: 'Screens Available', value: String(stats.screens), trend: '+5', icon: 'tv', color: 'text-blue-400' },
-        { label: 'Total Spent', value: pricingService.formatPrice(stats.spent), trend: '+12%', icon: 'payments', color: 'text-emerald-400' },
-    ];
-
-    const columns = [
-        {
-            header: 'Campaign Name',
-            render: (cmp) => (
-                <div className="flex flex-col">
-                    <span className="text-base font-semibold">{cmp.name}</span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">ID: {cmp.id}</span>
-                </div>
-            )
-        },
-        {
-            header: 'Preview',
-            render: (cmp) => (
-                <div className="relative w-16 h-10 rounded-md overflow-hidden bg-slate-200 dark:bg-slate-700 ring-1 ring-slate-200 dark:ring-slate-700">
-                    <div
-                        className="absolute inset-0 bg-cover bg-center"
-                        style={{ backgroundImage: `url("${cmp.creative_url}")` }}
-                    />
-                </div>
-            )
-        },
-        {
-            header: 'Status',
-            render: (cmp) => (
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${cmp.status === 'live' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' :
-                    cmp.status === 'scheduled' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800' :
-                        cmp.status === 'pending_approval' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800' :
-                            'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
-                    }`}>
-                    {cmp.status === 'live' && <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>}
-                    {cmp.status === 'live' ? 'Live' : cmp.status === 'scheduled' ? 'Scheduled' : cmp.status === 'pending_approval' ? 'Pending' : 'Ended'}
-                </span>
-            )
-        },
-        {
-            header: 'Duration',
-            render: (cmp) => (
-                <span className="text-sm">
-                    {new Date(cmp.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(cmp.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </span>
-            )
-        },
-        {
-            header: 'Budget',
-            render: (cmp) => (
-                <div className="flex flex-col">
-                    <span className="font-medium">{pricingService.formatPrice(cmp.budget)}</span>
-                    <span className="text-xs text-slate-500">
-                        {pricingService.formatPrice(cmp.spent || 0)} spent
-                    </span>
-                </div>
-            )
-        },
-        {
-            header: 'Performance',
-            render: (cmp) => {
-                const progress = cmp.budget > 0 ? Math.round(((cmp.spent || 0) / cmp.budget) * 100) : 0;
-                return (
-                    <div className="flex flex-col gap-1 w-24">
-                        <span className="text-slate-900 dark:text-white font-medium">
-                            {pricingService.formatImpressions(cmp.impressions || 0)}
-                            <span className="text-xs font-normal text-slate-500"> Impr.</span>
-                        </span>
-                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5">
-                            <div
-                                className={`h-1.5 rounded-full ${cmp.status === 'ended' ? 'bg-slate-400' : 'bg-primary'}`}
-                                style={{ width: `${Math.min(progress, 100)}%` }}
-                            />
-                        </div>
-                    </div>
-                );
-            }
-        },
-        {
-            header: 'Actions',
-            className: 'text-right',
-            render: () => (
-                <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="p-1.5 text-slate-400 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors" title="Edit">
-                        <span className="material-symbols-outlined text-[20px]" aria-hidden="true">edit</span>
-                    </button>
-                    <button className="p-1.5 text-slate-400 hover:text-orange-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors" title="Pause">
-                        <span className="material-symbols-outlined text-[20px]" aria-hidden="true">pause_circle</span>
-                    </button>
-                    <button className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors" title="Settings">
-                        <span className="material-symbols-outlined text-[20px]" aria-hidden="true">more_vert</span>
-                    </button>
-                </div>
-            )
-        }
-    ];
+    const handleUploadSuccess = () => {
+        fetchDashboardData(); // Refresh data after upload
+    };
 
     return (
-        <div className="flex flex-col gap-8 animate-in fade-in duration-500">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Your Campaigns</h1>
-                    <p className="text-slate-500 dark:text-slate-400">Manage and monitor your advertising campaigns</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <Link
-                        to="/player/demo"
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium transition-colors"
-                    >
-                        <span className="material-symbols-outlined text-[20px]">slideshow</span>
-                        Preview Demo
-                    </Link>
-                    <button
-                        onClick={() => navigate('campaign/new')}
-                        data-testid="new-campaign-btn"
-                        className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white font-medium rounded-lg text-sm px-5 py-2.5 transition-colors shadow-lg shadow-primary/25"
-                    >
-                        <span className="material-symbols-outlined text-[20px]" aria-hidden="true">add</span>
-                        <span>New Campaign</span>
-                    </button>
-                </div>
-            </div>
-
-            {/* KPI Stats Row */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {kpis.map((kpi, i) => (
-                    <KPICard
-                        key={i}
-                        label={kpi.label}
-                        value={kpi.value}
-                        trend={kpi.trend}
-                        icon={kpi.icon}
-                        color={kpi.color}
-                        description="Running across network"
-                    />
-                ))}
-            </div>
-
-            {/* Quick Tip for new users */}
-            {campaigns.length === 0 && (
-                <GlassCard className="border-l-4 border-l-primary">
-                    <div className="flex items-center gap-4">
-                        <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                            <span className="material-symbols-outlined text-primary text-2xl">lightbulb</span>
-                        </div>
-                        <div className="flex-1">
-                            <p className="font-bold">Ready to advertise?</p>
-                            <p className="text-sm text-slate-500">Create your first campaign to start reaching customers across our retail network.</p>
-                        </div>
+        <>
+            <HamburgerMenu />
+            <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
+                {/* Header */}
+                <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                        <h1 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '0.5rem' }}>
+                            Brand Dashboard
+                        </h1>
+                        <p style={{ color: '#6b7280' }}>Campaign performance and analytics</p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.75rem' }}>
                         <button
-                            onClick={() => navigate('campaign/new')}
-                            className="px-4 py-2 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover"
+                            onClick={() => setShowTimeline(!showTimeline)}
+                            style={{
+                                padding: '0.75rem 1.5rem',
+                                backgroundColor: showTimeline ? '#eef2ff' : '#fff',
+                                color: showTimeline ? '#6366f1' : '#374151',
+                                border: '1px solid ' + (showTimeline ? '#6366f1' : '#d1d5db'),
+                                borderRadius: '0.5rem',
+                                fontSize: '1rem',
+                                fontWeight: '500',
+                                cursor: 'pointer'
+                            }}
                         >
-                            Get Started
+                            📅 {showTimeline ? 'Hide' : 'View'} Schedule Timeline
+                        </button>
+                        <button
+                            onClick={() => setIsUploadOpen(true)}
+                            style={{
+                                padding: '0.75rem 1.5rem',
+                                backgroundColor: '#6366f1',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '0.5rem',
+                                fontSize: '1rem',
+                                fontWeight: '500',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem'
+                            }}
+                        >
+                            📤 Create Campaign
                         </button>
                     </div>
-                </GlassCard>
-            )}
+                </div>
 
-            {/* Main Table */}
-            {campaigns.length > 0 && (
-                <DataTable
-                    columns={columns}
-                    data={campaigns}
+                {/* Stats Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+                    <StatCard
+                        title="Active Campaigns"
+                        value={summary?.total_campaigns || 0}
+                        color="#6366f1"
+                    />
+                    <StatCard
+                        title="Total Impressions"
+                        value={(summary?.total_impressions || 0).toLocaleString()}
+                        color="#10b981"
+                    />
+                    <StatCard
+                        title="Ad Credits"
+                        value={credits.toLocaleString()}
+                        color="#f59e0b"
+                    />
+                    <StatCard
+                        title="Screens Reached"
+                        value={summary?.screens_reached || 0}
+                        color="#8b5cf6"
+                    />
+                </div>
+
+                {/* Schedule Timeline */}
+                {showTimeline && campaigns.length > 0 && (
+                    <div style={{ marginBottom: '2rem' }}>
+                        <ScheduleTimeline campaigns={campaigns} />
+                    </div>
+                )}
+
+                {/* Campaigns Table */}
+                <div style={{ backgroundColor: '#fff', borderRadius: '0.75rem', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>
+                        Your Campaigns
+                    </h2>
+                    {campaigns.length === 0 ? (
+                        <p style={{ color: '#9ca3af', textAlign: 'center', padding: '2rem' }}>
+                            No campaigns yet. Create your first campaign to get started!
+                        </p>
+                    ) : (
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                                <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
+                                    <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280' }}>Campaign</th>
+                                    <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280' }}>Status</th>
+                                    <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280' }}>Impressions</th>
+                                    <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280' }}>Duration</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {campaigns.map((campaign, idx) => (
+                                    <tr key={idx} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                                        <td style={{ padding: '0.75rem', fontWeight: '500' }}>{campaign.title}</td>
+                                        <td style={{ padding: '0.75rem' }}>
+                                            <span style={{
+                                                padding: '0.25rem 0.75rem',
+                                                borderRadius: '999px',
+                                                fontSize: '0.75rem',
+                                                backgroundColor: campaign.status === 'active' ? '#d1fae5' : '#fee2e2',
+                                                color: campaign.status === 'active' ? '#065f46' : '#991b1b',
+                                                fontWeight: '500'
+                                            }}>
+                                                {campaign.status}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '0.75rem' }}>{(campaign.impressions || 0).toLocaleString()}</td>
+                                        <td style={{ padding: '0.75rem' }}>{campaign.duration}s</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+
+                {/* Campaign Upload Drawer */}
+                <CampaignUploadDrawer
+                    isOpen={isUploadOpen}
+                    onClose={() => setIsUploadOpen(false)}
+                    onSuccess={handleUploadSuccess}
                 />
-            )}
+            </div>
+        </>
+    );
+}
+
+function StatCard({ title, value, color }) {
+    return (
+        <div style={{
+            backgroundColor: '#fff',
+            padding: '1.5rem',
+            borderRadius: '0.75rem',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            borderLeft: `4px solid ${color}`
+        }}>
+            <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>{title}</p>
+            <p style={{ fontSize: '2rem', fontWeight: '700', color: '#111827' }}>{value}</p>
         </div>
     );
-};
+}
 
 export default BrandDashboard;
-

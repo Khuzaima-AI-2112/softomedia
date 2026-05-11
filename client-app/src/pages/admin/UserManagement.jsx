@@ -1,355 +1,343 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { usersAPI } from '../../services/api.js';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
-import DataTable from '../../components/DataTable';
-import apiService from '../../services/ApiService';
+import SlideDrawer from '../../components/SlideDrawer';
+import '../../design-tokens.css';
 
-const ROLES = [
-    { value: 'super_admin', label: 'Super Admin', color: 'text-purple-500', icon: 'shield_person' },
-    { value: 'content_manager', label: 'Content Manager', color: 'text-blue-500', icon: 'edit_note' },
-    { value: 'tech_operator', label: 'Tech Operator', color: 'text-amber-500', icon: 'engineering' },
-    { value: 'retailer_admin', label: 'Retailer Admin', color: 'text-emerald-500', icon: 'storefront' },
-    { value: 'advertiser', label: 'Advertiser', color: 'text-rose-500', icon: 'campaign' }
-];
-
+/**
+ * UserManagement - State 17: User Management Tables (Admin CRM)
+ * Manage retailers, brands, and admins with invite flow
+ */
 function UserManagement() {
+    const [activeTab, setActiveTab] = useState('retailers'); // 'retailers', 'brands', 'admins'
     const [users, setUsers] = useState([]);
-    const [retailers, setRetailers] = useState([]);
-    const [advertisers, setAdvertisers] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [showModal, setShowModal] = useState(false);
-    const [editingUser, setEditingUser] = useState(null);
-    const [formData, setFormData] = useState({
+    const [inviteDrawerOpen, setInviteDrawerOpen] = useState(false);
+    const [inviteForm, setInviteForm] = useState({
         name: '',
         email: '',
-        role: 'advertiser',
-        retailer_id: '',
-        advertiser_id: ''
+        businessName: '',
     });
-    const [filterRole, setFilterRole] = useState('all');
 
     useEffect(() => {
-        loadData();
-    }, []);
+        fetchUsers(activeTab);
+    }, [activeTab]);
 
-    const loadData = async () => {
+    const fetchUsers = async (type) => {
         try {
-            setLoading(true);
-            const [allUsers, allRetailers, allAdvertisers] = await Promise.all([
-                apiService.getUsers(),
-                apiService.getRetailers(),
-                apiService.getAdvertisers()
-            ]);
-            setUsers(allUsers);
-            setRetailers(allRetailers);
-            setAdvertisers(allAdvertisers);
+            const data = await usersAPI.list(type, null);
+            setUsers(data.users || []);
         } catch (error) {
-            console.error('Failed to load user management data:', error);
-        } finally {
-            setLoading(false);
+            console.error('Failed to fetch users:', error);
         }
     };
 
-    const handleSubmit = async (e) => {
+    const handleInvite = async (e) => {
         e.preventDefault();
+
         try {
-            if (editingUser) {
-                await apiService.updateUser(editingUser.id, formData);
-            } else {
-                await apiService.createUser({
-                    ...formData,
-                    status: 'active'
-                });
-            }
-            await loadData();
-            closeModal();
+            await usersAPI.invite(
+                inviteForm.email,
+                activeTab === 'retailers' ? 'retailer' : activeTab === 'brands' ? 'brand' : 'admin',
+                inviteForm.name,
+                inviteForm.businessName
+            );
+
+            alert(`Invitation sent to ${inviteForm.email}\n\nThey will receive an email to set up their account.`);
+
+            // Reset form and close drawer
+            setInviteForm({ name: '', email: '', businessName: '' });
+            setInviteDrawerOpen(false);
+
+            // Refresh user list
+            fetchUsers(activeTab);
         } catch (error) {
-            console.error('Failed to save user:', error);
+            console.error('Invitation failed:', error);
+            alert('Failed to send invitation: ' + error.message);
         }
     };
 
-    const openModal = (user = null) => {
-        if (user) {
-            setEditingUser(user);
-            setFormData({
-                name: user.name,
-                email: user.email,
-                role: user.role,
-                retailer_id: user.retailer_id || '',
-                advertiser_id: user.advertiser_id || ''
-            });
+    const getInviteButtonText = () => {
+        return activeTab === 'retailers' ? 'Invite New Retailer' :
+            activeTab === 'brands' ? 'Invite New Brand' :
+                'Add New Admin';
+    };
+
+    const getTableColumns = () => {
+        if (activeTab === 'retailers') {
+            return ['Business Name', 'Contact Person', 'Email', 'Screens Deployed', 'Status'];
+        } else if (activeTab === 'brands') {
+            return ['Company Name', 'Contact Person', 'Email', 'Active Campaigns', 'Status'];
         } else {
-            setEditingUser(null);
-            setFormData({
-                name: '',
-                email: '',
-                role: 'advertiser',
-                retailer_id: '',
-                advertiser_id: ''
-            });
-        }
-        setShowModal(true);
-    };
-
-    const closeModal = () => {
-        setShowModal(false);
-        setEditingUser(null);
-    };
-
-    const toggleUserStatus = async (userId) => {
-        const user = users.find(u => u.id === userId);
-        if (user) {
-            try {
-                await apiService.updateUser(userId, {
-                    status: user.status === 'active' ? 'inactive' : 'active'
-                });
-                await loadData();
-            } catch (error) {
-                console.error('Failed to toggle user status:', error);
-            }
+            return ['Name', 'Email', 'Role', 'Status'];
         }
     };
-
-    const getRoleInfo = (roleName) => ROLES.find(r => r.value === roleName) || ROLES[4];
-
-    const filteredUsers = filterRole === 'all'
-        ? users
-        : users.filter(u => u.role === filterRole);
-
-    const columns = [
-        {
-            header: 'User',
-            render: (user) => (
-                <div className="flex items-center gap-3">
-                    <div className="size-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary font-bold">
-                        {user.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                        <p className="font-semibold text-slate-900 dark:text-white">{user.name}</p>
-                        <p className="text-xs text-slate-500">{user.email}</p>
-                    </div>
-                </div>
-            )
-        },
-        {
-            header: 'Role',
-            render: (user) => {
-                const role = getRoleInfo(user.role);
-                return (
-                    <div className="flex items-center gap-2">
-                        <span className={`material-symbols-outlined text-lg ${role.color}`}>{role.icon}</span>
-                        <span className="text-sm font-medium">{role.label}</span>
-                    </div>
-                );
-            }
-        },
-        {
-            header: 'Organization',
-            render: (user) => {
-                if (user.retailer_id) {
-                    const retailer = retailers.find(r => r.id === user.retailer_id);
-                    return retailer ? (
-                        <span className="text-sm">{retailer.logo} {retailer.name}</span>
-                    ) : '-';
-                }
-                if (user.advertiser_id) {
-                    const advertiser = advertisers.find(a => a.id === user.advertiser_id);
-                    return advertiser ? (
-                        <span className="text-sm">{advertiser.logo} {advertiser.name}</span>
-                    ) : '-';
-                }
-                return <span className="text-slate-400">Softomedia</span>;
-            }
-        },
-        {
-            header: 'Status',
-            render: (user) => (
-                <StatusBadge status={user.status === 'active' ? 'Active' : 'Inactive'} />
-            )
-        },
-        {
-            header: 'Actions',
-            className: 'text-right',
-            render: (user) => (
-                <div className="flex items-center justify-end gap-2">
-                    <button
-                        onClick={() => openModal(user)}
-                        className="p-1.5 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                        title="Edit"
-                    >
-                        <span className="material-symbols-outlined text-lg">edit</span>
-                    </button>
-                    <button
-                        onClick={() => toggleUserStatus(user.id)}
-                        className={`p-1.5 rounded-lg transition-colors ${user.status === 'active'
-                            ? 'text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
-                            : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
-                            }`}
-                        title={user.status === 'active' ? 'Deactivate' : 'Activate'}
-                    >
-                        <span className="material-symbols-outlined text-lg">
-                            {user.status === 'active' ? 'person_off' : 'person_check'}
-                        </span>
-                    </button>
-                </div>
-            )
-        }
-    ];
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-                        User Management
-                    </h1>
-                    <p className="text-slate-500 dark:text-slate-400">
-                        Create and manage platform user accounts
-                    </p>
-                </div>
-                <button
-                    onClick={() => openModal()}
-                    className="px-4 py-2 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover transition-colors flex items-center gap-2"
-                >
-                    <span className="material-symbols-outlined text-[20px]">person_add</span>
-                    Add User
-                </button>
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                {ROLES.map(role => {
-                    const count = users.filter(u => u.role === role.value).length;
-                    return (
-                        <GlassCard
-                            key={role.value}
-                            className={`cursor-pointer transition-all ${filterRole === role.value ? 'ring-2 ring-primary' : ''}`}
-                            onClick={() => setFilterRole(filterRole === role.value ? 'all' : role.value)}
-                        >
-                            <div className="flex items-center gap-2 mb-1">
-                                <span className={`material-symbols-outlined text-lg ${role.color}`}>{role.icon}</span>
-                                <span className="text-xs text-slate-500">{role.label}s</span>
-                            </div>
-                            <p className="text-2xl font-bold">{count}</p>
-                        </GlassCard>
-                    );
-                })}
-            </div>
-
-            {/* Filter indicator */}
-            {filterRole !== 'all' && (
-                <div className="flex items-center gap-2 text-sm">
-                    <span className="text-slate-500">Filtering by:</span>
-                    <span className="px-2 py-1 rounded-full bg-primary/10 text-primary font-medium">
-                        {getRoleInfo(filterRole).label}
-                    </span>
+        <div className="dashboard-ui" style={{ padding: 'var(--space-6)' }}>
+            <GlassCard>
+                {/* Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-6)' }}>
+                    <div>
+                        <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 'var(--font-bold)', marginBottom: 'var(--space-2)' }}>
+                            User Management
+                        </h1>
+                        <p style={{ color: 'var(--color-text-secondary)' }}>
+                            Manage network users and send invitations
+                        </p>
+                    </div>
                     <button
-                        onClick={() => setFilterRole('all')}
-                        className="text-slate-400 hover:text-slate-600"
+                        onClick={() => setInviteDrawerOpen(true)}
+                        style={{
+                            padding: 'var(--space-3) var(--space-6)',
+                            fontSize: 'var(--text-sm)',
+                            fontWeight: 'var(--font-semibold)',
+                            color: 'white',
+                            backgroundColor: 'var(--color-primary)',
+                            border: 'none',
+                            borderRadius: 'var(--radius-md)',
+                            cursor: 'pointer',
+                            transition: 'all var(--transition-base)',
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                        }}
                     >
-                        <span className="material-symbols-outlined text-sm">close</span>
+                        + {getInviteButtonText()}
                     </button>
                 </div>
-            )}
 
-            {/* Users Table */}
-            <DataTable columns={columns} data={filteredUsers} />
-
-            {/* Add/Edit Modal */}
-            {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <GlassCard className="w-full max-w-md">
-                        <h2 className="text-xl font-bold mb-4">
-                            {editingUser ? 'Edit User' : 'Add New User'}
-                        </h2>
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Full Name</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
-                                    placeholder="John Doe"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Email</label>
-                                <input
-                                    type="email"
-                                    required
-                                    value={formData.email}
-                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
-                                    placeholder="john@example.com"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Role</label>
-                                <select
-                                    value={formData.role}
-                                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
-                                >
-                                    {ROLES.map(role => (
-                                        <option key={role.value} value={role.value}>{role.label}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {formData.role === 'retailer_admin' && (
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">Assign to Retailer</label>
-                                    <select
-                                        value={formData.retailer_id}
-                                        onChange={(e) => setFormData({ ...formData, retailer_id: e.target.value })}
-                                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
-                                    >
-                                        <option value="">Select Retailer...</option>
-                                        {retailers.map(r => (
-                                            <option key={r.id} value={r.id}>{r.logo} {r.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
-
-                            {formData.role === 'advertiser' && (
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">Assign to Advertiser</label>
-                                    <select
-                                        value={formData.advertiser_id}
-                                        onChange={(e) => setFormData({ ...formData, advertiser_id: e.target.value })}
-                                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
-                                    >
-                                        <option value="">Select Advertiser...</option>
-                                        {advertisers.map(a => (
-                                            <option key={a.id} value={a.id}>{a.logo} {a.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
-
-                            <div className="flex justify-end gap-3 mt-6">
-                                <button
-                                    type="button"
-                                    onClick={closeModal}
-                                    className="px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 font-medium"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover shadow-lg shadow-primary/20"
-                                >
-                                    {editingUser ? 'Save Changes' : 'Create User'}
-                                </button>
-                            </div>
-                        </form>
-                    </GlassCard>
+                {/* Tabs */}
+                <div style={{ borderBottom: '2px solid var(--color-border)', marginBottom: 'var(--space-6)', display: 'flex', gap: 'var(--space-4)' }}>
+                    {['retailers', 'brands', 'admins'].map(tab => (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab)}
+                            style={{
+                                padding: 'var(--space-3) var(--space-4)',
+                                fontSize: 'var(--text-base)',
+                                fontWeight: activeTab === tab ? 'var(--font-semibold)' : 'var(--font-medium)',
+                                color: activeTab === tab ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                                backgroundColor: 'transparent',
+                                border: 'none',
+                                borderBottom: activeTab === tab ? '2px solid var(--color-primary)' : '2px solid transparent',
+                                marginBottom: '-2px',
+                                cursor: 'pointer',
+                                textTransform: 'capitalize',
+                                transition: 'all var(--transition-fast)',
+                            }}
+                        >
+                            {tab}
+                        </button>
+                    ))}
                 </div>
-            )}
+
+                {/* Table */}
+                <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+                        <thead>
+                            <tr style={{ borderBottom: '2px solid var(--color-border)' }}>
+                                {getTableColumns().map(col => (
+                                    <th key={col} style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)' }}>
+                                        {col}
+                                    </th>
+                                ))}
+                                <th style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)' }}>
+                                    Actions
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {users.map(user => (
+                                <tr
+                                    key={user.id}
+                                    style={{ borderBottom: '1px solid var(--color-border-light)', transition: 'background-color var(--transition-fast)' }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                                >
+                                    <td style={{ padding: 'var(--space-3)', fontWeight: 'var(--font-medium)' }}>
+                                        {user.businessName}
+                                    </td>
+                                    <td style={{ padding: 'var(--space-3)' }}>
+                                        {user.name}
+                                    </td>
+                                    <td style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
+                                        {user.email}
+                                    </td>
+                                    <td style={{ padding: 'var(--space-3)' }}>
+                                        {activeTab === 'retailers' ? user.screensDeployed :
+                                            activeTab === 'brands' ? user.activeCampaigns :
+                                                user.role}
+                                    </td>
+                                    <td style={{ padding: 'var(--space-3)' }}>
+                                        <StatusBadge status={user.status} />
+                                    </td>
+                                    <td style={{ padding: 'var(--space-3)' }}>
+                                        <button
+                                            onClick={() => alert(`View details for ${user.name}`)}
+                                            style={{
+                                                padding: 'var(--space-2) var(--space-3)',
+                                                fontSize: 'var(--text-xs)',
+                                                color: 'var(--color-primary)',
+                                                backgroundColor: 'transparent',
+                                                border: '1px solid var(--color-primary)',
+                                                borderRadius: 'var(--radius-md)',
+                                                cursor: 'pointer',
+                                                transition: 'all var(--transition-fast)',
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.backgroundColor = 'var(--color-primary)';
+                                                e.currentTarget.style.color = 'white';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.backgroundColor = 'transparent';
+                                                e.currentTarget.style.color = 'var(--color-primary)';
+                                            }}
+                                        >
+                                            View
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                            {users.length === 0 && (
+                                <tr>
+                                    <td colSpan="6" style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>
+                                        No users found
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </GlassCard>
+
+            {/* Invite Drawer */}
+            <SlideDrawer
+                isOpen={inviteDrawerOpen}
+                onClose={() => setInviteDrawerOpen(false)}
+                title={getInviteButtonText()}
+                width="500px"
+            >
+                <form onSubmit={handleInvite}>
+                    <div style={{ marginBottom: 'var(--space-6)' }}>
+                        <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-2)' }}>
+                            Contact Name *
+                        </label>
+                        <input
+                            type="text"
+                            required
+                            value={inviteForm.name}
+                            onChange={(e) => setInviteForm({ ...inviteForm, name: e.target.value })}
+                            placeholder="John Smith"
+                            style={{
+                                width: '100%',
+                                padding: 'var(--space-3)',
+                                fontSize: 'var(--text-base)',
+                                border: '1px solid var(--color-border)',
+                                borderRadius: 'var(--radius-md)',
+                                outline: 'none',
+                            }}
+                            onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-primary)'; }}
+                            onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
+                        />
+                    </div>
+
+                    <div style={{ marginBottom: 'var(--space-6)' }}>
+                        <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-2)' }}>
+                            Email *
+                        </label>
+                        <input
+                            type="email"
+                            required
+                            value={inviteForm.email}
+                            onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+                            placeholder="john@business.com"
+                            style={{
+                                width: '100%',
+                                padding: 'var(--space-3)',
+                                fontSize: 'var(--text-base)',
+                                border: '1px solid var(--color-border)',
+                                borderRadius: 'var(--radius-md)',
+                                outline: 'none',
+                            }}
+                            onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-primary)'; }}
+                            onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
+                        />
+                    </div>
+
+                    <div style={{ marginBottom: 'var(--space-8)' }}>
+                        <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-2)' }}>
+                            {activeTab === 'retailers' ? 'Business Name *' : activeTab === 'brands' ? 'Company Name *' : 'Role *'}
+                        </label>
+                        <input
+                            type="text"
+                            required
+                            value={inviteForm.businessName}
+                            onChange={(e) => setInviteForm({ ...inviteForm, businessName: e.target.value })}
+                            placeholder={activeTab === 'retailers' ? 'Pizza Hut Downtown' : activeTab === 'brands' ? 'Coca-Cola' : 'Admin'}
+                            style={{
+                                width: '100%',
+                                padding: 'var(--space-3)',
+                                fontSize: 'var(--text-base)',
+                                border: '1px solid var(--color-border)',
+                                borderRadius: 'var(--radius-md)',
+                                outline: 'none',
+                            }}
+                            onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-primary)'; }}
+                            onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
+                        />
+                        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
+                            An email invitation will be sent to set up their password
+                        </p>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end' }}>
+                        <button
+                            type="button"
+                            onClick={() => setInviteDrawerOpen(false)}
+                            style={{
+                                padding: 'var(--space-3) var(--space-6)',
+                                fontSize: 'var(--text-base)',
+                                fontWeight: 'var(--font-medium)',
+                                color: 'var(--color-text-secondary)',
+                                backgroundColor: 'transparent',
+                                border: '1px solid var(--color-border)',
+                                borderRadius: 'var(--radius-md)',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            style={{
+                                padding: 'var(--space-3) var(--space-8)',
+                                fontSize: 'var(--text-base)',
+                                fontWeight: 'var(--font-semibold)',
+                                color: 'white',
+                                backgroundColor: 'var(--color-primary)',
+                                border: 'none',
+                                borderRadius: 'var(--radius-md)',
+                                cursor: 'pointer',
+                                transition: 'all var(--transition-base)',
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = 'var(--shadow-lg)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = 'none';
+                            }}
+                        >
+                            Send Invitation
+                        </button>
+                    </div>
+                </form>
+            </SlideDrawer>
         </div>
     );
 }

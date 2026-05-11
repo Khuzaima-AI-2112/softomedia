@@ -1,176 +1,332 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { dashboardAPI } from '../../services/api.js';
+import { useAuth } from '../../contexts/AuthContext.jsx';
 import GlassCard from '../../components/GlassCard';
-import StatusBadge from '../../components/StatusBadge';
-import SupportTicketModal from '../../components/SupportTicketModal';
-import LocationManager from '../../components/LocationManager';
-import CampaignApprovalList from '../../components/CampaignApprovalList';
-import apiService from '../../services/ApiService';
+import HamburgerMenu from '../../components/HamburgerMenu';
+import '../../design-tokens.css';
 
+/**
+ * RetailerDashboard - State 10: Retailer Concierge View
+ * Simplified dashboard for shop owners - mobile-friendly
+ */
 function RetailerDashboard() {
-    const [isSyncActive, setIsSyncActive] = useState(true);
-    const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+    const { user } = useAuth();
+    const [systemStatus, setSystemStatus] = useState('online');
+    const [earnings, setEarnings] = useState(0);
+    const [screenData, setScreenData] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [stats, setStats] = useState({
-        stores: 0,
-        screens: 0,
-        onlineScreens: 0,
-        pendingLoops: 0
-    });
 
     useEffect(() => {
-        loadStats();
-    }, []);
+        if (user?.linked_entity_id) {
+            fetchRetailerData();
+        }
+    }, [user]);
 
-    const loadStats = async () => {
+    const fetchRetailerData = async () => {
+        if (!user?.linked_entity_id) return;
+
         setLoading(true);
         try {
-            const [stores, screens, loops] = await Promise.all([
-                apiService.getStores(),
-                apiService.getScreens(),
-                apiService.getLoops()
-            ]);
+            const data = await dashboardAPI.getRetailerDashboard(user.linked_entity_id);
 
-            setStats({
-                stores: stores.length,
-                screens: screens.length,
-                onlineScreens: screens.filter(s => s.status === 'online' || s.status === 'ACTIVE').length,
-                pendingLoops: loops.filter(l => l.validation_status === 'pending' || l.status === 'PENDING').length
-            });
+            setSystemStatus(data.system_status || 'offline');
+            setEarnings(data.earnings.current_month || 0);
+            setScreenData(data.screen);
         } catch (error) {
-            console.error('Failed to load retailer stats:', error);
+            console.error('Failed to fetch retailer data:', error);
+            setSystemStatus('offline');
         } finally {
             setLoading(false);
         }
     };
 
-    const toggleSync = () => setIsSyncActive(!isSyncActive);
-
-    const quickActions = [
-        { label: 'Schedule Calendar', icon: 'event', path: '/dashboard/retailer/schedule/calendar', color: 'primary' },
-        { label: 'Approval History', icon: 'history', path: '/dashboard/retailer/history', color: 'amber' },
-        { label: 'Demo Player', icon: 'slideshow', path: '/player/demo', color: 'purple' }
-    ];
+    // Toggle status for demo purposes
+    const toggleStatus = () => {
+        setSystemStatus(prev => prev === 'online' ? 'offline' : 'online');
+    };
 
     return (
-        <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
-            <div className="flex flex-col md:flex-row justify-between items-start gap-6">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Retailer Command Center</h1>
-                    <p className="text-slate-500 dark:text-slate-400">Network health and store management for your locations</p>
+        <>
+            <HamburgerMenu />
+            <div className="dashboard-ui" style={{ padding: 'var(--space-6)', maxWidth: '800px', margin: '0 auto' }}>
+                {/* Simplified Navigation Helper */}
+                <div style={{ marginBottom: 'var(--space-6)' }}>
+                    <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 'var(--font-bold)', marginBottom: 'var(--space-2)' }}>
+                        My Store
+                    </h1>
+                    <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
+                        Quick overview of your screen system
+                    </p>
                 </div>
-                <div className="flex gap-3 w-full md:w-auto">
-                    <button
-                        onClick={() => setIsSupportModalOpen(true)}
-                        className="flex-1 md:flex-none px-4 py-2 bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-lg font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                    >
-                        Report Issue
-                    </button>
-                    <button
-                        onClick={toggleSync}
-                        className={`flex-1 md:flex-none px-4 py-2 text-white border-none rounded-lg font-bold transition-all ${isSyncActive ? 'bg-orange-500 hover:bg-orange-600 shadow-lg shadow-orange-500/20' : 'bg-green-500 hover:bg-green-600 shadow-lg shadow-green-500/20'}`}
-                    >
-                        {isSyncActive ? 'Disconnect Sync' : 'Re-establish Sync'}
-                    </button>
-                </div>
-            </div>
 
-            {/* Quick Actions */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {quickActions.map(action => (
-                    <Link
-                        key={action.path}
-                        to={action.path}
-                        className={`
-                            p-4 rounded-xl border border-slate-200 dark:border-slate-700 
-                            bg-white dark:bg-slate-800/50 hover:border-primary/50
-                            hover:shadow-lg transition-all flex items-center gap-3 group
-                        `}
-                    >
-                        <div className={`size-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform`}>
-                            <span className="material-symbols-outlined">{action.icon}</span>
+                {/* Hero Status Card - State 10: The Concierge */}
+                <GlassCard style={{ marginBottom: 'var(--space-8)', textAlign: 'center' }}>
+                    {systemStatus === 'online' ? (
+                        <>
+                            {/* Green Checkmark */}
+                            <div
+                                style={{
+                                    width: '120px',
+                                    height: '120px',
+                                    backgroundColor: 'var(--color-success-light)',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    margin: '0 auto var(--space-6)',
+                                }}
+                            >
+                                <span style={{ fontSize: '4rem', color: 'var(--color-success)' }}>✓</span>
+                            </div>
+
+                            {/* Status Text */}
+                            <h2 style={{ fontSize: 'var(--text-3xl)', fontWeight: 'var(--font-bold)', color: 'var(--color-success)', marginBottom: 'var(--space-3)' }}>
+                                System Online
+                            </h2>
+                            <p style={{ fontSize: 'var(--text-lg)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>
+                                Your screen is active
+                            </p>
+                            {screenData && (
+                                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>
+                                    {screenData.location} • {screenData.uptime}% uptime
+                                </p>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            {/* Offline State - Triggers State 18 */}
+                            <div
+                                style={{
+                                    width: '120px',
+                                    height: '120px',
+                                    backgroundColor: 'var(--color-error-light)',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    margin: '0 auto var(--space-6)',
+                                }}
+                            >
+                                <span style={{ fontSize: '4rem', color: 'var(--color-error)' }}>⚠️</span>
+                            </div>
+
+                            <h2 style={{ fontSize: 'var(--text-3xl)', fontWeight: 'var(--font-bold)', color: 'var(--color-error)', marginBottom: 'var(--space-3)' }}>
+                                Needs Attention
+                            </h2>
+                            <p style={{ fontSize: 'var(--text-lg)', color: 'var(--color-text-secondary)' }}>
+                                Screen Offline
+                            </p>
+                        </>
+                    )}
+                </GlassCard>
+
+                {/* Earnings Card - Single Metric */}
+                {systemStatus === 'online' && (
+                    <GlassCard style={{ marginBottom: 'var(--space-8)', textAlign: 'center' }}>
+                        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-3)' }}>
+                            Estimated Earnings This Month
+                        </p>
+                        <p style={{ fontSize: 'var(--text-5xl)', fontWeight: 'var(--font-bold)', color: 'var(--color-success)', fontVariantNumeric: 'tabular-nums' }}>
+                            ${earnings.toFixed(2)}
+                        </p>
+                        <button
+                            onClick={() => window.location.href = '/dashboard/earnings'}
+                            style={{
+                                marginTop: 'var(--space-6)',
+                                padding: 'var(--space-4) var(--space-8)',
+                                fontSize: 'var(--text-base)',
+                                fontWeight: 'var(--font-semibold)',
+                                color: 'white',
+                                backgroundColor: 'var(--color-primary)',
+                                border: 'none',
+                                borderRadius: 'var(--radius-md)',
+                                cursor: 'pointer',
+                                transition: 'all var(--transition-base)',
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = 'var(--shadow-lg)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = 'none';
+                            }}
+                        >
+                            View Earnings Details
+                        </button>
+                    </GlassCard>
+                )}
+
+                {/* Troubleshoot Section - State 18 */}
+                {systemStatus === 'offline' && (
+                    <GlassCard>
+                        <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-6)', textAlign: 'center' }}>
+                            Quick Troubleshooting
+                        </h3>
+
+                        {/* Three Large Tappable Buttons for Mobile */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                            <button
+                                onClick={() => alert('Checklist: \n1. Check Wi-Fi connection\n2. Verify router is on\n3. Test other devices')}
+                                style={{
+                                    padding: 'var(--space-6)',
+                                    fontSize: 'var(--text-base)',
+                                    fontWeight: 'var(--font-medium)',
+                                    color: 'var(--color-text-primary)',
+                                    backgroundColor: 'var(--color-bg-hover)',
+                                    border: '2px solid var(--color-border)',
+                                    borderRadius: 'var(--radius-md)',
+                                    cursor: 'pointer',
+                                    textAlign: 'left',
+                                    transition: 'all var(--transition-fast)',
+                                    minHeight: '80px',
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.borderColor = 'var(--color-primary)';
+                                    e.currentTarget.style.backgroundColor = 'white';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.borderColor = 'var(--color-border)';
+                                    e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+                                }}
+                            >
+                                <div style={{ fontSize: 'var(--text-2xl)', marginBottom: 'var(--space-2)' }}>📶</div>
+                                <div style={{ fontWeight: 'var(--font-semibold)' }}>Did the store lose Wi-Fi?</div>
+                                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
+                                    Tap to see Wi-Fi troubleshooting steps
+                                </div>
+                            </button>
+
+                            <button
+                                onClick={() => alert('Check if:\n• TV is plugged in\n• Power strip is on\n• No tripped breakers')}
+                                style={{
+                                    padding: 'var(--space-6)',
+                                    fontSize: 'var(--text-base)',
+                                    fontWeight: 'var(--font-medium)',
+                                    color: 'var(--color-text-primary)',
+                                    backgroundColor: 'var(--color-bg-hover)',
+                                    border: '2px solid var(--color-border)',
+                                    borderRadius: 'var(--radius-md)',
+                                    cursor: 'pointer',
+                                    textAlign: 'left',
+                                    transition: 'all var(--transition-fast)',
+                                    minHeight: '80px',
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.borderColor = 'var(--color-primary)';
+                                    e.currentTarget.style.backgroundColor = 'white';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.borderColor = 'var(--color-border)';
+                                    e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+                                }}
+                            >
+                                <div style={{ fontSize: 'var(--text-2xl)', marginBottom: 'var(--space-2)' }}>🔌</div>
+                                <div style={{ fontWeight: 'var(--font-semibold)' }}>Is the TV unplugged?</div>
+                                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
+                                    Tap to see power connection guide
+                                </div>
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    const issue = prompt('Tell us what you see:');
+                                    if (issue) {
+                                        alert(`Report submitted!\n\nYour Issue: ${issue}\n\nOur support team has been notified and will contact you shortly.`);
+                                    }
+                                }}
+                                style={{
+                                    padding: 'var(--space-6)',
+                                    fontSize: 'var(--text-base)',
+                                    fontWeight: 'var(--font-semibold)',
+                                    color: 'white',
+                                    backgroundColor: 'var(--color-primary)',
+                                    border: 'none',
+                                    borderRadius: 'var(--radius-md)',
+                                    cursor: 'pointer',
+                                    textAlign: 'left',
+                                    transition: 'all var(--transition-base)',
+                                    minHeight: '80px',
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                    e.currentTarget.style.boxShadow = 'var(--shadow-lg)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                    e.currentTarget.style.boxShadow = 'none';
+                                }}
+                            >
+                                <div style={{ fontSize: 'var(--text-2xl)', marginBottom: 'var(--space-2)' }}>📝</div>
+                                <div>Report Issue to Support</div>
+                                <div style={{ fontSize: 'var(--text-sm)', opacity: 0.9, marginTop: 'var(--space-1)' }}>
+                                    Our team will contact you within 1 hour
+                                </div>
+                            </button>
                         </div>
-                        <span className="font-medium text-slate-700 dark:text-slate-300">{action.label}</span>
-                    </Link>
-                ))}
-            </div>
+                    </GlassCard>
+                )}
 
-            {/* Stats Row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <GlassCard className="!p-4">
-                    <p className="text-sm text-slate-500 mb-1">Stores</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{loading ? '...' : stats.stores}</p>
-                </GlassCard>
-                <GlassCard className="!p-4">
-                    <p className="text-sm text-slate-500 mb-1">Screens</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{loading ? '...' : stats.screens}</p>
-                </GlassCard>
-                <GlassCard className="!p-4">
-                    <p className="text-sm text-slate-500 mb-1">Online</p>
-                    <p className="text-2xl font-bold text-emerald-500">{loading ? '...' : stats.onlineScreens}</p>
-                </GlassCard>
-                <GlassCard className="!p-4">
-                    <p className="text-sm text-slate-500 mb-1">Pending Approvals</p>
-                    <p className={`text-2xl font-bold ${stats.pendingLoops > 0 ? 'text-amber-500' : 'text-slate-400'}`}>
-                        {loading ? '...' : stats.pendingLoops}
-                    </p>
-                </GlassCard>
-            </div>
+                {/* Profit Sharing & Earnings */}
+                <GlassCard style={{ marginBottom: 'var(--space-6)' }}>
+                    <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-4)' }}>
+                        💰 Your Earnings
+                    </h3>
 
-            {/* Pending Alert */}
-            {!loading && stats.pendingLoops > 0 && (
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                    <span className="material-symbols-outlined text-amber-500">pending_actions</span>
-                    <div className="flex-1">
-                        <p className="font-medium text-amber-800 dark:text-amber-200">
-                            {stats.pendingLoops} loops awaiting your approval
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
+                        <div style={{ padding: 'var(--space-4)', backgroundColor: 'var(--color-bg-light)', borderRadius: 'var(--radius-md)', borderLeft: '4px solid var(--color-success)' }}>
+                            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>Total Earned</p>
+                            <p style={{ fontSize: 'var(--text-2xl)', fontWeight: 'var(--font-bold)', color: 'var(--color-success)' }}>
+                                ${(earnings || 0).toFixed(2)}
+                            </p>
+                        </div>
+
+                        <div style={{ padding: 'var(--space-4)', backgroundColor: 'var(--color-bg-light)', borderRadius: 'var(--radius-md)', borderLeft: '4px solid var(--color-primary)' }}>
+                            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>Profit Share</p>
+                            <p style={{ fontSize: 'var(--text-2xl)', fontWeight: 'var(--font-bold)', color: 'var(--color-primary)' }}>
+                                40%
+                            </p>
+                        </div>
+
+                        <div style={{ padding: 'var(--space-4)', backgroundColor: 'var(--color-bg-light)', borderRadius: 'var(--radius-md)', borderLeft: '4px solid var(--color-warning)' }}>
+                            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>Impressions</p>
+                            <p style={{ fontSize: 'var(--text-2xl)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)' }}>
+                                {screenData?.impressions_today || 0}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div style={{ padding: 'var(--space-4)', backgroundColor: 'rgba(99, 102, 241, 0.1)', borderRadius: 'var(--radius-md)', marginTop: 'var(--space-4)' }}>
+                        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>
+                            How it works
                         </p>
-                        <p className="text-sm text-amber-600 dark:text-amber-400">
-                            Review tomorrow&apos;s broadcast schedule before midnight
+                        <p style={{ fontSize: 'var(--text-sm)', lineHeight: '1.6' }}>
+                            You earn 40% of advertising revenue generated from your screen.
+                            For every ad impression displayed, you receive a share of the advertiser's payment.
+                            Earnings are calculated monthly and paid out automatically.
                         </p>
                     </div>
-                    <Link
-                        to="/dashboard/retailer/schedule/calendar"
-                        className="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600"
+                </GlassCard>
+
+                {/* Toggle for Demo */}
+                <div style={{ textAlign: 'center', marginTop: 'var(--space-8)' }}>
+                    <button
+                        onClick={() => setSystemStatus(systemStatus === 'online' ? 'offline' : 'online')}
+                        style={{
+                            padding: 'var(--space-3) var(--space-6)',
+                            fontSize: 'var(--text-sm)',
+                            color: 'var(--color-text-secondary)',
+                            backgroundColor: 'transparent',
+                            border: '1px solid var(--color-border)',
+                            borderRadius: 'var(--radius-md)',
+                            cursor: 'pointer',
+                        }}
                     >
-                        Review Now
-                    </Link>
+                        Toggle Status (Demo)
+                    </button>
                 </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <GlassCard className="flex flex-col justify-between">
-                    <div className="flex justify-between items-center mb-4">
-                        <span className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                            <span className="material-symbols-outlined text-primary">hub</span>
-                            Network Connectivity
-                        </span>
-                        <StatusBadge status={isSyncActive ? 'Online' : 'Offline'} />
-                    </div>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                        {isSyncActive ? 'Secure handshake active with Softomedia-Cloud core' : 'Connection lost. Please check local connectivity.'}
-                    </p>
-                </GlassCard>
-                <GlassCard className="flex flex-col justify-between">
-                    <div className="flex justify-between items-center mb-4">
-                        <span className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                            <span className="material-symbols-outlined text-primary">cyclone</span>
-                            Active Loop Rate
-                        </span>
-                        <span className="text-emerald-500 font-bold bg-emerald-500/10 px-2 py-0.5 rounded text-xs">12 Slots/Min</span>
-                    </div>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Fixed 5-second per ad transition with D-1 scheduling sync.</p>
-                </GlassCard>
             </div>
-
-            <CampaignApprovalList />
-
-            <LocationManager />
-
-            {isSupportModalOpen && <SupportTicketModal onClose={() => setIsSupportModalOpen(false)} />}
-        </div>
-    );
+        </>);
 }
 
 export default RetailerDashboard;
-

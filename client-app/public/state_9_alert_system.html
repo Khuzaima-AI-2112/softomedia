@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>State 9: Alert System | SoftoMedia</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-bg-main: #f9fafb;
+            --color-error: #dc2626;
+            --color-error-light: #fee2e2;
+            --color-warning: #f59e0b;
+            --color-warning-light: #fef3c7;
+            --color-success: #10b981;
+            --color-success-light: #d1fae5;
+            --color-primary: #6366f1;
+            --color-text-primary: #111827;
+            --color-text-secondary: #6b7280;
+            --color-text-tertiary: #9ca3af;
+            --font-body: 'Inter', sans-serif;
+            --space-1: 0.25rem;
+            --space-2: 0.5rem;
+            --space-3: 0.75rem;
+            --space-4: 1rem;
+            --radius-md: 0.5rem;
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background-color: var(--color-bg-main);
+            padding: 2rem;
+        }
+
+        .demo-controls {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 2rem;
+            border-radius: var(--radius-md);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .demo-controls h1 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .demo-controls p {
+            color: var(--color-text-secondary);
+            margin-bottom: 2rem;
+        }
+
+        .btn-group {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .demo-btn {
+            padding: 1rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            border: none;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: transform 0.15s;
+        }
+
+        .demo-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-offline {
+            color: white;
+            background-color: var(--color-error);
+        }
+
+        .btn-warning {
+            color: #92400e;
+            background-color: var(--color-warning);
+        }
+
+        .btn-success {
+            color: white;
+            background-color: var(--color-success);
+        }
+
+        .btn-info {
+            color: white;
+            background-color: var(--color-primary);
+        }
+
+        /* Toast Container */
+        .toast-container {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            max-width: 400px;
+        }
+
+        .toast {
+            background-color: white;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-xl);
+            padding: var(--space-4);
+            display: flex;
+            gap: var(--space-3);
+            align-items: flex-start;
+            animation: slideInRight 0.3s ease-out;
+        }
+
+        .toast.exiting {
+            animation: slideOutRight 0.3s ease-out;
+        }
+
+        .toast.offline {
+            border-left: 4px solid var(--color-error);
+        }
+
+        .toast.warning {
+            border-left: 4px solid var(--color-warning);
+        }
+
+        .toast.success {
+            border-left: 4px solid var(--color-success);
+        }
+
+        .toast.info {
+            border-left: 4px solid var(--color-primary);
+        }
+
+        .toast-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .toast-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .toast-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--color-text-primary);
+            margin-bottom: var(--space-1);
+        }
+
+        .toast-message {
+            font-size: 0.875rem;
+            color: var(--color-text-secondary);
+            line-height: 1.4;
+        }
+
+        .toast-close {
+            background: none;
+            border: none;
+            font-size: 1.125rem;
+            color: var(--color-text-tertiary);
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
+        .toast-close:hover {
+            color: var(--color-text-secondary);
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOutRight {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="demo-controls">
+        <h1>🔴 State 9: Alert System</h1>
+        <p>Real-time toast notifications for screen status changes and system alerts</p>
+
+        <div class="btn-group">
+            <button class="demo-btn btn-offline" onclick="showOfflineAlert()">
+                Screen Offline Alert
+            </button>
+            <button class="demo-btn btn-warning" onclick="showWarningAlert()">
+                Connection Warning
+            </button>
+            <button class="demo-btn btn-success" onclick="showSuccessAlert()">
+                Campaign Published
+            </button>
+            <button class="demo-btn btn-info" onclick="showInfoAlert()">
+                New Update Available
+            </button>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        const toastConfigs = {
+            offline: {
+                icon: '🔴',
+                title: 'Screen Offline',
+                message: 'screen3 at Airport Terminal has lost connection',
+            },
+            warning: {
+                icon: '⚠️',
+                title: 'Connection Unstable',
+                message: 'screen2 experiencing intermittent connectivity issues',
+            },
+            success: {
+                icon: '✅',
+                title: 'Campaign Published',
+                message: 'Holiday Sale campaign is now live on 8 screens',
+            },
+            info: {
+                icon: 'ℹ️',
+                title: 'Update Available',
+                message: 'New dashboard features are ready to install',
+            },
+        };
+
+        function showToast(type) {
+            const config = toastConfigs[type];
+            const container = document.getElementById('toastContainer');
+
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+
+            toast.innerHTML = `
+                <div class="toast-icon">${config.icon}</div>
+                <div class="toast-content">
+                    <div class="toast-title">${config.title}</div>
+                    <div class="toast-message">${config.message}</div>
+                </div>
+                <button class="toast-close" onclick="dismissToast(this)">×</button>
+            `;
+
+            container.appendChild(toast);
+
+            // Auto-dismiss after 5 seconds
+            setTimeout(() => {
+                dismissToast(toast.querySelector('.toast-close'));
+            }, 5000);
+        }
+
+        function dismissToast(btn) {
+            const toast = btn.closest('.toast');
+            toast.classList.add('exiting');
+            setTimeout(() => {
+                toast.remove();
+            }, 300);
+        }
+
+        function showOfflineAlert() {
+            showToast('offline');
+        }
+
+        function showWarningAlert() {
+            showToast('warning');
+        }
+
+        function showSuccessAlert() {
+            showToast('success');
+        }
+
+        function showInfoAlert() {
+            showToast('info');
+        }
+
+        // Show demo toast on load
+        setTimeout(() => {
+            showToast('offline');
+        }, 1000);
+    </script>
+</body>
+
+</html>
