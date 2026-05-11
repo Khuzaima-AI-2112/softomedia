@@ -1,168 +1,204 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import '../design-tokens.css';
 
 function HamburgerMenu() {
     const [isOpen, setIsOpen] = useState(false);
-    const { user, login } = useAuth();
+    const { user, logout } = useAuth();
     const navigate = useNavigate();
 
-    const menuItems = [
-        { label: 'Dashboard', path: `/dashboard/${user?.role || 'admin'}`, icon: 'dashboard' },
-        { label: 'Ad Player', path: '/player', icon: 'play_circle' },
-        { label: 'Demo Player', path: '/player/demo', icon: 'slideshow' },
-        ...(user?.role === 'admin' || user?.role === 'super_admin' ? [
-            { label: 'Overview', path: '/dashboard/admin', icon: 'dashboard' },
-            { label: 'Screens', path: '/dashboard/admin/screens', icon: 'monitor' },
-            { label: 'Playlists', path: '/dashboard/admin/playlists', icon: 'playlist_play' },
-            { label: 'Loops', path: '/dashboard/admin/loops', icon: 'loop' },
-            { label: 'Analytics', path: '/dashboard/admin/analytics', icon: 'analytics' },
-            { label: 'Pricing', path: '/dashboard/admin/pricing', icon: 'attach_money' },
-            { label: 'Users', path: '/dashboard/admin/users', icon: 'people' },
-            { label: 'Retailers', path: '/dashboard/admin/retailers', icon: 'storefront' },
-            { label: 'Business Hours', path: '/dashboard/admin/hours', icon: 'schedule' },
-            { label: 'Advertisers', path: '/dashboard/admin/advertisers', icon: 'campaign' },
-            { label: 'Network Map', path: '/dashboard/admin/map', icon: 'map' },
-            { label: 'System Health', path: '/dashboard/health', icon: 'health_metrics' },
-            { label: 'Ticket Index', path: '/dashboard/tickets', icon: 'history_edu' },
-            { label: 'AI Log', path: '/dashboard/admin/ai-log', icon: 'psychology' }
-        ] : []),
-        ...(user?.role === 'retailer' ? [
-            { label: 'Schedule Manager', path: '/dashboard/retailer/schedule', icon: 'calendar_today' },
-            { label: 'Schedule Calendar', path: '/dashboard/retailer/schedule/calendar', icon: 'event' },
-            { label: 'History', path: '/dashboard/retailer/history', icon: 'history' }
-        ] : []),
-        ...(user?.role === 'brand' ? [
-            { label: 'New Campaign', path: '/dashboard/brand/campaign/new', icon: 'add_circle' }
-        ] : []),
-        { label: 'Settings', path: '#', icon: 'settings' },
-    ];
+    const getMenuItems = () => {
+        if (user?.role === 'admin') {
+            return [
+                { label: 'Dashboard', path: '/dashboard', icon: '📊' },
+                { label: 'Users', path: '/dashboard/users', icon: '👥' },
+                { label: 'Screens', path: '/dashboard/screens', icon: '📺' },
+            ];
+        } else if (user?.role === 'brand') {
+            return [
+                { label: 'Dashboard', path: '/brand/dashboard', icon: '📊' },
+            ];
+        } else if (user?.role === 'retailer') {
+            return [
+                { label: 'Dashboard', path: '/retailer/dashboard', icon: '📊' },
+            ];
+        }
+        return [];
+    };
 
-    const personaSwatches = [
-        { role: 'admin', label: '🔐 Admin View', color: '#6366f1', path: '/dashboard/admin' },
-        { role: 'brand', label: '📺 Brand View', color: '#10b981', path: '/dashboard/brand' },
-        { role: 'retailer', label: '🏪 Retailer View', color: '#f59e0b', path: '/dashboard/retailer' },
-    ];
-
-    const handlePersonaSwitch = (swatch) => {
-        const mockUser = {
-            id: `demo-${swatch.role}`,
-            email: `${swatch.role}@demo.com`,
-            role: swatch.role,
-            linked_entity_id: `entity-${swatch.role}`
-        };
-        // Signal the demo role to the backend bypass
-        localStorage.setItem('demo_role', swatch.role);
-        login(mockUser, 'demo-token');
+    const handleNavigate = (path) => {
+        navigate(path);
         setIsOpen(false);
-        navigate(swatch.path);
+    };
+
+    const handleLogout = () => {
+        logout();
+        navigate('/login');
     };
 
     return (
         <>
-            {/* Toggle Button */}
+            {/* Hamburger Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                data-testid="menu-toggle"
                 style={{
                     position: 'fixed',
                     top: '1rem',
-                    left: '1rem',
+                    right: '1rem',
                     zIndex: 1001,
-                    backgroundColor: 'white',
-                    border: '1px solid #e5e7eb',
+                    padding: '0.75rem',
+                    backgroundColor: 'var(--color-primary, #6366f1)',
+                    color: 'white',
+                    border: 'none',
                     borderRadius: '0.5rem',
-                    padding: '0.5rem',
+                    fontSize: '1.5rem',
                     cursor: 'pointer',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                    transition: 'all 0.2s',
+                    width: '3rem',
+                    height: '3rem',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center'
+                    justifyContent: 'center',
                 }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                }}
+                aria-label="Menu"
             >
-                <span className="material-symbols-outlined" style={{ fontSize: '20px' }} aria-hidden="true">{isOpen ? 'close' : 'menu'}</span>
+                {isOpen ? '✕' : '☰'}
             </button>
 
-            {/* Backdrop */}
+            {/* Backdrop Overlay */}
             {isOpen && (
                 <div
                     onClick={() => setIsOpen(false)}
-                    style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 999 }}
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                        zIndex: 999,
+                        animation: 'fadeIn 0.2s',
+                    }}
                 />
             )}
 
-            {/* Sidebar */}
+            {/* Slide-out Menu */}
             <div
                 style={{
                     position: 'fixed',
                     top: 0,
-                    left: isOpen ? 0 : '-300px',
+                    right: isOpen ? 0 : '-300px',
                     width: '280px',
                     height: '100vh',
                     backgroundColor: 'white',
+                    boxShadow: isOpen ? '-4px 0 6px -1px rgba(0, 0, 0, 0.1)' : 'none',
                     zIndex: 1000,
-                    transition: 'left 0.3s ease',
-                    padding: '2rem 1.5rem',
+                    padding: '5rem 1.5rem 2rem 1.5rem',
+                    transition: 'right 0.3s ease-in-out',
                     display: 'flex',
                     flexDirection: 'column',
-                    boxShadow: '4px 0 10px rgba(0,0,0,0.1)'
                 }}
             >
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '2rem', color: '#111827' }}>SoftoMedia</h3>
+                {/* User Info */}
+                <div style={{
+                    marginBottom: '2rem',
+                    paddingBottom: '1rem',
+                    borderBottom: '1px solid #e5e7eb',
+                }}>
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                        Signed in as
+                    </div>
+                    <div style={{ fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                        {user?.email}
+                    </div>
+                    <div style={{
+                        display: 'inline-block',
+                        padding: '0.25rem 0.75rem',
+                        backgroundColor: '#dbeafe',
+                        color: '#1e40af',
+                        borderRadius: '999px',
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        textTransform: 'capitalize',
+                    }}>
+                        {user?.role}
+                    </div>
+                </div>
 
-                <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {menuItems.map(item => (
-                        <Link
-                            key={item.label}
-                            to={item.path}
-                            onClick={() => setIsOpen(false)}
-                            data-testid={`nav-link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                {/* Navigation Links */}
+                <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {getMenuItems().map((item) => (
+                        <button
+                            key={item.path}
+                            onClick={() => handleNavigate(item.path)}
                             style={{
+                                padding: '0.75rem 1rem',
+                                textAlign: 'left',
+                                fontSize: '1rem',
+                                color: '#374151',
+                                backgroundColor: 'transparent',
+                                border: 'none',
+                                borderRadius: '0.5rem',
+                                cursor: 'pointer',
+                                transition: 'background-color 0.2s',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '0.75rem',
-                                padding: '0.75rem',
-                                color: '#4b5563',
-                                textDecoration: 'none',
-                                borderRadius: '0.5rem',
-                                transition: 'background 0.2s'
                             }}
-                            onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
-                            onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#f3f4f6';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
                         >
-                            <span className="material-symbols-outlined" style={{ fontSize: '20px' }} aria-hidden="true">{item.icon}</span>
-                            {item.label}
-                        </Link>
+                            <span>{item.icon}</span>
+                            <span>{item.label}</span>
+                        </button>
                     ))}
                 </nav>
 
-                <div style={{ marginTop: 'auto', borderTop: '1px solid #e5e7eb', paddingTop: '1.5rem' }}>
-                    <p style={{ fontSize: '0.75rem', color: '#9ca3af', fontWeight: '600', textTransform: 'uppercase', marginBottom: '1rem' }}>Persona Switch</p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        {personaSwatches.map(swatch => (
-                            <button
-                                key={swatch.role}
-                                onClick={() => handlePersonaSwitch(swatch)}
-                                data-testid={`menu-persona-${swatch.role}`}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.75rem',
-                                    padding: '0.5rem',
-                                    border: `1px solid ${swatch.color}`,
-                                    borderRadius: '0.5rem',
-                                    backgroundColor: 'white',
-                                    color: swatch.color,
-                                    cursor: 'pointer',
-                                    fontSize: '0.875rem'
-                                }}
-                            >
-                                {swatch.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                {/* Logout Button */}
+                <button
+                    onClick={handleLogout}
+                    style={{
+                        padding: '0.75rem 1rem',
+                        marginTop: 'auto',
+                        fontSize: '1rem',
+                        fontWeight: '500',
+                        color: '#dc2626',
+                        backgroundColor: '#fef2f2',
+                        border: '1px solid #fecaca',
+                        borderRadius: '0.5rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#fee2e2';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#fef2f2';
+                    }}
+                >
+                    🚪 Logout
+                </button>
             </div>
+
+            {/* Keyframe animation for fade-in */}
+            <style>{`
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+            `}</style>
         </>
     );
 }

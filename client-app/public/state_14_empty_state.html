@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>State 14: Day Zero - Empty State | SoftoMedia</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --color-bg-main: #f9fafb;
+            --color-bg-card: #ffffff;
+            --color-primary: #6366f1;
+            --color-primary-hover: #4f46e5;
+            --color-text-primary: #111827;
+            --color-text-secondary: #6b7280;
+            --font-body: 'Inter', -apple-system, sans-serif;
+            --space-4: 1rem;
+            --space-6: 1.5rem;
+            --space-8: 2rem;
+            --space-16: 4rem;
+            --radius-lg: 0.75rem;
+            --radius-md: 0.5rem;
+            --shadow-md: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background-color: var(--color-bg-main);
+            color: var(--color-text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-4);
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-16);
+            text-align: center;
+            min-height: 400px;
+            background-color: var(--color-bg-card);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            max-width: 600px;
+        }
+
+        .illustration {
+            font-size: 4rem;
+            margin-bottom: var(--space-6);
+            opacity: 0.9;
+        }
+
+        .title {
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: var(--color-text-primary);
+            margin-bottom: var(--space-4);
+        }
+
+        .message {
+            font-size: 1.125rem;
+            color: var(--color-text-secondary);
+            margin-bottom: var(--space-8);
+            max-width: 500px;
+            line-height: 1.6;
+        }
+
+        .cta-button {
+            padding: var(--space-4) calc(var(--space-8) * 1);
+            font-size: 1rem;
+            font-weight: 600;
+            color: white;
+            background-color: var(--color-primary);
+            border: none;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.25s;
+            box-shadow: var(--shadow-md);
+            font-family: var(--font-body);
+        }
+
+        .cta-button:hover {
+            background-color: var(--color-primary-hover);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .cta-button:active {
+            transform: translateY(0);
+        }
+
+        .subtitle {
+            color: var(--color-text-secondary);
+            font-size: 0.875rem;
+            margin-top: var(--space-8);
+            padding-top: var(--space-8);
+            border-top: 1px solid #e5e7eb;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="empty-state">
+        <!-- Hero Illustration -->
+        <div class="illustration">🎯</div>
+
+        <!-- Title -->
+        <h2 class="title">Ready to Activate</h2>
+
+        <!-- Message -->
+        <p class="message">
+            Pair your first screen to start earning. Your network is configured and ready to display campaigns across
+            your retail locations.
+        </p>
+
+        <!-- CTA Button -->
+        <button class="cta-button" onclick="alert('This would navigate to the pairing flow!')">
+            Pair Screen
+        </button>
+
+        <!-- Subtitle -->
+        <p class="subtitle">
+            State 14: The "Day Zero" Dashboard - First impression for new users
+        </p>
+    </div>
+</body>
+
+</html>

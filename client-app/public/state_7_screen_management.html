@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>State 7: Screen Management | SoftoMedia</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --color-bg-main: #f9fafb;
+            --color-bg-card: #ffffff;
+            --color-bg-hover: #f3f4f6;
+            --color-primary: #6366f1;
+            --color-success: #10b981;
+            --color-success-light: #d1fae5;
+            --color-error-light: #fee2e2;
+            --color-text-primary: #111827;
+            --color-text-secondary: #6b7280;
+            --color-text-tertiary: #9ca3af;
+            --color-border: #e5e7eb;
+            --color-border-light: #f3f4f6;
+            --font-body: 'Inter', sans-serif;
+            --font-mono: 'Inter', monospace;
+            --space-2: 0.5rem;
+            --space-3: 0.75rem;
+            --space-4: 1rem;
+            --space-6: 1.5rem;
+            --radius-md: 0.5rem;
+            --radius-full: 9999px;
+            --shadow-md: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background-color: var(--color-bg-main);
+            color: var(--color-text-primary);
+        }
+
+        .dashboard-ui {
+            padding: var(--space-6);
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .glass-card {
+            background-color: var(--color-bg-card);
+            padding: var(--space-6);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-md);
+        }
+
+        .filters {
+            display: flex;
+            gap: var(--space-4);
+            margin-bottom: var(--space-6);
+            flex-wrap: wrap;
+        }
+
+        input[type="text"],
+        select {
+            padding: var(--space-3);
+            font-size: 0.875rem;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            outline: none;
+            font-family: var(--font-body);
+        }
+
+        input[type="text"] {
+            flex: 1;
+            min-width: 250px;
+        }
+
+        input[type="text"]:focus,
+        select:focus {
+            border-color: var(--color-primary);
+        }
+
+        select {
+            background-color: var(--color-bg-card);
+            cursor: pointer;
+        }
+
+        table {
+            width: 100%;
+            text-align: left;
+            border-collapse: collapse;
+        }
+
+        thead tr {
+            border-bottom: 2px solid var(--color-border);
+        }
+
+        th {
+            padding: var(--space-3);
+            color: var(--color-text-secondary);
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        tbody tr {
+            border-bottom: 1px solid var(--color-border-light);
+            transition: background-color 0.15s;
+        }
+
+        tbody tr:hover {
+            background-color: var(--color-bg-hover);
+        }
+
+        td {
+            padding: var(--space-3);
+        }
+
+        .screen-id {
+            font-weight: 500;
+            font-family: var(--font-mono);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: var(--radius-full);
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .status-badge.active {
+            background-color: var(--color-success-light);
+            color: #03543f;
+        }
+
+        .status-badge.offline {
+            background-color: var(--color-error-light);
+            color: #9b1c1c;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            margin-right: var(--space-2);
+        }
+
+        .status-dot.active {
+            background-color: #03543f;
+        }
+
+        .status-dot.offline {
+            background-color: #9b1c1c;
+        }
+
+        .btn-details {
+            padding: var(--space-2) var(--space-3);
+            font-size: 0.75rem;
+            color: var(--color-primary);
+            background-color: transparent;
+            border: 1px solid var(--color-primary);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: var(--font-body);
+        }
+
+        .btn-details:hover {
+            background-color: var(--color-primary);
+            color: white;
+        }
+
+        .results-count {
+            display: flex;
+            align-items: center;
+            color: var(--color-text-secondary);
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="dashboard-ui">
+        <div class="glass-card">
+            <!-- Header -->
+            <div style="margin-bottom: var(--space-6);">
+                <h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem;">Screen Management</h1>
+                <p style="color: var(--color-text-secondary);">Manage physical hardware across all locations</p>
+            </div>
+
+            <!-- Filters & Search -->
+            <div class="filters">
+                <input type="text" id="searchInput" placeholder="Search by Screen ID or Location..."
+                    onkeyup="filterTable()">
+                <select id="statusFilter" onchange="filterTable()">
+                    <option value="all">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="offline">Offline</option>
+                </select>
+                <div class="results-count" id="resultsCount">8 of 8 screens</div>
+            </div>
+
+            <!-- Table -->
+            <div style="overflow-x: auto;">
+                <table id="screensTable">
+                    <thead>
+                        <tr>
+                            <th>Unit ID</th>
+                            <th>Store Name</th>
+                            <th>Status</th>
+                            <th>Last Heartbeat</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr data-status="active">
+                            <td class="screen-id">screen1</td>
+                            <td>Downtown Plaza</td>
+                            <td>
+                                <span class="status-badge active">
+                                    <span class="status-dot active"></span>
+                                    Active
+                                </span>
+                            </td>
+                            <td style="color: var(--color-text-secondary); font-size: 0.875rem;">2m ago</td>
+                            <td><button class="btn-details" onclick="alert('View details for screen1')">Details</button>
+                            </td>
+                        </tr>
+                        <tr data-status="active">
+                            <td class="screen-id">screen2</td>
+                            <td>West Mall</td>
+                            <td>
+                                <span class="status-badge active">
+                                    <span class="status-dot active"></span>
+                                    Active
+                                </span>
+                            </td>
+                            <td style="color: var(--color-text-secondary); font-size: 0.875rem;">5m ago</td>
+                            <td><button class="btn-details" onclick="alert('View details for screen2')">Details</button>
+                            </td>
+                        </tr>
+                        <tr data-status="offline">
+                            <td class="screen-id">screen3</td>
+                            <td>Airport Terminal</td>
+                            <td>
+                                <span class="status-badge offline">
+                                    <span class="status-dot offline"></span>
+                                    Offline
+                                </span>
+                            </td>
+                            <td style="color: var(--color-text-secondary); font-size: 0.875rem;">2h ago</td>
+                            <td><button class="btn-details" onclick="alert('View details for screen3')">Details</button>
+                            </td>
+                        </tr>
+                        <tr data-status="active">
+                            <td class="screen-id">screen4</td>
+                            <td>Central Station</td>
+                            <td>
+                                <span class="status-badge active">
+                                    <span class="status-dot active"></span>
+                                    Active
+                                </span>
+                            </td>
+                            <td style="color: var(--color-text-secondary); font-size: 0.875rem;">Just now</td>
+                            <td><button class="btn-details" onclick="alert('View details for screen4')">Details</button>
+                            </td>
+                        </tr>
+                        <tr data-status="active">
+                            <td class="screen-id">screen5</td>
+                            <td>University Campus</td>
+                            <td>
+                                <span class="status-badge active">
+                                    <span class="status-dot active"></span>
+                                    Active
+                                </span>
+                            </td>
+                            <td style="color: var(--color-text-secondary); font-size: 0.875rem;">10m ago</td>
+                            <td><button class="btn-details" onclick="alert('View details for screen5')">Details</button>
+                            </td>
+                        </tr>
+                        <tr data-status="active">
+                            <td class="screen-id">screen6</td>
+                            <td>Sports Arena</td>
+                            <td>
+                                <span class="status-badge active">
+                                    <span class="status-dot active"></span>
+                                    Active
+                                </span>
+                            </td>
+                            <td style="color: var(--color-text-secondary); font-size: 0.875rem;">1m ago</td>
+                            <td><button class="btn-details" onclick="alert('View details for screen6')">Details</button>
+                            </td>
+                        </tr>
+                        <tr data-status="offline">
+                            <td class="screen-id">screen7</td>
+                            <td>City Hall</td>
+                            <td>
+                                <span class="status-badge offline">
+                                    <span class="status-dot offline"></span>
+                                    Offline
+                                </span>
+                            </td>
+                            <td style="color: var(--color-text-secondary); font-size: 0.875rem;">1 day ago</td>
+                            <td><button class="btn-details" onclick="alert('View details for screen7')">Details</button>
+                            </td>
+                        </tr>
+                        <tr data-status="active">
+                            <td class="screen-id">screen8</td>
+                            <td>Riverside Park</td>
+                            <td>
+                                <span class="status-badge active">
+                                    <span class="status-dot active"></span>
+                                    Active
+                                </span>
+                            </td>
+                            <td style="color: var(--color-text-secondary); font-size: 0.875rem;">3m ago</td>
+                            <td><button class="btn-details" onclick="alert('View details for screen8')">Details</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function filterTable() {
+            const searchInput = document.getElementById('searchInput').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+            const table = document.getElementById('screensTable');
+            const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+
+            let visibleCount = 0;
+            const totalCount = rows.length;
+
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                const screenId = row.cells[0].textContent.toLowerCase();
+                const location = row.cells[1].textContent.toLowerCase();
+                const status = row.getAttribute('data-status');
+
+                const matchesSearch = screenId.includes(searchInput) || location.includes(searchInput);
+                const matchesStatus = statusFilter === 'all' || status === statusFilter;
+
+                if (matchesSearch && matchesStatus) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+
+            document.getElementById('resultsCount').textContent = `${visibleCount} of ${totalCount} screens`;
+        }
+    </script>
+</body>
+
+</html>

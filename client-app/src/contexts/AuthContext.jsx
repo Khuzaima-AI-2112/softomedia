@@ -1,63 +1,64 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { authAPI } from '../services/api';
 
 const AuthContext = createContext(null);
 
-export const AuthProvider = ({ children }) => {
+export const useAuth = () => {
+    const context = useContext(AuthContext);
+    if (!context) {
+        throw new Error('useAuth must be used within AuthProvider');
+    }
+    return context;
+};
+
+export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
-    const [persona, setPersonaState] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const savedPersona = localStorage.getItem('active_persona');
-        const savedUser = localStorage.getItem('auth_user');
+        // Check if user is logged in on mount
+        const token = localStorage.getItem('auth_token');
+        const userData = localStorage.getItem('user_data');
 
-        if (savedUser) {
-            setUser(JSON.parse(savedUser));
+        if (token && userData) {
+            setUser(JSON.parse(userData));
         }
 
-        if (savedPersona) {
-            setPersonaState(savedPersona);
-        } else if (savedUser) {
-            setPersonaState(JSON.parse(savedUser).role);
-        } else {
-            setPersonaState('brand');
-        }
         setLoading(false);
     }, []);
 
-    const login = (userData, token) => {
-        localStorage.setItem('auth_user', JSON.stringify(userData));
-        localStorage.setItem('auth_token', token);
-        localStorage.setItem('active_persona', userData.role);
-        setUser(userData);
-        setPersonaState(userData.role);
-    };
+    const login = async (email, password) => {
+        try {
+            const data = await authAPI.login(email, password);
 
-    const setPersona = (type) => {
-        localStorage.setItem('active_persona', type);
-        localStorage.setItem('demo_role', type); // Sync role for backend bypass
+            // Store user data
+            localStorage.setItem('user_data', JSON.stringify(data.user));
+            setUser(data.user);
 
-        // Ensure demo-token is set if no real token exists
-        if (!localStorage.getItem('auth_token')) {
-            localStorage.setItem('auth_token', 'demo-token');
+            return data;
+        } catch (error) {
+            throw error;
         }
-
-        setPersonaState(type);
     };
 
     const logout = () => {
-        localStorage.removeItem('auth_user');
         localStorage.removeItem('auth_token');
-        localStorage.removeItem('active_persona');
+        localStorage.removeItem('user_data');
         setUser(null);
-        setPersonaState('brand');
+        authAPI.logout();
+    };
+
+    const value = {
+        user,
+        login,
+        logout,
+        isAuthenticated: !!user,
+        loading,
     };
 
     return (
-        <AuthContext.Provider value={{ user, persona, loading, login, setPersona, logout }}>
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     );
-};
-
-export const useAuth = () => useContext(AuthContext);
+}

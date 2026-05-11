@@ -1,34 +1,59 @@
-﻿import express from 'express';
-import { authService } from '../services/index.js';
-import logger from '../utils/logger.js';
+import express from 'express';
+import { Firestore } from '@google-cloud/firestore';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 const router = express.Router();
+const firestore = new Firestore();
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-change-in-prod';
 
-/**
- * POST /api/auth/login
- * Standardized login for MVP personas
- */
+// POST /api/auth/login
 router.post('/login', async (req, res) => {
     try {
-        const { email } = req.body;
-        if (!email) return res.status(400).json({ error: 'Email is required' });
+        const { email, password } = req.body;
 
-        const result = await authService.login(email);
-        res.json(result);
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email and password required' });
+        }
+
+        // Find user by email
+        const usersRef = firestore.collection('users');
+        const snapshot = await usersRef.where('email', '==', email).get();
+
+        if (snapshot.empty) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        const userDoc = snapshot.docs[0];
+        const user = { id: userDoc.id, ...userDoc.data() };
+
+        // Verify password
+        const isValid = await bcrypt.compare(password, user.password);
+        if (!isValid) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        // Generate JWT token
+        const token = jwt.sign(
+            { uid: user.id, email: user.email, role: user.role },
+            JWT_SECRET,
+            { expiresIn: '24h' }
+        );
+
+        res.json({
+            token,
+            user: {
+                id: user.id,
+                email: user.email,
+                role: user.role,
+                name: user.name,
+                linked_entity_id: user.linked_entity_id  // CRITICAL: Needed for brand/retailer dashboards
+            }
+        });
     } catch (error) {
-        logger.error('Login error', { error: error.message });
-        const status = error.message === 'User not found' ? 401 : 500;
-        res.status(status).json({ error: error.message });
+        console.error('Login error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
-});
-
-/**
- * GET /api/auth/me
- * Returns current authenticated user session
- */
-router.get('/me', (req, res) => {
-    // Session check logic would go here
-    res.json({ status: 'ok', user: req.user });
 });
 
 export default router;

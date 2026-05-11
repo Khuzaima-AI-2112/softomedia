@@ -1,0 +1,36 @@
+{
+    "displayName": "SoftoMedia Production Budget",
+    "budgetFilter": {
+        "projects": [
+            "projects/softomedia-live2026"
+        ]
+    },
+    "amount": {
+        "specifiedAmount": {
+            "currencyCode": "USD",
+            "units": "50"
+        }
+    },
+    "thresholdRules": [
+        {
+            "thresholdPercent": 0.5,
+            "spendBasis": "CURRENT_SPEND"
+        },
+        {
+            "thresholdPercent": 0.75,
+            "spendBasis": "CURRENT_SPEND"
+        },
+        {
+            "thresholdPercent": 0.9,
+            "spendBasis": "CURRENT_SPEND"
+        },
+        {
+            "thresholdPercent": 1.0,
+            "spendBasis": "CURRENT_SPEND"
+        }
+    ],
+    "allUpdatesRule": {
+        "pubsubTopic": "",
+        "schemaVersion": "1.0"
+    }
+}

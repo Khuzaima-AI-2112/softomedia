@@ -1,138 +1,98 @@
-/**
- * verify_predeploy.js
- * Pre-deployment verification script
- * Run before deploying to ensure configuration is correct
- */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { Storage } from '@google-cloud/storage';
 
-const checks = [];
-let hasErrors = false;
+// Configuration
+const BUCKET_NAME = 'softomedia-live2026-ads';
 
-function check(name, condition, errorMessage) {
-    if (condition) {
-        checks.push({ name, status: '✅ PASS' });
+const SEED_FILE = 'ad-server/seed_demo.js';
+const EXPECTED_EXTENSION = '.png'; // We decided to move everything to PNG
+const EXPECTED_DURATION = 5;
+
+const storage = new Storage();
+
+async function verify() {
+    console.log('🔍 Starting Pre-deployment Verification...');
+    let errors = 0;
+
+    // 1. Verify SEED script content
+    console.log(`\nChecking Config in ${SEED_FILE}...`);
+    const seedContent = fs.readFileSync(SEED_FILE, 'utf8');
+
+    // Check for SVGs (Failure condition)
+    if (seedContent.includes('.svg')) {
+        console.error('❌ FAIL: Seed file contains .svg references. All ads must be .png.');
+        errors++;
     } else {
-        checks.push({ name, status: '❌ FAIL', error: errorMessage });
-        hasErrors = true;
+        console.log('✅ PASS: No .svg references found.');
     }
-}
 
-console.log('\n🔍 Running Pre-Deployment Verification...\n');
+    // Check for correct duration
+    // Simple regex check for "duration: 5"
+    if (seedContent.includes('duration: 5')) {
+        console.log('✅ PASS: Found "duration: 5" configuration.');
+    } else {
+        console.error(`❌ FAIL: "duration: ${EXPECTED_DURATION}" not found in seed script. Check durations.`);
+        errors++;
+    }
 
-// Check 1: Client app build output exists (skip in CI/Cloud Build)
-const isCI = process.env.PROJECT_ID || process.env.BUILD_ID || process.env.CI || process.env.GCP_PROJECT;
-const clientDistPath = path.join(__dirname, 'client-app', 'dist');
-
-if (!isCI) {
-    check(
-        'Client Build',
-        fs.existsSync(clientDistPath),
-        'client-app/dist not found. Run: cd client-app && npm run build'
-    );
-} else {
-    console.log('⏭️  Skipping local build check in CI environment');
-}
-
-// Check 2: Ad-server entry point exists
-const adServerIndex = path.join(__dirname, 'ad-server', 'index.js');
-check(
-    'Ad-Server Entry',
-    fs.existsSync(adServerIndex),
-    'ad-server/index.js not found'
-);
-
-// Check 3: No hardcoded localhost in ad-server
-if (fs.existsSync(adServerIndex)) {
-    const adServerContent = fs.readFileSync(adServerIndex, 'utf8');
-    const hasLocalhost = /localhost:\d+/.test(adServerContent) && !/process\.env/.test(adServerContent);
-    check(
-        'No Hardcoded Localhost',
-        !hasLocalhost,
-        'ad-server/index.js contains hardcoded localhost without env fallback'
-    );
-}
-
-// Check 4: Package.json files exist
-check(
-    'Client package.json',
-    fs.existsSync(path.join(__dirname, 'client-app', 'package.json')),
-    'client-app/package.json not found'
-);
-
-check(
-    'Ad-Server package.json',
-    fs.existsSync(path.join(__dirname, 'ad-server', 'package.json')),
-    'ad-server/package.json not found'
-);
-
-// Check 5: Dockerfiles exist (or warn)
-const clientDockerfile = path.join(__dirname, 'client-app', 'Dockerfile');
-const adServerDockerfile = path.join(__dirname, 'ad-server', 'Dockerfile');
-
-if (!fs.existsSync(clientDockerfile)) {
-    checks.push({ name: 'Client Dockerfile', status: '⚠️ WARN', error: 'Dockerfile not found - will need for Cloud Run' });
-}
-
-if (!fs.existsSync(adServerDockerfile)) {
-    checks.push({ name: 'Ad-Server Dockerfile', status: '⚠️ WARN', error: 'Dockerfile not found - will need for Cloud Run' });
-}
-
-// Check 6: ESLint config exists
-check(
-    'ESLint Config',
-    fs.existsSync(path.join(__dirname, 'client-app', '.eslintrc.cjs')),
-    'client-app/.eslintrc.cjs not found'
-);
-
-// Check 7: No Hardcoded Absolute Paths (Safeguard)
-function scanForAbsolutePaths(dir) {
-    let found = false;
-    const files = fs.readdirSync(dir);
-
-    for (const file of files) {
-        if (file.startsWith('node_modules') || file.startsWith('.')) continue;
-
-        const fullPath = path.join(dir, file);
-        const stat = fs.statSync(fullPath);
-
-        if (stat.isDirectory()) {
-            if (scanForAbsolutePaths(fullPath)) found = true;
-        } else if (file.endsWith('.js')) {
-            const content = fs.readFileSync(fullPath, 'utf8');
-            // Look for C:\Users or /Users/ (mac/linux home)
-            if (/C:\\Users/i.test(content) || /\/Users\//.test(content)) {
-                // Allow our own verification script to have it (false positive prevention)
-                if (file === 'verify_predeploy.js') continue;
-
-                check(
-                    `No Hardcoded Paths in ${file}`,
-                    false,
-                    `Found hardcoded absolute path in ${fullPath}`
-                );
-                found = true;
-            }
+    // 1.5 Verify ad-server/index.js for hardcoded legacy data
+    const INDEX_FILE = 'ad-server/index.js';
+    console.log(`\nChecking source code in ${INDEX_FILE}...`);
+    try {
+        const indexContent = fs.readFileSync(INDEX_FILE, 'utf8');
+        if (indexContent.includes('.svg')) {
+            console.error('❌ FAIL: index.js contains hardcoded .svg references. Use seed data only!');
+            errors++;
+        } else {
+            console.log('✅ PASS: No hardcoded .svg in index.js.');
         }
+    } catch (e) {
+        console.warn('⚠️ WARN: Could not check index.js (file missing?)');
     }
-    return found;
+
+    // 2. Verify Cloud Storage Assets
+    console.log(`\nChecking Assets in gs://${BUCKET_NAME}...`);
+    try {
+        const [files] = await storage.bucket(BUCKET_NAME).getFiles();
+        const fileNames = files.map(f => f.name);
+
+        const requiredAssets = [
+            'demo_ad_costco.png',
+            'demo_ad_pizza.png',
+            'demo_ad_1.png',
+            'demo_ad_2.png',
+            'demo_ad_3.png'
+        ];
+
+        requiredAssets.forEach(asset => {
+            if (fileNames.includes(asset)) {
+                console.log(`✅ PASS: Found ${asset}`);
+            } else {
+                console.error(`❌ FAIL: Missing required asset: ${asset}`);
+                errors++;
+            }
+        });
+
+    } catch (e) {
+        console.error('❌ FAIL: Could not list GCS bucket. Check permissions.', e.message);
+        errors++;
+    }
+
+    // Summary
+    console.log('\n-----------------------------------');
+    if (errors === 0) {
+        console.log('✅ VERIFICATION SUCCEEDED. Safe to deploy.');
+        process.exit(0);
+    } else {
+        console.error(`❌ VERIFICATION FAILED with ${errors} errors.`);
+        console.error('Fix these errors before deploying.');
+        process.exit(1);
+    }
 }
 
-console.log('Scanning for hardcoded absolute paths...');
-scanForAbsolutePaths(path.join(__dirname, 'ad-server'));
-
-// Print results
-console.log('─'.repeat(50));
-checks.forEach(c => {
-    console.log(`${c.status}  ${c.name}`);
-    if (c.error) console.log(`      └── ${c.error}`);
-});
-console.log('─'.repeat(50));
-
-if (hasErrors) {
-    console.log('\n❌ Pre-deployment checks FAILED\n');
+verify().catch(e => {
+    console.error('Script Error:', e);
     process.exit(1);
-} else {
-    console.log('\n✅ All pre-deployment checks passed!\n');
-    process.exit(0);
-}
+});

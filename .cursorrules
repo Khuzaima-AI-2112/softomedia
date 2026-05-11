@@ -1,0 +1,77 @@
+# SoftoMedia Live - AI Assistant Rules
+
+## Critical Deployment Rules
+
+### 1. Never Hardcode Configuration
+- ❌ FORBIDDEN: Hardcoding API URLs, backend URLs, or env-specific values in components
+- ✅ REQUIRED: Use `client-app/src/config.js` for all API URLs
+- Example: `import { API_URL } from '../config.js'`
+
+### 2. Service Deletion Requires Verification
+- Before `gcloud run services delete`: ALWAYS run `gcloud run services list` first
+- Confirm service URL matches deletion target
+- Get explicit user approval with service name + URL
+- Remember: Deleting a service deletes ALL revisions
+
+### 3. Post-Deployment Seed is Mandatory
+- After EVERY `gcloud builds submit`, immediately run:
+  ```
+  Invoke-RestMethod -Uri "https://ad-server-bi477lfjdq-uc.a.run.app/api/debug/seed"
+  ```
+- Verify response: `{"status":"seeded"}`
+
+### 4. Verify GCS Assets
+- When uploading to GCS, check file sizes to detect duplicates
+- Visual inspection required: download and view at least one file
+- All demo ad images must be unique
+
+### 5. Check IAM After Every Deployment
+- Run: `gcloud run services get-iam-policy SERVICE_NAME --region us-central1`
+- If missing `allUsers → roles/run.invoker`, add it immediately
+
+### 6. Cache Invalidation Required
+- After deploying image or API changes, instruct user to hard refresh (Ctrl+Shift+R)
+- Signed URLs cache for 60 minutes
+
+### 7. Atomic Deployments Only
+- ONLY deploy via: `gcloud builds submit --config cloudbuild.yaml .`
+- NEVER manually delete or update individual Cloud Run services
+
+### 8. GCS Bucket Must Be Publicly Readable
+- After creating GCS bucket, immediately run:
+  ```
+  gcloud storage buckets add-iam-policy-binding gs://BUCKET_NAME --member=allUsers --role=roles/storage.objectViewer
+  ```
+- Without this, player will show black screens (images won't load)
+
+### 9. Seed Endpoint Must Create Admin User
+- NEVER rely only on `bootstrapAdmin()` server startup functions
+- Always include admin user creation in `/api/debug/seed` endpoint:
+  ```javascript
+  const hashedPassword = await hashPassword('password');
+  await usersRef.doc('admin_001').set({email, password: hashedPassword, role: 'admin'});
+  ```
+- Why: Server containers restart frequently; seed endpoint is guaranteed to run when called
+
+## Project Context
+- **Backend URL**: `https://ad-server-bi477lfjdq-uc.a.run.app`
+- **Frontend URL**: `https://client-app-bi477lfjdq-uc.a.run.app`
+- **GCS Bucket**: `gs://softo-media-live-ads/`
+- **Admin Login**: `sokallel@gmail.com` / `thisisbusiness`
+
+## Pre-Deployment Checklist
+1. Run `node verify_predeploy.js` if it exists
+2. Verify no hardcoded URLs in new code
+3. Confirm GCS assets are unique (if modified)
+4. Review `DEPLOYMENT_LOG.md` for past issues
+
+## Post-Deployment Checklist
+1. Run seed endpoint
+2. Check IAM policy
+3. Test in incognito mode
+4. Verify both frontend + backend URLs work
+
+## Reference Documents
+- `DEPLOYMENT_LOG.md` - History of issues and fixes
+- `PROJECT_RULES.md` - Detailed rules documentation
+- `SoftoMediaLive_Complete_Specifications.md` - Full system specs

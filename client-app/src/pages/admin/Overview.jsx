@@ -1,308 +1,180 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { dashboardAPI } from '../../services/api.js';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
-import apiService from '../../services/ApiService';
-import pricingService from '../../services/PricingService';
+import HamburgerMenu from '../../components/HamburgerMenu';
+import EmptyState from '../../components/EmptyState';
+import '../../design-tokens.css';
 
-function AdminOverview() {
-    const navigate = useNavigate();
-    const [stats, setStats] = useState({
-        retailers: 0,
-        advertisers: 0,
-        activeScreens: 0,
-        totalScreens: 0,
-        pendingLoops: 0,
-        totalUsers: 0
-    });
+/**
+ * DashboardOverview - State 6: God View (Super Admin Dashboard)
+ * Enhanced with Industrial Premium design system
+ */
+function DashboardOverview() {
+    const role = localStorage.getItem('softomedia_role') || 'admin';
+    const [screens, setScreens] = React.useState([]);
+    const [ads, setAds] = React.useState([]);
+    const [stats, setStats] = React.useState({ active: 0, impressions: 0, playTime: 0 });
 
-    const [retailers, setRetailers] = useState([]);
-    const [advertisers, setAdvertisers] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [showRetailerModal, setShowRetailerModal] = useState(false);
-    const [newRetailerName, setNewRetailerName] = useState('');
-    const [newRetailerEmail, setNewRetailerEmail] = useState('');
+    React.useEffect(() => {
+        const fetchData = async () => {
+            try {
+                // Fetch Screens
+                const screensRes = await fetch(`${API_URL}/api/screens`);
+                const screensData = await screensRes.json();
 
-    useEffect(() => {
-        loadData();
+                // Fetch Ads
+                const adsRes = await fetch(`${API_URL}/api/ads`);
+                const adsData = await adsRes.json();
+
+                if (screensData.screens) {
+                    setScreens(screensData.screens);
+                    // Calculate aggregates
+                    const active = screensData.screens.length;
+                    const impressions = screensData.screens.reduce((acc, s) => acc + (s.stats?.total_impressions || 0), 0);
+                    const playTime = screensData.screens.reduce((acc, s) => acc + (s.stats?.total_play_time || 0), 0);
+                    setStats({ active, impressions, playTime });
+                }
+
+                if (adsData.ads) {
+                    setAds(adsData.ads);
+                }
+
+            } catch (e) {
+                console.error('Failed to fetch dashboard data', e);
+            }
+        };
+
+        fetchData();
     }, []);
 
-    const loadData = async () => {
-        try {
-            setLoading(true);
-
-            // Safely initialize services
-            try {
-                await pricingService.init();
-            } catch (err) {
-                console.error('[AdminOverview] PricingService init failed:', err);
-            }
-
-            // Fetch data with error handling for each request to prevent one failure from breaking everything
-            const [allRetailers, allAdvertisers, allScreens, allLoops, allUsers] = await Promise.all([
-                apiService.getRetailers().catch(() => []),
-                apiService.getAdvertisers().catch(() => []),
-                apiService.getScreens().catch(() => []),
-                apiService.getLoops().catch(() => []),
-                apiService.getUsers().catch(() => [])
-            ]);
-
-            // Ensure we have arrays before slicing/filtering
-            const safeRetailers = Array.isArray(allRetailers) ? allRetailers : [];
-            const safeAdvertisers = Array.isArray(allAdvertisers) ? allAdvertisers : [];
-            const safeScreens = Array.isArray(allScreens) ? allScreens : [];
-            const safeLoops = Array.isArray(allLoops) ? allLoops : [];
-            const safeUsers = Array.isArray(allUsers) ? allUsers : [];
-
-            setRetailers(safeRetailers.slice(0, 4));
-            setAdvertisers(safeAdvertisers.slice(0, 4));
-
-            setStats({
-                retailers: safeRetailers.length,
-                advertisers: safeAdvertisers.length,
-                activeScreens: safeScreens.filter(s => s.status === 'online').length,
-                totalScreens: safeScreens.length,
-                pendingLoops: safeLoops.filter(l => l.status === 'PENDING_APPROVAL').length,
-                totalUsers: safeUsers.length
-            });
-        } catch (error) {
-            console.error('Failed to load admin overview data:', error);
-        } finally {
-            setLoading(false);
-        }
+    const formatTime = (seconds) => {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        return `${h}h ${m}m`;
     };
-
-    const handleCreateRetailer = async () => {
-        if (newRetailerName && newRetailerEmail) {
-            try {
-                await apiService.createRetailer({
-                    name: newRetailerName,
-                    contactEmail: newRetailerEmail,
-                    logo: '🏪',
-                    status: 'active'
-                });
-                await loadData();
-                setShowRetailerModal(false);
-                setNewRetailerName('');
-                setNewRetailerEmail('');
-            } catch (error) {
-                console.error('Failed to create retailer:', error);
-            }
-        }
-    };
-
-    const quickActions = [
-        { label: 'CPM Pricing', icon: 'attach_money', path: '/dashboard/admin/pricing', color: 'emerald' },
-        { label: 'Users', icon: 'people', path: '/dashboard/admin/users', color: 'blue' },
-        { label: 'Retailers', icon: 'storefront', path: '/dashboard/admin/retailers', color: 'amber' },
-        { label: 'Advertisers', icon: 'campaign', path: '/dashboard/admin/advertisers', color: 'rose' },
-        { label: 'Demo Player', icon: 'slideshow', path: '/player/demo', color: 'purple' },
-        { label: 'Store Hours', icon: 'schedule', path: '/dashboard/admin/hours', color: 'indigo' },
-        { label: 'Network Map', icon: 'map', path: '/dashboard/admin/map', color: 'cyan' },
-        { label: 'Screens', icon: 'monitor', path: '/dashboard/admin/screens', color: 'slate' }
-    ];
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Platform Governance</h1>
-                    <p className="text-slate-500 dark:text-slate-400">Softomedia Super Admin Control Center</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => setShowRetailerModal(true)}
-                        className="px-4 py-2 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover transition-colors flex items-center gap-2"
-                    >
-                        <span className="material-symbols-outlined text-[20px]">add</span>
-                        New Retailer
-                    </button>
-                    <button
-                        onClick={() => navigate('/dashboard/admin/map')}
-                        className="px-4 py-2 bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-lg font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                    >
-                        Network Map
-                    </button>
-                </div>
-            </div>
+        <>
+            <HamburgerMenu />
+            <div className="dashboard-ui" style={{ padding: 'var(--space-6)' }}>
+                {/* Empty State Check - State 14 */}
+                {screens.length === 0 && ads.length === 0 && (
+                    <EmptyState
+                        title="Welcome to SoftoMedia"
+                        message="Your network is ready to go. Start by adding screens or uploading your first ad campaign."
+                        ctaText="Get Started"
+                        onCtaClick={() => console.log('Navigate to setup')}
+                        illustration="🎯"
+                    />
+                )}
 
-            {/* Quick Actions Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                {quickActions.map(action => (
-                    <Link
-                        key={action.path}
-                        to={action.path}
-                        className={`
-                            p-4 rounded-xl border border-slate-200 dark:border-slate-700 
-                            bg-white dark:bg-slate-800/50 hover:border-${action.color}-400 
-                            hover:shadow-lg hover:shadow-${action.color}-500/10 transition-all 
-                            flex flex-col items-center gap-2 group
-                        `}
-                    >
-                        <div className={`size-10 rounded-lg bg-${action.color}-100 dark:bg-${action.color}-900/30 flex items-center justify-center text-${action.color}-600 dark:text-${action.color}-400 group-hover:scale-110 transition-transform`}>
-                            <span className="material-symbols-outlined">{action.icon}</span>
+                {/* Hero Metrics - State 6: God View */}
+                {(screens.length > 0 || ads.length > 0) && (
+                    <>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 'var(--space-6)', marginBottom: 'var(--space-8)' }}>
+                            <GlassCard>
+                                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>Active Screens</p>
+                                <p style={{ fontSize: 'var(--text-4xl)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', marginTop: 'var(--space-2)', fontVariantNumeric: 'tabular-nums' }}>
+                                    {stats.active}
+                                </p>
+                            </GlassCard>
+                            <GlassCard>
+                                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>Total Impressions</p>
+                                <p style={{ fontSize: 'var(--text-4xl)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', marginTop: 'var(--space-2)', fontVariantNumeric: 'tabular-nums' }}>
+                                    {stats.impressions.toLocaleString()}
+                                </p>
+                            </GlassCard>
+                            <GlassCard>
+                                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>Total Play Time</p>
+                                <p style={{ fontSize: 'var(--text-4xl)', fontWeight: 'var(--font-bold)', color: 'var(--color-success)', marginTop: 'var(--space-2)', fontVariantNumeric: 'tabular-nums' }}>
+                                    {formatTime(stats.playTime)}
+                                </p>
+                            </GlassCard>
                         </div>
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{action.label}</span>
-                    </Link>
-                ))}
-            </div>
 
-            {/* Stats Row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <GlassCard className="border-l-4 border-l-primary" data-testid="stat-card-retailers">
-                    <p className="text-sm font-medium text-slate-500 mb-1 leading-none">Retailers</p>
-                    <p className="text-3xl font-bold text-slate-900 dark:text-white" data-testid="stat-value-retailers">{stats.retailers}</p>
-                </GlassCard>
-                <GlassCard className="border-l-4 border-l-amber-500" data-testid="stat-card-advertisers">
-                    <p className="text-sm font-medium text-slate-500 mb-1 leading-none">Advertisers</p>
-                    <p className="text-3xl font-bold text-slate-900 dark:text-white" data-testid="stat-value-advertisers">{stats.advertisers}</p>
-                </GlassCard>
-                <GlassCard className="border-l-4 border-l-emerald-500">
-                    <p className="text-sm font-medium text-slate-500 mb-1 leading-none">Screens Online</p>
-                    <p className="text-3xl font-bold text-emerald-500">{stats.activeScreens}</p>
-                    <p className="text-xs text-slate-400">of {stats.totalScreens} total</p>
-                </GlassCard>
-                <GlassCard className="border-l-4 border-l-blue-500">
-                    <p className="text-sm font-medium text-slate-500 mb-1 leading-none">Platform Users</p>
-                    <p className="text-3xl font-bold text-blue-500">{stats.totalUsers}</p>
-                </GlassCard>
-            </div>
-
-            {/* Pending Alert */}
-            {stats.pendingLoops > 0 && (
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                    <span className="material-symbols-outlined text-amber-500">pending_actions</span>
-                    <div className="flex-1">
-                        <p className="font-medium text-amber-800 dark:text-amber-200">
-                            {stats.pendingLoops} loops awaiting retailer approval
-                        </p>
-                        <p className="text-sm text-amber-600 dark:text-amber-400">
-                            Retailers need to approve tomorrow&apos;s schedule
-                        </p>
-                    </div>
-                    <Link
-                        to="/dashboard/admin/loops"
-                        className="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600"
-                    >
-                        View Loops
-                    </Link>
-                </div>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <GlassCard>
-                    <div className="flex items-center justify-between mb-6">
-                        <h3 className="font-bold text-lg">Retail Partners</h3>
-                        <Link to="/dashboard/admin/retailers" className="text-primary text-sm font-medium hover:underline">
-                            View All →
-                        </Link>
-                    </div>
-                    <div className="space-y-3">
-                        {retailers.map(ret => {
-                            return (
-                                <Link
-                                    key={ret.id}
-                                    to="/dashboard/admin/retailers"
-                                    className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 hover:border-primary/30 transition-colors cursor-pointer group"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="size-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-2xl border border-slate-200 dark:border-slate-600">
-                                            {ret.logo}
+                        {/* Campaign Performance (Ads) */}
+                        <GlassCard title="Campaign Performance" style={{ marginBottom: 'var(--space-8)' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 'var(--space-6)' }}>
+                                {ads.map(ad => (
+                                    <div key={ad.id} style={{ backgroundColor: 'var(--color-bg-hover)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-sm)', overflow: 'hidden' }}>
+                                        <div style={{ height: '120px', backgroundColor: '#f3f4f6', position: 'relative' }}>
+                                            <img
+                                                src={ad.thumbnail_url}
+                                                alt={ad.title}
+                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                onError={(e) => { e.target.style.display = 'none' }}
+                                            />
                                         </div>
-                                        <div>
-                                            <p className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">{ret.name}</p>
-                                            <p className="text-[11px] text-slate-500">{ret.store_count || 0} Locations</p>
+                                        <div style={{ padding: 'var(--space-4)' }}>
+                                            <h4 style={{ fontWeight: 'var(--font-semibold)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ad.title}</h4>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                                                <span>Views</span>
+                                                <span style={{ fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)' }}>{(ad.stats?.impressions || 0).toLocaleString()}</span>
+                                            </div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
+                                                <span>Duration</span>
+                                                <span>{ad.duration_seconds}s</span>
+                                            </div>
                                         </div>
                                     </div>
-                                    <StatusBadge status={ret.status === 'active' ? 'Active' : 'Inactive'} />
-                                </Link>
-                            );
-                        })}
-                    </div>
-                </GlassCard>
+                                ))}
+                            </div>
+                        </GlassCard>
 
-                <GlassCard>
-                    <div className="flex items-center justify-between mb-6">
-                        <h3 className="font-bold text-lg">Key Advertisers</h3>
-                        <Link to="/dashboard/admin/advertisers" className="text-primary text-sm font-medium hover:underline">
-                            View All →
-                        </Link>
-                    </div>
-                    <div className="space-y-3">
-                        {advertisers.map(adv => {
-                            return (
-                                <Link
-                                    key={adv.id}
-                                    to="/dashboard/admin/advertisers"
-                                    className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 hover:border-amber-500/30 transition-colors cursor-pointer group"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="size-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-2xl border border-slate-200 dark:border-slate-600">
-                                            {adv.logo}
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-amber-500 transition-colors">{adv.name}</p>
-                                            <p className="text-[11px] text-slate-500">{adv.active_campaign_count || 0} Active Campaigns</p>
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-sm font-bold text-slate-900 dark:text-white">{pricingService.formatPrice(adv.budget)}</p>
-                                        <p className="text-[10px] text-slate-500 uppercase tracking-tighter font-bold">Budget</p>
-                                    </div>
-                                </Link>
-                            );
-                        })}
-                    </div>
-                </GlassCard>
+                        {/* Screen Performance Table */}
+                        <GlassCard title="Screen Performance" style={{ marginBottom: 'var(--space-8)' }}>
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                                            <th style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Screen ID</th>
+                                            <th style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Status</th>
+                                            <th style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Impressions</th>
+                                            <th style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Play Time</th>
+                                            <th style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Last Seen</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {screens.map(screen => (
+                                            <tr key={screen.screen_id} style={{ borderBottom: '1px solid var(--color-border-light)' }}>
+                                                <td style={{ padding: 'var(--space-3)', fontWeight: 'var(--font-medium)' }}>{screen.screen_id}</td>
+                                                <td style={{ padding: 'var(--space-3)' }}>
+                                                    <StatusBadge status={screen.status} />
+                                                </td>
+                                                <td style={{ padding: 'var(--space-3)' }}>{(screen.stats?.total_impressions || 0).toLocaleString()}</td>
+                                                <td style={{ padding: 'var(--space-3)' }}>{formatTime(screen.stats?.total_play_time || 0)}</td>
+                                                <td style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
+                                                    {screen.last_seen ? new Date(screen.last_seen).toLocaleString() : 'Never'}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {screens.length === 0 && (
+                                            <tr>
+                                                <td colSpan="5" style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>No screens found.</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </GlassCard>
+
+                        <GlassCard>
+                            <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-4)', color: 'var(--color-text-primary)' }}>
+                                Welcome back, {role}!
+                            </h3>
+                            <p style={{ color: 'var(--color-text-secondary)' }}>
+                                This is your central command center. Use the sidebar to manage your
+                                {role === 'admin' ? ' entire network, users, and global settings.' :
+                                    role === 'advertiser' ? ' campaigns, creatives, and budget.' :
+                                        ' screens, playlists, and location settings.'}
+                            </p>
+                        </GlassCard>
+                    </>
+                )}
             </div>
-
-            {/* New Retailer Modal */}
-            {showRetailerModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <GlassCard className="w-full max-w-md">
-                        <h2 className="text-xl font-bold mb-4">Register New Retailer</h2>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Company Name</label>
-                                <input
-                                    type="text"
-                                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
-                                    placeholder="e.g. Acme Retail Corp"
-                                    value={newRetailerName}
-                                    onChange={(e) => setNewRetailerName(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Contact Email</label>
-                                <input
-                                    type="email"
-                                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
-                                    placeholder="admin@retailer.com"
-                                    value={newRetailerEmail}
-                                    onChange={(e) => setNewRetailerEmail(e.target.value)}
-                                />
-                            </div>
-                            <div className="flex justify-end gap-3 mt-6">
-                                <button
-                                    onClick={() => setShowRetailerModal(false)}
-                                    className="px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 font-medium"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleCreateRetailer}
-                                    className="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover shadow-lg shadow-primary/20"
-                                >
-                                    Create Account
-                                </button>
-                            </div>
-                        </div>
-                    </GlassCard>
-                </div>
-            )}
-        </div>
+        </>
     );
 }
 
-export default AdminOverview;
-
+export default DashboardOverview;
