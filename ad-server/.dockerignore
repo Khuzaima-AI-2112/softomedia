@@ -1,0 +1,13 @@
+node_modules
+node_modules_old
+*.txt
+*.log
+coverage/
+tests/
+.env
+.env.*
+.git
+.gitignore
+<<<<<<< SEARCH
+=======
+>>>>>>> REPLACE
