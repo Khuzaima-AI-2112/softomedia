@@ -47,6 +47,14 @@ class ApiService {
         return apiClient.post('/api/stores', data);
     }
 
+    async updateStore(id, data) {
+        return apiClient.put(`/api/stores/${id}`, data);
+    }
+
+    async deleteStore(id) {
+        return apiClient.delete(`/api/stores/${id}`);
+    }
+
     async getEffectiveHours(storeId, date) {
         return apiClient.get(`/api/stores/${storeId}/hours?date=${date}`);
     }
@@ -110,6 +118,31 @@ class ApiService {
 
     async deleteAdvertiser(id) {
         return apiClient.delete(`/api/advertisers/${id}`);
+    }
+
+    // ============================================
+    // ADS
+    // ============================================
+
+    async getAds(filters = {}) {
+        const params = new URLSearchParams();
+        if (filters.campaign_id) params.append('campaign_id', filters.campaign_id);
+        if (filters.status) params.append('status', filters.status);
+        if (filters.limit) params.append('limit', filters.limit);
+        const qs = params.toString();
+        return apiClient.get(`/api/ads${qs ? `?${qs}` : ''}`);
+    }
+
+    async getAd(id) {
+        return apiClient.get(`/api/ads/${id}`);
+    }
+
+    async reviewAd(id, status, rejection_reason = null) {
+        return apiClient.put(`/api/ads/${id}/review`, { status, rejection_reason });
+    }
+
+    async deleteAd(id) {
+        return apiClient.delete(`/api/ads/${id}`);
     }
 
     // ============================================
@@ -302,8 +335,6 @@ class ApiService {
 
         return apiClient.get(url);
     }
-
-
 
     // ============================================
     // ADDITIONAL SCREEN OPS

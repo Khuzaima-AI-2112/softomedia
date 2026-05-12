@@ -328,7 +328,8 @@ export const notificationsAPI = {
         return response.json();
     },
 
-    getHistory: async (async (limit = 50) => {
+    // FIX: removed erroneous double `async` keyword that caused a syntax error
+    getHistory: async (limit = 50) => {
         const response = await authFetch(`${API_URL}/api/notifications/history?limit=${limit}`);
         return response.json();
     },
