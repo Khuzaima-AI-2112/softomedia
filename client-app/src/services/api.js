@@ -15,9 +15,15 @@ export const setAuthToken = (token) => {
     localStorage.setItem('auth_token', token);
 };
 
-// Remove auth token
+// Set auth role in localStorage
+export const setAuthRole = (role) => {
+    localStorage.setItem('auth_role', role);
+};
+
+// Remove auth token and role (atomic logout)
 export const removeAuthToken = () => {
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_role');
 };
 
 // Base fetch with auth headers
@@ -38,7 +44,7 @@ const authFetch = async (url, options = {}) => {
     });
 
     if (response.status === 401) {
-        // Token expired or invalid
+        // Token expired or invalid — clear both keys before redirecting
         removeAuthToken();
         window.location.href = '/login';
         throw new Error('Unauthorized');
@@ -118,6 +124,9 @@ export const authAPI = {
 
         const data = await response.json();
         setAuthToken(data.token);
+        if (data.user?.role) {
+            setAuthRole(data.user.role);
+        }
         return data;
     },
 
@@ -175,6 +184,9 @@ export const usersAPI = {
 
         const data = await response.json();
         setAuthToken(data.token);
+        if (data.user?.role) {
+            setAuthRole(data.user.role);
+        }
         return data;
     },
 
@@ -316,7 +328,7 @@ export const notificationsAPI = {
         return response.json();
     },
 
-    getHistory: async (limit = 50) => {
+    getHistory: async (async (limit = 50) => {
         const response = await authFetch(`${API_URL}/api/notifications/history?limit=${limit}`);
         return response.json();
     },
