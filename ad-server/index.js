@@ -9,13 +9,17 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 8080;
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-change-in-prod';
-const PROJECT_ID = process.env.PROJECT_ID || 'softomedia-live2026';
+const JWT_SECRET = process.env.JWT_SECRET;
+const PROJECT_ID = process.env.PROJECT_ID || 'softomedia-live-2026';
+
+if (!JWT_SECRET) {
+    console.error('FATAL: JWT_SECRET is not defined.');
+    process.exit(1);
+}
 
 // Initialize Firestore
 const firestore = new Firestore({
-    projectId: PROJECT_ID,
-    databaseId: '(default)'
+    projectId: PROJECT_ID
 });
 
 // --- HELPER FUNCTIONS ---
@@ -37,8 +41,8 @@ const generateToken = (user) => {
 };
 
 // --- BOOTSTRAP ADMIN ---
-const ADMIN_EMAIL = 'sokallel@gmail.com';
-const ADMIN_PASS = 'thisisbusiness';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+const ADMIN_PASS = process.env.ADMIN_PASS;
 
 async function bootstrapAdmin() {
     try {
@@ -262,7 +266,9 @@ app.get('/health', (req, res) => {
 });
 
 // Start server and bootstrap
-app.listen(PORT, async () => {
+app.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
-    await bootstrapAdmin();
 });
+
+// Bootstrap runs independently, doesn't block health checks
+bootstrapAdmin().catch(console.error);

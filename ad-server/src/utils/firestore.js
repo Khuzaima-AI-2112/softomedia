@@ -1,5 +1,5 @@
 ﻿import { Firestore } from '@google-cloud/firestore';
-import logger from './logger.js';
+import { logger } from './logger.js';
 
 let db = null;
 let useMock = false;

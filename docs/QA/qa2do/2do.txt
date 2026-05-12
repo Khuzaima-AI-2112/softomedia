@@ -1,2 +1,6 @@
-push the current softomedia to GitHub using antigravity (to main branch)
+push the current softomedia to GitHub using antigravity (to main branch) DONE
+new deployment DONE
+test new deployment
+change agent type in Roo code
+
 ask Ricardo about the main VS branches VS merges VS commits VS pulls VS pushes

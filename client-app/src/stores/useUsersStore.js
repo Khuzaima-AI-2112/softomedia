@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { usersAPI } from '../services/api.js';
 
-const useUsersStore = create((set, get) => ({
+const useUsersStore = create((set) => ({
     users: [],
     loading: false,
     error: null,
