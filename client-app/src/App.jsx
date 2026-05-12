@@ -36,8 +36,10 @@ import ScheduleManager from './pages/retailer/ScheduleManager';
 import ScheduleCalendar from './pages/retailer/ScheduleCalendar';
 import ScheduleHistory from './pages/retailer/ScheduleHistory';
 
-// Pages — tech
+// Pages — tech (Sprint 4)
 import TechOpsDashboard from './pages/tech/TechOpsDashboard';
+import TicketDashboard from './pages/tech/TicketDashboard';
+import TicketDetail from './pages/tech/TicketDetail';
 
 import DashboardLayout from './layouts/DashboardLayout';
 
@@ -120,8 +122,10 @@ function App() {
                             <Route path="retailer/schedule/calendar" element={<ProtectedRoute allowedRoles={['retailer', 'admin']}><ScheduleCalendar /></ProtectedRoute>} />
                             <Route path="retailer/history" element={<ProtectedRoute allowedRoles={['retailer', 'admin']}><ScheduleHistory /></ProtectedRoute>} />
 
-                            {/* Tech ops */}
+                            {/* Tech ops — Sprint 4 */}
                             <Route path="tech" element={<ProtectedRoute allowedRoles={['tech', 'admin']}><TechOpsDashboard /></ProtectedRoute>} />
+                            <Route path="tech/tickets" element={<ProtectedRoute allowedRoles={['tech', 'admin']}><TicketDashboard /></ProtectedRoute>} />
+                            <Route path="tech/tickets/:id" element={<ProtectedRoute allowedRoles={['tech', 'admin']}><TicketDetail /></ProtectedRoute>} />
 
                             {/* Shared */}
                             <Route path="health" element={<Health />} />
