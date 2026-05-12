@@ -17,6 +17,8 @@ import {
     Megaphone,
     CalendarDays,
     History,
+    Ticket,
+    Activity,
 } from 'lucide-react';
 
 function DashboardLayout() {
@@ -102,6 +104,7 @@ function DashboardLayout() {
                                 <li><Link to="/dashboard/admin/users" style={linkStyle('/dashboard/admin/users')}><Users size={16} />Users</Link></li>
                                 <li><Link to="/dashboard/admin/ai-log" style={linkStyle('/dashboard/admin/ai-log')}><Bot size={16} />AI Log</Link></li>
                                 <li><Link to="/dashboard/tech" style={linkStyle('/dashboard/tech')}><Monitor size={16} />Tech Ops</Link></li>
+                                <li><Link to="/dashboard/tech/tickets" style={linkStyle('/dashboard/tech/tickets')}><Ticket size={16} />Support Tickets</Link></li>
                                 <li><Link to="/dashboard/health" style={linkStyle('/dashboard/health')}><Settings size={16} />Health</Link></li>
                             </>
                         )}
@@ -131,7 +134,8 @@ function DashboardLayout() {
                             <>
                                 {sectionLabel('Operations')}
                                 <li><Link to="/dashboard/tech" style={linkStyle('/dashboard/tech')}><Monitor size={16} />Tech Ops</Link></li>
-                                <li><Link to="/dashboard/health" style={linkStyle('/dashboard/health')}><Settings size={16} />Health</Link></li>
+                                <li><Link to="/dashboard/tech/tickets" style={linkStyle('/dashboard/tech/tickets')}><Ticket size={16} />Support Tickets</Link></li>
+                                <li><Link to="/dashboard/health" style={linkStyle('/dashboard/health')}><Activity size={16} />Health</Link></li>
                             </>
                         )}
 
