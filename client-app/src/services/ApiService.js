@@ -83,8 +83,8 @@ class ApiService {
         let url = '/api/screens';
         const params = new URLSearchParams();
         if (filters.retailerId) params.append('retailerId', filters.retailerId);
-        if (filters.storeId) params.append('storeId', filters.storeId);
-        if (filters.status) params.append('status', filters.status);
+        if (filters.storeId)    params.append('storeId',    filters.storeId);
+        if (filters.status)     params.append('status',     filters.status);
 
         const queryString = params.toString();
         if (queryString) url += `?${queryString}`;
@@ -127,8 +127,8 @@ class ApiService {
     async getAds(filters = {}) {
         const params = new URLSearchParams();
         if (filters.campaign_id) params.append('campaign_id', filters.campaign_id);
-        if (filters.status) params.append('status', filters.status);
-        if (filters.limit) params.append('limit', filters.limit);
+        if (filters.status)      params.append('status',      filters.status);
+        if (filters.limit)       params.append('limit',       filters.limit);
         const qs = params.toString();
         return apiClient.get(`/api/ads${qs ? `?${qs}` : ''}`);
     }
@@ -201,9 +201,9 @@ class ApiService {
     async getLoops(filters = {}) {
         let url = '/api/loops';
         const params = new URLSearchParams();
-        if (filters.date) params.append('date', filters.date);
-        if (filters.screenId) params.append('screenId', filters.screenId);
-        if (filters.retailerId) params.append('retailerId', filters.retailerId);
+        if (filters.date)       params.append('date',        filters.date);
+        if (filters.screenId)   params.append('screenId',    filters.screenId);
+        if (filters.retailerId) params.append('retailerId',  filters.retailerId);
         if (filters.locationId) params.append('location_id', filters.locationId);
         if (filters.location_id) params.append('location_id', filters.location_id);
 
@@ -214,7 +214,7 @@ class ApiService {
     }
 
     async getLoopByParams(screenId, date, hour) {
-        const data = await apiClient.get(`/api/loops?screenId=${screenId}&date=${date}&hour=${hour}`);
+        const data  = await apiClient.get(`/api/loops?screenId=${screenId}&date=${date}&hour=${hour}`);
         const loops = data.loops || (Array.isArray(data) ? data : []);
         return loops[0];
     }
@@ -239,6 +239,27 @@ class ApiService {
         return apiClient.post('/api/loops/generate', data);
     }
 
+    /**
+     * FE-3.3 — Fetch aggregated loop analytics from the server.
+     *
+     * @param {object} [dateRange]               Optional date range
+     * @param {string} [dateRange.start_date]    YYYY-MM-DD  (default: today on the server)
+     * @param {string} [dateRange.end_date]      YYYY-MM-DD  (default: today on the server)
+     * @returns {Promise<{
+     *   impressions_by_day: Array<{date: string, impressions: number}>,
+     *   top_screens:        Array<{screen_id: string, impressions: number}>,
+     *   fill_rate:          number,
+     *   paid_vs_house_ratio: number
+     * }>}
+     */
+    async getLoopAnalytics(dateRange = {}) {
+        const params = new URLSearchParams();
+        if (dateRange.start_date) params.append('start_date', dateRange.start_date);
+        if (dateRange.end_date)   params.append('end_date',   dateRange.end_date);
+        const qs = params.toString();
+        return apiClient.get(`/api/loops/analytics${qs ? `?${qs}` : ''}`);
+    }
+
     // ============================================
     // PRICING
     // ============================================
@@ -257,9 +278,9 @@ class ApiService {
         if (!config) return null;
         return {
             ...config,
-            baseCPM: config.baseCPM || config.base_cpm || 15.00,
-            trafficTiers: config.trafficTiers || config.traffic_tiers || {},
-            dateOverrides: config.dateOverrides || config.date_overrides || {},
+            baseCPM:           config.baseCPM           || config.base_cpm           || 15.00,
+            trafficTiers:      config.trafficTiers      || config.traffic_tiers      || {},
+            dateOverrides:     config.dateOverrides      || config.date_overrides      || {},
             retailerOverrides: config.retailerOverrides || config.retailer_overrides || {}
         };
     }
@@ -353,23 +374,20 @@ class ApiService {
     // ============================================
 
     async reportError(error, componentStack = null) {
-        // Safe wrapper to prevent error reporting from causing errors
         try {
             const payload = {
-                message: error.message || String(error),
-                stack: error.stack,
+                message:        error.message || String(error),
+                stack:          error.stack,
                 componentStack,
-                url: window.location.href,
-                userAgent: navigator.userAgent
+                url:            window.location.href,
+                userAgent:      navigator.userAgent
             };
-            // Fire and forget
             apiClient.post('/api/telemetry/error', payload).catch(e => console.error('Failed to report error:', e));
         } catch (e) {
             console.error('Error reporting failed:', e);
         }
     }
 }
-
 
 const apiService = new ApiService();
 export default apiService;
