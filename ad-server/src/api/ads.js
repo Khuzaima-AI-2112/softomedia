@@ -2,6 +2,7 @@ import express from 'express';
 import { Firestore } from '@google-cloud/firestore';
 import { generateSignedUrl } from '../utils/storage.js';
 import { logger } from '../utils/logger.js';
+import { replacementService } from '../services/ReplacementService.js';
 
 const router = express.Router();
 const firestore = new Firestore();
@@ -87,8 +88,12 @@ router.get('/:id', async (req, res) => {
 
 /**
  * PUT /api/ads/:id/review
- * Admin approve or reject an ad
+ * Admin approve or reject an ad.
  * Body: { status: 'approved' | 'rejected', rejection_reason?: string, reviewed_by?: string }
+ *
+ * On rejection: ReplacementService scans loops within the next 2 hours and
+ * auto-fills any affected slot with a placeholder, then signals RTDB so
+ * players refresh their queue within the 10-second SLA.
  */
 router.put('/:id/review', async (req, res) => {
     try {
@@ -99,7 +104,7 @@ router.put('/:id/review', async (req, res) => {
         }
 
         const docRef = adsCollection.doc(req.params.id);
-        const doc = await docRef.get();
+        const doc    = await docRef.get();
 
         if (!doc.exists) {
             return res.status(404).json({ error: 'Ad not found' });
@@ -119,8 +124,37 @@ router.put('/:id/review', async (req, res) => {
 
         await docRef.update(update);
 
+        // ── Replacement automation (BE-3.2) ──────────────────────────────────
+        // Fire-and-await so the HTTP response already carries replacement_meta,
+        // but we never let a replacement failure block the review response.
+        let replacement_meta = null;
+        if (status === 'rejected') {
+            try {
+                const adData = { id: req.params.id, ...doc.data() };
+                replacement_meta = await replacementService.handleRejection(
+                    req.params.id,
+                    adData
+                );
+
+                logger.info('[Ads API] Replacement automation complete', {
+                    adId: req.params.id,
+                    ...replacement_meta
+                });
+            } catch (replErr) {
+                // Non-fatal — log and continue so the review itself still succeeds
+                logger.error('[Ads API] ReplacementService error (non-fatal)', {
+                    adId: req.params.id,
+                    error: replErr.message
+                });
+            }
+        }
+
         const updated = await docRef.get();
-        res.json({ id: updated.id, ...updated.data() });
+        res.json({
+            id: updated.id,
+            ...updated.data(),
+            ...(replacement_meta ? { replacement_meta } : {})
+        });
     } catch (error) {
         logger.error('Error reviewing ad:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -134,7 +168,7 @@ router.put('/:id/review', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     try {
         const docRef = adsCollection.doc(req.params.id);
-        const doc = await docRef.get();
+        const doc    = await docRef.get();
 
         if (!doc.exists) {
             return res.status(404).json({ error: 'Ad not found' });
