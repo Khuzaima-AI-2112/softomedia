@@ -1,6 +1,6 @@
 import express from 'express';
 import { retailerRepository } from '../repositories/RetailerRepository.js';
-import logger from '../utils/logger.js';
+import { logger } from '../utils/logger.js';
 
 const router = express.Router();
 

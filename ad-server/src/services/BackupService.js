@@ -1,5 +1,5 @@
 import { getFirestore } from '../utils/firestore.js';
-import logger from '../utils/logger.js';
+import { logger } from '../utils/logger.js';
 import { withRetry } from '../utils/ResilienceUtility.js';
 
 export class BackupService {

@@ -1,7 +1,7 @@
 ﻿import express from 'express';
 import { heartbeatService } from '../services/index.js';
 import { impressionRepository, locationRepository } from '../repositories/index.js';
-import logger from '../utils/logger.js';
+import { logger } from '../utils/logger.js';
 
 const router = express.Router();
 

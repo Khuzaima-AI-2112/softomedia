@@ -2,7 +2,7 @@
 // Provides common CRUD operations with in-memory fallback for offline testing
 
 import { getFirestore } from '../utils/firestore.js';
-import logger from '../utils/logger.js';
+import { logger } from '../utils/logger.js';
 import { CircuitBreaker } from '../utils/ResilienceUtility.js';
 
 // In-memory store for fallback

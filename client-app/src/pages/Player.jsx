@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import apiService from '../../services/ApiService'; // Ensure this path is correct if ApiService is there
+import apiService from '../services/ApiService'; // Ensure this path is correct if ApiService is there
 import { API_URL } from '../config.js';
 
 function Player() {
