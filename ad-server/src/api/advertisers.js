@@ -1,6 +1,6 @@
 import express from 'express';
 import { advertiserRepository } from '../repositories/AdvertiserRepository.js';
-import logger from '../utils/logger.js';
+import { logger } from '../utils/logger.js';
 
 const router = express.Router();
 

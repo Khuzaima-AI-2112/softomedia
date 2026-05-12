@@ -6,7 +6,7 @@ import {
     retailerRepository,
     screenRepository
 } from '../repositories/index.js';
-import logger from '../utils/logger.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Seed Service

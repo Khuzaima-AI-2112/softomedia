@@ -8,7 +8,7 @@ import express from 'express';
 import { loopRepository, BUSINESS_HOURS } from '../repositories/LoopRepository.js';
 import { loopGenerationService } from '../services/LoopGenerationService.js';
 import { BusinessHoursService } from '../services/BusinessHoursService.js';
-import logger from '../utils/logger.js';
+import { logger } from '../utils/logger.js';
 
 const router = express.Router();
 

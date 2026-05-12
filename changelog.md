@@ -23,6 +23,7 @@ Objectives: Document changes and progress milestones throughout the project life
 
 ## Unreleased
 - **Infrastructure**:
+    - **Dockerfile Fix**: Upgraded `client-app` build stage to `node:22-alpine` to resolve Vite 8 incompatibility with Node 18 (ReferenceError: CustomEvent).
     - **Runtime Configuration Injection**: Decoupled frontend builds from environment-specific URLs using a dynamic `config.js` generator.
     - **CORS Improvement**: Added support for wildcard `*` in `CORS_ORIGINS` to simplify secure cross-origin communication in cloud environments.
 - **Client App**:
