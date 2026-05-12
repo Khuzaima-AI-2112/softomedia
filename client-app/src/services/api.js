@@ -47,6 +47,60 @@ const authFetch = async (url, options = {}) => {
     return response;
 };
 
+// ===== HTTP CLIENT =====
+// Generic REST client used by ApiService.js (apiClient.get/post/put/patch/delete)
+
+const handleResponse = async (response) => {
+    if (!response.ok) {
+        let errorMsg = `HTTP ${response.status}`;
+        try {
+            const err = await response.json();
+            errorMsg = err.error || err.message || errorMsg;
+        } catch (_) { /* non-JSON body */ }
+        throw new Error(errorMsg);
+    }
+    // 204 No Content — nothing to parse
+    if (response.status === 204) return null;
+    return response.json();
+};
+
+const apiClient = {
+    get: (path) =>
+        authFetch(`${API_URL}${path}`).then(handleResponse),
+
+    post: (path, body, options = {}) => {
+        const isFormData = body instanceof FormData;
+        const fetchOptions = {
+            method: 'POST',
+            ...options,
+        };
+        if (!isFormData) {
+            fetchOptions.body = JSON.stringify(body);
+        } else {
+            // Let the browser set the multipart boundary automatically
+            fetchOptions.body = body;
+            fetchOptions.headers = { ...options.headers };
+            delete fetchOptions.headers['Content-Type'];
+        }
+        return authFetch(`${API_URL}${path}`, fetchOptions).then(handleResponse);
+    },
+
+    put: (path, body) =>
+        authFetch(`${API_URL}${path}`, {
+            method: 'PUT',
+            body: JSON.stringify(body),
+        }).then(handleResponse),
+
+    patch: (path, body) =>
+        authFetch(`${API_URL}${path}`, {
+            method: 'PATCH',
+            body: JSON.stringify(body),
+        }).then(handleResponse),
+
+    delete: (path) =>
+        authFetch(`${API_URL}${path}`, { method: 'DELETE' }).then(handleResponse),
+};
+
 // ===== AUTH API =====
 
 export const authAPI = {
@@ -268,11 +322,4 @@ export const notificationsAPI = {
     },
 };
 
-export default {
-    auth: authAPI,
-    users: usersAPI,
-    dashboard: dashboardAPI,
-    screens: screensAPI,
-    campaigns: campaignsAPI,
-    notifications: notificationsAPI,
-};
+export default apiClient;
