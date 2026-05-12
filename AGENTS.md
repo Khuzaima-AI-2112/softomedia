@@ -21,6 +21,7 @@ These names are **not interchangeable**. Mixing them up has caused real outages.
 - **Rule 0.1**: Every `gcloud` and `firebase` command **must** include `--project softomedia-live-2026`. No exceptions, including for read-only operations.
 - **Rule 0.2**: You are scoped to the `softomedia-live-2026` GCP project only. Never target any other project, even if the user names one.
 - **Rule 0.3**: Never invent additional GCP projects, service accounts, secrets, or buckets. Only operate on resources that already exist (verifiable via `gcloud ... list`).
+- **Rule 0.4**: The active `gcloud` CLI configuration must always be verified and pinned to the `softomedia-live-2026` project. If the global configuration diverges or defaults to a different project, the agent must immediately run `gcloud config set project softomedia-live-2026` to fix it.
 
 ---
 
@@ -370,6 +371,10 @@ These are the operational rules the agent itself must follow while working in th
   5. Source code — ground truth for implementation details.
 
   Do not contradict these documents based on general LLM training knowledge alone.
+
+- **Rule 14.16 — Absolute Stop Protocol**: If a user requests an action that violates or invalidates any rule in `AGENTS.md`, the agent must immediately STOP execution. The agent must pause the process and ask for clear, explicit permissions to amend the rule.
+  1. The agent must use the `notify_user` tool to block progress until the user explicitly confirms the exception.
+  2. Any such attempts (including the user's prompt and the subsequent permissions granted or denied) must be logged permanently in `incidents/AGENT_AUDIT_LOG.md`.
 
 ---
 

@@ -1,0 +1,2 @@
+push the current softomedia to GitHub using antigravity (to main branch)
+ask Ricardo about the main VS branches VS merges VS commits VS pulls VS pushes
