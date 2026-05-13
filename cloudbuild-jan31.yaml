@@ -214,6 +214,5 @@ images:
 options:
   machineType: 'E2_HIGHCPU_8'
   logging: CLOUD_LOGGING_ONLY
-  serviceAccount: 'projects/softomedia-live-2026/serviceAccounts/cloudbuild-deployer@softomedia-live-2026.iam.gserviceaccount.com'
 
 timeout: '2400s'
