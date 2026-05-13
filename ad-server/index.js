@@ -1,8 +1,18 @@
+// --- Structured Logger ---
+// Outputs JSON compatible with Google Cloud Logging severity parsing.
+// Levels: DEFAULT, DEBUG, INFO, NOTICE, WARNING, ERROR, CRITICAL
+const log = {
+    info:  (msg, data = {}) => console.log(JSON.stringify({ severity: 'INFO',    message: msg, ...data, timestamp: new Date().toISOString() })),
+    warn:  (msg, data = {}) => console.warn(JSON.stringify({ severity: 'WARNING', message: msg, ...data, timestamp: new Date().toISOString() })),
+    error: (msg, data = {}) => console.error(JSON.stringify({ severity: 'ERROR',  message: msg, ...data, timestamp: new Date().toISOString() })),
+    debug: (msg, data = {}) => console.log(JSON.stringify({ severity: 'DEBUG',   message: msg, ...data, timestamp: new Date().toISOString() })),
+};
+
 process.on('uncaughtException', (err) => {
-    console.error('UNCAUGHT EXCEPTION (non-fatal, server stays up):', err.stack || err.message);
+    log.error('Uncaught exception', { error: err.message, stack: err.stack });
 });
 process.on('unhandledRejection', (reason) => {
-    console.error('UNHANDLED REJECTION (non-fatal):', reason);
+    log.error('Unhandled promise rejection', { reason: String(reason) });
 });
 
 import express from 'express';
@@ -18,11 +28,31 @@ const PORT = process.env.PORT || 8080;
 const JWT_SECRET = process.env.JWT_SECRET;
 const PROJECT_ID = process.env.PROJECT_ID || 'softomedia-live-2026';
 
-console.log(`Starting ad-server on port ${PORT} in project ${PROJECT_ID}`);
+log.info('Starting ad-server', { port: PORT, project: PROJECT_ID });
 
 if (!JWT_SECRET) {
-    console.error('WARNING: JWT_SECRET is not defined. Auth endpoints will fail. Check --set-secrets in cloudbuild.yaml.');
+    log.warn('JWT_SECRET is not defined — auth endpoints will fail. Check --set-secrets in cloudbuild.yaml.');
 }
+
+// --- Request logging middleware ---
+app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+        const duration = Date.now() - start;
+        const severity = res.statusCode >= 500 ? 'ERROR' : res.statusCode >= 400 ? 'WARNING' : 'INFO';
+        console.log(JSON.stringify({
+            severity,
+            message: 'HTTP request',
+            method: req.method,
+            path: req.path,
+            status: res.statusCode,
+            durationMs: duration,
+            userAgent: req.headers['user-agent'] || '',
+            timestamp: new Date().toISOString(),
+        }));
+    });
+    next();
+});
 
 import { getFirestore } from './src/utils/firestore.js';
 const firestore = getFirestore();
@@ -44,18 +74,18 @@ const ADMIN_PASS = process.env.ADMIN_PASS;
 
 async function bootstrapAdmin() {
     if (!ADMIN_EMAIL || !ADMIN_PASS) {
-        console.warn('Bootstrap skipped: ADMIN_EMAIL or ADMIN_PASS not defined.');
+        log.warn('Bootstrap skipped: ADMIN_EMAIL or ADMIN_PASS not defined.');
         return;
     }
     if (!firestore) {
-        console.error('Bootstrap skipped: Firestore is not available.');
+        log.error('Bootstrap skipped: Firestore is not available.');
         return;
     }
     try {
         const usersRef = firestore.collection('users');
         const snapshot = await usersRef.where('email', '==', ADMIN_EMAIL).get();
         if (snapshot.empty) {
-            console.log('Bootstrapping Admin User...');
+            log.info('Bootstrapping admin user...');
             const hashedPassword = await hashPassword(ADMIN_PASS);
             await usersRef.doc('admin_001').set({
                 email: ADMIN_EMAIL,
@@ -64,12 +94,12 @@ async function bootstrapAdmin() {
                 created_at: new Date().toISOString(),
                 status: 'active'
             });
-            console.log('Admin user created successfully.');
+            log.info('Admin user created successfully.');
         } else {
-            console.log('Admin user already exists.');
+            log.info('Admin user already exists — skipping bootstrap.');
         }
     } catch (error) {
-        console.error('Failed to bootstrap admin:', error);
+        log.error('Failed to bootstrap admin', { error: error.message, stack: error.stack });
     }
 }
 
@@ -140,9 +170,10 @@ app.get('/api/debug/seed', async (req, res) => {
     try {
         const db = firestore;
         if (!db) {
+            log.error('Seed endpoint: Firestore is not available.');
             return res.status(503).json({ error: 'Firestore is not available.' });
         }
-        console.log('Seeding Demo Data via Endpoint...');
+        log.info('Seeding demo data via endpoint...');
         const hashedPassword = await hashPassword('password');
         const usersRef = db.collection('users');
 
@@ -157,9 +188,9 @@ app.get('/api/debug/seed', async (req, res) => {
             const snap = await usersRef.where('email', '==', u.email).limit(1).get();
             if (snap.empty) {
                 await usersRef.doc(u.id).set({ ...u, password: hashedPassword, created_at: new Date().toISOString() });
-                console.log(`Created user: ${u.email}`);
+                log.info('Seed: created user', { email: u.email, role: u.role });
             } else {
-                console.log(`User already exists: ${u.email}`);
+                log.debug('Seed: user already exists', { email: u.email });
             }
         }
 
@@ -168,9 +199,10 @@ app.get('/api/debug/seed', async (req, res) => {
         await db.collection('screens').doc('scr_001_01').set({ screen_id: 'scr_001_01', name: 'Main Lobby Screen', status: 'online', retailer_id: 'ret_001', store_id: 'str_001', last_seen: new Date().toISOString() });
         await db.collection('campaigns').doc('cmp_001').set({ advertiser_id: 'adv_001', name: 'TechGear Summer Sale', status: 'live', budget: 5000, spent: 1250, start_date: '2026-01-01', end_date: '2026-12-31', created_at: new Date().toISOString() });
 
+        log.info('Seed completed successfully.');
         res.json({ status: 'seeded', message: 'Demo data seeded. All 4 personas use password: password' });
     } catch (e) {
-        console.error(e);
+        log.error('Seed endpoint failed', { error: e.message, stack: e.stack });
         res.status(500).json({ error: e.message });
     }
 });
@@ -179,7 +211,7 @@ app.get('/', (req, res) => res.status(200).send('SoftoMedia Ad Server Online'));
 app.get('/health', (req, res) => res.status(200).send('OK'));
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server listening on port ${PORT}`);
+    log.info('Server ready', { port: PORT, project: PROJECT_ID, env: process.env.NODE_ENV || 'development' });
 });
 
-bootstrapAdmin().catch(console.error);
+bootstrapAdmin().catch((err) => log.error('bootstrapAdmin failed', { error: err.message }));
