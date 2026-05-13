@@ -12,36 +12,20 @@ const PORT = process.env.PORT || 8080;
 const JWT_SECRET = process.env.JWT_SECRET;
 const PROJECT_ID = process.env.PROJECT_ID || 'softomedia-live-2026';
 
-// Log startup configuration (Rule 11.2)
 console.log(`Starting ad-server on port ${PORT} in project ${PROJECT_ID}`);
 
 if (!JWT_SECRET) {
-    // Log loudly but do NOT exit — the server must bind to PORT before Cloud Run
-    // considers the revision healthy. Exiting here causes the health check timeout.
-    // Auth routes will return 500 if JWT_SECRET is missing, which is the right
-    // failure mode. Check Secret Manager binding in cloudbuild.yaml if this fires.
+    // Do NOT exit — server must bind to PORT before Cloud Run considers revision healthy.
+    // Auth routes will return 500 if JWT_SECRET is missing.
     console.error('WARNING: JWT_SECRET is not defined. Auth endpoints will fail. Check --set-secrets in cloudbuild.yaml.');
 }
 
-// Initialize Firestore
-const firestore = new Firestore({
-    projectId: PROJECT_ID
-});
+const firestore = new Firestore({ projectId: PROJECT_ID });
 
-// --- HELPER FUNCTIONS ---
-
-const hashPassword = async (password) => {
-    return await bcrypt.hash(password, 10);
-};
-
-const comparePassword = async (password, hash) => {
-    return await bcrypt.compare(password, hash);
-};
+const hashPassword = async (password) => bcrypt.hash(password, 10);
 
 const generateToken = (user) => {
-    if (!JWT_SECRET) {
-        throw new Error('JWT_SECRET is not configured on this instance.');
-    }
+    if (!JWT_SECRET) throw new Error('JWT_SECRET is not configured on this instance.');
     return jwt.sign(
         { uid: user.id, email: user.email, role: user.role },
         JWT_SECRET,
@@ -61,20 +45,16 @@ async function bootstrapAdmin() {
     try {
         const usersRef = firestore.collection('users');
         const snapshot = await usersRef.where('email', '==', ADMIN_EMAIL).get();
-
         if (snapshot.empty) {
             console.log('Bootstrapping Admin User...');
             const hashedPassword = await hashPassword(ADMIN_PASS);
-            const newUser = {
+            await usersRef.doc('admin_001').set({
                 email: ADMIN_EMAIL,
-                password_hash: hashedPassword,
+                password: hashedPassword,
                 role: 'admin',
                 created_at: new Date().toISOString(),
                 status: 'active'
-            };
-
-            // Use email as ID for simplicity or auto-gen
-            await usersRef.doc('admin_001').set(newUser);
+            });
             console.log('Admin user created successfully.');
         } else {
             console.log('Admin user already exists.');
@@ -96,192 +76,66 @@ import schedulesRouter from './src/api/schedules.js';
 import notificationsRouter from './src/api/notifications.js';
 import { generalLimiter, authLimiter, uploadLimiter } from './src/middleware/rateLimiter.js';
 
-// Apply rate limiters
-app.use('/api/auth', authLimiter); // Strict rate limit for auth
-app.use('/api/campaigns/create', uploadLimiter); // Limit uploads
-app.use('/api', generalLimiter); // General rate limit for all other API routes
+// Rate limiters
+app.use('/api/auth', authLimiter);
+app.use('/api/campaigns/create', uploadLimiter);
+app.use('/api', generalLimiter);
 
 app.use('/api/screens', screensRouter);
 app.use('/api/playlist', playlistRouter);
 app.use('/api/ads', adsRouter);
-app.use('/api/auth', authRouter);
+app.use('/api/auth', authRouter);   // <-- single authoritative login handler lives here
 app.use('/api/users', usersRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/campaigns', campaignsRouter);
 app.use('/api/schedules', schedulesRouter);
 app.use('/api/notifications', notificationsRouter);
 
-// --- DEBUG SEED ROUTE (Remove in Prod) ---
+// --- DEBUG SEED ROUTE ---
+// Seeds the same 4 demo personas as seed.js (password: 'password').
+// All users can switch between any persona from the dashboard without re-login.
 app.get('/api/debug/seed', async (req, res) => {
     try {
-        const firestore = new Firestore();
+        const db = new Firestore();
         console.log('Seeding Demo Data via Endpoint...');
-        const SCREEN_ID = 'demo-screen-01';
+        const hashedPassword = await hashPassword('password');
+        const usersRef = db.collection('users');
 
-        // 0. Create Admin User (if doesn't exist)
-        const usersRef = firestore.collection('users');
-        const adminSnapshot = await usersRef.where('email', '==', 'sokallel@gmail.com').get();
-
-        if (adminSnapshot.empty) {
-            console.log('Creating admin user...');
-            const hashedPassword = await hashPassword('thisisbusiness');
-            await usersRef.doc('admin_001').set({
-                email: 'sokallel@gmail.com',
-                password: hashedPassword,
-                role: 'admin',
-                name: 'Admin User',
-                created_at: new Date().toISOString()
-            });
-            console.log('Admin user created');
-        } else {
-            console.log('Admin user already exists');
-        }
-
-        // 0b. Create Retailer User (if doesn't exist)
-        const retailerSnapshot = await usersRef.where('email', '==', 'retailer@demo.com').get();
-        if (retailerSnapshot.empty) {
-            console.log('Creating retailer user...');
-            const hashedPassword = await hashPassword('demo123');
-            await usersRef.doc('retailer_001').set({
-                email: 'retailer@demo.com',
-                password: hashedPassword,
-                role: 'retailer',
-                name: 'Demo Retailer',
-                linked_entity_id: SCREEN_ID, // Linked to demo screen
-                status: 'active', // Free access
-                created_at: new Date().toISOString()
-            });
-            console.log('Retailer user created');
-        } else {
-            console.log('Retailer user already exists');
-        }
-
-        // 0c. Create Brand User (if doesn't exist)
-        const brandSnapshot = await usersRef.where('email', '==', 'brand@demo.com').get();
-        if (brandSnapshot.empty) {
-            console.log('Creating brand user...');
-            const hashedPassword = await hashPassword('demo123');
-            await usersRef.doc('brand_001').set({
-                email: 'brand@demo.com',
-                password: hashedPassword,
-                role: 'brand',
-                name: 'Demo Brand',
-                linked_entity_id: 'demo_corp', // Linked to demo advertiser
-                advertising_credits: 1000, // Start with 1000 credits
-                status: 'active', // Free access
-                created_at: new Date().toISOString()
-            });
-            console.log('Brand user created with 1000 advertising credits');
-        } else {
-            console.log('Brand user already exists');
-        }
-
-
-        // 1. Create Demo Advertiser
-        await firestore.collection('advertisers').doc('demo_corp').set({
-            name: 'Demo Corp',
-            contact_email: 'demo@example.com',
-            status: 'active',
-            created_at: new Date().toISOString()
-        });
-
-        // 2. Create 3 Ads with Variable Durations
-        // 2. Create 5 Ads with 5s Durations
-        const ads = [
-            { id: 'ad_001', title: 'Demo Coffee', file_path: 'demo_ad_1.png', duration: 5 },
-            { id: 'ad_002', title: 'Demo Tech', file_path: 'demo_ad_2.png', duration: 5 },  // Fixed ext
-            { id: 'ad_003', title: 'Demo Travel', file_path: 'demo_ad_3.png', duration: 5 }, // Fixed ext
-            { id: 'ad_004', title: 'Costco', file_path: 'demo_ad_costco.png', duration: 5 },
-            { id: 'ad_005', title: 'Pizza', file_path: 'demo_ad_pizza.png', duration: 5 },
+        const demoUsers = [
+            { id: 'admin_001',      email: 'admin@demo.com',      role: 'admin',    name: 'Global Admin',      status: 'active' },
+            { id: 'retailer_001',   email: 'retailer@demo.com',   role: 'retailer', name: 'Retailer Admin',    linked_entity_id: 'ret_001', status: 'active' },
+            { id: 'advertiser_001', email: 'advertiser@demo.com', role: 'brand',    name: 'Brand Manager',     linked_entity_id: 'adv_001', status: 'active' },
+            { id: 'tech_001',       email: 'tech@demo.com',       role: 'tech',     name: 'Technical Support', status: 'active' },
         ];
 
-        for (const ad of ads) {
-            await firestore.collection('ads').doc(ad.id).set({
-                advertiser_id: 'demo_corp',
-                title: ad.title,
-                type: 'image',
-                storage_path: ad.file_path,
-                duration_seconds: ad.duration,
-                status: 'active',
-                created_at: new Date().toISOString()
-            });
-
-            // 3. Approve for the demo screen
-            await firestore.collection('screen_approvals').doc(`${SCREEN_ID}_${ad.id}`).set({
-                screen_id: SCREEN_ID,
-                ad_id: ad.id,
-                status: 'approved',
-                approved_by: 'system',
-                approved_at: new Date().toISOString()
-            });
+        for (const u of demoUsers) {
+            const snap = await usersRef.where('email', '==', u.email).limit(1).get();
+            if (snap.empty) {
+                await usersRef.doc(u.id).set({ ...u, password: hashedPassword, created_at: new Date().toISOString() });
+                console.log(`Created user: ${u.email}`);
+            } else {
+                console.log(`User already exists: ${u.email}`);
+            }
         }
 
-        // 4. Register Screen
-        await firestore.collection('screens').doc(SCREEN_ID).set({
-            screen_id: SCREEN_ID,
-            status: 'active',
-            location_owner_id: 'demo_owner',
-            last_seen: new Date().toISOString()
-        });
+        // Seed core supporting data
+        await db.collection('advertisers').doc('adv_001').set({ name: 'TechGear Electronics', contact_email: 'marketing@techgear.com', status: 'active', created_at: new Date().toISOString() });
+        await db.collection('retailers').doc('ret_001').set({ name: 'Metro Supermarkets', contact_email: 'admin@metrosuper.com', status: 'active', created_at: new Date().toISOString() });
+        await db.collection('screens').doc('scr_001_01').set({ screen_id: 'scr_001_01', name: 'Main Lobby Screen', status: 'online', retailer_id: 'ret_001', store_id: 'str_001', last_seen: new Date().toISOString() });
+        await db.collection('campaigns').doc('cmp_001').set({ advertiser_id: 'adv_001', name: 'TechGear Summer Sale', status: 'live', budget: 5000, spent: 1250, start_date: '2026-01-01', end_date: '2026-12-31', created_at: new Date().toISOString() });
 
-        res.json({ status: 'seeded', message: 'Database populated with demo data.' });
+        res.json({ status: 'seeded', message: 'Demo data seeded. All 4 personas use password: password' });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: e.message });
     }
 });
 
-app.post('/api/auth/login', async (req, res) => {
-    try {
-        const { email, password } = req.body;
+app.get('/', (req, res) => res.status(200).send('SoftoMedia Ad Server Online'));
+app.get('/health', (req, res) => res.status(200).send('OK'));
 
-        if (!email || !password) {
-            return res.status(400).json({ error: 'Email and password required' });
-        }
-
-        const usersRef = firestore.collection('users');
-        const snapshot = await usersRef.where('email', '==', email).limit(1).get();
-
-        if (snapshot.empty) {
-            return res.status(401).json({ error: 'Invalid credentials' });
-        }
-
-        const userDoc = snapshot.docs[0];
-        const userData = userDoc.data();
-
-        const isMatch = await comparePassword(password, userData.password_hash);
-        if (!isMatch) {
-            return res.status(401).json({ error: 'Invalid credentials' });
-        }
-
-        const token = generateToken({ id: userDoc.id, ...userData });
-
-        // Return user info sans password
-        const { password_hash, ...safeUser } = userData;
-
-        res.json({
-            token,
-            user: safeUser
-        });
-
-    } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-app.get('/', (req, res) => {
-    res.status(200).send('SoftoMedia Ad Server Online');
-});
-
-app.get('/health', (req, res) => {
-    res.status(200).send('OK');
-});
-
-// Start server and bootstrap
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server listening on port ${PORT}`);
 });
 
-// Bootstrap runs independently, doesn't block health checks
 bootstrapAdmin().catch(console.error);
