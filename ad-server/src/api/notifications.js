@@ -1,226 +1,197 @@
+/**
+ * notifications.js — Sprint 10
+ *
+ * FCM send is now fully wired (no more console.log placeholder).
+ * GET /history now supports cursor-based pagination.
+ * POST /mark-read marks a single notification or all as read.
+ * POST /send validates admin role and dispatches via FCM.
+ */
+
 import express from 'express';
-import { Firestore } from '@google-cloud/firestore';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getMessaging } from 'firebase-admin/messaging';
 import { requireAuth } from '../middleware/auth.js';
+import { logger } from '../utils/logger.js';
 
 const router = express.Router();
-const firestore = new Firestore();
 
-/**
- * POST /api/notifications/subscribe
- * Subscribe to push notifications (FCM)
- * Auth: Any authenticated user
- */
+function db() { return getFirestore(); }
+
+// ── POST /subscribe ──────────────────────────────────────────────────────────
 router.post('/subscribe', requireAuth, async (req, res) => {
     try {
         const { fcm_token, device_type } = req.body;
+        if (!fcm_token) return res.status(400).json({ error: 'fcm_token is required' });
 
-        if (!fcm_token) {
-            return res.status(400).json({ error: 'fcm_token is required' });
-        }
-
-        const userId = req.user.uid;
-
-        // Store FCM token for this user
-        await firestore.collection('user_tokens').doc(userId).set({
-            user_id: userId,
+        await db().collection('user_tokens').doc(req.user.uid).set({
+            user_id: req.user.uid,
             fcm_token,
             device_type: device_type || 'web',
             subscribed_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            updated_at:    new Date().toISOString(),
         }, { merge: true });
 
-        res.json({
-            message: 'Successfully subscribed to notifications'
-        });
-
+        res.json({ message: 'Successfully subscribed to notifications' });
     } catch (error) {
-        console.error('Subscribe error:', error);
+        logger.error('Subscribe error:', error);
         res.status(500).json({ error: 'Failed to subscribe' });
     }
 });
 
-/**
- * DELETE /api/notifications/unsubscribe
- * Unsubscribe from push notifications
- * Auth: Any authenticated user
- */
+// ── DELETE /unsubscribe ───────────────────────────────────────────────────────
 router.delete('/unsubscribe', requireAuth, async (req, res) => {
     try {
-        const userId = req.user.uid;
-
-        await firestore.collection('user_tokens').doc(userId).delete();
-
-        res.json({
-            message: 'Successfully unsubscribed from notifications'
-        });
-
+        await db().collection('user_tokens').doc(req.user.uid).delete();
+        res.json({ message: 'Successfully unsubscribed from notifications' });
     } catch (error) {
-        console.error('Unsubscribe error:', error);
+        logger.error('Unsubscribe error:', error);
         res.status(500).json({ error: 'Failed to unsubscribe' });
     }
 });
 
-/**
- * GET /api/notifications/preferences
- * Get user notification preferences
- * Auth: Any authenticated user
- */
+// ── GET /preferences ─────────────────────────────────────────────────────────
 router.get('/preferences', requireAuth, async (req, res) => {
     try {
-        const userId = req.user.uid;
-
-        const prefsDoc = await firestore
-            .collection('notification_preferences')
-            .doc(userId)
-            .get();
-
-        if (!prefsDoc.exists) {
-            // Return default preferences
-            return res.json({
-                screen_offline: true,
-                campaign_completed: true,
-                low_balance: true,
-                new_earnings: true,
-                system_updates: false
-            });
-        }
-
-        res.json(prefsDoc.data());
-
+        const doc = await db().collection('notification_preferences').doc(req.user.uid).get();
+        res.json(doc.exists ? doc.data() : {
+            screen_offline:     true,
+            campaign_completed: true,
+            low_balance:        true,
+            new_earnings:       true,
+            system_updates:     false,
+        });
     } catch (error) {
-        console.error('Get preferences error:', error);
+        logger.error('Get preferences error:', error);
         res.status(500).json({ error: 'Failed to fetch preferences' });
     }
 });
 
-/**
- * PUT /api/notifications/preferences
- * Update user notification preferences
- * Auth: Any authenticated user
- */
+// ── PUT /preferences ─────────────────────────────────────────────────────────
 router.put('/preferences', requireAuth, async (req, res) => {
     try {
-        const userId = req.user.uid;
-        const preferences = req.body;
-
-        // Validate preferences
-        const validKeys = ['screen_offline', 'campaign_completed', 'low_balance', 'new_earnings', 'system_updates'];
-        const filteredPrefs = {};
-
-        for (const key of validKeys) {
-            if (preferences[key] !== undefined) {
-                filteredPrefs[key] = Boolean(preferences[key]);
-            }
+        const validKeys = ['screen_offline','campaign_completed','low_balance','new_earnings','system_updates'];
+        const filtered  = {};
+        for (const k of validKeys) {
+            if (req.body[k] !== undefined) filtered[k] = Boolean(req.body[k]);
         }
+        if (!Object.keys(filtered).length) return res.status(400).json({ error: 'No valid preferences provided' });
 
-        if (Object.keys(filteredPrefs).length === 0) {
-            return res.status(400).json({ error: 'No valid preferences provided' });
-        }
-
-        filteredPrefs.updated_at = new Date().toISOString();
-
-        await firestore
-            .collection('notification_preferences')
-            .doc(userId)
-            .set(filteredPrefs, { merge: true });
-
-        res.json({
-            message: 'Preferences updated successfully',
-            preferences: filteredPrefs
-        });
-
+        filtered.updated_at = new Date().toISOString();
+        await db().collection('notification_preferences').doc(req.user.uid).set(filtered, { merge: true });
+        res.json({ message: 'Preferences updated successfully', preferences: filtered });
     } catch (error) {
-        console.error('Update preferences error:', error);
+        logger.error('Update preferences error:', error);
         res.status(500).json({ error: 'Failed to update preferences' });
     }
 });
 
-/**
- * GET /api/notifications/history
- * Get notification history for user
- * Auth: Any authenticated user
- */
+// ── GET /history ─────────────────────────────────────────────────────────────
+// Supports cursor pagination via ?after=<last_doc_id>
 router.get('/history', requireAuth, async (req, res) => {
     try {
-        const userId = req.user.uid;
-        const { limit = 50 } = req.query;
+        const { limit = '30', after } = req.query;
+        const pageSize = Math.min(parseInt(limit) || 30, 100);
 
-        const snapshot = await firestore
-            .collection('notifications')
-            .where('user_id', '==', userId)
+        let q = db().collection('notifications')
+            .where('user_id', '==', req.user.uid)
             .orderBy('created_at', 'desc')
-            .limit(parseInt(limit))
-            .get();
+            .limit(pageSize + 1);
 
-        const notifications = [];
-        snapshot.forEach(doc => {
-            notifications.push({
-                id: doc.id,
-                ...doc.data()
-            });
-        });
+        if (after) {
+            const cursorDoc = await db().collection('notifications').doc(after).get();
+            if (cursorDoc.exists) q = q.startAfter(cursorDoc);
+        }
+
+        const snap   = await q.get();
+        const docs   = snap.docs.slice(0, pageSize);
+        const hasMore = snap.docs.length > pageSize;
 
         res.json({
-            notifications,
-            total: notifications.length
+            notifications: docs.map(d => ({ id: d.id, ...d.data() })),
+            hasMore,
+            nextCursor: hasMore ? docs[docs.length - 1].id : null,
+            unreadCount: docs.filter(d => !d.data().read).length,
         });
-
     } catch (error) {
-        console.error('Get notification history error:', error);
+        logger.error('Get notification history error:', error);
         res.status(500).json({ error: 'Failed to fetch notification history' });
     }
 });
 
-/**
- * POST /api/notifications/send (Admin only)
- * Manually send a notification
- * Auth: Admin
- */
-router.post('/send', requireAuth, async (req, res) => {
+// ── POST /mark-read ───────────────────────────────────────────────────────────
+// Body: { id?: string }  — omit id to mark all as read
+router.post('/mark-read', requireAuth, async (req, res) => {
     try {
-        // This would integrate with Firebase Cloud Messaging
-        // For now, just log it as a placeholder
+        const { id } = req.body;
+        const firestore = db();
 
-        const { user_id, title, message, type } = req.body;
+        if (id) {
+            const ref = firestore.collection('notifications').doc(id);
+            const doc = await ref.get();
+            if (!doc.exists || doc.data().user_id !== req.user.uid) {
+                return res.status(404).json({ error: 'Notification not found.' });
+            }
+            await ref.update({ read: true });
+        } else {
+            // Mark all unread for this user
+            const snap = await firestore.collection('notifications')
+                .where('user_id', '==', req.user.uid)
+                .where('read', '==', false)
+                .get();
 
-        if (!user_id || !title || !message) {
-            return res.status(400).json({ error: 'user_id, title, and message are required' });
+            const batch = firestore.batch();
+            snap.docs.forEach(d => batch.update(d.ref, { read: true }));
+            await batch.commit();
         }
 
-        // Store notification in database
-        const notificationData = {
-            user_id,
-            title,
-            message,
-            type: type || 'info',
-            read: false,
-            created_at: new Date().toISOString()
-        };
-
-        const notifRef = await firestore.collection('notifications').add(notificationData);
-
-        // TODO: Integrate with FCM to actually send push notification
-        // const admin = require('firebase-admin');
-        // const tokenDoc = await firestore.collection('user_tokens').doc(user_id).get();
-        // if (tokenDoc.exists) {
-        //     await admin.messaging().send({
-        //         token: tokenDoc.data().fcm_token,
-        //         notification: { title, body: message }
-        //     });
-        // }
-
-        console.log('📧 NOTIFICATION (Placeholder)');
-        console.log(`To User: ${user_id}`);
-        console.log(`Title: ${title}`);
-        console.log(`Message: ${message}`);
-
-        res.json({
-            notification_id: notifRef.id,
-            message: 'Notification sent successfully'
-        });
-
+        res.json({ message: 'Marked as read' });
     } catch (error) {
-        console.error('Send notification error:', error);
+        logger.error('Mark-read error:', error);
+        res.status(500).json({ error: 'Failed to mark notification as read' });
+    }
+});
+
+// ── POST /send (admin only) ───────────────────────────────────────────────────
+router.post('/send', requireAuth, async (req, res) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Admin access required.' });
+        }
+
+        const { user_id, title, message, type = 'info' } = req.body;
+        if (!user_id || !title || !message) {
+            return res.status(400).json({ error: 'user_id, title, and message are required.' });
+        }
+
+        const firestore = db();
+
+        // Persist to Firestore
+        const payload = {
+            user_id, title, message,
+            type, read: false,
+            created_at: new Date().toISOString(),
+        };
+        const notifRef = await firestore.collection('notifications').add(payload);
+
+        // Dispatch FCM push if the user has a registered token
+        const tokenDoc = await firestore.collection('user_tokens').doc(user_id).get();
+        if (tokenDoc.exists) {
+            const { fcm_token } = tokenDoc.data();
+            try {
+                await getMessaging().send({
+                    token: fcm_token,
+                    notification: { title, body: message },
+                    data: { notification_id: notifRef.id, type },
+                });
+            } catch (fcmErr) {
+                // Token may be stale — log but don't fail the request
+                logger.warn(`FCM dispatch failed for user ${user_id}:`, fcmErr.message);
+            }
+        }
+
+        res.json({ notification_id: notifRef.id, message: 'Notification sent successfully' });
+    } catch (error) {
+        logger.error('Send notification error:', error);
         res.status(500).json({ error: 'Failed to send notification' });
     }
 });
