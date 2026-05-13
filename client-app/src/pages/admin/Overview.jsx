@@ -1,270 +1,342 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { dashboardAPI } from '../../services/api.js';
-import GlassCard from '../../components/GlassCard';
-import StatusBadge from '../../components/StatusBadge';
-import HamburgerMenu from '../../components/HamburgerMenu';
-import EmptyState from '../../components/EmptyState';
 import '../../design-tokens.css';
 
 /**
- * DashboardOverview — God View (Super Admin Dashboard)
- * Shows live network stats + persona preview cards for Brand / Retailer / Advertiser
+ * DashboardOverview — Platform Governance (Super Admin)
+ * Always renders the governance layout. KPI cards and partner lists
+ * populate from live API data; zero-states show dashes, not a blank page.
  */
 function DashboardOverview() {
     const navigate = useNavigate();
-    // Fixed: was incorrectly reading 'softomedia_role' — now reads 'auth_role' to match api.js
-    const role = localStorage.getItem('auth_role') || 'admin';
+
+    const [retailers, setRetailers] = React.useState([]);
+    const [advertisers, setAdvertisers] = React.useState([]);
     const [screens, setScreens] = React.useState([]);
-    const [ads, setAds] = React.useState([]);
-    const [stats, setStats] = React.useState({ active: 0, impressions: 0, playTime: 0 });
-    const [userCounts, setUserCounts] = React.useState({ brands: 0, retailers: 0, advertisers: 0 });
+    const [platformUsers, setPlatformUsers] = React.useState([]);
+    const [loading, setLoading] = React.useState(true);
 
     React.useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const API_URL = window.__API_URL__ || '';
+        const API_URL = window.__API_URL__ || '';
+        const headers = { Authorization: `Bearer ${localStorage.getItem('auth_token') || ''}` };
 
-                // Fetch Screens
-                const screensRes = await fetch(`${API_URL}/api/screens`);
-                const screensData = await screensRes.json();
-
-                // Fetch Ads
-                const adsRes = await fetch(`${API_URL}/api/ads`);
-                const adsData = await adsRes.json();
-
-                // Fetch Users (for persona counts)
-                const usersRes = await fetch(`${API_URL}/api/users`);
-                const usersData = await usersRes.json();
-
-                if (screensData.screens) {
-                    setScreens(screensData.screens);
-                    const active = screensData.screens.length;
-                    const impressions = screensData.screens.reduce((acc, s) => acc + (s.stats?.total_impressions || 0), 0);
-                    const playTime = screensData.screens.reduce((acc, s) => acc + (s.stats?.total_play_time || 0), 0);
-                    setStats({ active, impressions, playTime });
-                }
-
-                if (adsData.ads) {
-                    setAds(adsData.ads);
-                }
-
-                if (usersData.users) {
-                    const brands = usersData.users.filter(u => u.role === 'brand').length;
-                    const retailers = usersData.users.filter(u => u.role === 'retailer').length;
-                    const advertisers = usersData.users.filter(u => u.role === 'advertiser').length;
-                    setUserCounts({ brands, retailers, advertisers });
-                }
-
-            } catch (e) {
-                console.error('Failed to fetch dashboard data', e);
-            }
-        };
-
-        fetchData();
+        Promise.allSettled([
+            fetch(`${API_URL}/api/retailers`, { headers }).then(r => r.json()),
+            fetch(`${API_URL}/api/advertisers`, { headers }).then(r => r.json()),
+            fetch(`${API_URL}/api/screens`, { headers }).then(r => r.json()),
+            fetch(`${API_URL}/api/users`, { headers }).then(r => r.json()),
+        ]).then(([rRes, aRes, sRes, uRes]) => {
+            if (rRes.status === 'fulfilled') setRetailers(rRes.value?.retailers || rRes.value?.data || []);
+            if (aRes.status === 'fulfilled') setAdvertisers(aRes.value?.advertisers || aRes.value?.data || []);
+            if (sRes.status === 'fulfilled') setScreens(sRes.value?.screens || sRes.value?.data || []);
+            if (uRes.status === 'fulfilled') setPlatformUsers(uRes.value?.users || uRes.value?.data || []);
+            setLoading(false);
+        });
     }, []);
 
-    const formatTime = (seconds) => {
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        return `${h}h ${m}m`;
-    };
+    const screensOnline = screens.filter(s => s.status === 'online' || s.status === 'active').length;
 
-    const personaCardStyle = {
-        backgroundColor: 'white',
-        borderRadius: 'var(--radius-md, 8px)',
-        border: '1px solid #e5e7eb',
-        padding: '1.5rem',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '1rem',
-    };
-
-    const personaButtonStyle = (color) => ({
-        padding: '0.5rem 1rem',
-        backgroundColor: color,
-        color: 'white',
-        border: 'none',
-        borderRadius: '6px',
-        cursor: 'pointer',
-        fontSize: '0.875rem',
-        fontWeight: '500',
-        alignSelf: 'flex-start',
-    });
-
-    const personas = [
-        {
-            label: 'Brands',
-            count: userCounts.brands,
-            description: 'Upload creatives, launch campaigns, track performance.',
-            route: '/dashboard/brand',
-            color: '#7c3aed',
-            icon: '🎯',
-        },
-        {
-            label: 'Retailers',
-            count: userCounts.retailers,
-            description: 'Manage screens, approve schedules, view play history.',
-            route: '/dashboard/retailer',
-            color: '#0891b2',
-            icon: '🏪',
-        },
-        {
-            label: 'Advertisers',
-            count: userCounts.advertisers,
-            description: 'Set CPM budgets, review placements, monitor ROI.',
-            route: '/dashboard/admin/advertisers',
-            color: '#059669',
-            icon: '📊',
-        },
+    // ── quick-nav tiles (top icon grid) ──────────────────────────────
+    const quickNavTiles = [
+        { icon: '$', label: 'CPM Pricing',   route: '/dashboard/admin/cpm-pricing' },
+        { icon: '👥', label: 'Users',        route: '/dashboard/admin/users' },
+        { icon: '🏪', label: 'Retailers',    route: '/dashboard/admin/retailers' },
+        { icon: '📢', label: 'Advertisers',  route: '/dashboard/admin/advertisers' },
+        { icon: '▶', label: 'Demo Player',   route: '/player/demo' },
+        { icon: '🕐', label: 'Store Hours',  route: '/dashboard/admin/business-hours' },
+        { icon: '🗺', label: 'Network Map',  route: '/dashboard/admin/network-map' },
     ];
 
+    // ── styles ────────────────────────────────────────────────────────
+    const page = {
+        padding: '2rem 2.5rem',
+        background: '#f3f4f6',
+        minHeight: '100%',
+    };
+
+    const headerRow = {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: '1.75rem',
+    };
+
+    const tileGrid = {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+        gap: '1rem',
+        marginBottom: '1.75rem',
+    };
+
+    const tile = {
+        background: '#fff',
+        border: '1px solid #e5e7eb',
+        borderRadius: '10px',
+        padding: '1.25rem 1rem',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '0.6rem',
+        cursor: 'pointer',
+        transition: 'box-shadow 0.15s',
+    };
+
+    const tileIcon = {
+        width: 40,
+        height: 40,
+        borderRadius: 8,
+        background: '#f9fafb',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '1.25rem',
+    };
+
+    const kpiGrid = {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+        gap: '1rem',
+        marginBottom: '1.75rem',
+    };
+
+    const kpiCard = (accent) => ({
+        background: '#fff',
+        border: '1px solid #e5e7eb',
+        borderLeft: `4px solid ${accent}`,
+        borderRadius: '10px',
+        padding: '1.25rem 1.5rem',
+    });
+
+    const twoCol = {
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '1.25rem',
+    };
+
+    const listCard = {
+        background: '#fff',
+        border: '1px solid #e5e7eb',
+        borderRadius: '10px',
+        padding: '1.25rem 1.5rem',
+    };
+
+    const listRow = {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0.65rem 0',
+        borderBottom: '1px solid #f3f4f6',
+    };
+
+    const avatar = {
+        width: 36,
+        height: 36,
+        borderRadius: 8,
+        background: '#f3f4f6',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '1.1rem',
+        marginRight: '0.75rem',
+        flexShrink: 0,
+    };
+
+    const badgeGreen = {
+        background: '#dcfce7',
+        color: '#166534',
+        fontSize: '0.7rem',
+        fontWeight: 600,
+        padding: '2px 8px',
+        borderRadius: 99,
+    };
+
+    const btnPrimary = {
+        background: '#2563eb',
+        color: '#fff',
+        border: 'none',
+        borderRadius: 8,
+        padding: '0.5rem 1.1rem',
+        fontWeight: 600,
+        fontSize: '0.875rem',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.4rem',
+    };
+
+    const btnSecondary = {
+        background: '#fff',
+        color: '#374151',
+        border: '1px solid #d1d5db',
+        borderRadius: 8,
+        padding: '0.5rem 1.1rem',
+        fontWeight: 500,
+        fontSize: '0.875rem',
+        cursor: 'pointer',
+    };
+
     return (
-        <>
-            <HamburgerMenu />
-            <div className="dashboard-ui" style={{ padding: 'var(--space-6)' }}>
+        <div style={page}>
 
-                {/* Empty State */}
-                {screens.length === 0 && ads.length === 0 && (
-                    <EmptyState
-                        title="Welcome to SoftoMedia"
-                        message="Your network is ready to go. Start by adding screens or uploading your first ad campaign."
-                        ctaText="Get Started"
-                        onCtaClick={() => navigate('/dashboard/admin/screens')}
-                        illustration="🎯"
-                    />
-                )}
-
-                {/* Hero Metrics */}
-                {(screens.length > 0 || ads.length > 0) && (
-                    <>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 'var(--space-6)', marginBottom: 'var(--space-8)' }}>
-                            <GlassCard>
-                                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>Active Screens</p>
-                                <p style={{ fontSize: 'var(--text-4xl)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', marginTop: 'var(--space-2)', fontVariantNumeric: 'tabular-nums' }}>
-                                    {stats.active}
-                                </p>
-                            </GlassCard>
-                            <GlassCard>
-                                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>Total Impressions</p>
-                                <p style={{ fontSize: 'var(--text-4xl)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', marginTop: 'var(--space-2)', fontVariantNumeric: 'tabular-nums' }}>
-                                    {stats.impressions.toLocaleString()}
-                                </p>
-                            </GlassCard>
-                            <GlassCard>
-                                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>Total Play Time</p>
-                                <p style={{ fontSize: 'var(--text-4xl)', fontWeight: 'var(--font-bold)', color: 'var(--color-success)', marginTop: 'var(--space-2)', fontVariantNumeric: 'tabular-nums' }}>
-                                    {formatTime(stats.playTime)}
-                                </p>
-                            </GlassCard>
-                        </div>
-
-                        {/* ── Persona Preview (God View) ── */}
-                        <div style={{ marginBottom: 'var(--space-8)' }}>
-                            <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#111827', marginBottom: '1rem' }}>
-                                User Personas — Preview as any role
-                            </h3>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
-                                {personas.map((p) => (
-                                    <div key={p.label} style={personaCardStyle}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                            <span style={{ fontSize: '1.5rem' }}>{p.icon}</span>
-                                            <div>
-                                                <div style={{ fontWeight: '600', fontSize: '1rem', color: '#111827' }}>{p.label}</div>
-                                                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{p.count} user{p.count !== 1 ? 's' : ''}</div>
-                                            </div>
-                                        </div>
-                                        <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>{p.description}</p>
-                                        <button
-                                            style={personaButtonStyle(p.color)}
-                                            onClick={() => navigate(p.route)}
-                                        >
-                                            View as {p.label.slice(0, -1)} →
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Campaign Performance */}
-                        <GlassCard title="Campaign Performance" style={{ marginBottom: 'var(--space-8)' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 'var(--space-6)' }}>
-                                {ads.map(ad => (
-                                    <div key={ad.id} style={{ backgroundColor: 'var(--color-bg-hover)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-sm)', overflow: 'hidden' }}>
-                                        <div style={{ height: '120px', backgroundColor: '#f3f4f6', position: 'relative' }}>
-                                            <img
-                                                src={ad.thumbnail_url}
-                                                alt={ad.title}
-                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                onError={(e) => { e.target.style.display = 'none' }}
-                                            />
-                                        </div>
-                                        <div style={{ padding: 'var(--space-4)' }}>
-                                            <h4 style={{ fontWeight: 'var(--font-semibold)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ad.title}</h4>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
-                                                <span>Views</span>
-                                                <span style={{ fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)' }}>{(ad.stats?.impressions || 0).toLocaleString()}</span>
-                                            </div>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
-                                                <span>Duration</span>
-                                                <span>{ad.duration_seconds}s</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </GlassCard>
-
-                        {/* Screen Performance Table */}
-                        <GlassCard title="Screen Performance" style={{ marginBottom: 'var(--space-8)' }}>
-                            <div style={{ overflowX: 'auto' }}>
-                                <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
-                                    <thead>
-                                        <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                                            <th style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Screen ID</th>
-                                            <th style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Status</th>
-                                            <th style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Impressions</th>
-                                            <th style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Play Time</th>
-                                            <th style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Last Seen</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {screens.map(screen => (
-                                            <tr key={screen.screen_id} style={{ borderBottom: '1px solid var(--color-border-light)' }}>
-                                                <td style={{ padding: 'var(--space-3)', fontWeight: 'var(--font-medium)' }}>{screen.screen_id}</td>
-                                                <td style={{ padding: 'var(--space-3)' }}><StatusBadge status={screen.status} /></td>
-                                                <td style={{ padding: 'var(--space-3)' }}>{(screen.stats?.total_impressions || 0).toLocaleString()}</td>
-                                                <td style={{ padding: 'var(--space-3)' }}>{formatTime(screen.stats?.total_play_time || 0)}</td>
-                                                <td style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
-                                                    {screen.last_seen ? new Date(screen.last_seen).toLocaleString() : 'Never'}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {screens.length === 0 && (
-                                            <tr>
-                                                <td colSpan="5" style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>No screens found.</td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </GlassCard>
-
-                        <GlassCard>
-                            <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-4)', color: 'var(--color-text-primary)' }}>
-                                Welcome back, {role}!
-                            </h3>
-                            <p style={{ color: 'var(--color-text-secondary)' }}>
-                                This is your central command center. Use the sidebar to manage your
-                                {role === 'admin' ? ' entire network, users, and global settings.' :
-                                    role === 'advertiser' ? ' campaigns, creatives, and budget.' :
-                                        ' screens, playlists, and location settings.'}
-                            </p>
-                        </GlassCard>
-                    </>
-                )}
+            {/* ── Page Header ─────────────────────────────────── */}
+            <div style={headerRow}>
+                <div>
+                    <h1 style={{ fontSize: '1.6rem', fontWeight: 700, color: '#111827', margin: 0 }}>
+                        Platform Governance
+                    </h1>
+                    <p style={{ color: '#6b7280', fontSize: '0.875rem', marginTop: '0.2rem' }}>
+                        Softomedia Super Admin Control Center
+                    </p>
+                </div>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button style={btnPrimary} onClick={() => navigate('/dashboard/admin/retailers')}>
+                        + New Retailer
+                    </button>
+                    <button style={btnSecondary} onClick={() => navigate('/dashboard/admin/network-map')}>
+                        Network Map
+                    </button>
+                </div>
             </div>
-        </>
+
+            {/* ── Quick-Nav Tiles ──────────────────────────────── */}
+            <div style={tileGrid}>
+                {quickNavTiles.map((t) => (
+                    <div
+                        key={t.label}
+                        style={tile}
+                        onClick={() => navigate(t.route)}
+                        onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.10)'}
+                        onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
+                    >
+                        <div style={tileIcon}>{t.icon}</div>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 500, color: '#374151', textAlign: 'center' }}>
+                            {t.label}
+                        </span>
+                    </div>
+                ))}
+            </div>
+
+            {/* ── KPI Cards ────────────────────────────────────── */}
+            <div style={kpiGrid}>
+                <div style={kpiCard('#3b82f6')}>
+                    <p style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '0.4rem' }}>Retailers</p>
+                    <p style={{ fontSize: '2rem', fontWeight: 700, color: '#111827', fontVariantNumeric: 'tabular-nums' }}>
+                        {loading ? '—' : retailers.length}
+                    </p>
+                </div>
+                <div style={kpiCard('#f59e0b')}>
+                    <p style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '0.4rem' }}>Advertisers</p>
+                    <p style={{ fontSize: '2rem', fontWeight: 700, color: '#111827', fontVariantNumeric: 'tabular-nums' }}>
+                        {loading ? '—' : advertisers.length}
+                    </p>
+                </div>
+                <div style={kpiCard('#10b981')}>
+                    <p style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '0.4rem' }}>Screens Online</p>
+                    <p style={{ fontSize: '2rem', fontWeight: 700, color: '#10b981', fontVariantNumeric: 'tabular-nums' }}>
+                        {loading ? '—' : screensOnline}
+                    </p>
+                    {!loading && (
+                        <p style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.2rem' }}>
+                            of {screens.length} total
+                        </p>
+                    )}
+                </div>
+                <div style={kpiCard('#8b5cf6')}>
+                    <p style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '0.4rem' }}>Platform Users</p>
+                    <p style={{ fontSize: '2rem', fontWeight: 700, color: '#111827', fontVariantNumeric: 'tabular-nums' }}>
+                        {loading ? '—' : platformUsers.length}
+                    </p>
+                </div>
+            </div>
+
+            {/* ── Partner Lists ─────────────────────────────────── */}
+            <div style={twoCol}>
+
+                {/* Retail Partners */}
+                <div style={listCard}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: '#111827' }}>Retail Partners</h3>
+                        <button
+                            style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 500 }}
+                            onClick={() => navigate('/dashboard/admin/retailers')}
+                        >
+                            View All →
+                        </button>
+                    </div>
+                    {loading ? (
+                        <p style={{ color: '#9ca3af', fontSize: '0.85rem' }}>Loading…</p>
+                    ) : retailers.length === 0 ? (
+                        <p style={{ color: '#9ca3af', fontSize: '0.85rem' }}>No retailers yet.</p>
+                    ) : (
+                        retailers.slice(0, 5).map((r) => (
+                            <div key={r.id || r.retailer_id} style={listRow}>
+                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                    <div style={avatar}>
+                                        {r.logo_url
+                                            ? <img src={r.logo_url} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'cover' }} />
+                                            : '🏪'}
+                                    </div>
+                                    <div>
+                                        <div style={{ fontWeight: 500, fontSize: '0.875rem', color: '#111827' }}>
+                                            {r.name || r.business_name || 'Unnamed'}
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
+                                            {r.location_count ?? 0} Location{r.location_count !== 1 ? 's' : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                <span style={badgeGreen}>● Active</span>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                {/* Key Advertisers */}
+                <div style={listCard}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: '#111827' }}>Key Advertisers</h3>
+                        <button
+                            style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 500 }}
+                            onClick={() => navigate('/dashboard/admin/advertisers')}
+                        >
+                            View All →
+                        </button>
+                    </div>
+                    {loading ? (
+                        <p style={{ color: '#9ca3af', fontSize: '0.85rem' }}>Loading…</p>
+                    ) : advertisers.length === 0 ? (
+                        <p style={{ color: '#9ca3af', fontSize: '0.85rem' }}>No advertisers yet.</p>
+                    ) : (
+                        advertisers.slice(0, 5).map((a) => (
+                            <div key={a.id || a.advertiser_id} style={listRow}>
+                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                    <div style={avatar}>
+                                        {a.logo_url
+                                            ? <img src={a.logo_url} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'cover' }} />
+                                            : '📢'}
+                                    </div>
+                                    <div>
+                                        <div style={{ fontWeight: 500, fontSize: '0.875rem', color: '#111827' }}>
+                                            {a.name || a.company_name || 'Unnamed'}
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
+                                            {a.active_campaigns ?? 0} Active Campaign{a.active_campaigns !== 1 ? 's' : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                    <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>
+                                        ${(a.budget || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </div>
+                                    <div style={{ fontSize: '0.7rem', color: '#9ca3af', letterSpacing: '0.05em' }}>BUDGET</div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+            </div>
+        </div>
     );
 }
 
