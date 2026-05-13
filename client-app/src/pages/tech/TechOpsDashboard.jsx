@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import GlassCard from '../../components/GlassCard';
-import StatusBadge from '../../components/StatusBadge';
+import { Monitor, Wifi, WifiOff, Search, RotateCcw, Terminal } from 'lucide-react';
 import apiClient from '../../services/api';
+import '../../design-tokens.css';
 
 function TechOpsDashboard() {
-    const [stats, setStats] = useState({ total: 0, online: 0, offline: 0, screens: [] });
-    const [, setLoading] = useState(true);
+    const [stats, setStats]           = useState({ total: 0, online: 0, offline: 0, screens: [] });
     const [searchQuery, setSearchQuery] = useState('');
+    const [hoveredRow, setHoveredRow] = useState(null);
 
     useEffect(() => {
         fetchStatus();
@@ -17,209 +17,263 @@ function TechOpsDashboard() {
     const fetchStatus = async () => {
         try {
             const data = await apiClient.get('/api/monitoring/status');
-            const onlineCount = data.screens.filter(s => s.status?.toUpperCase() === 'ONLINE').length;
+            const onlineCount  = data.screens.filter(s => s.status?.toUpperCase() === 'ONLINE').length;
             const offlineCount = data.screens.filter(s => s.status?.toUpperCase() === 'OFFLINE').length;
             setStats({ ...data, online: onlineCount, offline: offlineCount });
-        } catch (error) {
-            console.error('Failed to fetch screen status', error);
-        } finally {
-            setLoading(false);
-        }
+        } catch (e) { console.error('Failed to fetch screen status', e); }
     };
 
     const healthPct = stats.total > 0 ? Math.round((stats.online / stats.total) * 100) : 0;
     const healthColor =
-        healthPct >= 80 ? 'text-emerald-500' :
-        healthPct >= 50 ? 'text-amber-500' :
-        'text-rose-500';
+        healthPct >= 80 ? 'var(--color-success)'
+        : healthPct >= 50 ? '#d97706'
+        : 'var(--color-error)';
 
     const filteredScreens = stats.screens.filter(s =>
         !searchQuery || String(s.id).toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    return (
-        <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 px-1">
+    const card = {
+        backgroundColor: 'var(--color-bg-card)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-lg)',
+        boxShadow: 'var(--shadow-sm)',
+        padding: 'var(--space-5)',
+        display: 'flex', flexDirection: 'column', gap: 'var(--space-3)',
+    };
 
-            {/* Page header */}
-            <div className="flex items-end justify-between gap-4 pt-2">
+    const KPI_CARDS = [
+        {
+            label: 'Managed Fleet',
+            value: stats.total,
+            sub: 'Active Screen Registry',
+            icon: <Monitor size={15} />,
+            iconColor: 'var(--color-primary)',
+            iconBg: 'rgba(99,102,241,0.1)',
+            valueColor: 'var(--color-text-primary)',
+            pulse: false,
+        },
+        {
+            label: 'Currently Online',
+            value: stats.online,
+            sub: 'Heartbeat active (< 2m)',
+            icon: <Wifi size={15} />,
+            iconColor: 'var(--color-success)',
+            iconBg: 'var(--color-success-light)',
+            valueColor: 'var(--color-success)',
+            pulse: true,
+        },
+        {
+            label: 'Connection Lost',
+            value: stats.offline,
+            sub: 'Requires immediate audit',
+            icon: <WifiOff size={15} />,
+            iconColor: 'var(--color-error)',
+            iconBg: 'var(--color-error-light)',
+            valueColor: 'var(--color-error)',
+            pulse: false,
+        },
+    ];
+
+    return (
+        <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+
+            <style>{`
+                @keyframes pulse-dot {
+                    0%, 100% { opacity: 1; transform: scale(1); }
+                    50%       { opacity: 0.4; transform: scale(0.7); }
+                }
+                .pulse-dot {
+                    width: 8px; height: 8px; border-radius: 50%;
+                    background-color: var(--color-success);
+                    animation: pulse-dot 1.6s ease-in-out infinite;
+                    flex-shrink: 0;
+                }
+            `}</style>
+
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 'var(--space-4)', paddingTop: 'var(--space-2)' }}>
                 <div>
-                    <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white leading-tight">
-                        Technical Operations
-                    </h1>
-                    <p className="text-sm text-slate-400 dark:text-slate-500 mt-0.5">
-                        Network-wide screen health and diagnostic tracking
-                    </p>
+                    <h1 style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', margin: 0, lineHeight: 1.2 }}>Technical Operations</h1>
+                    <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)', marginTop: 2 }}>Network-wide screen health and diagnostic tracking</p>
                 </div>
-                <div className="text-right shrink-0">
-                    <p className="text-[10px] uppercase font-semibold tracking-widest text-slate-400 mb-0.5">
-                        Global Health
-                    </p>
-                    <p className={`text-2xl font-black tabular-nums leading-none ${healthColor}`}>
-                        {healthPct}%
-                    </p>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <p style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-tertiary)', margin: '0 0 2px' }}>Global Health</p>
+                    <p style={{ fontSize: 'var(--text-2xl)', fontWeight: 900, color: healthColor, margin: 0, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{healthPct}%</p>
                 </div>
             </div>
 
             {/* KPI row */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {/* Managed Fleet */}
-                <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm p-5 flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                            Managed Fleet
-                        </span>
-                        <span className="w-7 h-7 rounded-lg bg-primary/8 dark:bg-primary/10 flex items-center justify-center text-primary">
-                            <span className="material-symbols-outlined text-[16px]">display_settings</span>
-                        </span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-4)' }}>
+                {KPI_CARDS.map(kpi => (
+                    <div key={kpi.label} style={card}>
+                        {/* Label row + icon badge top-right */}
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-bold)', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-tertiary)' }}>{kpi.label}</span>
+                                {/* Pulse dot sits right below label for Online card */}
+                                {kpi.pulse && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                        <span className="pulse-dot" />
+                                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-success)' }}>Live</span>
+                                    </div>
+                                )}
+                            </div>
+                            <span style={{
+                                width: 28, height: 28, borderRadius: 'var(--radius-sm)',
+                                backgroundColor: kpi.iconBg, color: kpi.iconColor,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                            }}>{kpi.icon}</span>
+                        </div>
+                        {/* Big number */}
+                        <p style={{ fontSize: 'var(--text-4xl)', fontWeight: 900, color: kpi.valueColor, margin: 0, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{kpi.value}</p>
+                        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', margin: 0 }}>{kpi.sub}</p>
                     </div>
-                    <p className="text-4xl font-black tabular-nums text-slate-900 dark:text-white leading-none">
-                        {stats.total}
-                    </p>
-                    <p className="text-xs text-slate-400 leading-snug">Active Screen Registry</p>
-                </div>
-
-                {/* Currently Online */}
-                <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm p-5 flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                            Currently Online
-                        </span>
-                        <span className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-                            <span className="material-symbols-outlined text-[16px]">sensors</span>
-                        </span>
-                    </div>
-                    <p className="text-4xl font-black tabular-nums text-emerald-500 leading-none">
-                        {stats.online}
-                    </p>
-                    <p className="text-xs text-slate-400 leading-snug">Heartbeat active ({'< 2m'})</p>
-                </div>
-
-                {/* Connection Lost */}
-                <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm p-5 flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                            Connection Lost
-                        </span>
-                        <span className="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center text-rose-500">
-                            <span className="material-symbols-outlined text-[16px]">error_outline</span>
-                        </span>
-                    </div>
-                    <p className="text-4xl font-black tabular-nums text-rose-500 leading-none">
-                        {stats.offline}
-                    </p>
-                    <p className="text-xs text-slate-400 leading-snug">Requires immediate audit</p>
-                </div>
+                ))}
             </div>
 
             {/* Screen Inventory */}
-            <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div style={{
+                backgroundColor: 'var(--color-bg-card)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-lg)',
+                boxShadow: 'var(--shadow-sm)',
+                overflow: 'hidden',
+            }}>
                 {/* Table header bar */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
-                    <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[18px] text-primary">list_alt</span>
-                        Screen Inventory &amp; Health
-                    </h2>
-                    <div className="relative">
-                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-                            <span className="material-symbols-outlined text-[14px]">search</span>
+                <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: 'var(--space-4) var(--space-5)',
+                    borderBottom: '1px solid var(--color-border)',
+                }}>
+                    <p style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', margin: 0 }}>Screen Inventory &amp; Health</p>
+                    <div style={{ position: 'relative' }}>
+                        <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)', pointerEvents: 'none', display: 'flex' }}>
+                            <Search size={13} />
                         </span>
                         <input
                             type="text"
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                             placeholder="Search screen ID…"
-                            className="text-xs pl-7 pr-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 w-48 transition-all"
+                            style={{
+                                paddingLeft: 28, paddingRight: 10, paddingTop: 6, paddingBottom: 6,
+                                border: '1px solid var(--color-border)',
+                                borderRadius: 'var(--radius-md)',
+                                fontSize: 'var(--text-xs)',
+                                backgroundColor: 'var(--color-bg-hover)',
+                                color: 'var(--color-text-primary)',
+                                outline: 'none', width: 180,
+                                fontFamily: 'var(--font-body)',
+                            }}
                         />
                     </div>
                 </div>
 
                 {/* Table */}
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
+                <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                         <thead>
-                            <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40">
-                                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                                    Screen ID
-                                </th>
-                                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                                    Status
-                                </th>
-                                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                                    Last Sync
-                                </th>
-                                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">
-                                    Actions
-                                </th>
+                            <tr style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg-hover)' }}>
+                                {['Screen ID', 'Status', 'Last Sync', ''].map((h, i) => (
+                                    <th key={i} style={{
+                                        padding: 'var(--space-3) var(--space-5)',
+                                        fontSize: 'var(--text-xs)', fontWeight: 'var(--font-bold)',
+                                        textTransform: 'uppercase', letterSpacing: '0.08em',
+                                        color: 'var(--color-text-tertiary)',
+                                        textAlign: i === 3 ? 'right' : 'left',
+                                    }}>{h}</th>
+                                ))}
                             </tr>
                         </thead>
                         <tbody>
                             {filteredScreens.length === 0 ? (
                                 <tr>
-                                    <td colSpan="4" className="py-14 text-center">
-                                        <div className="flex flex-col items-center gap-2">
-                                            <span className="material-symbols-outlined text-[36px] text-slate-300 dark:text-slate-600">
-                                                desktop_windows
-                                            </span>
-                                            <p className="text-sm text-slate-400 italic">
-                                                {searchQuery
-                                                    ? 'No screens match your search.'
-                                                    : 'No screens detected in the registry.'}
-                                            </p>
-                                        </div>
+                                    <td colSpan={4} style={{ padding: 'var(--space-12) var(--space-5)', textAlign: 'center' }}>
+                                        <Monitor size={32} style={{ color: 'var(--color-border)', margin: '0 auto var(--space-2)' }} />
+                                        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)', margin: 0, fontStyle: 'italic' }}>
+                                            {searchQuery ? 'No screens match your search.' : 'No screens detected in the registry.'}
+                                        </p>
                                     </td>
                                 </tr>
-                            ) : (
-                                filteredScreens.map((screen, idx) => (
+                            ) : filteredScreens.map((screen, idx) => {
+                                const isOnline = screen.status?.toUpperCase() === 'ONLINE';
+                                const isHovered = hoveredRow === screen.id;
+                                return (
                                     <tr
                                         key={screen.id}
-                                        className={`group transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 ${
-                                            idx !== filteredScreens.length - 1
-                                                ? 'border-b border-slate-50 dark:border-slate-800/60'
-                                                : ''
-                                        }`}
+                                        onMouseEnter={() => setHoveredRow(screen.id)}
+                                        onMouseLeave={() => setHoveredRow(null)}
+                                        style={{
+                                            borderBottom: idx !== filteredScreens.length - 1 ? '1px solid var(--color-border-light)' : 'none',
+                                            backgroundColor: isHovered ? 'var(--color-bg-hover)' : 'transparent',
+                                            transition: 'background-color var(--transition-fast)',
+                                        }}
                                     >
-                                        <td className="py-3.5 px-5 font-mono text-sm text-slate-600 dark:text-slate-300">
+                                        {/* Screen ID */}
+                                        <td style={{ padding: 'var(--space-3) var(--space-5)', fontFamily: 'monospace', fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
                                             {screen.id}
                                         </td>
-                                        <td className="py-3.5 px-5">
-                                            <StatusBadge status={screen.status === 'ONLINE' ? 'Online' : 'Offline'} />
+                                        {/* Status badge */}
+                                        <td style={{ padding: 'var(--space-3) var(--space-5)' }}>
+                                            <span style={{
+                                                display: 'inline-flex', alignItems: 'center', gap: 5,
+                                                padding: '2px 9px', borderRadius: 'var(--radius-full)',
+                                                fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)',
+                                                backgroundColor: isOnline ? 'var(--color-success-light)' : 'var(--color-error-light)',
+                                                color: isOnline ? 'var(--color-success)' : 'var(--color-error)',
+                                                border: `1px solid ${isOnline ? 'var(--color-success)' : 'var(--color-error)'}40`,
+                                            }}>
+                                                <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: isOnline ? 'var(--color-success)' : 'var(--color-error)', flexShrink: 0 }} />
+                                                {isOnline ? 'Online' : 'Offline'}
+                                            </span>
                                         </td>
-                                        <td className="py-3.5 px-5 text-sm text-slate-400 tabular-nums">
+                                        {/* Last Sync */}
+                                        <td style={{ padding: 'var(--space-3) var(--space-5)', fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
                                             {screen.last_seen
                                                 ? new Date(screen.last_seen).toLocaleTimeString()
-                                                : <span className="italic text-slate-300 dark:text-slate-600">Never</span>}
+                                                : <span style={{ fontStyle: 'italic', color: 'var(--color-border)' }}>Never</span>}
                                         </td>
-                                        <td className="py-3.5 px-5 text-right">
-                                            <div className="flex items-center justify-end gap-1">
-                                                <button
-                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-primary hover:bg-primary/8 dark:hover:bg-primary/10 transition-colors disabled:opacity-30"
-                                                    aria-label="Restart screen"
-                                                    title="Restart"
-                                                >
-                                                    <span className="material-symbols-outlined text-[16px]">restart_alt</span>
-                                                </button>
-                                                <button
-                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-primary hover:bg-primary/8 dark:hover:bg-primary/10 transition-colors"
-                                                    aria-label="Open terminal"
-                                                    title="Terminal"
-                                                >
-                                                    <span className="material-symbols-outlined text-[16px]">terminal</span>
-                                                </button>
+                                        {/* Actions */}
+                                        <td style={{ padding: 'var(--space-3) var(--space-5)', textAlign: 'right' }}>
+                                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                                {[{ Icon: RotateCcw, label: 'Restart' }, { Icon: Terminal, label: 'Terminal' }].map(({ Icon, label }) => (
+                                                    <button
+                                                        key={label}
+                                                        title={label}
+                                                        aria-label={label}
+                                                        style={{
+                                                            padding: 6, borderRadius: 'var(--radius-sm)',
+                                                            border: 'none', backgroundColor: 'transparent',
+                                                            color: 'var(--color-text-tertiary)', cursor: 'pointer',
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            transition: 'all var(--transition-fast)',
+                                                        }}
+                                                        onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.1)'; e.currentTarget.style.color = 'var(--color-primary)'; }}
+                                                        onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}
+                                                    >
+                                                        <Icon size={15} />
+                                                    </button>
+                                                ))}
                                             </div>
                                         </td>
                                     </tr>
-                                ))
-                            )}
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
 
                 {/* Footer count */}
                 {filteredScreens.length > 0 && (
-                    <div className="px-5 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-800/20">
-                        <p className="text-xs text-slate-400">
-                            Showing <span className="font-medium text-slate-600 dark:text-slate-300">{filteredScreens.length}</span> of{' '}
-                            <span className="font-medium text-slate-600 dark:text-slate-300">{stats.total}</span> screen{stats.total !== 1 ? 's' : ''}
+                    <div style={{
+                        padding: 'var(--space-3) var(--space-5)',
+                        borderTop: '1px solid var(--color-border)',
+                        backgroundColor: 'var(--color-bg-hover)',
+                    }}>
+                        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', margin: 0 }}>
+                            Showing <strong style={{ color: 'var(--color-text-secondary)' }}>{filteredScreens.length}</strong> of{' '}
+                            <strong style={{ color: 'var(--color-text-secondary)' }}>{stats.total}</strong> screen{stats.total !== 1 ? 's' : ''}
                         </p>
                     </div>
                 )}
