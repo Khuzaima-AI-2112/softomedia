@@ -1,6 +1,4 @@
 process.on('uncaughtException', (err) => {
-    // Log but do NOT exit — process.exit(1) here kills the container before
-    // Cloud Run can confirm port 8080 is bound, causing revision startup failure.
     console.error('UNCAUGHT EXCEPTION (non-fatal, server stays up):', err.stack || err.message);
 });
 process.on('unhandledRejection', (reason) => {
@@ -23,8 +21,6 @@ const PROJECT_ID = process.env.PROJECT_ID || 'softomedia-live-2026';
 console.log(`Starting ad-server on port ${PORT} in project ${PROJECT_ID}`);
 
 if (!JWT_SECRET) {
-    // Do NOT exit — server must bind to PORT before Cloud Run considers revision healthy.
-    // Auth routes will return 500 if JWT_SECRET is missing.
     console.error('WARNING: JWT_SECRET is not defined. Auth endpoints will fail. Check --set-secrets in cloudbuild.yaml.');
 }
 
@@ -78,6 +74,7 @@ async function bootstrapAdmin() {
 }
 
 // --- ROUTES ---
+// Sprint 1-5 (original)
 import screensRouter from './src/api/screens.js';
 import playlistRouter from './src/api/playlist.js';
 import adsRouter from './src/api/ads.js';
@@ -87,6 +84,23 @@ import dashboardRouter from './src/api/dashboard.js';
 import campaignsRouter from './src/api/campaigns.js';
 import schedulesRouter from './src/api/schedules.js';
 import notificationsRouter from './src/api/notifications.js';
+
+// Sprint 6: register previously unmounted routes
+import retailersRouter from './src/api/retailers.js';
+import storesRouter from './src/api/stores.js';
+import advertisersRouter from './src/api/advertisers.js';
+import locationsRouter from './src/api/locations.js';
+import loopsRouter from './src/api/loops.js';
+import healthRouter from './src/api/health.js';
+import auditRouter from './src/api/audit.js';
+import ticketsRouter from './src/api/tickets.js';
+import telemetryRouter from './src/api/telemetry.js';
+import monitoringRouter from './src/api/monitoring.js';
+import assetsRouter from './src/api/assets.js';
+import playlistsRouter from './src/api/playlists.js';
+import pricingRouter from './src/api/pricing.js';
+import opsRouter from './src/api/ops.js';
+
 import { generalLimiter, authLimiter, uploadLimiter } from './src/middleware/rateLimiter.js';
 
 // Rate limiters
@@ -94,23 +108,36 @@ app.use('/api/auth', authLimiter);
 app.use('/api/campaigns/create', uploadLimiter);
 app.use('/api', generalLimiter);
 
+// Sprint 1-5 routes
 app.use('/api/screens', screensRouter);
 app.use('/api/playlist', playlistRouter);
 app.use('/api/ads', adsRouter);
-app.use('/api/auth', authRouter);   // <-- single authoritative login handler lives here
+app.use('/api/auth', authRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/campaigns', campaignsRouter);
 app.use('/api/schedules', schedulesRouter);
 app.use('/api/notifications', notificationsRouter);
 
+// Sprint 6 routes — newly registered
+app.use('/api/retailers', retailersRouter);
+app.use('/api/stores', storesRouter);
+app.use('/api/advertisers', advertisersRouter);
+app.use('/api/locations', locationsRouter);
+app.use('/api/loops', loopsRouter);
+app.use('/api/health', healthRouter);
+app.use('/api/audit', auditRouter);
+app.use('/api/tickets', ticketsRouter);
+app.use('/api/telemetry', telemetryRouter);
+app.use('/api/monitoring', monitoringRouter);
+app.use('/api/assets', assetsRouter);
+app.use('/api/playlists', playlistsRouter);
+app.use('/api/pricing', pricingRouter);
+app.use('/api/ops', opsRouter);
+
 // --- DEBUG SEED ROUTE ---
-// Seeds the same 4 demo personas as seed.js (password: 'password').
-// All users can switch between any persona from the dashboard without re-login.
 app.get('/api/debug/seed', async (req, res) => {
     try {
-        // Use the existing Firestore singleton — do NOT call `new Firestore()` here,
-        // as Firestore is not imported in this file and would throw ReferenceError.
         const db = firestore;
         if (!db) {
             return res.status(503).json({ error: 'Firestore is not available.' });
@@ -136,7 +163,6 @@ app.get('/api/debug/seed', async (req, res) => {
             }
         }
 
-        // Seed core supporting data
         await db.collection('advertisers').doc('adv_001').set({ name: 'TechGear Electronics', contact_email: 'marketing@techgear.com', status: 'active', created_at: new Date().toISOString() });
         await db.collection('retailers').doc('ret_001').set({ name: 'Metro Supermarkets', contact_email: 'admin@metrosuper.com', status: 'active', created_at: new Date().toISOString() });
         await db.collection('screens').doc('scr_001_01').set({ screen_id: 'scr_001_01', name: 'Main Lobby Screen', status: 'online', retailer_id: 'ret_001', store_id: 'str_001', last_seen: new Date().toISOString() });
