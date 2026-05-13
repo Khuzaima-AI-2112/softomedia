@@ -91,7 +91,7 @@ steps:
       - '--platform=managed'
       - '--allow-unauthenticated'
       - '--port=8080'
-      - '--set-env-vars=PROJECT_ID=${_PROJECT},GCS_BUCKET=${_GCS_ADS_BUCKET},NODE_ENV=production'
+      - '--set-env-vars=PROJECT_ID=${_PROJECT},GCS_BUCKET=${_GCS_ADS_BUCKET},NODE_ENV=production,DISABLE_MOCK_STORAGE=true'
       - '--set-secrets=JWT_SECRET=JWT_SECRET:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest'
       - '--memory=512Mi'
       - '--cpu=1'

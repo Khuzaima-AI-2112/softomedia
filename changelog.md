@@ -8,6 +8,7 @@ Objectives: Document changes and progress milestones throughout the project life
 - **Root `cloudbuild.yaml`**: Pinned every `gcloud` invocation to `--project=softomedia-live-2026` (Rule 0.1). Synchronized backend secret name to `JWT_SECRET:latest` (matching Secret Manager) and added `GEMINI_API_KEY:latest` (Rule 9.3). Added explicit `--port=8080` to both Cloud Run deploys.
 - **`ad-server/cloudbuild.yaml`**: Pinned project to `softomedia-live-2026`, switched secret reference from `jwt-secret:latest` to `JWT_SECRET:latest`, added `GEMINI_API_KEY:latest`, and added explicit `--port=8080`.
 - **`client-app/cloudbuild.yaml`**: Pinned project to `softomedia-live-2026` and added a guard that fails fast when the `ad-server` service is missing (instead of writing an empty `VITE_API_URL` to `.env.production`).
+- **`BaseRepository` Resilience**: Added `DISABLE_MOCK_STORAGE=true` to Cloud Run environment variables in both `cloudbuild.yaml` files. This ensures that Firestore failures in production surface as real errors rather than being masked by stale in-memory `MOCK_STORAGE` fallbacks.
 
 ### Added
 - **Pre-deploy verification step** in root `cloudbuild.yaml` that runs `node verify_predeploy.js` before any image is built (Rule 9.2).

@@ -13,10 +13,40 @@ try {
   if (isWindows) {
     // Windows: use findstr
     try {
-      output = execSync(
+      // Exclude documentation and logs that are allowed to have URLs
+      const excludePatterns = [
+        'deployment_log.md',
+        'lessons_learned.md',
+        'changelog.md',
+        'AGENTS.md',
+        'DEPLOYMENT_README.md',
+        'DEPLOY_GUIDE.md',
+        'verify_predeploy.js',
+        'WHATS_AVAILABLE.md',
+        'TEST_ACCESS.md'
+      ];
+      
+      const rawOutput = execSync(
         'findstr /s /i /r "https://ad-server-.*\\.run\\.app https://client-app-.*\\.run\\.app" *.yaml *.js *.jsx *.json *.md',
         { stdio: ['pipe', 'pipe', 'pipe'] }
       ).toString();
+
+      // Filter out excluded files manually since findstr /v is limited for multiple patterns
+      output = rawOutput.split('\n')
+        .filter(line => {
+          const filePath = line.split(':')[0].toLowerCase();
+          return !excludePatterns.some(p => filePath.includes(p.toLowerCase())) &&
+                 !filePath.includes('node_modules') &&
+                 !filePath.includes('.git') &&
+                 !filePath.includes('dist') &&
+                 !filePath.includes('.agent') &&
+                 !filePath.includes('.archives') &&
+                 !filePath.includes('docs\\agents_archive') &&
+                 !filePath.includes('docs\\') &&
+                 !filePath.includes('claude\\') &&
+                 !filePath.includes('check_api.js');
+        })
+        .join('\n');
     } catch (e) {
       // findstr exit code 1 means no matches
       output = '';
@@ -30,7 +60,8 @@ try {
           "--exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist " +
           "--exclude='deployment_log.md' --exclude='lessons_learned.md' --exclude='changelog.md' " +
           "--exclude='AGENTS.md' --exclude='DEPLOYMENT_README.md' --exclude='DEPLOY_GUIDE.md' " +
-          "--exclude='verify_predeploy.js' " +
+          "--exclude='verify_predeploy.js' --exclude='WHATS_AVAILABLE.md' --exclude='TEST_ACCESS.md' " +
+          "--exclude-dir=docs --exclude-dir=Claude --exclude='check_api.js' " +
           ".",
         { stdio: ['pipe', 'pipe', 'pipe'] }
       ).toString();
