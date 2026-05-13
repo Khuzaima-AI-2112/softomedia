@@ -1,7 +1,7 @@
 import { Storage } from '@google-cloud/storage';
 
 const storage = new Storage();
-const BUCKET_NAME = 'softomedia-live2026-ads';
+const BUCKET_NAME = process.env.GCS_BUCKET || 'softomedia-live2026-ads';
 
 export const generateSignedUrl = async (fileName) => {
     try {
@@ -22,4 +22,30 @@ export const generateSignedUrl = async (fileName) => {
         // Fallback to public URL if signing fails (e.g. missing permissions in dev)
         return `https://storage.googleapis.com/${BUCKET_NAME}/${fileName}`;
     }
+};
+
+/**
+ * Upload a local file to Google Cloud Storage.
+ * @param {string} localPath - Absolute or relative path to the temp file on disk.
+ * @param {string} destinationName - Filename/path to store in GCS.
+ * @returns {{ storage_path: string, url: string }}
+ */
+export const uploadFile = async (localPath, destinationName) => {
+    const destPath = `assets/${destinationName}`;
+    const bucket = storage.bucket(BUCKET_NAME);
+
+    await bucket.upload(localPath, {
+        destination: destPath,
+        metadata: {
+            cacheControl: 'public, max-age=31536000',
+        },
+    });
+
+    const file = bucket.file(destPath);
+    await file.makePublic();
+
+    return {
+        storage_path: destPath,
+        url: `https://storage.googleapis.com/${BUCKET_NAME}/${destPath}`,
+    };
 };
