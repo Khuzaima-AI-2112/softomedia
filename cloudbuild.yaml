@@ -19,7 +19,8 @@ steps:
   # =============================================================================
   # PRE-DEPLOY VERIFICATION (Rule 9.2)
   # =============================================================================
-  - name: 'gcr.io/cloud-builders/npm'
+  # FIX: replaced deprecated gcr.io/cloud-builders/npm with node:20
+  - name: 'node:20'
     entrypoint: 'node'
     args: ['verify_predeploy.js']
     id: 'pre-deploy-check'
@@ -79,6 +80,7 @@ steps:
     waitFor: ['build-backend']
 
   # Step 3: Deploy backend to Cloud Run
+  # FIX: now waits for both push-backend AND push-backend-latest
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
@@ -99,7 +101,7 @@ steps:
       - '--min-instances=0'
       - '--timeout=600s'
     id: 'deploy-backend'
-    waitFor: ['push-backend']
+    waitFor: ['push-backend', 'push-backend-latest']
 
   # Step 3b: Verify Cloud Run public IAM (Rule 9.8)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -118,6 +120,7 @@ steps:
     waitFor: ['deploy-backend']
 
   # Step 4: Get backend URL for frontend + run seed + health checks (Rule 9.7, 9.13)
+  # FIX: health check extended to 12 x 10s = 2 minutes to handle Cloud Run cold starts
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'bash'
     args:
@@ -131,16 +134,16 @@ steps:
         echo "Backend deployed at: $$BACKEND_URL"
         echo "$$BACKEND_URL" > /workspace/backend_url.txt
 
-        echo "--- Health check (Rule 9.13) ---"
-        for i in 1 2 3 4 5 6; do
+        echo "--- Health check (Rule 9.13) — up to 2 minutes ---"
+        for i in $(seq 1 12); do
           if curl -fsS "$$BACKEND_URL/health" >/dev/null; then
-            echo "  Health OK"
+            echo "  Health OK on attempt $$i"
             break
           fi
-          echo "  Health not ready yet (attempt $$i)..."
-          sleep 5
-          if [ "$$i" = "6" ]; then
-            echo "ERROR: ad-server /health did not return 200 OK after 30s."
+          echo "  Health not ready yet (attempt $$i/12)..."
+          sleep 10
+          if [ "$$i" = "12" ]; then
+            echo "ERROR: ad-server /health did not return 200 OK after 120s."
             exit 1
           fi
         done
@@ -203,6 +206,7 @@ steps:
     waitFor: ['build-frontend']
 
   # Step 8: Deploy frontend to Cloud Run
+  # FIX: now waits for both push-frontend AND push-frontend-latest
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
@@ -219,7 +223,7 @@ steps:
       - '--cpu=1'
       - '--max-instances=10'
     id: 'deploy-frontend'
-    waitFor: ['push-frontend']
+    waitFor: ['push-frontend', 'push-frontend-latest']
 
   # Step 8b: Verify Cloud Run public IAM for client-app (Rule 9.8)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -261,6 +265,7 @@ steps:
   # =============================================================================
   # DEPLOYMENT SUMMARY (Rule 9.13)
   # =============================================================================
+  # FIX: frontend health check now fails the build if frontend is unreachable
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'bash'
     args:
@@ -283,9 +288,21 @@ steps:
         echo "Build ID: $BUILD_ID"
         echo "=========================================="
         echo "Verifying frontend health..."
-        curl -fsS -o /dev/null -w "  Frontend HTTP: %{http_code}\n" "$$FRONTEND_URL/" || true
+        FRONTEND_CODE=$$(curl -fsS -o /dev/null -w "%{http_code}" "$$FRONTEND_URL/" || echo "000")
+        echo "  Frontend HTTP: $$FRONTEND_CODE"
+        if [ "$$FRONTEND_CODE" != "200" ]; then
+          echo "ERROR: Frontend did not return HTTP 200 (got $$FRONTEND_CODE)."
+          exit 1
+        fi
         echo "Verifying backend health..."
-        curl -fsS -o /dev/null -w "  Backend  HTTP: %{http_code}\n" "$$BACKEND_URL/health" || true
+        BACKEND_CODE=$$(curl -fsS -o /dev/null -w "%{http_code}" "$$BACKEND_URL/health" || echo "000")
+        echo "  Backend  HTTP: $$BACKEND_CODE"
+        if [ "$$BACKEND_CODE" != "200" ]; then
+          echo "ERROR: Backend did not return HTTP 200 (got $$BACKEND_CODE)."
+          exit 1
+        fi
+        echo "=========================================="
+        echo "ALL HEALTH CHECKS PASSED. DEPLOYMENT SUCCESSFUL."
         echo "=========================================="
     id: 'display-summary'
     waitFor: ['gcs-public-read']
