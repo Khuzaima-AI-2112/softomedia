@@ -67,3 +67,8 @@ ui-debug.log
 *.pid
 *.seed
 *.pid.lock
+
+# Bare env files (no .local suffix)
+.env.development
+.env.production
+.env.test
