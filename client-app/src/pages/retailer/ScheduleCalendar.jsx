@@ -1,137 +1,131 @@
 /**
  * Schedule Calendar Page
  * Retailer interface for previewing and approving tomorrow's broadcast schedule
- * Business Hours: 8am - 10pm (14 loops per day)
  */
 
 import { useState, useEffect } from 'react';
-import GlassCard from '../../components/GlassCard';
-import StatusBadge from '../../components/StatusBadge';
+import { CheckCircle2, Clock, AlertCircle, Calendar } from 'lucide-react';
 import LoopPreviewModal from '../../components/LoopPreviewModal';
 import { API_URL } from '../../config';
+import '../../design-tokens.css';
 
-// Business hours configuration
-const BUSINESS_HOURS = {
-    START: 8,
-    END: 22
-};
+const BUSINESS_HOURS = { START: 8, END: 22 };
 
-// Generate business hours array
 const getBusinessHours = () => {
     const hours = [];
-    for (let h = BUSINESS_HOURS.START; h < BUSINESS_HOURS.END; h++) {
-        hours.push(h);
-    }
+    for (let h = BUSINESS_HOURS.START; h < BUSINESS_HOURS.END; h++) hours.push(h);
     return hours;
 };
 
-// Format hour to display string
 const formatHour = (hour) => {
     const period = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-    return `${displayHour}:00 ${period}`;
+    const h = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+    return `${h}:00 ${period}`;
 };
 
-// Get status styling
-const getStatusStyle = (status) => {
-    switch (status) {
-        case 'APPROVED': return 'bg-emerald-500/10 border-emerald-500 text-emerald-600';
-        case 'PENDING_APPROVAL': return 'bg-amber-500/10 border-amber-500 text-amber-600';
-        case 'REJECTED': return 'bg-red-500/10 border-red-500 text-red-600';
-        default: return 'bg-slate-100 border-slate-300 text-slate-500';
-    }
-};
+function SkeletonRow() {
+    return (
+        <div style={{
+            display: 'flex', alignItems: 'center', gap: '1rem',
+            padding: '1rem 1.125rem',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--color-border)',
+            overflow: 'hidden', position: 'relative',
+            backgroundColor: 'var(--color-bg-hover)',
+        }}>
+            <style>{`
+                @keyframes shimmer {
+                    0%   { transform: translateX(-100%); }
+                    100% { transform: translateX(100%); }
+                }
+                .shimmer-bar::after {
+                    content: '';
+                    position: absolute;
+                    inset: 0;
+                    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.25) 50%, transparent 100%);
+                    animation: shimmer 1.4s infinite;
+                }
+            `}</style>
+            <div className="shimmer-bar" style={{ width: 64, height: 20, borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--color-border)', position: 'relative' }} />
+            <div className="shimmer-bar" style={{ flex: 1, height: 24, borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--color-border)', position: 'relative' }} />
+            <div className="shimmer-bar" style={{ width: 72, height: 20, borderRadius: 'var(--radius-full)', backgroundColor: 'var(--color-border)', position: 'relative' }} />
+        </div>
+    );
+}
 
 function ScheduleCalendar() {
-    // Get tomorrow's date
     const [targetDate] = useState(() => {
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         return tomorrow.toISOString().split('T')[0];
     });
 
-    const [loops, setLoops] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [loops, setLoops]           = useState([]);
+    const [loading, setLoading]       = useState(true);
     const [selectedLoop, setSelectedLoop] = useState(null);
-    const [approving, setApproving] = useState(false);
+    const [approving, setApproving]   = useState(false);
 
     const businessHours = getBusinessHours();
 
-    useEffect(() => {
-        fetchLoops();
-    }, [targetDate]);
+    useEffect(() => { fetchLoops(); }, [targetDate]);
 
     const fetchLoops = async () => {
         setLoading(true);
         try {
-            // 🔶 TODO: Filter by retailer_id from auth context
             const res = await fetch(`${API_URL}/api/loops?date=${targetDate}`);
-            if (res.ok) {
-                const data = await res.json();
-                setLoops(data.loops || []);
-            }
-        } catch (error) {
-            console.error('Failed to fetch schedule:', error);
-        } finally {
-            setLoading(false);
-        }
+            if (res.ok) { const data = await res.json(); setLoops(data.loops || []); }
+        } catch (e) { console.error(e); }
+        finally { setLoading(false); }
     };
 
-    const getLoopForHour = (hour) => {
-        return loops.find(l => l.hour === hour) || null;
-    };
+    const getLoopForHour = (hour) => loops.find(l => l.hour === hour) || null;
 
     const handleApproveAll = async () => {
         setApproving(true);
         try {
-            // Approve all pending loops
             const pending = loops.filter(l => l.status === 'PENDING_APPROVAL');
             for (const loop of pending) {
                 await fetch(`${API_URL}/api/loops/${loop.id}/approve`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: 'retailer_demo' }) // 🔶 TODO: Get from auth
+                    body: JSON.stringify({ userId: 'retailer_demo' }),
                 });
             }
             await fetchLoops();
-        } catch (error) {
-            console.error('Failed to approve loops:', error);
-        } finally {
-            setApproving(false);
-        }
+        } catch (e) { console.error(e); }
+        finally { setApproving(false); }
     };
 
-    const handleLoopClick = (loop) => {
-        if (loop) {
-            setSelectedLoop(loop);
-        }
-    };
-
-    const handleModalClose = () => {
-        setSelectedLoop(null);
-        fetchLoops(); // Refresh after potential changes
-    };
-
-    const pendingCount = loops.filter(l => l.status === 'PENDING_APPROVAL').length;
+    const pendingCount  = loops.filter(l => l.status === 'PENDING_APPROVAL').length;
     const approvedCount = loops.filter(l => l.status === 'APPROVED').length;
     const rejectedCount = loops.filter(l => l.status === 'REJECTED').length;
 
+    const card = {
+        backgroundColor: 'var(--color-bg-card)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-lg)',
+        boxShadow: 'var(--shadow-sm)',
+        padding: 'var(--space-5)',
+    };
+
+    const KPI_CARDS = [
+        { label: 'Total Hours',     value: businessHours.length, sub: '8AM – 10PM',                   icon: <Calendar size={16} />,      dotColor: 'var(--color-primary)', dotBg: 'rgba(99,102,241,0.12)', valueColor: 'var(--color-text-primary)' },
+        { label: 'Pending Review',  value: pendingCount,         sub: 'Requires your approval',         icon: <Clock size={16} />,         dotColor: '#d97706',             dotBg: 'rgba(217,119,6,0.12)',  valueColor: '#d97706' },
+        { label: 'Approved',        value: approvedCount,        sub: 'Ready to broadcast',             icon: <CheckCircle2 size={16} />,  dotColor: 'var(--color-success)', dotBg: 'var(--color-success-light)', valueColor: 'var(--color-success)' },
+        { label: 'Needs Attention', value: rejectedCount,        sub: 'Rejected ads need replacement',  icon: <AlertCircle size={16} />,   dotColor: 'var(--color-error)',   dotBg: 'var(--color-error-light)',   valueColor: 'var(--color-error)' },
+    ];
+
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-                        Tomorrow&apos;s Broadcast Schedule
-                    </h1>
-                    <p className="text-slate-500 dark:text-slate-400">
-                        Review and approve the broadcast schedule for{' '}
-                        <span className="font-semibold text-primary">
-                            {new Date(targetDate).toLocaleDateString('en-US', {
-                                weekday: 'long',
-                                month: 'long',
-                                day: 'numeric'
-                            })}
+                    <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', margin: 0 }}>Tomorrow’s Broadcast Schedule</h1>
+                    <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginTop: 4 }}>
+                        Review and approve the schedule for{' '}
+                        <span style={{ fontWeight: 'var(--font-semibold)', color: 'var(--color-primary)' }}>
+                            {new Date(targetDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
                         </span>
                     </p>
                 </div>
@@ -139,163 +133,132 @@ function ScheduleCalendar() {
                     <button
                         onClick={handleApproveAll}
                         disabled={approving}
-                        className="px-6 py-3 bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-all flex items-center gap-2 disabled:opacity-50"
                         data-testid="approve-all-btn"
+                        style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '0.375rem',
+                            padding: '0.625rem 1.125rem',
+                            backgroundColor: 'var(--color-success)', color: '#fff',
+                            border: 'none', borderRadius: 'var(--radius-md)',
+                            fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)',
+                            cursor: approving ? 'not-allowed' : 'pointer', opacity: approving ? 0.6 : 1,
+                            boxShadow: 'var(--shadow-sm)', transition: 'all var(--transition-fast)',
+                        }}
                     >
-                        <span className="material-symbols-outlined">check_circle</span>
-                        {approving ? 'Approving...' : `Approve All (${pendingCount})`}
+                        <CheckCircle2 size={16} />
+                        {approving ? 'Approving…' : `Approve All (${pendingCount})`}
                     </button>
                 )}
             </div>
 
-            {/* Status Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <GlassCard className="border-l-4 border-l-primary">
-                    <p className="text-sm font-medium text-slate-500 mb-1">Total Hours</p>
-                    <p className="text-3xl font-bold text-slate-900 dark:text-white">{businessHours.length}</p>
-                    <p className="text-xs text-slate-400 mt-1">8AM - 10PM</p>
-                </GlassCard>
-                <GlassCard className="border-l-4 border-l-amber-500">
-                    <p className="text-sm font-medium text-slate-500 mb-1">Pending Review</p>
-                    <p className="text-3xl font-bold text-amber-500">{pendingCount}</p>
-                    <p className="text-xs text-slate-400 mt-1">Requires your approval</p>
-                </GlassCard>
-                <GlassCard className="border-l-4 border-l-emerald-500">
-                    <p className="text-sm font-medium text-slate-500 mb-1">Approved</p>
-                    <p className="text-3xl font-bold text-emerald-500">{approvedCount}</p>
-                    <p className="text-xs text-slate-400 mt-1">Ready to broadcast</p>
-                </GlassCard>
-                <GlassCard className="border-l-4 border-l-red-500">
-                    <p className="text-sm font-medium text-slate-500 mb-1">Needs Attention</p>
-                    <p className="text-3xl font-bold text-red-500">{rejectedCount}</p>
-                    <p className="text-xs text-slate-400 mt-1">Rejected ads need replacement</p>
-                </GlassCard>
+            {/* KPI cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-4)' }}>
+                {KPI_CARDS.map(kpi => (
+                    <div key={kpi.label} style={card}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: 'var(--space-3)' }}>
+                            <span style={{
+                                width: 28, height: 28, borderRadius: 'var(--radius-sm)',
+                                backgroundColor: kpi.dotBg, color: kpi.dotColor,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                            }}>{kpi.icon}</span>
+                            <p style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-secondary)', margin: 0, lineHeight: 1.2 }}>{kpi.label}</p>
+                        </div>
+                        <p style={{ fontSize: 'var(--text-3xl)', fontWeight: 'var(--font-bold)', color: kpi.valueColor, margin: 0, lineHeight: 1 }}>{kpi.value}</p>
+                        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 'var(--space-1)' }}>{kpi.sub}</p>
+                    </div>
+                ))}
             </div>
 
-            {/* Timeline View */}
-            <GlassCard>
-                <div className="flex items-center justify-between mb-6">
-                    <h3 className="font-bold text-lg flex items-center gap-2">
-                        <span className="material-symbols-outlined text-primary">calendar_today</span>
-                        Hourly Schedule Timeline
-                    </h3>
-                    <div className="flex items-center gap-4 text-xs">
-                        <span className="flex items-center gap-1">
-                            <span className="w-3 h-3 rounded-full bg-emerald-500"></span> Approved
-                        </span>
-                        <span className="flex items-center gap-1">
-                            <span className="w-3 h-3 rounded-full bg-amber-500"></span> Pending
-                        </span>
-                        <span className="flex items-center gap-1">
-                            <span className="w-3 h-3 rounded-full bg-red-500"></span> Rejected
-                        </span>
+            {/* Timeline */}
+            <div style={card}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)' }}>
+                    <p style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', margin: 0 }}>Hourly Schedule Timeline</p>
+                    <div style={{ display: 'flex', gap: 'var(--space-4)', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
+                        {[['var(--color-success)', 'Approved'], ['#d97706', 'Pending'], ['var(--color-error)', 'Rejected']].map(([c, l]) => (
+                            <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: c, flexShrink: 0 }} />{l}
+                            </span>
+                        ))}
                     </div>
                 </div>
 
-                {loading ? (
-                    <div className="py-12 text-center text-slate-500 animate-pulse">
-                        Loading schedule...
-                    </div>
-                ) : (
-                    <div className="space-y-2" data-testid="schedule-timeline">
-                        {businessHours.map(hour => {
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }} data-testid="schedule-timeline">
+                    {loading
+                        ? businessHours.map(h => <SkeletonRow key={h} />)
+                        : businessHours.map(hour => {
                             const loop = getLoopForHour(hour);
                             const rejectedSlots = loop?.slots?.filter(s => s.status === 'REJECTED').length || 0;
+                            const statusColor =
+                                !loop ? null
+                                : loop.status === 'APPROVED'         ? 'var(--color-success)'
+                                : loop.status === 'PENDING_APPROVAL' ? '#d97706'
+                                : 'var(--color-error)';
 
                             return (
                                 <button
                                     key={hour}
-                                    onClick={() => handleLoopClick(loop)}
+                                    onClick={() => loop && setSelectedLoop(loop)}
                                     disabled={!loop}
-                                    className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all ${loop
-                                        ? `${getStatusStyle(loop.status)} hover:shadow-md cursor-pointer`
-                                        : 'bg-slate-50 dark:bg-slate-800 border-dashed border-slate-200 dark:border-slate-700 opacity-50 cursor-not-allowed'
-                                        }`}
                                     data-testid={`schedule-hour-${hour}`}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '1rem',
+                                        padding: '0.875rem 1rem',
+                                        borderRadius: 'var(--radius-md)',
+                                        border: loop ? `1.5px solid ${statusColor}33` : '1.5px dashed var(--color-border)',
+                                        backgroundColor: loop ? `${statusColor}0d` : 'var(--color-bg-hover)',
+                                        opacity: !loop ? 0.5 : 1,
+                                        cursor: !loop ? 'not-allowed' : 'pointer',
+                                        transition: 'all var(--transition-fast)',
+                                        width: '100%', textAlign: 'left',
+                                    }}
                                 >
-                                    {/* Time */}
-                                    <div className="w-24 text-left">
-                                        <span className="text-lg font-bold">{formatHour(hour)}</span>
+                                    <span style={{ width: 72, fontSize: 'var(--text-base)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', flexShrink: 0 }}>
+                                        {formatHour(hour)}
+                                    </span>
+                                    <div style={{ flex: 1, display: 'flex', gap: 2 }}>
+                                        {loop
+                                            ? Array.from({ length: 12 }).map((_, i) => {
+                                                const slot = loop.slots?.[i];
+                                                const slotColor = slot?.asset_id
+                                                    ? slot.status === 'REJECTED' ? 'var(--color-error)' : 'var(--color-primary)'
+                                                    : 'var(--color-border)';
+                                                return <div key={i} style={{ height: 22, flex: 1, borderRadius: 3, backgroundColor: slotColor }} title={`Slot ${i + 1}`} />;
+                                            })
+                                            : <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontStyle: 'italic' }}>No loop generated</span>
+                                        }
                                     </div>
-
-                                    {/* Loop Preview Bar */}
-                                    <div className="flex-1">
-                                        {loop ? (
-                                            <div className="flex gap-0.5">
-                                                {Array.from({ length: 12 }).map((_, i) => {
-                                                    const slot = loop.slots?.[i];
-                                                    return (
-                                                        <div
-                                                            key={i}
-                                                            className={`h-6 flex-1 rounded ${slot?.asset_id
-                                                                ? slot.status === 'REJECTED'
-                                                                    ? 'bg-red-400'
-                                                                    : 'bg-primary'
-                                                                : 'bg-slate-300 dark:bg-slate-600'
-                                                                }`}
-                                                            title={`Slot ${i + 1}`}
-                                                        />
-                                                    );
-                                                })}
-                                            </div>
-                                        ) : (
-                                            <span className="text-sm text-slate-400 italic">No loop generated</span>
-                                        )}
-                                    </div>
-
-                                    {/* Status */}
-                                    <div className="w-32 text-right">
-                                        {loop && (
-                                            <div className="flex items-center justify-end gap-2">
-                                                {rejectedSlots > 0 && (
-                                                    <span className="text-xs text-red-500 font-bold">
-                                                        {rejectedSlots} rejected
-                                                    </span>
-                                                )}
-                                                <StatusBadge status={
-                                                    loop.status === 'APPROVED' ? 'Active' :
-                                                        loop.status === 'PENDING_APPROVAL' ? 'Warning' : 'Offline'
-                                                } />
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Action */}
-                                    <div className="w-8">
-                                        {loop && (
-                                            <span className="material-symbols-outlined text-slate-400">
-                                                chevron_right
+                                    {loop && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexShrink: 0 }}>
+                                            {rejectedSlots > 0 && (
+                                                <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-bold)', color: 'var(--color-error)' }}>{rejectedSlots} rejected</span>
+                                            )}
+                                            <span style={{
+                                                fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)',
+                                                padding: '2px 8px', borderRadius: 'var(--radius-full)',
+                                                backgroundColor: `${statusColor}1a`, color: statusColor,
+                                                border: `1px solid ${statusColor}40`,
+                                            }}>
+                                                {loop.status === 'APPROVED' ? 'Approved' : loop.status === 'PENDING_APPROVAL' ? 'Pending' : 'Rejected'}
                                             </span>
-                                        )}
-                                    </div>
+                                            <span style={{ color: 'var(--color-text-tertiary)', fontSize: 16 }}>›</span>
+                                        </div>
+                                    )}
                                 </button>
                             );
-                        })}
-                    </div>
-                )}
-            </GlassCard>
+                        })
+                    }
+                </div>
+            </div>
 
-            {/* Empty State */}
+            {/* Empty state */}
             {!loading && loops.length === 0 && (
-                <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
-                    <span className="material-symbols-outlined text-6xl text-slate-300 mb-4">event_busy</span>
-                    <h3 className="text-lg font-bold text-slate-600 dark:text-slate-400 mb-2">
-                        No Schedule Available
-                    </h3>
-                    <p className="text-slate-500">
-                        Tomorrow&apos;s broadcast schedule has not been generated yet.<br />
-                        Please contact Softomedia operations.
-                    </p>
+                <div style={{ textAlign: 'center', padding: 'var(--space-10) var(--space-6)', border: '2px dashed var(--color-border)', borderRadius: 'var(--radius-lg)' }}>
+                    <p style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-secondary)', margin: 0 }}>No Schedule Available</p>
+                    <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)', marginTop: 'var(--space-2)' }}>Tomorrow’s broadcast schedule has not been generated yet. Please contact Softomedia operations.</p>
                 </div>
             )}
 
-            {/* Loop Preview Modal */}
             {selectedLoop && (
-                <LoopPreviewModal
-                    loop={selectedLoop}
-                    onClose={handleModalClose}
-                    onRefresh={fetchLoops}
-                />
+                <LoopPreviewModal loop={selectedLoop} onClose={() => { setSelectedLoop(null); fetchLoops(); }} onRefresh={fetchLoops} />
             )}
         </div>
     );
