@@ -8,6 +8,8 @@ const firestore = new Firestore();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-change-in-prod';
 
 // POST /api/auth/login
+// Single authoritative login handler — duplicate in index.js has been removed.
+// All demo users share the password 'password' for easy persona switching during testing.
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -16,9 +18,8 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ error: 'Email and password required' });
         }
 
-        // Find user by email
         const usersRef = firestore.collection('users');
-        const snapshot = await usersRef.where('email', '==', email).get();
+        const snapshot = await usersRef.where('email', '==', email).limit(1).get();
 
         if (snapshot.empty) {
             return res.status(401).json({ error: 'Invalid credentials' });
@@ -27,13 +28,18 @@ router.post('/login', async (req, res) => {
         const userDoc = snapshot.docs[0];
         const user = { id: userDoc.id, ...userDoc.data() };
 
-        // Verify password
-        const isValid = await bcrypt.compare(password, user.password);
+        // Support both field names for backwards compatibility with any legacy docs
+        const storedHash = user.password || user.password_hash;
+        if (!storedHash) {
+            console.error(`[Auth] User ${email} has no password hash stored.`);
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        const isValid = await bcrypt.compare(password, storedHash);
         if (!isValid) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        // Generate JWT token
         const token = jwt.sign(
             { uid: user.id, email: user.email, role: user.role },
             JWT_SECRET,
