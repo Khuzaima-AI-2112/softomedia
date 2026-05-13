@@ -1,9 +1,10 @@
 process.on('uncaughtException', (err) => {
-    console.error('FATAL UNCAUGHT EXCEPTION:', err.stack || err.message);
-    process.exit(1);
+    // Log but do NOT exit — process.exit(1) here kills the container before
+    // Cloud Run can confirm port 8080 is bound, causing revision startup failure.
+    console.error('UNCAUGHT EXCEPTION (non-fatal, server stays up):', err.stack || err.message);
 });
 process.on('unhandledRejection', (reason) => {
-    console.error('FATAL UNHANDLED REJECTION:', reason);
+    console.error('UNHANDLED REJECTION (non-fatal):', reason);
 });
 
 import express from 'express';
@@ -48,6 +49,10 @@ const ADMIN_PASS = process.env.ADMIN_PASS;
 async function bootstrapAdmin() {
     if (!ADMIN_EMAIL || !ADMIN_PASS) {
         console.warn('Bootstrap skipped: ADMIN_EMAIL or ADMIN_PASS not defined.');
+        return;
+    }
+    if (!firestore) {
+        console.error('Bootstrap skipped: Firestore is not available.');
         return;
     }
     try {
@@ -104,7 +109,12 @@ app.use('/api/notifications', notificationsRouter);
 // All users can switch between any persona from the dashboard without re-login.
 app.get('/api/debug/seed', async (req, res) => {
     try {
-        const db = new Firestore();
+        // Use the existing Firestore singleton — do NOT call `new Firestore()` here,
+        // as Firestore is not imported in this file and would throw ReferenceError.
+        const db = firestore;
+        if (!db) {
+            return res.status(503).json({ error: 'Firestore is not available.' });
+        }
         console.log('Seeding Demo Data via Endpoint...');
         const hashedPassword = await hashPassword('password');
         const usersRef = db.collection('users');
