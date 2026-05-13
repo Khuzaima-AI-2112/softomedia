@@ -16,9 +16,11 @@ const PROJECT_ID = process.env.PROJECT_ID || 'softomedia-live-2026';
 console.log(`Starting ad-server on port ${PORT} in project ${PROJECT_ID}`);
 
 if (!JWT_SECRET) {
-    console.error('FATAL: JWT_SECRET is not defined.');
-    // In Cloud Run, we want to see this in logs before exiting
-    setTimeout(() => process.exit(1), 1000);
+    // Log loudly but do NOT exit — the server must bind to PORT before Cloud Run
+    // considers the revision healthy. Exiting here causes the health check timeout.
+    // Auth routes will return 500 if JWT_SECRET is missing, which is the right
+    // failure mode. Check Secret Manager binding in cloudbuild.yaml if this fires.
+    console.error('WARNING: JWT_SECRET is not defined. Auth endpoints will fail. Check --set-secrets in cloudbuild.yaml.');
 }
 
 // Initialize Firestore
@@ -37,6 +39,9 @@ const comparePassword = async (password, hash) => {
 };
 
 const generateToken = (user) => {
+    if (!JWT_SECRET) {
+        throw new Error('JWT_SECRET is not configured on this instance.');
+    }
     return jwt.sign(
         { uid: user.id, email: user.email, role: user.role },
         JWT_SECRET,
