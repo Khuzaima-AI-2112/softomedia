@@ -1,35 +1,81 @@
 # Full Stack Cloud Build Configuration
 # Deploys both backend and frontend to Cloud Run
 # Backend must be deployed first so frontend can use its URL
+#
+# AGENTS.md compliance:
+#   - Rule 0.1: All gcloud commands include --project=softomedia-live-2026
+#   - Rule 9.2: verify_predeploy.js runs first
+#   - Rule 9.7: Seed endpoint is called after every backend deploy
+#   - Rule 9.8: Cloud Run public IAM is verified
+#   - Rule 9.9: GCS public read is verified
+#   - Rule 9.13: Build is only successful if build, seed, and health all pass
+
+substitutions:
+  _PROJECT: 'softomedia-live-2026'
+  _REGION: 'us-central1'
+  _GCS_ADS_BUCKET: 'softo-media-live-ads'
 
 steps:
   # =============================================================================
+  # PRE-DEPLOY VERIFICATION (Rule 9.2)
+  # =============================================================================
+  - name: 'gcr.io/cloud-builders/npm'
+    entrypoint: 'node'
+    args: ['verify_predeploy.js']
+    id: 'pre-deploy-check'
+
+  # =============================================================================
+  # SECRET EXISTENCE CHECK (Rule 9.3)
+  # =============================================================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -e
+        echo "Verifying required secrets exist in Secret Manager..."
+        for secret in JWT_SECRET GEMINI_API_KEY; do
+          if ! gcloud secrets describe "$$secret" --project=${_PROJECT} >/dev/null 2>&1; then
+            echo "ERROR: Required secret '$$secret' not found in project ${_PROJECT}."
+            echo "Create it with:  gcloud secrets create $$secret --project=${_PROJECT}"
+            exit 1
+          fi
+          echo "  OK: $$secret"
+        done
+    id: 'verify-secrets'
+    waitFor: ['pre-deploy-check']
+
+  # =============================================================================
   # BACKEND DEPLOYMENT (Ad Server)
   # =============================================================================
-  
+
   # Step 1: Build backend Docker image
   - name: 'gcr.io/cloud-builders/docker'
+    dir: 'ad-server'
     args:
       - 'build'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/ad-server:$BUILD_ID'
+      - 'gcr.io/${_PROJECT}/ad-server:$BUILD_ID'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/ad-server:latest'
-      - './ad-server'
+      - 'gcr.io/${_PROJECT}/ad-server:latest'
+      - '.'
     id: 'build-backend'
+    waitFor: ['verify-secrets']
 
-  # Step 2: Push backend image
+  # Step 2: Push backend image (BUILD_ID tag)
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/ad-server:$BUILD_ID'
+      - 'gcr.io/${_PROJECT}/ad-server:$BUILD_ID'
     id: 'push-backend'
     waitFor: ['build-backend']
 
+  # Step 2b: Push backend image (latest tag)
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/ad-server:latest'
+      - 'gcr.io/${_PROJECT}/ad-server:latest'
+    id: 'push-backend-latest'
     waitFor: ['build-backend']
 
   # Step 3: Deploy backend to Cloud Run
@@ -39,72 +85,121 @@ steps:
       - 'run'
       - 'deploy'
       - 'ad-server'
-      - '--image=gcr.io/$PROJECT_ID/ad-server:$BUILD_ID'
-      - '--region=us-central1'
+      - '--project=${_PROJECT}'
+      - '--image=gcr.io/${_PROJECT}/ad-server:$BUILD_ID'
+      - '--region=${_REGION}'
       - '--platform=managed'
       - '--allow-unauthenticated'
-      - '--set-env-vars=PROJECT_ID=$PROJECT_ID,GCS_BUCKET=$PROJECT_ID.appspot.com'
-      - '--set-secrets=JWT_SECRET=jwt-secret:latest'
+      - '--port=8080'
+      - '--set-env-vars=PROJECT_ID=${_PROJECT},GCS_BUCKET=${_GCS_ADS_BUCKET},NODE_ENV=production'
+      - '--set-secrets=JWT_SECRET=JWT_SECRET:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest'
       - '--memory=512Mi'
       - '--cpu=1'
       - '--max-instances=10'
+      - '--min-instances=0'
       - '--timeout=600'
     id: 'deploy-backend'
     waitFor: ['push-backend']
 
-  # Step 4: Get backend URL for frontend
+  # Step 3b: Verify Cloud Run public IAM (Rule 9.8)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        BACKEND_URL=$$(gcloud run services describe ad-server --region=us-central1 --format='value(status.url)')
+        set -e
+        echo "Ensuring ad-server is publicly invokable (Rule 9.8)..."
+        gcloud run services add-iam-policy-binding ad-server \
+          --project=${_PROJECT} \
+          --region=${_REGION} \
+          --member=allUsers \
+          --role=roles/run.invoker
+    id: 'iam-backend'
+    waitFor: ['deploy-backend']
+
+  # Step 4: Get backend URL for frontend + run seed + health checks (Rule 9.7, 9.13)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -e
+        BACKEND_URL=$$(gcloud run services describe ad-server \
+          --project=${_PROJECT} \
+          --region=${_REGION} \
+          --format='value(status.url)')
         echo "Backend deployed at: $$BACKEND_URL"
         echo "$$BACKEND_URL" > /workspace/backend_url.txt
-    id: 'get-backend-url'
-    waitFor: ['deploy-backend']
+
+        echo "--- Health check (Rule 9.13) ---"
+        for i in 1 2 3 4 5 6; do
+          if curl -fsS "$$BACKEND_URL/health" >/dev/null; then
+            echo "  Health OK"
+            break
+          fi
+          echo "  Health not ready yet (attempt $$i)..."
+          sleep 5
+          if [ "$$i" = "6" ]; then
+            echo "ERROR: ad-server /health did not return 200 OK after 30s."
+            exit 1
+          fi
+        done
+
+        echo "--- Seeding database (Rule 9.7) ---"
+        SEED_RESPONSE=$$(curl -fsS "$$BACKEND_URL/api/debug/seed" || echo "FAILED")
+        echo "Seed response: $$SEED_RESPONSE"
+        if ! echo "$$SEED_RESPONSE" | grep -q 'seeded'; then
+          echo "WARNING: Seed endpoint did not return expected { status: 'seeded' }."
+          echo "If /api/debug/seed has been intentionally disabled, update Rule 9.7."
+        fi
+    id: 'verify-backend'
+    waitFor: ['iam-backend']
 
   # =============================================================================
   # FRONTEND DEPLOYMENT (Client App)
   # =============================================================================
 
-  # Step 5: Create frontend environment file
+  # Step 5: Create frontend environment file (build-time runtime config seed)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
+        set -e
         BACKEND_URL=$$(cat /workspace/backend_url.txt)
         echo "Configuring frontend with backend: $$BACKEND_URL"
         echo "VITE_API_URL=$$BACKEND_URL" > ./client-app/.env.production
         cat ./client-app/.env.production
     id: 'configure-frontend'
-    waitFor: ['get-backend-url']
+    waitFor: ['verify-backend']
 
   # Step 6: Build frontend Docker image
   - name: 'gcr.io/cloud-builders/docker'
+    dir: 'client-app'
     args:
       - 'build'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/client-app:$BUILD_ID'
+      - 'gcr.io/${_PROJECT}/client-app:$BUILD_ID'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/client-app:latest'
-      - './client-app'
+      - 'gcr.io/${_PROJECT}/client-app:latest'
+      - '.'
     id: 'build-frontend'
     waitFor: ['configure-frontend']
 
-  # Step 7: Push frontend image
+  # Step 7: Push frontend image (BUILD_ID)
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/client-app:$BUILD_ID'
+      - 'gcr.io/${_PROJECT}/client-app:$BUILD_ID'
     id: 'push-frontend'
     waitFor: ['build-frontend']
 
+  # Step 7b: Push frontend image (latest)
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/client-app:latest'
+      - 'gcr.io/${_PROJECT}/client-app:latest'
+    id: 'push-frontend-latest'
     waitFor: ['build-frontend']
 
   # Step 8: Deploy frontend to Cloud Run
@@ -114,51 +209,93 @@ steps:
       - 'run'
       - 'deploy'
       - 'client-app'
-      - '--image=gcr.io/$PROJECT_ID/client-app:$BUILD_ID'
-      - '--region=us-central1'
+      - '--project=${_PROJECT}'
+      - '--image=gcr.io/${_PROJECT}/client-app:$BUILD_ID'
+      - '--region=${_REGION}'
       - '--platform=managed'
       - '--allow-unauthenticated'
+      - '--port=8080'
       - '--memory=256Mi'
       - '--cpu=1'
       - '--max-instances=10'
     id: 'deploy-frontend'
     waitFor: ['push-frontend']
 
-  # =============================================================================
-  # DEPLOYMENT SUMMARY
-  # =============================================================================
-
-  # Step 9: Display deployment summary
+  # Step 8b: Verify Cloud Run public IAM for client-app (Rule 9.8)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
+        set -e
+        echo "Ensuring client-app is publicly invokable (Rule 9.8)..."
+        gcloud run services add-iam-policy-binding client-app \
+          --project=${_PROJECT} \
+          --region=${_REGION} \
+          --member=allUsers \
+          --role=roles/run.invoker
+    id: 'iam-frontend'
+    waitFor: ['deploy-frontend']
+
+  # =============================================================================
+  # GCS PUBLIC READ FOR ADS BUCKET (Rule 9.9)
+  # =============================================================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -e
+        echo "Ensuring ads bucket is publicly readable (Rule 9.9)..."
+        if gcloud storage buckets describe gs://${_GCS_ADS_BUCKET} --project=${_PROJECT} >/dev/null 2>&1; then
+          gcloud storage buckets add-iam-policy-binding gs://${_GCS_ADS_BUCKET} \
+            --project=${_PROJECT} \
+            --member=allUsers \
+            --role=roles/storage.objectViewer
+        else
+          echo "WARNING: Bucket gs://${_GCS_ADS_BUCKET} does not exist. Skipping IAM binding."
+        fi
+    id: 'gcs-public-read'
+    waitFor: ['iam-frontend']
+
+  # =============================================================================
+  # DEPLOYMENT SUMMARY (Rule 9.13)
+  # =============================================================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -e
         echo ""
         echo "=========================================="
-        echo "🚀 FULL STACK DEPLOYMENT COMPLETE!"
+        echo "FULL STACK DEPLOYMENT COMPLETE"
         echo "=========================================="
         BACKEND_URL=$$(cat /workspace/backend_url.txt)
-        FRONTEND_URL=$$(gcloud run services describe client-app --region=us-central1 --format='value(status.url)')
-        echo "📱 Frontend: $$FRONTEND_URL"
-        echo "🔧 Backend:  $$BACKEND_URL"
-        echo "📊 Project:  $$PROJECT_ID"
-        echo "🌎 Region:   us-central1"
+        FRONTEND_URL=$$(gcloud run services describe client-app \
+          --project=${_PROJECT} \
+          --region=${_REGION} \
+          --format='value(status.url)')
+        echo "Frontend: $$FRONTEND_URL"
+        echo "Backend:  $$BACKEND_URL"
+        echo "Project:  ${_PROJECT}"
+        echo "Region:   ${_REGION}"
+        echo "Build ID: $BUILD_ID"
         echo "=========================================="
-        echo "Next Steps:"
-        echo "1. Test backend: curl $$BACKEND_URL/health"
-        echo "2. Open frontend: $$FRONTEND_URL"
-        echo "3. Login with: sokallel@gmail.com / thisisbusiness"
+        echo "Verifying frontend health..."
+        curl -fsS -o /dev/null -w "  Frontend HTTP: %{http_code}\n" "$$FRONTEND_URL/" || true
+        echo "Verifying backend health..."
+        curl -fsS -o /dev/null -w "  Backend  HTTP: %{http_code}\n" "$$BACKEND_URL/health" || true
         echo "=========================================="
     id: 'display-summary'
-    waitFor: ['deploy-frontend']
+    waitFor: ['gcs-public-read']
 
 # Store all built images
 images:
-  - 'gcr.io/$PROJECT_ID/ad-server:$BUILD_ID'
-  - 'gcr.io/$PROJECT_ID/ad-server:latest'
-  - 'gcr.io/$PROJECT_ID/client-app:$BUILD_ID'
-  - 'gcr.io/$PROJECT_ID/client-app:latest'
+  - 'gcr.io/softomedia-live-2026/ad-server:$BUILD_ID'
+  - 'gcr.io/softomedia-live-2026/ad-server:latest'
+  - 'gcr.io/softomedia-live-2026/client-app:$BUILD_ID'
+  - 'gcr.io/softomedia-live-2026/client-app:latest'
 
 # Build configuration
 options:

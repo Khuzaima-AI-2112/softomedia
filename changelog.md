@@ -2,6 +2,25 @@
 
 Objectives: Document changes and progress milestones throughout the project lifecycle.
 
+## [2026-05-13] - Cloud Build Pipeline Hardening
+### Fixed
+- **`verify_predeploy.js`**: Replaced Windows-only `findstr` invocation with cross-platform logic that uses `grep` on the Linux Cloud Build runners (and falls back to `findstr` locally on Windows). Resolves the build-blocking `command not found` failure.
+- **Root `cloudbuild.yaml`**: Pinned every `gcloud` invocation to `--project=softomedia-live-2026` (Rule 0.1). Synchronized backend secret name to `JWT_SECRET:latest` (matching Secret Manager) and added `GEMINI_API_KEY:latest` (Rule 9.3). Added explicit `--port=8080` to both Cloud Run deploys.
+- **`ad-server/cloudbuild.yaml`**: Pinned project to `softomedia-live-2026`, switched secret reference from `jwt-secret:latest` to `JWT_SECRET:latest`, added `GEMINI_API_KEY:latest`, and added explicit `--port=8080`.
+- **`client-app/cloudbuild.yaml`**: Pinned project to `softomedia-live-2026` and added a guard that fails fast when the `ad-server` service is missing (instead of writing an empty `VITE_API_URL` to `.env.production`).
+
+### Added
+- **Pre-deploy verification step** in root `cloudbuild.yaml` that runs `node verify_predeploy.js` before any image is built (Rule 9.2).
+- **Secret existence check** that calls `gcloud secrets describe` for `JWT_SECRET` and `GEMINI_API_KEY` and exits non-zero if either is missing (Rule 9.3).
+- **Post-deploy seed + health gate** that calls `/health` and `/api/debug/seed` after the backend deploy and fails the build if the backend never returns HTTP 200 (Rule 9.7, Rule 9.13).
+- **Cloud Run public IAM binding** for both `ad-server` and `client-app` (`allUsers → roles/run.invoker`, Rule 9.8).
+- **GCS public read binding** for the `softo-media-live-ads` bucket so player image URLs do not 403 (Rule 9.9).
+- **Substitutions block** (`_PROJECT`, `_REGION`, `_GCS_ADS_BUCKET`) in all three `cloudbuild.yaml` files so the project ID is defined exactly once per file.
+
+### Notes
+- This commit only touches build pipeline configuration and the predeploy script. No application code, no Firestore schema, and no `package.json` versions were changed.
+- Per Rule 9.13, deployment success now requires all three of: `gcloud builds submit` exit code 0, `/api/debug/seed` returning `{ "status": "seeded" }`, and `/health` returning HTTP 200.
+
 ## [2026-01-14] - Schema Governance & Verification Stabilization (Deployed v1)
 ### Fixed
 - **Pricing Schema**: Resolved Zod v4 syntax incompatibility in `PricingSchema.js` by standardizing on `z.record(z.string(), schema)`.

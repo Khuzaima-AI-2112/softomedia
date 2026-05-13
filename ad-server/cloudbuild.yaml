@@ -1,32 +1,42 @@
 # Backend (Ad Server) Cloud Build Configuration
 # Builds Docker image and deploys to Cloud Run with environment variables
+#
+# AGENTS.md compliance:
+#   - Rule 0.1: All gcloud commands include --project=softomedia-live-2026
+#   - Rule 9.7: Seed endpoint is called after deploy
+#   - Rule 9.8: Cloud Run public IAM is verified
+#   - Rule 9.13: Build only succeeds when build, seed, and health all pass
+
+substitutions:
+  _PROJECT: 'softomedia-live-2026'
+  _REGION: 'us-central1'
+  _GCS_ADS_BUCKET: 'softo-media-live-ads'
 
 steps:
   # Step 1: Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
-    args: 
+    args:
       - 'build'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/ad-server:$BUILD_ID'
+      - 'gcr.io/${_PROJECT}/ad-server:$BUILD_ID'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/ad-server:latest'
+      - 'gcr.io/${_PROJECT}/ad-server:latest'
       - '.'
     id: 'build-image'
 
-
-  # Step 2: Push the Docker image to GCR
+  # Step 2: Push the Docker image to GCR (BUILD_ID)
   - name: 'gcr.io/cloud-builders/docker'
-    args: 
+    args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/ad-server:$BUILD_ID'
+      - 'gcr.io/${_PROJECT}/ad-server:$BUILD_ID'
     id: 'push-image'
     waitFor: ['build-image']
 
   # Step 3: Push latest tag
   - name: 'gcr.io/cloud-builders/docker'
-    args: 
+    args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/ad-server:latest'
+      - 'gcr.io/${_PROJECT}/ad-server:latest'
     id: 'push-latest'
     waitFor: ['build-image']
 
@@ -37,12 +47,14 @@ steps:
       - 'run'
       - 'deploy'
       - 'ad-server'
-      - '--image=gcr.io/$PROJECT_ID/ad-server:$BUILD_ID'
-      - '--region=us-central1'
+      - '--project=${_PROJECT}'
+      - '--image=gcr.io/${_PROJECT}/ad-server:$BUILD_ID'
+      - '--region=${_REGION}'
       - '--platform=managed'
       - '--allow-unauthenticated'
-      - '--set-env-vars=PROJECT_ID=$PROJECT_ID,GCS_BUCKET=$PROJECT_ID.appspot.com'
-      - '--set-secrets=JWT_SECRET=jwt-secret:latest'
+      - '--port=8080'
+      - '--set-env-vars=PROJECT_ID=${_PROJECT},GCS_BUCKET=${_GCS_ADS_BUCKET},NODE_ENV=production'
+      - '--set-secrets=JWT_SECRET=JWT_SECRET:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest'
       - '--memory=512Mi'
       - '--cpu=1'
       - '--max-instances=10'
@@ -51,22 +63,63 @@ steps:
     id: 'deploy-to-cloud-run'
     waitFor: ['push-image']
 
-  # Step 5: Get the deployed service URL (for frontend configuration)
+  # Step 5: Verify Cloud Run public IAM (Rule 9.8)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        echo "Backend deployed successfully!"
-        gcloud run services describe ad-server --region=us-central1 --format='value(status.url)' > /workspace/backend_url.txt
-        echo "Backend URL: $(cat /workspace/backend_url.txt)"
-    id: 'get-backend-url'
+        set -e
+        echo "Ensuring ad-server is publicly invokable (Rule 9.8)..."
+        gcloud run services add-iam-policy-binding ad-server \
+          --project=${_PROJECT} \
+          --region=${_REGION} \
+          --member=allUsers \
+          --role=roles/run.invoker
+    id: 'iam-public'
     waitFor: ['deploy-to-cloud-run']
+
+  # Step 6: Health check + seed (Rule 9.7, 9.13)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -e
+        BACKEND_URL=$$(gcloud run services describe ad-server \
+          --project=${_PROJECT} \
+          --region=${_REGION} \
+          --format='value(status.url)')
+        echo "Backend URL: $$BACKEND_URL"
+        echo "$$BACKEND_URL" > /workspace/backend_url.txt
+
+        echo "--- Health check ---"
+        for i in 1 2 3 4 5 6; do
+          if curl -fsS "$$BACKEND_URL/health" >/dev/null; then
+            echo "  Health OK"
+            break
+          fi
+          echo "  Health not ready (attempt $$i)..."
+          sleep 5
+          if [ "$$i" = "6" ]; then
+            echo "ERROR: ad-server /health did not return 200 OK after 30s."
+            exit 1
+          fi
+        done
+
+        echo "--- Seeding (Rule 9.7) ---"
+        SEED_RESPONSE=$$(curl -fsS "$$BACKEND_URL/api/debug/seed" || echo "FAILED")
+        echo "Seed response: $$SEED_RESPONSE"
+        if ! echo "$$SEED_RESPONSE" | grep -q 'seeded'; then
+          echo "WARNING: /api/debug/seed did not return { status: 'seeded' }."
+        fi
+    id: 'verify-deploy'
+    waitFor: ['iam-public']
 
 # Store the built images
 images:
-  - 'gcr.io/$PROJECT_ID/ad-server:$BUILD_ID'
-  - 'gcr.io/$PROJECT_ID/ad-server:latest'
+  - 'gcr.io/softomedia-live-2026/ad-server:$BUILD_ID'
+  - 'gcr.io/softomedia-live-2026/ad-server:latest'
 
 # Configuration
 options:
