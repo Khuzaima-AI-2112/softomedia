@@ -1,6 +1,13 @@
+process.on('uncaughtException', (err) => {
+    console.error('FATAL UNCAUGHT EXCEPTION:', err.stack || err.message);
+    process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+    console.error('FATAL UNHANDLED REJECTION:', reason);
+});
+
 import express from 'express';
 import cors from 'cors';
-import { Firestore } from '@google-cloud/firestore';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 
@@ -20,7 +27,8 @@ if (!JWT_SECRET) {
     console.error('WARNING: JWT_SECRET is not defined. Auth endpoints will fail. Check --set-secrets in cloudbuild.yaml.');
 }
 
-const firestore = new Firestore({ projectId: PROJECT_ID });
+import { getFirestore } from './src/utils/firestore.js';
+const firestore = getFirestore();
 
 const hashPassword = async (password) => bcrypt.hash(password, 10);
 

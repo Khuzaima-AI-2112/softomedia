@@ -8,17 +8,19 @@ export const getFirestore = () => {
     if (db) return db;
 
     try {
-        // Only force mock if we're not in production AND not even trying a project ID
-        // Note: softomedia-live-2026 is hardcoded here for safety
-        const projectId = 'softomedia-live-2026';
-
-        db = new Firestore({
-            projectId: projectId,
-            keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS, // Can be undefined
+        const config = {
+            projectId: 'softomedia-live-2026',
             retry: { retries: 1 }
-        });
+        };
 
-        logger.info('Firestore initialized', { projectId });
+        // Only set keyFilename if explicitly provided (local dev only)
+        if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+            config.keyFilename = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+        }
+
+        db = new Firestore(config);
+
+        logger.info('Firestore initialized', { projectId: config.projectId });
         return db;
     } catch (error) {
         logger.error('Firestore initialization failed, switching to mock mode', { error: error.message });
