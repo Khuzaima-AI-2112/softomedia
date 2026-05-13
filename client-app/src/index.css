@@ -1,8 +1,15 @@
-/* Import Industrial Premium Design System */
+/* SoftoMedia AdManager — Entry stylesheet */
+
+/* 1. Tailwind v4 base */
+@import 'tailwindcss';
+
+/* 2. Design tokens (@theme block + backward-compat aliases) */
+@import './styles/tokens.css';
+
+/* 3. Original token file — PRESERVED UNCHANGED as reference */
+/*    Components still using var(--color-bg-main) etc. continue to work */
+/*    via the compat aliases in tokens.css */
 @import './design-tokens.css';
 
-body {
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-}
+/* 4. Base resets and global styles */
+@import './styles/base.css';
