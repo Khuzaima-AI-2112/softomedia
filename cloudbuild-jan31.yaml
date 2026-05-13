@@ -1,0 +1,219 @@
+# Cloud Build Configuration — January 31 Snapshot
+# Deploys ad-server-jan31 and client-app-jan31 as SEPARATE Cloud Run services
+# so both the Jan 31 snapshot and main branch run independently side-by-side.
+
+substitutions:
+  _PROJECT: 'softomedia-live-2026'
+  _REGION: 'us-central1'
+  _GCS_ADS_BUCKET: 'softo-media-live-ads'
+  _SERVICE_BACKEND: 'ad-server-jan31'
+  _SERVICE_FRONTEND: 'client-app-jan31'
+
+steps:
+  # =============================================================================
+  # SECRET EXISTENCE CHECK
+  # =============================================================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -e
+        echo "Verifying required secrets exist in Secret Manager..."
+        for secret in JWT_SECRET GEMINI_API_KEY; do
+          if ! gcloud secrets describe "$$secret" --project=${_PROJECT} >/dev/null 2>&1; then
+            echo "ERROR: Required secret '$$secret' not found."
+            exit 1
+          fi
+          echo "  OK: $$secret"
+        done
+    id: 'verify-secrets'
+
+  # =============================================================================
+  # BACKEND — ad-server-jan31
+  # =============================================================================
+  - name: 'gcr.io/cloud-builders/docker'
+    dir: 'ad-server'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/${_PROJECT}/${_SERVICE_BACKEND}:$BUILD_ID'
+      - '-t'
+      - 'gcr.io/${_PROJECT}/${_SERVICE_BACKEND}:latest'
+      - '.'
+    id: 'build-backend'
+    waitFor: ['verify-secrets']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/${_PROJECT}/${_SERVICE_BACKEND}:$BUILD_ID'
+    id: 'push-backend'
+    waitFor: ['build-backend']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_SERVICE_BACKEND}'
+      - '--project=${_PROJECT}'
+      - '--image=gcr.io/${_PROJECT}/${_SERVICE_BACKEND}:$BUILD_ID'
+      - '--region=${_REGION}'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--port=8080'
+      - '--set-env-vars=PROJECT_ID=${_PROJECT},GCS_BUCKET=${_GCS_ADS_BUCKET},NODE_ENV=production,DISABLE_MOCK_STORAGE=true'
+      - '--set-secrets=JWT_SECRET=JWT_SECRET:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest'
+      - '--memory=512Mi'
+      - '--cpu=1'
+      - '--max-instances=5'
+      - '--min-instances=0'
+      - '--timeout=600s'
+    id: 'deploy-backend'
+    waitFor: ['push-backend']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -e
+        echo "Making ${_SERVICE_BACKEND} publicly invokable..."
+        gcloud run services add-iam-policy-binding ${_SERVICE_BACKEND} \
+          --project=${_PROJECT} \
+          --region=${_REGION} \
+          --member=allUsers \
+          --role=roles/run.invoker
+    id: 'iam-backend'
+    waitFor: ['deploy-backend']
+
+  # =============================================================================
+  # FRONTEND — client-app-jan31
+  # =============================================================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -e
+        BACKEND_URL=$$(gcloud run services describe ${_SERVICE_BACKEND} \
+          --project=${_PROJECT} \
+          --region=${_REGION} \
+          --format='value(status.url)')
+        echo "Backend URL: $$BACKEND_URL"
+        echo "$$BACKEND_URL" > /workspace/backend_url.txt
+
+        echo "Health checking backend..."
+        for i in 1 2 3 4 5 6; do
+          if curl -fsS "$$BACKEND_URL/health" >/dev/null; then
+            echo "  Health OK"
+            break
+          fi
+          echo "  Not ready yet (attempt $$i)..."
+          sleep 5
+          if [ "$$i" = "6" ]; then
+            echo "ERROR: backend health check failed after 30s."
+            exit 1
+          fi
+        done
+    id: 'verify-backend'
+    waitFor: ['iam-backend']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -e
+        BACKEND_URL=$$(cat /workspace/backend_url.txt)
+        echo "VITE_API_URL=$$BACKEND_URL" > ./client-app/.env.production
+        cat ./client-app/.env.production
+    id: 'configure-frontend'
+    waitFor: ['verify-backend']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    dir: 'client-app'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/${_PROJECT}/${_SERVICE_FRONTEND}:$BUILD_ID'
+      - '-t'
+      - 'gcr.io/${_PROJECT}/${_SERVICE_FRONTEND}:latest'
+      - '.'
+    id: 'build-frontend'
+    waitFor: ['configure-frontend']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/${_PROJECT}/${_SERVICE_FRONTEND}:$BUILD_ID'
+    id: 'push-frontend'
+    waitFor: ['build-frontend']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_SERVICE_FRONTEND}'
+      - '--project=${_PROJECT}'
+      - '--image=gcr.io/${_PROJECT}/${_SERVICE_FRONTEND}:$BUILD_ID'
+      - '--region=${_REGION}'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--port=8080'
+      - '--memory=256Mi'
+      - '--cpu=1'
+      - '--max-instances=5'
+    id: 'deploy-frontend'
+    waitFor: ['push-frontend']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -e
+        echo "Making ${_SERVICE_FRONTEND} publicly invokable..."
+        gcloud run services add-iam-policy-binding ${_SERVICE_FRONTEND} \
+          --project=${_PROJECT} \
+          --region=${_REGION} \
+          --member=allUsers \
+          --role=roles/run.invoker
+    id: 'iam-frontend'
+    waitFor: ['deploy-frontend']
+
+  # =============================================================================
+  # DEPLOYMENT SUMMARY
+  # =============================================================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -e
+        BACKEND_URL=$$(cat /workspace/backend_url.txt)
+        FRONTEND_URL=$$(gcloud run services describe ${_SERVICE_FRONTEND} \
+          --project=${_PROJECT} \
+          --region=${_REGION} \
+          --format='value(status.url)')
+        echo "=========================================="
+        echo "JAN 31 SNAPSHOT DEPLOYMENT COMPLETE"
+        echo "=========================================="
+        echo "Frontend (jan31): $$FRONTEND_URL"
+        echo "Backend  (jan31): $$BACKEND_URL"
+        echo "=========================================="
+    id: 'display-summary'
+    waitFor: ['iam-frontend']
+
+images:
+  - 'gcr.io/${_PROJECT}/${_SERVICE_BACKEND}:$BUILD_ID'
+  - 'gcr.io/${_PROJECT}/${_SERVICE_FRONTEND}:$BUILD_ID'
+
+options:
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+  serviceAccount: 'projects/softomedia-live-2026/serviceAccounts/cloudbuild-deployer@softomedia-live-2026.iam.gserviceaccount.com'
+
+timeout: '2400s'
