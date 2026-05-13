@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { dashboardAPI } from '../../services/api.js';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
@@ -7,18 +8,23 @@ import EmptyState from '../../components/EmptyState';
 import '../../design-tokens.css';
 
 /**
- * DashboardOverview - State 6: God View (Super Admin Dashboard)
- * Enhanced with Industrial Premium design system
+ * DashboardOverview — God View (Super Admin Dashboard)
+ * Shows live network stats + persona preview cards for Brand / Retailer / Advertiser
  */
 function DashboardOverview() {
-    const role = localStorage.getItem('softomedia_role') || 'admin';
+    const navigate = useNavigate();
+    // Fixed: was incorrectly reading 'softomedia_role' — now reads 'auth_role' to match api.js
+    const role = localStorage.getItem('auth_role') || 'admin';
     const [screens, setScreens] = React.useState([]);
     const [ads, setAds] = React.useState([]);
     const [stats, setStats] = React.useState({ active: 0, impressions: 0, playTime: 0 });
+    const [userCounts, setUserCounts] = React.useState({ brands: 0, retailers: 0, advertisers: 0 });
 
     React.useEffect(() => {
         const fetchData = async () => {
             try {
+                const API_URL = window.__API_URL__ || '';
+
                 // Fetch Screens
                 const screensRes = await fetch(`${API_URL}/api/screens`);
                 const screensData = await screensRes.json();
@@ -27,9 +33,12 @@ function DashboardOverview() {
                 const adsRes = await fetch(`${API_URL}/api/ads`);
                 const adsData = await adsRes.json();
 
+                // Fetch Users (for persona counts)
+                const usersRes = await fetch(`${API_URL}/api/users`);
+                const usersData = await usersRes.json();
+
                 if (screensData.screens) {
                     setScreens(screensData.screens);
-                    // Calculate aggregates
                     const active = screensData.screens.length;
                     const impressions = screensData.screens.reduce((acc, s) => acc + (s.stats?.total_impressions || 0), 0);
                     const playTime = screensData.screens.reduce((acc, s) => acc + (s.stats?.total_play_time || 0), 0);
@@ -38,6 +47,13 @@ function DashboardOverview() {
 
                 if (adsData.ads) {
                     setAds(adsData.ads);
+                }
+
+                if (usersData.users) {
+                    const brands = usersData.users.filter(u => u.role === 'brand').length;
+                    const retailers = usersData.users.filter(u => u.role === 'retailer').length;
+                    const advertisers = usersData.users.filter(u => u.role === 'advertiser').length;
+                    setUserCounts({ brands, retailers, advertisers });
                 }
 
             } catch (e) {
@@ -54,22 +70,72 @@ function DashboardOverview() {
         return `${h}h ${m}m`;
     };
 
+    const personaCardStyle = {
+        backgroundColor: 'white',
+        borderRadius: 'var(--radius-md, 8px)',
+        border: '1px solid #e5e7eb',
+        padding: '1.5rem',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1rem',
+    };
+
+    const personaButtonStyle = (color) => ({
+        padding: '0.5rem 1rem',
+        backgroundColor: color,
+        color: 'white',
+        border: 'none',
+        borderRadius: '6px',
+        cursor: 'pointer',
+        fontSize: '0.875rem',
+        fontWeight: '500',
+        alignSelf: 'flex-start',
+    });
+
+    const personas = [
+        {
+            label: 'Brands',
+            count: userCounts.brands,
+            description: 'Upload creatives, launch campaigns, track performance.',
+            route: '/dashboard/brand',
+            color: '#7c3aed',
+            icon: '🎯',
+        },
+        {
+            label: 'Retailers',
+            count: userCounts.retailers,
+            description: 'Manage screens, approve schedules, view play history.',
+            route: '/dashboard/retailer',
+            color: '#0891b2',
+            icon: '🏪',
+        },
+        {
+            label: 'Advertisers',
+            count: userCounts.advertisers,
+            description: 'Set CPM budgets, review placements, monitor ROI.',
+            route: '/dashboard/admin/advertisers',
+            color: '#059669',
+            icon: '📊',
+        },
+    ];
+
     return (
         <>
             <HamburgerMenu />
             <div className="dashboard-ui" style={{ padding: 'var(--space-6)' }}>
-                {/* Empty State Check - State 14 */}
+
+                {/* Empty State */}
                 {screens.length === 0 && ads.length === 0 && (
                     <EmptyState
                         title="Welcome to SoftoMedia"
                         message="Your network is ready to go. Start by adding screens or uploading your first ad campaign."
                         ctaText="Get Started"
-                        onCtaClick={() => console.log('Navigate to setup')}
+                        onCtaClick={() => navigate('/dashboard/admin/screens')}
                         illustration="🎯"
                     />
                 )}
 
-                {/* Hero Metrics - State 6: God View */}
+                {/* Hero Metrics */}
                 {(screens.length > 0 || ads.length > 0) && (
                     <>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 'var(--space-6)', marginBottom: 'var(--space-8)' }}>
@@ -93,7 +159,34 @@ function DashboardOverview() {
                             </GlassCard>
                         </div>
 
-                        {/* Campaign Performance (Ads) */}
+                        {/* ── Persona Preview (God View) ── */}
+                        <div style={{ marginBottom: 'var(--space-8)' }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#111827', marginBottom: '1rem' }}>
+                                User Personas — Preview as any role
+                            </h3>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
+                                {personas.map((p) => (
+                                    <div key={p.label} style={personaCardStyle}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                            <span style={{ fontSize: '1.5rem' }}>{p.icon}</span>
+                                            <div>
+                                                <div style={{ fontWeight: '600', fontSize: '1rem', color: '#111827' }}>{p.label}</div>
+                                                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{p.count} user{p.count !== 1 ? 's' : ''}</div>
+                                            </div>
+                                        </div>
+                                        <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>{p.description}</p>
+                                        <button
+                                            style={personaButtonStyle(p.color)}
+                                            onClick={() => navigate(p.route)}
+                                        >
+                                            View as {p.label.slice(0, -1)} →
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Campaign Performance */}
                         <GlassCard title="Campaign Performance" style={{ marginBottom: 'var(--space-8)' }}>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 'var(--space-6)' }}>
                                 {ads.map(ad => (
@@ -139,9 +232,7 @@ function DashboardOverview() {
                                         {screens.map(screen => (
                                             <tr key={screen.screen_id} style={{ borderBottom: '1px solid var(--color-border-light)' }}>
                                                 <td style={{ padding: 'var(--space-3)', fontWeight: 'var(--font-medium)' }}>{screen.screen_id}</td>
-                                                <td style={{ padding: 'var(--space-3)' }}>
-                                                    <StatusBadge status={screen.status} />
-                                                </td>
+                                                <td style={{ padding: 'var(--space-3)' }}><StatusBadge status={screen.status} /></td>
                                                 <td style={{ padding: 'var(--space-3)' }}>{(screen.stats?.total_impressions || 0).toLocaleString()}</td>
                                                 <td style={{ padding: 'var(--space-3)' }}>{formatTime(screen.stats?.total_play_time || 0)}</td>
                                                 <td style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
