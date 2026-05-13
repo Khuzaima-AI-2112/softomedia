@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 function Login() {
     const navigate = useNavigate();
-    const { login } = useAuth();
+    const { login, setUser } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -18,14 +18,16 @@ function Login() {
         try {
             const data = await login(email, password);
 
-            // Role-based routing
+            // Role-based routing — aligned to /dashboard/* structure
             const userRole = data.user.role;
             if (userRole === 'brand') {
-                navigate('/brand/dashboard');
+                navigate('/dashboard/brand');
             } else if (userRole === 'retailer') {
-                navigate('/retailer/dashboard');
+                navigate('/dashboard/retailer');
+            } else if (userRole === 'tech') {
+                navigate('/dashboard/tech');
             } else {
-                navigate('/dashboard'); // admin and others
+                navigate('/dashboard/admin'); // admin and others
             }
         } catch (err) {
             console.error(err);
@@ -33,6 +35,16 @@ function Login() {
         } finally {
             setLoading(false);
         }
+    };
+
+    // Super Admin demo bypass — no API call required
+    const handleDemoAccess = () => {
+        const demoUser = { role: 'admin', email: 'demo@softomedia.com', name: 'Super Admin (Demo)' };
+        localStorage.setItem('auth_token', 'superadmin-demo-token');
+        localStorage.setItem('auth_role', 'admin');
+        localStorage.setItem('user_data', JSON.stringify(demoUser));
+        // Force a full navigation so AuthContext re-reads localStorage on mount
+        window.location.href = '/dashboard/admin';
     };
 
     return (
@@ -109,6 +121,27 @@ function Login() {
                         {loading ? 'Signing in...' : 'Sign in'}
                     </button>
                 </form>
+
+                {/* Demo bypass — for Super Admin testing without credentials */}
+                <div style={{ marginTop: '1.5rem', borderTop: '1px solid #e5e7eb', paddingTop: '1.5rem' }}>
+                    <p style={{ textAlign: 'center', fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.75rem' }}>DEMO ACCESS</p>
+                    <button
+                        onClick={handleDemoAccess}
+                        style={{
+                            width: '100%',
+                            padding: '0.5rem',
+                            backgroundColor: 'transparent',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '4px',
+                            color: '#374151',
+                            cursor: 'pointer',
+                            fontSize: '0.875rem',
+                            fontWeight: '500',
+                        }}
+                    >
+                        ⚡ Enter as Super Admin (No Login)
+                    </button>
+                </div>
             </div>
         </div>
     );
