@@ -12,9 +12,13 @@ const PORT = process.env.PORT || 8080;
 const JWT_SECRET = process.env.JWT_SECRET;
 const PROJECT_ID = process.env.PROJECT_ID || 'softomedia-live-2026';
 
+// Log startup configuration (Rule 11.2)
+console.log(`Starting ad-server on port ${PORT} in project ${PROJECT_ID}`);
+
 if (!JWT_SECRET) {
     console.error('FATAL: JWT_SECRET is not defined.');
-    process.exit(1);
+    // In Cloud Run, we want to see this in logs before exiting
+    setTimeout(() => process.exit(1), 1000);
 }
 
 // Initialize Firestore
@@ -45,6 +49,10 @@ const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
 const ADMIN_PASS = process.env.ADMIN_PASS;
 
 async function bootstrapAdmin() {
+    if (!ADMIN_EMAIL || !ADMIN_PASS) {
+        console.warn('Bootstrap skipped: ADMIN_EMAIL or ADMIN_PASS not defined.');
+        return;
+    }
     try {
         const usersRef = firestore.collection('users');
         const snapshot = await usersRef.where('email', '==', ADMIN_EMAIL).get();
@@ -266,7 +274,7 @@ app.get('/health', (req, res) => {
 });
 
 // Start server and bootstrap
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server listening on port ${PORT}`);
 });
 

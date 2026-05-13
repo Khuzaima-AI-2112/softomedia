@@ -1,5 +1,14 @@
 # Frontend (Client App) Cloud Build Configuration
 # Builds Docker image with backend URL and deploys to Cloud Run
+#
+# AGENTS.md compliance:
+#   - Rule 0.1: All gcloud commands include --project=softomedia-live-2026
+#   - Rule 9.5: Build once, deploy many. Backend URL is fetched at deploy time.
+#   - Rule 9.8: Cloud Run public IAM is verified
+
+substitutions:
+  _PROJECT: 'softomedia-live-2026'
+  _REGION: 'us-central1'
 
 steps:
   # Step 1: Get backend URL from previous deployment
@@ -8,32 +17,40 @@ steps:
     args:
       - '-c'
       - |
-        echo "Fetching backend URL..."
-        BACKEND_URL=$$(gcloud run services describe ad-server --region=us-central1 --format='value(status.url)')
+        set -e
+        echo "Fetching backend URL from project ${_PROJECT}..."
+        BACKEND_URL=$$(gcloud run services describe ad-server \
+          --project=${_PROJECT} \
+          --region=${_REGION} \
+          --format='value(status.url)')
+        if [ -z "$$BACKEND_URL" ]; then
+          echo "ERROR: ad-server service not found in ${_PROJECT}/${_REGION}. Deploy backend first."
+          exit 1
+        fi
         echo "Backend URL: $$BACKEND_URL"
         echo "VITE_API_URL=$$BACKEND_URL" > .env.production
         cat .env.production
     dir: 'client-app'
     id: 'get-backend-url'
 
-  # Step 2: Build the Docker image with build arg
+  # Step 2: Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/client-app:$BUILD_ID'
+      - 'gcr.io/${_PROJECT}/client-app:$BUILD_ID'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/client-app:latest'
+      - 'gcr.io/${_PROJECT}/client-app:latest'
       - '.'
     dir: 'client-app'
     id: 'build-image'
     waitFor: ['get-backend-url']
 
-  # Step 3: Push the Docker image to GCR
+  # Step 3: Push image (BUILD_ID)
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/client-app:$BUILD_ID'
+      - 'gcr.io/${_PROJECT}/client-app:$BUILD_ID'
     id: 'push-image'
     waitFor: ['build-image']
 
@@ -41,7 +58,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/client-app:latest'
+      - 'gcr.io/${_PROJECT}/client-app:latest'
     id: 'push-latest'
     waitFor: ['build-image']
 
@@ -52,44 +69,71 @@ steps:
       - 'run'
       - 'deploy'
       - 'client-app'
-      - '--image=gcr.io/$PROJECT_ID/client-app:$BUILD_ID'
-      - '--region=us-central1'
+      - '--project=${_PROJECT}'
+      - '--image=gcr.io/${_PROJECT}/client-app:$BUILD_ID'
+      - '--region=${_REGION}'
       - '--platform=managed'
       - '--allow-unauthenticated'
+      - '--port=8080'
       - '--memory=256Mi'
       - '--cpu=1'
       - '--max-instances=10'
       - '--min-instances=0'
       - '--timeout=60s'
-      - '--port=8080'
     id: 'deploy-to-cloud-run'
     waitFor: ['push-image']
 
-  # Step 6: Display deployment info
+  # Step 6: Verify Cloud Run public IAM (Rule 9.8)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        echo "Frontend deployed successfully!"
-        FRONTEND_URL=$$(gcloud run services describe client-app --region=us-central1 --format='value(status.url)')
-        echo "=========================================" 
-        echo "🎉 DEPLOYMENT COMPLETE!"
-        echo "=========================================" 
-        echo "Frontend URL: $$FRONTEND_URL"
-        echo "Backend URL: $$(cat /workspace/backend_url.txt 2>/dev/null || gcloud run services describe ad-server --region=us-central1 --format='value(status.url)')"
-        echo "========================================="
-    id: 'display-urls'
+        set -e
+        echo "Ensuring client-app is publicly invokable (Rule 9.8)..."
+        gcloud run services add-iam-policy-binding client-app \
+          --project=${_PROJECT} \
+          --region=${_REGION} \
+          --member=allUsers \
+          --role=roles/run.invoker
+    id: 'iam-public'
     waitFor: ['deploy-to-cloud-run']
+
+  # Step 7: Display deployment info
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -e
+        FRONTEND_URL=$$(gcloud run services describe client-app \
+          --project=${_PROJECT} \
+          --region=${_REGION} \
+          --format='value(status.url)')
+        BACKEND_URL=$$(gcloud run services describe ad-server \
+          --project=${_PROJECT} \
+          --region=${_REGION} \
+          --format='value(status.url)' || echo 'unknown')
+        echo "=========================================="
+        echo "FRONTEND DEPLOYMENT COMPLETE"
+        echo "=========================================="
+        echo "Frontend: $$FRONTEND_URL"
+        echo "Backend:  $$BACKEND_URL"
+        echo "Project:  ${_PROJECT}"
+        echo "Build ID: $BUILD_ID"
+        echo "=========================================="
+        curl -fsS -o /dev/null -w "  Frontend HTTP: %{http_code}\n" "$$FRONTEND_URL/" || true
+    id: 'display-urls'
+    waitFor: ['iam-public']
 
 # Store the built images
 images:
-  - 'gcr.io/$PROJECT_ID/client-app:$BUILD_ID'
-  - 'gcr.io/$PROJECT_ID/client-app:latest'
+  - 'gcr.io/softomedia-live-2026/client-app:$BUILD_ID'
+  - 'gcr.io/softomedia-live-2026/client-app:latest'
 
 # Configuration
 options:
-  machineType: 'N1_HIGHCPU_8'
+  machineType: 'E2_HIGHCPU_8'
   logging: CLOUD_LOGGING_ONLY
 
 timeout: '1200s'  # 20 minutes

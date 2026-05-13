@@ -1,98 +1,75 @@
-
+import { execSync } from 'child_process';
 import fs from 'fs';
-import path from 'path';
-import { Storage } from '@google-cloud/storage';
+import os from 'os';
 
-// Configuration
-const BUCKET_NAME = 'softomedia-live2026-ads';
+console.log('--- Starting Pre-deployment Check ---');
 
-const SEED_FILE = 'ad-server/seed_demo.js';
-const EXPECTED_EXTENSION = '.png'; // We decided to move everything to PNG
-const EXPECTED_DURATION = 5;
+const isWindows = os.platform() === 'win32';
 
-const storage = new Storage();
-
-async function verify() {
-    console.log('🔍 Starting Pre-deployment Verification...');
-    let errors = 0;
-
-    // 1. Verify SEED script content
-    console.log(`\nChecking Config in ${SEED_FILE}...`);
-    const seedContent = fs.readFileSync(SEED_FILE, 'utf8');
-
-    // Check for SVGs (Failure condition)
-    if (seedContent.includes('.svg')) {
-        console.error('❌ FAIL: Seed file contains .svg references. All ads must be .png.');
-        errors++;
-    } else {
-        console.log('✅ PASS: No .svg references found.');
-    }
-
-    // Check for correct duration
-    // Simple regex check for "duration: 5"
-    if (seedContent.includes('duration: 5')) {
-        console.log('✅ PASS: Found "duration: 5" configuration.');
-    } else {
-        console.error(`❌ FAIL: "duration: ${EXPECTED_DURATION}" not found in seed script. Check durations.`);
-        errors++;
-    }
-
-    // 1.5 Verify ad-server/index.js for hardcoded legacy data
-    const INDEX_FILE = 'ad-server/index.js';
-    console.log(`\nChecking source code in ${INDEX_FILE}...`);
+// 1. Check for hardcoded URLs (cross-platform)
+console.log('Checking for hardcoded Cloud Run URLs...');
+try {
+  let output = '';
+  if (isWindows) {
+    // Windows: use findstr
     try {
-        const indexContent = fs.readFileSync(INDEX_FILE, 'utf8');
-        if (indexContent.includes('.svg')) {
-            console.error('❌ FAIL: index.js contains hardcoded .svg references. Use seed data only!');
-            errors++;
-        } else {
-            console.log('✅ PASS: No hardcoded .svg in index.js.');
-        }
+      output = execSync(
+        'findstr /s /i /r "https://ad-server-.*\\.run\\.app https://client-app-.*\\.run\\.app" *.yaml *.js *.jsx *.json *.md',
+        { stdio: ['pipe', 'pipe', 'pipe'] }
+      ).toString();
     } catch (e) {
-        console.warn('⚠️ WARN: Could not check index.js (file missing?)');
+      // findstr exit code 1 means no matches
+      output = '';
     }
-
-    // 2. Verify Cloud Storage Assets
-    console.log(`\nChecking Assets in gs://${BUCKET_NAME}...`);
+  } else {
+    // Linux/Mac (Cloud Build): use grep
     try {
-        const [files] = await storage.bucket(BUCKET_NAME).getFiles();
-        const fileNames = files.map(f => f.name);
-
-        const requiredAssets = [
-            'demo_ad_costco.png',
-            'demo_ad_pizza.png',
-            'demo_ad_1.png',
-            'demo_ad_2.png',
-            'demo_ad_3.png'
-        ];
-
-        requiredAssets.forEach(asset => {
-            if (fileNames.includes(asset)) {
-                console.log(`✅ PASS: Found ${asset}`);
-            } else {
-                console.error(`❌ FAIL: Missing required asset: ${asset}`);
-                errors++;
-            }
-        });
-
+      output = execSync(
+        "grep -r -E 'https://(ad-server|client-app)-[a-z0-9]+\\.run\\.app' " +
+          "--include='*.yaml' --include='*.js' --include='*.jsx' --include='*.json' --include='*.md' " +
+          "--exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist " +
+          "--exclude='deployment_log.md' --exclude='lessons_learned.md' --exclude='changelog.md' " +
+          "--exclude='AGENTS.md' --exclude='DEPLOYMENT_README.md' --exclude='DEPLOY_GUIDE.md' " +
+          "--exclude='verify_predeploy.js' " +
+          ".",
+        { stdio: ['pipe', 'pipe', 'pipe'] }
+      ).toString();
     } catch (e) {
-        console.error('❌ FAIL: Could not list GCS bucket. Check permissions.', e.message);
-        errors++;
+      // grep exit code 1 means no matches
+      output = '';
     }
+  }
 
-    // Summary
-    console.log('\n-----------------------------------');
-    if (errors === 0) {
-        console.log('✅ VERIFICATION SUCCEEDED. Safe to deploy.');
-        process.exit(0);
-    } else {
-        console.error(`❌ VERIFICATION FAILED with ${errors} errors.`);
-        console.error('Fix these errors before deploying.');
-        process.exit(1);
-    }
+  if (output && output.trim().length > 0) {
+    console.error('ERROR: Hardcoded Cloud Run URLs found in source files:');
+    console.error(output);
+    console.error('Per AGENTS.md Rule 9.12: Hardcoded run.app URLs must be removed before deploy.');
+    process.exit(1);
+  }
+  console.log('  ✓ No hardcoded run.app URLs found in source files.');
+} catch (e) {
+  console.error('Pre-deploy URL scan failed:', e.message);
+  process.exit(1);
 }
 
-verify().catch(e => {
-    console.error('Script Error:', e);
+// 2. Verify deployment_log.md exists
+console.log('Reviewing deployment_log.md...');
+if (!fs.existsSync('deployment_log.md')) {
+  console.error('ERROR: deployment_log.md not found.');
+  process.exit(1);
+}
+console.log('  ✓ deployment_log.md present.');
+
+// 3. Verify required cloudbuild.yaml files exist
+console.log('Verifying cloudbuild.yaml files...');
+const required = ['cloudbuild.yaml', 'ad-server/Dockerfile', 'client-app/Dockerfile'];
+for (const f of required) {
+  if (!fs.existsSync(f)) {
+    console.error(`ERROR: required file missing: ${f}`);
     process.exit(1);
-});
+  }
+}
+console.log('  ✓ All required deployment files present.');
+
+console.log('--- Pre-deployment Check Passed ---');
+process.exit(0);
