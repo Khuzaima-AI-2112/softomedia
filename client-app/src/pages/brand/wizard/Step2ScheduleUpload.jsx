@@ -1,180 +1,206 @@
-/**
- * Step2ScheduleUpload - Campaign name and date range selection
- * Part of the advertiser campaign booking wizard (5-step flow)
- */
+import { CalendarDays, Tv } from 'lucide-react';
+import '../../../design-tokens.css';
 
-import GlassCard from '../../../components/GlassCard';
+function DateRangePicker({ start, end, onChangeStart, onChangeEnd, minStart }) {
+    const inputBase = {
+        flex: 1, padding: '0.625rem 0.875rem',
+        border: 'none', outline: 'none',
+        fontSize: 'var(--text-sm)', backgroundColor: 'transparent',
+        color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)', minWidth: 0,
+    };
+    return (
+        <div style={{
+            display: 'flex', alignItems: 'stretch',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-md)',
+            backgroundColor: 'var(--color-bg-card)',
+            overflow: 'hidden', boxShadow: 'var(--shadow-sm)',
+        }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '0.375rem 0.875rem 0.5rem' }}>
+                <label style={{ fontSize: '0.6875rem', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Start</label>
+                <input type="date" value={start || ''} min={minStart} onChange={e => onChangeStart(e.target.value)} style={inputBase} data-testid="campaign-start-date-input" />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', padding: '0 0.625rem', borderLeft: '1px solid var(--color-border)', borderRight: '1px solid var(--color-border)', color: 'var(--color-text-tertiary)' }}>
+                <CalendarDays size={14} />
+            </div>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '0.375rem 0.875rem 0.5rem' }}>
+                <label style={{ fontSize: '0.6875rem', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>End</label>
+                <input type="date" value={end || ''} min={start || minStart} onChange={e => onChangeEnd(e.target.value)} style={inputBase} data-testid="campaign-end-date-input" />
+            </div>
+        </div>
+    );
+}
+
+function Field({ label, hint, children }) {
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+            <label style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-primary)' }}>{label}</label>
+            {children}
+            {hint && <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', margin: 0 }}>{hint}</p>}
+        </div>
+    );
+}
 
 const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
-    // Calculate campaign duration
+    const today = new Date().toISOString().split('T')[0];
+
     const getDuration = () => {
         if (!data.dateRange?.start || !data.dateRange?.end) return 0;
-        const start = new Date(data.dateRange.start);
-        const end = new Date(data.dateRange.end);
-        return Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1);
+        return Math.max(1, Math.ceil((new Date(data.dateRange.end) - new Date(data.dateRange.start)) / (1000 * 60 * 60 * 24)) + 1);
     };
-
     const duration = getDuration();
 
-    // Diagnostic logging for E2E debugging
-    console.log(`[Diagnostic] Step 2 Render. Duration: ${duration}, campaignName: ${data.campaignName}`, data.dateRange);
-
     const handleContinue = () => {
-        console.log('[Diagnostic] Step 2 Continue clicked. Name:', data.campaignName);
-        if (!data.campaignName) {
-            updateData({ campaignName: 'Untitled Campaign' });
-        }
+        if (!data.campaignName) updateData({ campaignName: 'Untitled Campaign' });
         onNext();
     };
 
-    return (
-        <div className="space-y-6 pb-24">
-            {/* Step Header */}
-            <GlassCard className="border-l-4 border-l-primary">
-                <div className="flex items-center gap-4">
-                    <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                        <span className="material-symbols-outlined text-primary text-2xl">calendar_month</span>
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-bold">Step 2: Campaign Schedule</h2>
-                        <p className="text-slate-500 dark:text-slate-400">
-                            Set your campaign name and date range
-                        </p>
-                    </div>
-                </div>
-            </GlassCard>
+    const cardStyle = {
+        backgroundColor: 'var(--color-bg-card)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-lg)',
+        boxShadow: 'var(--shadow-sm)',
+        padding: '1.25rem 1.375rem',
+    };
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Campaign Name */}
-                <GlassCard>
-                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                        <span className="material-symbols-outlined text-primary">badge</span>
-                        Campaign Name
-                    </h3>
+    const inputStyle = {
+        width: '100%', padding: '0.625rem 0.875rem',
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-md)',
+        fontSize: 'var(--text-sm)',
+        backgroundColor: 'var(--color-bg-card)',
+        color: 'var(--color-text-primary)',
+        fontFamily: 'var(--font-body)',
+        outline: 'none', boxSizing: 'border-box',
+    };
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingBottom: '5rem' }}>
+
+            {/* Campaign Name — full-width row */}
+            <div style={cardStyle}>
+                <Field label="Campaign Name" hint="Choose a memorable name for your campaign">
                     <input
                         type="text"
                         data-testid="campaign-name-input"
                         value={data.campaignName || ''}
-                        onChange={(e) => updateData({ campaignName: e.target.value })}
+                        onChange={e => updateData({ campaignName: e.target.value })}
                         placeholder="e.g., Summer Sale 2026"
-                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                        style={inputStyle}
                     />
-                    <p className="text-sm text-slate-500 mt-2">
-                        Choose a memorable name for your campaign
-                    </p>
-                </GlassCard>
+                </Field>
+            </div>
 
-                {/* Budget */}
-                <GlassCard>
-                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                        <span className="material-symbols-outlined text-primary">payments</span>
-                        Campaign Budget
-                    </h3>
-                    <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-slate-400">$</span>
+            {/* Campaign Budget — full-width row */}
+            <div style={cardStyle}>
+                <Field label="Campaign Budget" hint="Set your maximum spending limit">
+                    <div style={{ position: 'relative' }}>
+                        <span style={{
+                            position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)',
+                            fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)',
+                            color: 'var(--color-text-tertiary)', pointerEvents: 'none',
+                        }}>$</span>
                         <input
                             type="number"
                             data-testid="campaign-budget-input"
                             value={data.budget || 1000}
-                            onChange={(e) => updateData({ budget: parseInt(e.target.value) || 0 })}
-                            min="100"
-                            step="100"
-                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                            onChange={e => updateData({ budget: parseInt(e.target.value) || 0 })}
+                            min="100" step="100"
+                            style={{ ...inputStyle, paddingLeft: '1.75rem' }}
                         />
                     </div>
-                    <p className="text-sm text-slate-500 mt-2">
-                        Set your maximum spending limit
-                    </p>
-                </GlassCard>
+                </Field>
             </div>
 
-            {/* Date Range */}
-            <GlassCard>
-                <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-primary">date_range</span>
-                    Campaign Duration
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
-                        <label className="block text-sm font-medium mb-2">Start Date</label>
-                        <input
-                            type="date"
-                            data-testid="campaign-start-date-input"
-                            value={data.dateRange?.start || ''}
-                            onChange={(e) => updateData({
-                                dateRange: { ...data.dateRange, start: e.target.value }
-                            })}
-                            min={new Date().toISOString().split('T')[0]}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium mb-2">End Date</label>
-                        <input
-                            type="date"
-                            data-testid="campaign-end-date-input"
-                            value={data.dateRange?.end || ''}
-                            onChange={(e) => updateData({
-                                dateRange: { ...data.dateRange, end: e.target.value }
-                            })}
-                            min={data.dateRange?.start || new Date().toISOString().split('T')[0]}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
-                        />
-                    </div>
-                    <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-primary/5 border border-primary/20">
-                        <p className="text-4xl font-black text-primary">{duration}</p>
-                        <p className="text-sm text-slate-500">Days</p>
-                    </div>
+            {/* Date range — inline joined picker */}
+            <div style={cardStyle}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.875rem' }}>
+                    <label style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-primary)' }}>Campaign Duration</label>
+                    {duration > 0 && (
+                        <span style={{
+                            fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)',
+                            color: 'var(--color-primary)',
+                            backgroundColor: 'rgba(99,102,241,0.08)',
+                            padding: '3px 10px', borderRadius: 'var(--radius-full)',
+                        }}>{duration} day{duration !== 1 ? 's' : ''}</span>
+                    )}
                 </div>
-            </GlassCard>
-
-            {/* Selected Screens Summary */}
-            <GlassCard className="bg-slate-50 dark:bg-slate-800/50">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <span className="material-symbols-outlined text-primary">tv</span>
-                        </div>
-                        <div>
-                            <p className="font-bold">{(data.selectedScreens || []).length} Screens Selected</p>
-                            <p className="text-sm text-slate-500">{(data.selectedStores || []).length} Stores</p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={onPrev}
-                        className="text-primary hover:underline text-sm font-medium"
-                    >
-                        Change Selection
-                    </button>
-                </div>
-            </GlassCard>
-
-            {/* Navigation */}
-            <div className="fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-[#111722] border-t border-slate-200 dark:border-slate-800 shadow-[0_-4px_20px_rgba(0,0,0,0.15)]">
-                <div className="max-w-[1440px] mx-auto px-10 py-4 flex items-center justify-between">
-                    <button
-                        onClick={onPrev}
-                        className="px-6 py-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium transition-colors"
-                    >
-                        Back
-                    </button>
-                    <div className="flex items-center gap-4">
-                        <div className="text-right">
-                            <p className="text-sm text-slate-500">Campaign Duration</p>
-                            <p className="font-bold text-lg">{duration} Days</p>
-                        </div>
-                        <button
-                            onClick={handleContinue}
-                            disabled={duration < 1}
-                            data-testid="step-2-next-btn"
-                            className="px-8 py-3 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold shadow-lg shadow-primary/30 transition-all flex items-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <span>Select Time Slots</span>
-                            <span className="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
-                        </button>
-                    </div>
-                </div>
+                <DateRangePicker
+                    start={data.dateRange?.start}
+                    end={data.dateRange?.end}
+                    minStart={today}
+                    onChangeStart={v => updateData({ dateRange: { ...data.dateRange, start: v } })}
+                    onChangeEnd={v => updateData({ dateRange: { ...data.dateRange, end: v } })}
+                />
             </div>
+
+            {/* Screens summary */}
+            <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'var(--color-bg-hover)', padding: '0.875rem 1.125rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', flexShrink: 0, backgroundColor: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Tv size={16} style={{ color: 'var(--color-primary)' }} />
+                    </div>
+                    <div>
+                        <p style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', margin: 0 }}>
+                            {(data.selectedScreens || []).length} Screen{(data.selectedScreens || []).length !== 1 ? 's' : ''} Selected
+                        </p>
+                        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', margin: 0 }}>
+                            {(data.selectedStores || []).length} Store{(data.selectedStores || []).length !== 1 ? 's' : ''}
+                        </p>
+                    </div>
+                </div>
+                <button onClick={onPrev} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', cursor: 'pointer' }}>
+                    Change →
+                </button>
+            </div>
+
+            {/* Sticky nav footer */}
+            <footer style={{
+                position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40,
+                backgroundColor: 'var(--color-bg-card)',
+                borderTop: '1px solid var(--color-border)',
+                boxShadow: '0 -4px 20px rgba(0,0,0,0.08)',
+                padding: '0.875rem 2.5rem',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+                <button
+                    onClick={onPrev}
+                    style={{
+                        height: 38, padding: '0 1.125rem',
+                        backgroundColor: 'var(--color-bg-card)',
+                        border: '1px solid var(--color-border)',
+                        borderRadius: 'var(--radius-md)',
+                        fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)',
+                        color: 'var(--color-text-primary)', cursor: 'pointer',
+                        transition: 'background-color var(--transition-fast)',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--color-bg-card)'}
+                >← Back</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{ textAlign: 'right' }}>
+                        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', margin: 0 }}>Campaign Duration</p>
+                        <p style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', margin: 0 }}>{duration} Day{duration !== 1 ? 's' : ''}</p>
+                    </div>
+                    <button
+                        onClick={handleContinue}
+                        disabled={duration < 1}
+                        data-testid="step-2-next-btn"
+                        style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '0.375rem',
+                            height: 38, padding: '0 1.25rem',
+                            backgroundColor: 'var(--color-primary)', color: '#fff',
+                            border: 'none', borderRadius: 'var(--radius-md)',
+                            fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)',
+                            cursor: duration < 1 ? 'not-allowed' : 'pointer',
+                            opacity: duration < 1 ? 0.5 : 1,
+                            transition: 'all var(--transition-fast)', boxShadow: 'var(--shadow-md)',
+                        }}
+                        onMouseEnter={e => { if (duration >= 1) e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'var(--color-primary)'; }}
+                    >Select Time Slots →</button>
+                </div>
+            </footer>
         </div>
     );
 };
