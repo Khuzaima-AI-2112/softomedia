@@ -1,450 +1,323 @@
 import { useState, useEffect } from 'react';
-import GlassCard from '../../components/GlassCard';
-import StatusBadge from '../../components/StatusBadge';
+import { Store, CalendarDays, Clock, Save, ChevronLeft, ChevronRight, Check, Info, AlertCircle } from 'lucide-react';
 import apiService from '../../services/ApiService';
+import '../../design-tokens.css';
 
 const DAYS = [
-    { id: 0, name: 'Sunday' },
-    { id: 1, name: 'Monday' },
-    { id: 2, name: 'Tuesday' },
-    { id: 3, name: 'Wednesday' },
-    { id: 4, name: 'Thursday' },
-    { id: 5, name: 'Friday' },
-    { id: 6, name: 'Saturday' }
+    { id: 0, name: 'Sunday' }, { id: 1, name: 'Monday' }, { id: 2, name: 'Tuesday' },
+    { id: 3, name: 'Wednesday' }, { id: 4, name: 'Thursday' }, { id: 5, name: 'Friday' }, { id: 6, name: 'Saturday' },
 ];
 
 function BusinessHoursManagement() {
-    const [stores, setStores] = useState([]);
+    const [stores, setStores]           = useState([]);
     const [selectedStore, setSelectedStore] = useState(null);
     const [weeklyHours, setWeeklyHours] = useState([]);
     const [specialHours, setSpecialHours] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [message, setMessage] = useState(null);
-    const [activeTab, setActiveTab] = useState('weekly');
-
-    // Calendar State
+    const [loading, setLoading]         = useState(true);
+    const [saving, setSaving]           = useState(false);
+    const [message, setMessage]         = useState(null);
+    const [activeTab, setActiveTab]     = useState('weekly');
     const [currentDate, setCurrentDate] = useState(new Date());
     const [showSpecialModal, setShowSpecialModal] = useState(false);
     const [selectedDate, setSelectedDate] = useState(null);
-    const [specialFormData, setSpecialFormData] = useState({
-        open_time: '09:00',
-        close_time: '18:00',
-        is_closed: false,
-        reason: ''
-    });
+    const [specialFormData, setSpecialFormData] = useState({ open_time: '09:00', close_time: '18:00', is_closed: false, reason: '' });
 
-    useEffect(() => {
-        loadStores();
-    }, []);
-
-    useEffect(() => {
-        if (selectedStore) {
-            loadStoreHours(selectedStore.id);
-        }
-    }, [selectedStore]);
+    useEffect(() => { loadStores(); }, []);
+    useEffect(() => { if (selectedStore) loadStoreHours(selectedStore.id); }, [selectedStore]);
 
     const loadStores = async () => {
         try {
             setLoading(true);
-            const allStores = await apiService.getStores();
-            setStores(allStores);
-            if (allStores.length > 0) {
-                setSelectedStore(allStores[0]);
-            }
-        } catch (error) {
-            console.error('Failed to load stores:', error);
-        } finally {
-            setLoading(false);
-        }
+            const all = await apiService.getStores();
+            setStores(all);
+            if (all.length > 0) setSelectedStore(all[0]);
+        } catch (e) { console.error(e); } finally { setLoading(false); }
     };
 
     const loadStoreHours = async (storeId) => {
         try {
-            const [weekly, special] = await Promise.all([
-                apiService.getWeeklyHours(storeId),
-                apiService.listSpecialHours(storeId)
-            ]);
-
-            // Fill in missing days for weekly
-            const fullWeekly = DAYS.map(day => {
-                const existing = weekly.find(w => parseInt(w.day_of_week) === day.id);
-                return existing || {
-                    day_of_week: day.id,
-                    open_time: '09:00',
-                    close_time: '18:00',
-                    is_closed: false
-                };
+            const [weekly, special] = await Promise.all([apiService.getWeeklyHours(storeId), apiService.listSpecialHours(storeId)]);
+            const full = DAYS.map(day => {
+                const ex = weekly.find(w => parseInt(w.day_of_week) === day.id);
+                return ex || { day_of_week: day.id, open_time: '09:00', close_time: '18:00', is_closed: false };
             }).sort((a, b) => a.day_of_week - b.day_of_week);
-
-            setWeeklyHours(fullWeekly);
+            setWeeklyHours(full);
             setSpecialHours(special || []);
-        } catch (error) {
-            console.error('Failed to load store hours:', error);
-        }
+        } catch (e) { console.error(e); }
     };
 
-    const handleWeeklyUpdate = (dayIndex, field, value) => {
-        const newHours = [...weeklyHours];
-        newHours[dayIndex] = { ...newHours[dayIndex], [field]: value };
-        setWeeklyHours(newHours);
+    const handleWeeklyUpdate = (idx, field, value) => {
+        const n = [...weeklyHours]; n[idx] = { ...n[idx], [field]: value }; setWeeklyHours(n);
     };
 
     const saveWeeklyHours = async () => {
         if (!selectedStore) return;
-        try {
-            setSaving(true);
-            setMessage({ type: 'info', text: 'Saving weekly schedule...' });
-            await apiService.updateWeeklyHours(selectedStore.id, weeklyHours);
-            setMessage({ type: 'success', text: 'Weekly schedule saved successfully!' });
-        } catch (error) {
-            setMessage({ type: 'error', text: `Failed to save: ${error.message}` });
-        } finally {
-            setSaving(false);
-            setTimeout(() => setMessage(null), 3000);
-        }
+        setSaving(true); setMessage({ type: 'info', text: 'Saving weekly schedule…' });
+        try { await apiService.updateWeeklyHours(selectedStore.id, weeklyHours); setMessage({ type: 'success', text: 'Weekly schedule saved!' }); }
+        catch (e) { setMessage({ type: 'error', text: `Failed: ${e.message}` }); }
+        finally { setSaving(false); setTimeout(() => setMessage(null), 3000); }
     };
 
     const handleDateClick = async (date) => {
-        // Safe YYYY-MM-DD formatting in local time
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const dateStr = `${year}-${month}-${day}`;
-        setSelectedDate(dateStr);
-
-        // Find existing override if any
-        const existing = specialHours.find(h => h.date === dateStr);
-        if (existing) {
-            setSpecialFormData({
-                open_time: existing.open_time || '09:00',
-                close_time: existing.close_time || '18:00',
-                is_closed: existing.is_closed || false,
-                reason: existing.reason || ''
-            });
-        } else {
-            // Default based on weekly schedule for that day
-            const dayOfWeek = date.getDay();
-            const dayDefault = weeklyHours.find(w => parseInt(w.day_of_week) === dayOfWeek);
-            setSpecialFormData({
-                open_time: dayDefault?.open_time || '09:00',
-                close_time: dayDefault?.close_time || '18:00',
-                is_closed: dayDefault?.is_closed || false,
-                reason: ''
-            });
+        const y = date.getFullYear(), m = String(date.getMonth() + 1).padStart(2, '0'), d = String(date.getDate()).padStart(2, '0');
+        const ds = `${y}-${m}-${d}`; setSelectedDate(ds);
+        const ex = specialHours.find(h => h.date === ds);
+        if (ex) { setSpecialFormData({ open_time: ex.open_time || '09:00', close_time: ex.close_time || '18:00', is_closed: ex.is_closed || false, reason: ex.reason || '' }); }
+        else {
+            const dow = date.getDay(); const def = weeklyHours.find(w => parseInt(w.day_of_week) === dow);
+            setSpecialFormData({ open_time: def?.open_time || '09:00', close_time: def?.close_time || '18:00', is_closed: def?.is_closed || false, reason: '' });
         }
         setShowSpecialModal(true);
     };
 
     const saveSpecialHours = async () => {
         if (!selectedStore || !selectedDate) return;
-        try {
-            setSaving(true);
-            await apiService.updateSpecialHours(selectedStore.id, selectedDate, specialFormData);
-            await loadStoreHours(selectedStore.id);
-            setShowSpecialModal(false);
-            setMessage({ type: 'success', text: `Special hours for ${selectedDate} updated!` });
-        } catch (error) {
-            setMessage({ type: 'error', text: `Failed to update special hours: ${error.message}` });
-        } finally {
-            setSaving(false);
-            setTimeout(() => setMessage(null), 3000);
-        }
+        setSaving(true);
+        try { await apiService.updateSpecialHours(selectedStore.id, selectedDate, specialFormData); await loadStoreHours(selectedStore.id); setShowSpecialModal(false); setMessage({ type: 'success', text: `Special hours for ${selectedDate} updated!` }); }
+        catch (e) { setMessage({ type: 'error', text: `Failed: ${e.message}` }); }
+        finally { setSaving(false); setTimeout(() => setMessage(null), 3000); }
     };
 
-    // Calendar Helper Functions
-    const daysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
-    const firstDayOfMonth = (year, month) => new Date(year, month, 1).getDay();
-
+    const daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
+    const firstDayOfMonth = (y, m) => new Date(y, m, 1).getDay();
     const generateCalendarDays = () => {
-        const year = currentDate.getFullYear();
-        const month = currentDate.getMonth();
-        const days = [];
-
-        // Previous month padding
-        const prevMonthDays = daysInMonth(year, month - 1);
-        const firstDay = firstDayOfMonth(year, month);
-        for (let i = firstDay - 1; i >= 0; i--) {
-            days.push({ day: prevMonthDays - i, month: month - 1, year, padding: true });
-        }
-
-        // Current month
-        const count = daysInMonth(year, month);
-        for (let i = 1; i <= count; i++) {
-            days.push({ day: i, month, year, padding: false });
-        }
-
+        const y = currentDate.getFullYear(), m = currentDate.getMonth(), days = [];
+        const prev = daysInMonth(y, m - 1), first = firstDayOfMonth(y, m);
+        for (let i = first - 1; i >= 0; i--) days.push({ day: prev - i, month: m - 1, year: y, padding: true });
+        for (let i = 1; i <= daysInMonth(y, m); i++) days.push({ day: i, month: m, year: y, padding: false });
         return days;
     };
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-[400px]">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-        );
-    }
+    const card = { backgroundColor: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)', padding: 'var(--space-6)', position: 'relative', overflow: 'hidden' };
+    const inputStyle = { padding: 'var(--space-2) var(--space-3)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', backgroundColor: 'var(--color-bg-card)', color: 'var(--color-text-primary)', outline: 'none', fontFamily: 'var(--font-body)', fontVariantNumeric: 'tabular-nums', width: '100%', boxSizing: 'border-box' };
+
+    const msgColors = { success: { bg: 'var(--color-success-light)', color: 'var(--color-success)' }, error: { bg: 'var(--color-error-light)', color: 'var(--color-error)' }, info: { bg: 'rgba(99,102,241,0.08)', color: 'var(--color-primary)' } };
+
+    if (loading) return (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
+            <div style={{ width: 32, height: 32, borderRadius: '50%', border: '3px solid var(--color-primary)', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+    );
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-8)' }}>
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-                        Business Hours
-                    </h1>
-                    <p className="text-slate-500 dark:text-slate-400">
-                        Manage operational hours and holiday overrides for your retail network
-                    </p>
-                </div>
+            <div>
+                <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 900, color: 'var(--color-text-primary)', margin: 0, letterSpacing: '-0.02em' }}>Business Hours</h1>
+                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)', marginTop: 2 }}>Manage operational hours and holiday overrides for your retail network</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 'var(--space-8)', alignItems: 'start' }}>
+
                 {/* Store Sidebar */}
-                <div className="lg:col-span-1 space-y-4">
-                    <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-widest px-2">Select Store</h3>
-                    <div className="space-y-1">
-                        {stores.map(store => (
-                            <button
-                                key={store.id}
-                                onClick={() => setSelectedStore(store)}
-                                className={`w-full text-left px-4 py-3 rounded-xl transition-all flex items-center gap-3 ${selectedStore?.id === store.id
-                                    ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-[1.02]'
-                                    : 'hover:bg-white dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300'
-                                    }`}
-                            >
-                                <span className="material-symbols-outlined text-xl">storefront</span>
-                                <div>
-                                    <p className="font-semibold text-sm leading-tight">{store.name}</p>
-                                    <p className={`text-[10px] ${selectedStore?.id === store.id ? 'text-white/70' : 'text-slate-400'}`}>
-                                        {store.city}
-                                    </p>
-                                </div>
-                            </button>
-                        ))}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                    <p style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-bold)', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-text-tertiary)', margin: '0 0 var(--space-1) var(--space-1)' }}>Select Store</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+                        {stores.map(store => {
+                            const isActive = selectedStore?.id === store.id;
+                            return (
+                                <button
+                                    key={store.id}
+                                    onClick={() => setSelectedStore(store)}
+                                    style={{
+                                        width: '100%', textAlign: 'left',
+                                        padding: 'var(--space-3) var(--space-4)',
+                                        borderRadius: 'var(--radius-md)',
+                                        border: 'none', cursor: 'pointer',
+                                        backgroundColor: isActive ? 'var(--color-primary)' : 'transparent',
+                                        color: isActive ? '#fff' : 'var(--color-text-secondary)',
+                                        display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+                                        fontFamily: 'var(--font-body)',
+                                        transition: 'all var(--transition-fast)',
+                                    }}
+                                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'; }}
+                                    onMouseLeave={e => { if (!isActive) e.currentTarget.style.backgroundColor = 'transparent'; }}
+                                >
+                                    <Store size={16} />
+                                    <div>
+                                        <p style={{ fontWeight: 'var(--font-semibold)', fontSize: 'var(--text-sm)', margin: 0, lineHeight: 1.3 }}>{store.name}</p>
+                                        <p style={{ fontSize: 'var(--text-xs)', opacity: isActive ? 0.7 : 1, color: isActive ? '#fff' : 'var(--color-text-tertiary)', margin: 0 }}>{store.city}</p>
+                                    </div>
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 
-                {/* Main Content */}
-                <div className="lg:col-span-3 space-y-6">
-                    {selectedStore && (
-                        <>
-                            {/* Tabs */}
-                            <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit mb-2">
+                {/* Main content */}
+                {selectedStore && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+
+                        {/* Tabs */}
+                        <div style={{ display: 'flex', gap: 4, padding: 4, backgroundColor: 'var(--color-bg-hover)', borderRadius: 'var(--radius-md)', width: 'fit-content' }}>
+                            {[{ key: 'weekly', label: 'Standard Week' }, { key: 'overrides', label: 'Future Overrides' }].map(t => (
                                 <button
-                                    onClick={() => setActiveTab('weekly')}
-                                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'weekly'
-                                        ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white'
-                                        : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                                >
-                                    Standard Week
-                                </button>
-                                <button
-                                    onClick={() => setActiveTab('overrides')}
-                                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'overrides'
-                                        ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white'
-                                        : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                                >
-                                    Future Overrides
-                                </button>
+                                    key={t.key}
+                                    onClick={() => setActiveTab(t.key)}
+                                    style={{
+                                        padding: 'var(--space-2) var(--space-5)',
+                                        borderRadius: 'var(--radius-sm)', border: 'none',
+                                        fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)',
+                                        cursor: 'pointer', fontFamily: 'var(--font-body)',
+                                        backgroundColor: activeTab === t.key ? 'var(--color-bg-card)' : 'transparent',
+                                        color: activeTab === t.key ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+                                        boxShadow: activeTab === t.key ? 'var(--shadow-sm)' : 'none',
+                                        transition: 'all var(--transition-fast)',
+                                    }}
+                                >{t.label}</button>
+                            ))}
+                        </div>
+
+                        {/* Toast */}
+                        {message && (() => { const c = msgColors[message.type]; return (
+                            <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', backgroundColor: c.bg, color: c.color, fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                {message.type === 'success' ? <Check size={15} /> : message.type === 'error' ? <AlertCircle size={15} /> : <Info size={15} />}
+                                {message.text}
                             </div>
+                        ); })()}
 
-                            {/* Success/Error Toast (Global) */}
-                            {message && (
-                                <div className={`p-3 rounded-lg text-sm flex items-center gap-2 animate-in slide-in-from-top-2 duration-200 ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' :
-                                    message.type === 'error' ? 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400' :
-                                        'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
-                                    }`}>
-                                    <span className="material-symbols-outlined text-lg">
-                                        {message.type === 'success' ? 'check_circle' : message.type === 'error' ? 'error' : 'info'}
-                                    </span>
-                                    {message.text}
-                                </div>
-                            )}
-
-                            {activeTab === 'weekly' && (
-                                <GlassCard className="relative overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                    <div className="absolute top-0 left-0 w-1 h-full bg-primary"></div>
-                                    <div className="flex items-center justify-between mb-6">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-primary/10 rounded-lg">
-                                                <span className="material-symbols-outlined text-primary">calendar_view_week</span>
+                        {/* Weekly tab */}
+                        {activeTab === 'weekly' && (
+                            <div style={card}>
+                                {/* accent bar */}
+                                <div style={{ position: 'absolute', top: 0, left: 0, width: 4, height: '100%', backgroundColor: 'var(--color-primary)', borderRadius: '4px 0 0 4px' }} />
+                                <div style={{ paddingLeft: 'var(--space-4)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-5)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                                            <div style={{ padding: 'var(--space-2)', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(99,102,241,0.1)' }}>
+                                                <Clock size={16} style={{ color: 'var(--color-primary)' }} />
                                             </div>
                                             <div>
-                                                <h2 className="text-xl font-bold">Weekly Schedule</h2>
-                                                <p className="text-xs text-slate-500 uppercase font-medium tracking-wide">Standard Operational Hours</p>
+                                                <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', margin: 0 }}>Weekly Schedule</h2>
+                                                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: 0 }}>Standard Operational Hours</p>
                                             </div>
                                         </div>
                                         <button
-                                            onClick={saveWeeklyHours}
-                                            disabled={saving}
-                                            className="px-4 py-2 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover disabled:opacity-50 transition-all flex items-center gap-2"
-                                        >
-                                            {saving ? (
-                                                <div className="animate-spin size-4 border-2 border-white/30 border-t-white rounded-full"></div>
-                                            ) : (
-                                                <span className="material-symbols-outlined text-lg">save</span>
-                                            )}
-                                            Save Changes
-                                        </button>
+                                            onClick={saveWeeklyHours} disabled={saving}
+                                            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: 'var(--space-2) var(--space-4)', backgroundColor: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1, fontFamily: 'var(--font-body)' }}
+                                        ><Save size={14} />Save Changes</button>
                                     </div>
 
-                                    <div className="space-y-3">
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                                         {DAYS.map((day, idx) => {
                                             const hours = weeklyHours[idx] || {};
                                             return (
-                                                <div
-                                                    key={day.id}
-                                                    className={`flex items-center justify-between p-4 rounded-xl border transition-all ${hours.is_closed
-                                                        ? 'bg-slate-50/50 dark:bg-slate-900/20 border-slate-100 dark:border-slate-800'
-                                                        : 'bg-white dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 shadow-sm'
-                                                        }`}
-                                                >
-                                                    <div className="w-32">
-                                                        <p className={`font-bold ${hours.is_closed ? 'text-slate-400' : 'text-slate-900 dark:text-white'}`}>
-                                                            {day.name}
-                                                        </p>
-                                                    </div>
-
-                                                    <div className="flex-1 flex items-center gap-8 px-4">
-                                                        {!hours.is_closed && (
-                                                            <div className="flex items-center gap-4">
-                                                                <div className="space-y-1">
-                                                                    <label className="text-[10px] uppercase font-bold text-slate-400 tracking-widest block">Open</label>
-                                                                    <input
-                                                                        type="time"
-                                                                        value={hours.open_time}
-                                                                        onChange={(e) => handleWeeklyUpdate(idx, 'open_time', e.target.value)}
-                                                                        className="bg-transparent border-none p-0 text-sm font-semibold focus:ring-0 outline-none"
-                                                                    />
+                                                <div key={day.id} style={{
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                    padding: 'var(--space-3) var(--space-4)',
+                                                    borderRadius: 'var(--radius-md)',
+                                                    border: '1px solid var(--color-border)',
+                                                    backgroundColor: hours.is_closed ? 'var(--color-bg-hover)' : 'var(--color-bg-card)',
+                                                    transition: 'background-color var(--transition-fast)',
+                                                }}>
+                                                    <p style={{ width: 110, fontWeight: 'var(--font-semibold)', fontSize: 'var(--text-sm)', color: hours.is_closed ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)', margin: 0 }}>{day.name}</p>
+                                                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 'var(--space-6)', padding: '0 var(--space-4)' }}>
+                                                        {!hours.is_closed ? (
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+                                                                <div>
+                                                                    <label style={{ display: 'block', fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Open</label>
+                                                                    <input type="time" value={hours.open_time} onChange={e => handleWeeklyUpdate(idx, 'open_time', e.target.value)} style={{ background: 'transparent', border: 'none', padding: 0, fontSize: 'var(--text-sm)', fontWeight: 600, outline: 'none', color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-body)' }} />
                                                                 </div>
-                                                                <span className="text-slate-300">→</span>
-                                                                <div className="space-y-1">
-                                                                    <label className="text-[10px] uppercase font-bold text-slate-400 tracking-widest block">Close</label>
-                                                                    <input
-                                                                        type="time"
-                                                                        value={hours.close_time}
-                                                                        onChange={(e) => handleWeeklyUpdate(idx, 'close_time', e.target.value)}
-                                                                        className="bg-transparent border-none p-0 text-sm font-semibold focus:ring-0 outline-none"
-                                                                    />
+                                                                <span style={{ color: 'var(--color-border)' }}>→</span>
+                                                                <div>
+                                                                    <label style={{ display: 'block', fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Close</label>
+                                                                    <input type="time" value={hours.close_time} onChange={e => handleWeeklyUpdate(idx, 'close_time', e.target.value)} style={{ background: 'transparent', border: 'none', padding: 0, fontSize: 'var(--text-sm)', fontWeight: 600, outline: 'none', color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-body)' }} />
                                                                 </div>
                                                             </div>
-                                                        )}
-                                                        {hours.is_closed && (
-                                                            <div className="flex-1 h-[38px] flex items-center">
-                                                                <span className="text-xs font-semibold px-2 py-1 bg-slate-200 dark:bg-slate-700 text-slate-500 rounded-md">CLOSED ALL DAY</span>
-                                                            </div>
+                                                        ) : (
+                                                            <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '2px 10px', borderRadius: 9999, backgroundColor: 'var(--color-border)', color: 'var(--color-text-tertiary)' }}>CLOSED ALL DAY</span>
                                                         )}
                                                     </div>
-
-                                                    <div>
-                                                        <label className="flex items-center gap-2 cursor-pointer select-none">
-                                                            <span className="text-xs font-medium text-slate-500">Closed</span>
-                                                            <div className="relative">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    className="sr-only"
-                                                                    checked={hours.is_closed}
-                                                                    onChange={(e) => handleWeeklyUpdate(idx, 'is_closed', e.target.checked)}
-                                                                />
-                                                                <div className={`w-10 h-5 rounded-full transition-colors ${hours.is_closed ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
-                                                                <div className={`absolute left-1 top-1 w-3 h-3 bg-white rounded-full transition-transform ${hours.is_closed ? 'translate-x-5' : ''}`}></div>
-                                                            </div>
-                                                        </label>
-                                                    </div>
+                                                    {/* Toggle */}
+                                                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
+                                                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>Closed</span>
+                                                        <div
+                                                            onClick={() => handleWeeklyUpdate(idx, 'is_closed', !hours.is_closed)}
+                                                            style={{ position: 'relative', width: 40, height: 22, borderRadius: 9999, backgroundColor: hours.is_closed ? 'var(--color-primary)' : 'var(--color-border)', cursor: 'pointer', transition: 'background-color var(--transition-fast)', flexShrink: 0 }}
+                                                        >
+                                                            <div style={{ position: 'absolute', top: 3, left: hours.is_closed ? 21 : 3, width: 16, height: 16, borderRadius: '50%', backgroundColor: '#fff', transition: 'left var(--transition-fast)' }} />
+                                                        </div>
+                                                    </label>
                                                 </div>
                                             );
                                         })}
                                     </div>
-                                </GlassCard>
-                            )}
+                                </div>
+                            </div>
+                        )}
 
-                            {activeTab === 'overrides' && (
-                                <GlassCard className="relative overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                    <div className="absolute top-0 left-0 w-1 h-full bg-amber-500"></div>
-                                    <div className="flex items-center justify-between mb-6">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-amber-500/10 rounded-lg">
-                                                <span className="material-symbols-outlined text-amber-500">calendar_month</span>
+                        {/* Overrides tab */}
+                        {activeTab === 'overrides' && (
+                            <div style={card}>
+                                <div style={{ position: 'absolute', top: 0, left: 0, width: 4, height: '100%', backgroundColor: '#f59e0b', borderRadius: '4px 0 0 4px' }} />
+                                <div style={{ paddingLeft: 'var(--space-4)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-5)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                                            <div style={{ padding: 'var(--space-2)', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(245,158,11,0.1)' }}>
+                                                <CalendarDays size={16} style={{ color: '#f59e0b' }} />
                                             </div>
                                             <div>
-                                                <h2 className="text-xl font-bold">Override Calendar</h2>
-                                                <p className="text-xs text-slate-500 uppercase font-medium tracking-wide">Set Future Date Specific Hours</p>
+                                                <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', margin: 0 }}>Override Calendar</h2>
+                                                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: 0 }}>Set Future Date Specific Hours</p>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))}
-                                                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                                            >
-                                                <span className="material-symbols-outlined">chevron_left</span>
-                                            </button>
-                                            <span className="text-sm font-bold min-w-[120px] text-center">
-                                                {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
-                                            </span>
-                                            <button
-                                                onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}
-                                                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                                            >
-                                                <span className="material-symbols-outlined">chevron_right</span>
-                                            </button>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))} style={{ padding: 6, borderRadius: 'var(--radius-sm)', border: 'none', backgroundColor: 'transparent', cursor: 'pointer', color: 'var(--color-text-secondary)', display: 'flex' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}><ChevronLeft size={18} /></button>
+                                            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', minWidth: 130, textAlign: 'center' }}>{currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</span>
+                                            <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))} style={{ padding: 6, borderRadius: 'var(--radius-sm)', border: 'none', backgroundColor: 'transparent', cursor: 'pointer', color: 'var(--color-text-secondary)', display: 'flex' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}><ChevronRight size={18} /></button>
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-7 gap-px bg-slate-200 dark:bg-slate-700 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
-                                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                                            <div key={d} className="bg-slate-50 dark:bg-slate-800/50 py-2 text-center text-[10px] uppercase font-bold text-slate-400 tracking-widest">
-                                                {d}
-                                            </div>
+                                    {/* Calendar grid */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, backgroundColor: 'var(--color-border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
+                                        {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
+                                            <div key={d} style={{ backgroundColor: 'var(--color-bg-hover)', padding: 'var(--space-2)', textAlign: 'center', fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-text-tertiary)' }}>{d}</div>
                                         ))}
                                         {generateCalendarDays().map((dayObj, i) => {
                                             const d = new Date(dayObj.year, dayObj.month, dayObj.day);
-                                            // Format dateStr in local time to match database
-                                            const y = d.getFullYear();
-                                            const m = String(d.getMonth() + 1).padStart(2, '0');
-                                            const dayNum = String(d.getDate()).padStart(2, '0');
-                                            const dateStr = `${y}-${m}-${dayNum}`;
-
-                                            const isToday = new Date().toLocaleDateString('en-CA') === dateStr;
-                                            const override = specialHours.find(h => h.date === dateStr);
-                                            // Calculate default state for UI hint
-                                            const dayOfWeek = d.getDay();
-                                            const dayDefault = weeklyHours.find(w => parseInt(w.day_of_week) === dayOfWeek);
-                                            const isClosedByDefault = dayDefault?.is_closed;
-
+                                            const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), dn = String(d.getDate()).padStart(2, '0');
+                                            const ds = `${y}-${m}-${dn}`;
+                                            const isToday = new Date().toLocaleDateString('en-CA') === ds;
+                                            const override = specialHours.find(h => h.date === ds);
+                                            const dow = d.getDay(); const def = weeklyHours.find(w => parseInt(w.day_of_week) === dow);
                                             return (
                                                 <button
                                                     key={i}
                                                     onClick={() => !dayObj.padding && handleDateClick(d)}
                                                     disabled={dayObj.padding}
-                                                    className={`
-                                                        min-h-[100px] p-2 text-left transition-all relative
-                                                        ${dayObj.padding ? 'bg-slate-50/30 dark:bg-slate-900/10 cursor-default' : 'bg-white dark:bg-slate-800/20 hover:bg-slate-50 dark:hover:bg-slate-800/40'}
-                                                        ${override ? 'ring-1 ring-inset ring-amber-500/30' : ''}
-                                                    `}
+                                                    style={{
+                                                        minHeight: 90, padding: 'var(--space-2)', textAlign: 'left',
+                                                        backgroundColor: dayObj.padding ? 'rgba(0,0,0,0.02)' : 'var(--color-bg-card)',
+                                                        border: 'none', cursor: dayObj.padding ? 'default' : 'pointer',
+                                                        outline: override ? '1px solid rgba(245,158,11,0.4)' : 'none',
+                                                        fontFamily: 'var(--font-body)',
+                                                        transition: 'background-color var(--transition-fast)',
+                                                    }}
+                                                    onMouseEnter={e => { if (!dayObj.padding) e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'; }}
+                                                    onMouseLeave={e => { if (!dayObj.padding) e.currentTarget.style.backgroundColor = 'var(--color-bg-card)'; }}
                                                 >
-                                                    <span className={`
-                                                        inline-flex items-center justify-center size-6 text-xs font-bold rounded-full mb-1
-                                                        ${isToday ? 'bg-primary text-white' : 'text-slate-600 dark:text-slate-400'}
-                                                        ${dayObj.padding ? 'opacity-20' : ''}
-                                                    `}>
-                                                        {dayObj.day}
-                                                    </span>
-
+                                                    <span style={{
+                                                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                                        width: 22, height: 22, borderRadius: '50%',
+                                                        fontSize: 11, fontWeight: 700,
+                                                        backgroundColor: isToday ? 'var(--color-primary)' : 'transparent',
+                                                        color: isToday ? '#fff' : dayObj.padding ? 'var(--color-border)' : 'var(--color-text-secondary)',
+                                                        marginBottom: 4,
+                                                    }}>{dayObj.day}</span>
                                                     {!dayObj.padding && (
-                                                        <div className="space-y-1">
+                                                        <div style={{ fontSize: 9, lineHeight: 1.4 }}>
                                                             {override ? (
-                                                                <div className={`p-1 rounded text-[9px] font-bold leading-tight ${override.is_closed ? 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'}`}>
-                                                                    <div className="flex items-center gap-1">
-                                                                        <div className="size-1 rounded-full bg-current"></div>
-                                                                        {override.reason || (override.is_closed ? 'CLOSED' : 'OVERRIDE')}
-                                                                    </div>
-                                                                    {!override.is_closed && <div>{override.open_time} - {override.close_time}</div>}
+                                                                <div style={{ padding: '2px 4px', borderRadius: 4, backgroundColor: override.is_closed ? 'var(--color-error-light)' : '#fef3c7', color: override.is_closed ? 'var(--color-error)' : '#92400e', fontWeight: 700 }}>
+                                                                    {override.reason || (override.is_closed ? 'CLOSED' : 'OVERRIDE')}
+                                                                    {!override.is_closed && <div style={{ fontWeight: 400 }}>{override.open_time}–{override.close_time}</div>}
                                                                 </div>
                                                             ) : (
-                                                                <div className="p-1 text-[9px] text-slate-400 font-medium">
-                                                                    {isClosedByDefault ? 'Default: Closed' : `Default: ${dayDefault?.open_time}-${dayDefault?.close_time}`}
-                                                                </div>
+                                                                <span style={{ color: 'var(--color-text-tertiary)' }}>
+                                                                    {def?.is_closed ? 'Default: Closed' : `${def?.open_time}–${def?.close_time}`}
+                                                                </span>
                                                             )}
                                                         </div>
                                                     )}
@@ -452,91 +325,60 @@ function BusinessHoursManagement() {
                                             );
                                         })}
                                     </div>
-                                </GlassCard>
-                            )}
+                                </div>
+                            </div>
+                        )}
 
-                            {/* Special Hours Modal */}
-                            {showSpecialModal && (
-                                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                                    <GlassCard className="w-full max-w-md relative">
-                                        <div className="absolute top-0 left-0 w-full h-1.5 bg-amber-500"></div>
-                                        <h2 className="text-xl font-bold mb-1">Set Special Hours</h2>
-                                        <p className="text-sm text-slate-500 mb-6">
+                        {/* Special Hours Modal */}
+                        {showSpecialModal && (
+                            <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', padding: 'var(--space-4)' }}>
+                                <div style={{ ...card, width: '100%', maxWidth: 420 }}>
+                                    <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 4, backgroundColor: '#f59e0b', borderRadius: '4px 4px 0 0' }} />
+                                    <div style={{ paddingTop: 'var(--space-2)' }}>
+                                        <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', margin: '0 0 2px' }}>Set Special Hours</h2>
+                                        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-5)' }}>
                                             {selectedDate ? new Date(selectedDate + 'T00:00:00').toLocaleDateString(undefined, { dateStyle: 'full' }) : ''}
                                         </p>
-
-                                        <div className="space-y-4">
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                                             <div>
-                                                <label className="block text-sm font-medium mb-1">Reason / Event Name</label>
-                                                <input
-                                                    type="text"
-                                                    value={specialFormData.reason}
-                                                    onChange={(e) => setSpecialFormData({ ...specialFormData, reason: e.target.value })}
-                                                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-amber-500 outline-none"
-                                                    placeholder="e.g. Labor Day, Renovation..."
-                                                />
+                                                <label style={{ display: 'block', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-1)' }}>Reason / Event Name</label>
+                                                <input type="text" value={specialFormData.reason} onChange={e => setSpecialFormData({ ...specialFormData, reason: e.target.value })} placeholder="e.g. Labor Day, Renovation…" style={inputStyle} />
                                             </div>
-
-                                            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700">
-                                                <span className="text-sm font-bold">Store is Closed</span>
-                                                <label className="relative cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        className="sr-only"
-                                                        checked={specialFormData.is_closed}
-                                                        onChange={(e) => setSpecialFormData({ ...specialFormData, is_closed: e.target.checked })}
-                                                    />
-                                                    <div className={`w-10 h-5 rounded-full transition-colors ${specialFormData.is_closed ? 'bg-red-500' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
-                                                    <div className={`absolute left-1 top-1 w-3 h-3 bg-white rounded-full transition-transform ${specialFormData.is_closed ? 'translate-x-5' : ''}`}></div>
-                                                </label>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-bg-hover)', border: '1px solid var(--color-border)' }}>
+                                                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-primary)' }}>Store is Closed</span>
+                                                <div
+                                                    onClick={() => setSpecialFormData({ ...specialFormData, is_closed: !specialFormData.is_closed })}
+                                                    style={{ position: 'relative', width: 40, height: 22, borderRadius: 9999, backgroundColor: specialFormData.is_closed ? 'var(--color-error)' : 'var(--color-border)', cursor: 'pointer', transition: 'background-color var(--transition-fast)', flexShrink: 0 }}
+                                                >
+                                                    <div style={{ position: 'absolute', top: 3, left: specialFormData.is_closed ? 21 : 3, width: 16, height: 16, borderRadius: '50%', backgroundColor: '#fff', transition: 'left var(--transition-fast)' }} />
+                                                </div>
                                             </div>
-
                                             {!specialFormData.is_closed && (
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div className="space-y-1">
-                                                        <label className="text-[10px] uppercase font-bold text-slate-400 tracking-widest block px-1">Open Time</label>
-                                                        <input
-                                                            type="time"
-                                                            value={specialFormData.open_time}
-                                                            onChange={(e) => setSpecialFormData({ ...specialFormData, open_time: e.target.value })}
-                                                            className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-amber-500 outline-none"
-                                                        />
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+                                                    <div>
+                                                        <label style={{ display: 'block', fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Open Time</label>
+                                                        <input type="time" value={specialFormData.open_time} onChange={e => setSpecialFormData({ ...specialFormData, open_time: e.target.value })} style={inputStyle} />
                                                     </div>
-                                                    <div className="space-y-1">
-                                                        <label className="text-[10px] uppercase font-bold text-slate-400 tracking-widest block px-1">Close Time</label>
-                                                        <input
-                                                            type="time"
-                                                            value={specialFormData.close_time}
-                                                            onChange={(e) => setSpecialFormData({ ...specialFormData, close_time: e.target.value })}
-                                                            className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-amber-500 outline-none"
-                                                        />
+                                                    <div>
+                                                        <label style={{ display: 'block', fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Close Time</label>
+                                                        <input type="time" value={specialFormData.close_time} onChange={e => setSpecialFormData({ ...specialFormData, close_time: e.target.value })} style={inputStyle} />
                                                     </div>
                                                 </div>
                                             )}
-
-                                            <div className="flex justify-end gap-3 mt-8">
-                                                <button
-                                                    onClick={() => setShowSpecialModal(false)}
-                                                    className="px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 font-medium"
-                                                >
-                                                    Cancel
-                                                </button>
-                                                <button
-                                                    onClick={saveSpecialHours}
-                                                    disabled={saving}
-                                                    className="px-6 py-2 bg-amber-500 text-white rounded-lg font-bold hover:bg-amber-600 shadow-lg shadow-amber-500/20 disabled:opacity-50 flex items-center gap-2"
-                                                >
-                                                    {saving && <div className="animate-spin size-4 border-2 border-white/30 border-t-white rounded-full"></div>}
+                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+                                                <button onClick={() => setShowSpecialModal(false)} style={{ padding: 'var(--space-2) var(--space-4)', borderRadius: 'var(--radius-md)', border: 'none', backgroundColor: 'transparent', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', cursor: 'pointer', fontFamily: 'var(--font-body)' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>Cancel</button>
+                                                <button onClick={saveSpecialHours} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: 'var(--space-2) var(--space-5)', backgroundColor: '#f59e0b', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1, fontFamily: 'var(--font-body)' }}>
+                                                    {saving && <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.8s linear infinite' }} />}
                                                     Apply Override
                                                 </button>
                                             </div>
                                         </div>
-                                    </GlassCard>
+                                    </div>
                                 </div>
-                            )}
-                        </>
-                    )}
-                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );

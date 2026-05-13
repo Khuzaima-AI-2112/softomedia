@@ -1,278 +1,256 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import GlassCard from '../../components/GlassCard';
-import StatusBadge from '../../components/StatusBadge';
+import { ArrowLeft, CheckCircle, Grid3x3, PlayCircle, PlusCircle, Film, Image, X } from 'lucide-react';
 import apiService from '../../services/ApiService';
+import '../../design-tokens.css';
 
-// Get slot status styling
-const getSlotStyle = (slot) => {
-    if (!slot?.asset_id) return 'border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50';
-    if (slot.status === 'REJECTED') return 'border-red-400 bg-red-50 dark:bg-red-900/20';
-    if (slot.status === 'REPLACED') return 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20';
-    return 'border-primary/50 bg-primary/5';
-};
+function slotBorderStyle(slot, isDragOver) {
+    if (isDragOver) return { border: '2px dashed var(--color-primary)', backgroundColor: 'rgba(99,102,241,0.08)' };
+    if (!slot?.asset_id) return { border: '2px dashed var(--color-border)', backgroundColor: 'var(--color-bg-hover)' };
+    if (slot.status === 'REJECTED') return { border: '2px solid var(--color-error)', backgroundColor: 'var(--color-error-light)' };
+    if (slot.status === 'REPLACED') return { border: '2px solid var(--color-success)', backgroundColor: 'var(--color-success-light)' };
+    return { border: '2px solid rgba(99,102,241,0.4)', backgroundColor: 'rgba(99,102,241,0.05)' };
+}
 
 function LoopBuilder() {
     const { id } = useParams();
     const navigate = useNavigate();
-    const [loop, setLoop] = useState(null);
-    const [assets, setAssets] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [selectedSlot, setSelectedSlot] = useState(null);
+    const [loop, setLoop]                   = useState(null);
+    const [assets, setAssets]               = useState([]);
+    const [loading, setLoading]             = useState(true);
+    const [saving, setSaving]               = useState(false);
+    const [selectedSlot, setSelectedSlot]   = useState(null);
     const [showAssetPicker, setShowAssetPicker] = useState(false);
+    const [dragOverSlot, setDragOverSlot]   = useState(null);
 
-    useEffect(() => {
-        if (id) loadData();
-    }, [id]);
+    useEffect(() => { if (id) loadData(); }, [id]);
 
     const loadData = async () => {
         setLoading(true);
         try {
-            const [loopData, assetsData] = await Promise.all([
-                apiService.getLoop(id),
-                apiService.getAssets()
-            ]);
+            const [loopData, assetsData] = await Promise.all([apiService.getLoop(id), apiService.getAssets()]);
             setLoop(loopData);
             setAssets(assetsData || []);
-        } catch (error) {
-            console.error('Failed to load loop data:', error);
-        } finally {
-            setLoading(false);
-        }
+        } catch (e) { console.error('Failed to load loop data:', e); }
+        finally { setLoading(false); }
     };
 
-    const handleSlotClick = (position) => {
-        setSelectedSlot(position);
-        setShowAssetPicker(true);
-    };
+    const handleSlotClick = (position) => { setSelectedSlot(position); setShowAssetPicker(true); };
 
     const handleAssetSelect = async (asset) => {
         if (selectedSlot === null || !loop) return;
-
-        // Update local state optimistically
         const newSlots = [...loop.slots];
-        newSlots[selectedSlot] = {
-            ...newSlots[selectedSlot],
-            asset_id: asset.id,
-            asset_name: asset.filename,
-            asset_thumbnail: asset.file_type === 'image' ? '🖼️' : '🎬',
-            status: 'PENDING'
-        };
+        newSlots[selectedSlot] = { ...newSlots[selectedSlot], asset_id: asset.id, asset_name: asset.filename, asset_thumbnail: asset.file_type === 'image' ? 'image' : 'video', status: 'PENDING' };
         setLoop({ ...loop, slots: newSlots });
-        setShowAssetPicker(false);
-        setSelectedSlot(null);
-
-        try {
-            await apiService.replaceLoopSlot(id, selectedSlot, asset.id);
-            await loadData();
-        } catch (error) {
-            console.error('Failed to replace slot:', error);
-            alert('Failed to replace slot');
-        }
+        setShowAssetPicker(false); setSelectedSlot(null);
+        try { await apiService.replaceLoopSlot(id, selectedSlot, asset.id); await loadData(); }
+        catch (e) { console.error('Failed to replace slot:', e); alert('Failed to replace slot'); }
     };
 
     const handleApproveAll = async () => {
         setSaving(true);
-        try {
-            await apiService.approveLoop(id);
-            await loadData();
-        } catch (error) {
-            console.error('Failed to approve loop:', error);
-        } finally {
-            setSaving(false);
-        }
+        try { await apiService.approveLoop(id); await loadData(); }
+        catch (e) { console.error('Failed to approve loop:', e); }
+        finally { setSaving(false); }
     };
 
-    const formatHour = (hour) => {
-        const period = hour >= 12 ? 'PM' : 'AM';
-        const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-        return `${displayHour}:00 ${period}`;
+    const handleDrop = async (e, position) => {
+        e.preventDefault(); setDragOverSlot(null);
+        const assetId = e.dataTransfer.getData('assetId');
+        const asset = assets.find(a => String(a.id) === assetId);
+        if (asset) { setSelectedSlot(position); await handleAssetSelect(asset); }
     };
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-[400px]">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-            </div>
-        );
-    }
+    const formatHour = (h) => { const p = h >= 12 ? 'PM' : 'AM'; const d = h > 12 ? h - 12 : h === 0 ? 12 : h; return `${d}:00 ${p}`; };
 
-    if (!loop) {
-        return (
-            <div className="text-center py-12">
-                <h2 className="text-xl font-bold text-slate-600">Loop not found</h2>
-                <button
-                    onClick={() => navigate('/dashboard/admin/loops')}
-                    className="mt-4 text-primary hover:underline"
-                >
-                    Back to Loop Management
-                </button>
-            </div>
-        );
-    }
+    const card = { backgroundColor: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)', padding: 'var(--space-6)' };
+
+    const loopStatusBadge = (status) => {
+        const map = { APPROVED: { bg: 'var(--color-success-light)', color: 'var(--color-success)', label: 'Approved' }, PENDING_APPROVAL: { bg: '#fef3c7', color: '#92400e', label: 'Pending' } };
+        const s = map[status] || { bg: 'var(--color-bg-hover)', color: 'var(--color-text-tertiary)', label: status };
+        return <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '2px 10px', borderRadius: 9999, backgroundColor: s.bg, color: s.color }}>{s.label}</span>;
+    };
+
+    if (loading) return (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', border: '3px solid var(--color-primary)', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+    );
+
+    if (!loop) return (
+        <div style={{ textAlign: 'center', padding: 'var(--space-12)' }}>
+            <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-4)' }}>Loop not found.</p>
+            <button onClick={() => navigate('/dashboard/admin/loops')} style={{ color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-body)' }}>Back to Loop Management</button>
+        </div>
+    );
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-8)' }}>
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
                 <div>
-                    <div className="flex items-center gap-3 mb-2">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
                         <button
                             onClick={() => navigate('/dashboard/admin/loops')}
-                            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                        >
-                            <span className="material-symbols-outlined">arrow_back</span>
-                        </button>
-                        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+                            style={{ padding: 'var(--space-2)', borderRadius: 'var(--radius-md)', border: 'none', backgroundColor: 'transparent', cursor: 'pointer', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center' }}
+                            onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                        ><ArrowLeft size={18} /></button>
+                        <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 900, color: 'var(--color-text-primary)', margin: 0, letterSpacing: '-0.02em' }}>
                             Loop Builder — {formatHour(loop.hour)}
                         </h1>
-                        <StatusBadge status={loop.status === 'APPROVED' ? 'Active' :
-                            loop.status === 'PENDING_APPROVAL' ? 'Warning' : 'Offline'} />
+                        {loopStatusBadge(loop.status)}
                     </div>
-                    <p className="text-slate-500 dark:text-slate-400 ml-12">
-                        {new Date(loop.date).toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                        })} • 12 slots × 5 seconds = 60 second loop
+                    <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)', margin: '0 0 0 44px' }}>
+                        {new Date(loop.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} • 12 slots × 5 seconds = 60 second loop
                     </p>
                 </div>
-                <div className="flex items-center gap-3">
-                    {loop.status !== 'APPROVED' && (
-                        <button
-                            onClick={handleApproveAll}
-                            disabled={saving}
-                            className="px-4 py-2 bg-emerald-500 text-white rounded-lg font-medium shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-colors flex items-center gap-2 disabled:opacity-50"
-                            data-testid="approve-loop-btn"
-                        >
-                            <span className="material-symbols-outlined text-[20px]">check_circle</span>
-                            {saving ? 'Approving...' : 'Approve Loop'}
-                        </button>
-                    )}
-                </div>
+                {loop.status !== 'APPROVED' && (
+                    <button
+                        onClick={handleApproveAll} disabled={saving}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            padding: 'var(--space-2) var(--space-4)',
+                            backgroundColor: 'var(--color-success)', color: '#fff',
+                            border: 'none', borderRadius: 'var(--radius-md)',
+                            fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)',
+                            cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1,
+                            fontFamily: 'var(--font-body)',
+                        }}
+                    ><CheckCircle size={16} />{saving ? 'Approving…' : 'Approve Loop'}</button>
+                )}
             </div>
 
             {/* 12-Slot Grid */}
-            <GlassCard>
-                <div className="flex items-center justify-between mb-6">
-                    <h3 className="font-bold text-lg flex items-center gap-2">
-                        <span className="material-symbols-outlined text-primary">grid_view</span>
-                        Slot Configuration
+            <div style={card}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-5)' }}>
+                    <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Grid3x3 size={16} style={{ color: 'var(--color-primary)' }} /> Slot Configuration
                     </h3>
-                    <span className="text-sm text-slate-500">
+                    <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>
                         {loop.slots?.filter(s => s.asset_id).length || 0}/12 slots filled
                     </span>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4" data-testid="slot-grid">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 'var(--space-3)' }}>
                     {Array.from({ length: 12 }).map((_, position) => {
                         const slot = loop.slots?.[position] || {};
                         const asset = assets.find(a => a.id === slot.asset_id);
+                        const isDragOver = dragOverSlot === position;
 
                         return (
                             <button
                                 key={position}
                                 onClick={() => handleSlotClick(position)}
-                                className={`relative p-4 rounded-xl border-2 transition-all hover:shadow-md hover:scale-105 ${getSlotStyle(slot)}`}
-                                data-testid={`slot-${position}`}
+                                onDragOver={e => { e.preventDefault(); setDragOverSlot(position); }}
+                                onDragLeave={() => setDragOverSlot(null)}
+                                onDrop={e => handleDrop(e, position)}
+                                style={{
+                                    position: 'relative',
+                                    padding: 'var(--space-3)',
+                                    borderRadius: 'var(--radius-md)',
+                                    cursor: 'pointer',
+                                    transition: 'all var(--transition-fast)',
+                                    transform: isDragOver ? 'scale(1.04)' : 'scale(1)',
+                                    ...slotBorderStyle(slot, isDragOver),
+                                }}
                             >
-                                {/* Position Badge */}
-                                <div className="absolute -top-2 -left-2 w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center">
-                                    {position + 1}
-                                </div>
+                                {/* Position badge */}
+                                <div style={{
+                                    position: 'absolute', top: -8, left: -8,
+                                    width: 20, height: 20, borderRadius: '50%',
+                                    backgroundColor: 'var(--color-primary)', color: '#fff',
+                                    fontSize: 10, fontWeight: 800,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                }}>{position + 1}</div>
 
-                                {/* Slot Content */}
-                                <div className="h-20 flex flex-col items-center justify-center">
+                                <div style={{ height: 72, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
                                     {slot.asset_id ? (
                                         <>
-                                            <span className="text-3xl mb-1">
-                                                {slot.asset_thumbnail || (asset?.file_type === 'image' ? '🖼️' : '🎬')}
-                                            </span>
-                                            <span className="text-xs font-medium text-slate-700 dark:text-slate-300 text-center line-clamp-1">
+                                            {slot.asset_thumbnail === 'image' || asset?.file_type === 'image'
+                                                ? <Image size={24} style={{ color: 'var(--color-primary)' }} />
+                                                : <Film size={24} style={{ color: 'var(--color-primary)' }} />}
+                                            <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--color-text-secondary)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
                                                 {slot.asset_name || asset?.filename || slot.asset_id}
                                             </span>
-                                            {slot.status === 'REJECTED' && (
-                                                <span className="text-[10px] text-red-500 font-bold mt-1">REJECTED</span>
-                                            )}
+                                            {slot.status === 'REJECTED' && <span style={{ fontSize: 10, color: 'var(--color-error)', fontWeight: 800 }}>REJECTED</span>}
                                         </>
                                     ) : (
                                         <>
-                                            <span className="material-symbols-outlined text-2xl text-slate-400">add_circle</span>
-                                            <span className="text-xs text-slate-400 mt-1">Add Asset</span>
+                                            <PlusCircle size={22} style={{ color: 'var(--color-text-tertiary)' }} />
+                                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>Add Asset</span>
+                                            {isDragOver && <span style={{ fontSize: 10, color: 'var(--color-primary)', fontWeight: 700 }}>Drop here</span>}
                                         </>
                                     )}
                                 </div>
-
-                                {/* Duration */}
-                                <div className="text-[10px] text-center text-slate-400 mt-2 border-t border-slate-200 dark:border-slate-700 pt-2">
-                                    5 seconds
-                                </div>
+                                <div style={{ fontSize: 10, textAlign: 'center', color: 'var(--color-text-tertiary)', marginTop: 'var(--space-2)', borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-2)' }}>5 seconds</div>
                             </button>
                         );
                     })}
                 </div>
-            </GlassCard>
+            </div>
 
-            {/* Loop Timeline Preview */}
-            <GlassCard>
-                <h3 className="font-bold text-lg flex items-center gap-2 mb-4">
-                    <span className="material-symbols-outlined text-primary">play_circle</span>
-                    Timeline Preview (60 seconds)
+            {/* Timeline Preview */}
+            <div style={card}>
+                <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', margin: '0 0 var(--space-4)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <PlayCircle size={16} style={{ color: 'var(--color-primary)' }} /> Timeline Preview (60 seconds)
                 </h3>
-                <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-8 flex overflow-hidden">
+                <div style={{ width: '100%', backgroundColor: 'var(--color-bg-hover)', borderRadius: 9999, height: 32, display: 'flex', overflow: 'hidden' }}>
                     {Array.from({ length: 12 }).map((_, i) => {
                         const slot = loop.slots?.[i] || {};
                         return (
-                            <div
-                                key={i}
-                                className={`flex-1 flex items-center justify-center text-xs font-bold transition-colors ${slot.asset_id
-                                    ? slot.status === 'REJECTED'
-                                        ? 'bg-red-400 text-white'
-                                        : 'bg-primary text-white'
-                                    : 'bg-slate-200 dark:bg-slate-700 text-slate-500'
-                                    }`}
-                                title={`Slot ${i + 1}: ${slot.asset_id || 'Empty'}`}
-                            >
-                                {i + 1}
-                            </div>
+                            <div key={i} title={`Slot ${i + 1}: ${slot.asset_id || 'Empty'}`}
+                                style={{
+                                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: 11, fontWeight: 700,
+                                    backgroundColor: slot.asset_id
+                                        ? slot.status === 'REJECTED' ? 'var(--color-error)' : 'var(--color-primary)'
+                                        : 'var(--color-border)',
+                                    color: slot.asset_id ? '#fff' : 'var(--color-text-tertiary)',
+                                }}
+                            >{i + 1}</div>
                         );
                     })}
                 </div>
-                <div className="flex justify-between text-xs text-slate-400 mt-2">
-                    <span>0s</span>
-                    <span>15s</span>
-                    <span>30s</span>
-                    <span>45s</span>
-                    <span>60s</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 'var(--space-2)' }}>
+                    {['0s','15s','30s','45s','60s'].map(t => <span key={t}>{t}</span>)}
                 </div>
-            </GlassCard>
+            </div>
 
             {/* Asset Picker Modal */}
             {showAssetPicker && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-                    <div className="bg-white dark:bg-surface-dark rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden">
-                        <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                            <h3 className="font-bold text-lg">Select Asset for Slot {selectedSlot + 1}</h3>
-                            <button
-                                onClick={() => setShowAssetPicker(false)}
-                                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-                            >
-                                <span className="material-symbols-outlined">close</span>
-                            </button>
+                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 'var(--space-4)' }}>
+                    <div style={{ backgroundColor: 'var(--color-bg-card)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-lg)', maxWidth: 680, width: '100%', maxHeight: '80vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ padding: 'var(--space-5) var(--space-6)', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', margin: 0 }}>Select Asset for Slot {(selectedSlot ?? 0) + 1}</h3>
+                            <button onClick={() => setShowAssetPicker(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary)', display: 'flex', padding: 4 }}><X size={18} /></button>
                         </div>
-                        <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto max-h-[60vh]">
+                        <div style={{ padding: 'var(--space-5)', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3)', overflowY: 'auto' }}>
                             {assets.map(asset => (
                                 <button
                                     key={asset.id}
+                                    draggable
+                                    onDragStart={e => e.dataTransfer.setData('assetId', String(asset.id))}
                                     onClick={() => handleAssetSelect(asset)}
-                                    className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary hover:shadow-lg transition-all text-center"
-                                    data-testid={`asset-${asset.id}`}
+                                    style={{
+                                        padding: 'var(--space-4)', textAlign: 'center',
+                                        border: '1px solid var(--color-border)',
+                                        borderRadius: 'var(--radius-md)',
+                                        backgroundColor: 'var(--color-bg-card)',
+                                        cursor: 'pointer', transition: 'all var(--transition-fast)',
+                                        fontFamily: 'var(--font-body)',
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-primary)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.boxShadow = 'none'; }}
                                 >
-                                    <span className="text-4xl block mb-2">{asset.file_type === 'image' ? '🖼️' : '🎬'}</span>
-                                    <span className="text-sm font-medium">{asset.filename}</span>
-                                    <span className="text-xs text-slate-500 block">{asset.file_type}</span>
+                                    <div style={{ marginBottom: 'var(--space-2)', display: 'flex', justifyContent: 'center' }}>
+                                        {asset.file_type === 'image' ? <Image size={32} style={{ color: 'var(--color-primary)' }} /> : <Film size={32} style={{ color: 'var(--color-primary)' }} />}
+                                    </div>
+                                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-primary)', display: 'block' }}>{asset.filename}</span>
+                                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>{asset.file_type}</span>
                                 </button>
                             ))}
                         </div>
