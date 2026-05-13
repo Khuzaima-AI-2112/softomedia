@@ -1,251 +1,219 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import GlassCard from '../../../components/GlassCard';
 import { PriceSummary } from '../../../components/PriceDisplay';
-import TrafficTierBadge from '../../../components/TrafficTierBadge';
-import apiService from '../../../services/ApiService';
 import pricingService from '../../../services/PricingService';
+import '../../../design-tokens.css';
 
 function Step5ReviewConfirm({ data, onConfirm, onPrev }) {
     const navigate = useNavigate();
+    const [termsChecked, setTermsChecked] = useState(true);
 
-    // Calculate totals
     const summary = useMemo(() => {
         const slots = data.selectedSlots || [];
         const totalCost = slots.reduce((sum, s) => sum + (s.price || 0), 0);
         let totalImpressions = 0;
-
-        slots.forEach(s => {
-            totalImpressions += pricingService.getEstimatedImpressions(s.screen_id, s.hour);
-        });
-
-        // Group by date and hour
+        slots.forEach(s => { totalImpressions += pricingService.getEstimatedImpressions(s.screen_id, s.hour); });
         const byDateHour = slots.reduce((acc, slot) => {
             const key = `${slot.date}_${slot.hour}`;
-            if (!acc[key]) {
-                acc[key] = { date: slot.date, hour: slot.hour, count: 0 };
-            }
+            if (!acc[key]) acc[key] = { date: slot.date, hour: slot.hour, count: 0 };
             acc[key].count++;
             return acc;
         }, {});
-
-        // Get unique screens
-        const screens = [
-            ...new Set(slots.map(s => s.screen_id))
-        ];
-
+        const screens = [...new Set(slots.map(s => s.screen_id))];
         return {
-            totalCost,
-            totalSlots: slots.length,
-            totalImpressions,
-            slots,
+            totalCost, totalSlots: slots.length, totalImpressions,
             byDateHour: Object.values(byDateHour),
             screenCount: screens.length,
-            durationDays: data.dateRange ?
-                Math.ceil((new Date(data.dateRange.end) - new Date(data.dateRange.start)) / (1000 * 60 * 60 * 24)) + 1
-                : 0
+            durationDays: data.dateRange
+                ? Math.ceil((new Date(data.dateRange.end) - new Date(data.dateRange.start)) / (1000 * 60 * 60 * 24)) + 1
+                : 0,
         };
     }, [data.selectedSlots, data.dateRange]);
 
     const formatHour = (hour) => {
         const suffix = hour >= 12 ? 'PM' : 'AM';
-        const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-        return `${displayHour}:00 ${suffix}`;
+        const h = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+        return `${h}:00 ${suffix}`;
+    };
+    const formatDate = (d) => new Date(d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+    const handleConfirm = () => {
+        if (!termsChecked) { alert('Please agree to the Terms of Service to proceed.'); return; }
+        onConfirm();
     };
 
-    const formatDate = (dateStr) => {
-        return new Date(dateStr).toLocaleDateString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric'
-        });
+    const card = {
+        backgroundColor: 'var(--color-bg-card)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-lg)',
+        boxShadow: 'var(--shadow-sm)',
+        padding: '1.25rem 1.375rem',
+    };
+
+    const metaLabel = {
+        fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)',
+        color: 'var(--color-text-tertiary)', textTransform: 'uppercase',
+        letterSpacing: '0.06em', marginBottom: 3,
     };
 
     return (
-        <div className="space-y-6">
-            {/* Step Header */}
-            <GlassCard className="border-l-4 border-l-emerald-500">
-                <div className="flex items-center gap-4">
-                    <div className="size-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                        <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400 text-2xl">check_circle</span>
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-bold">Step 5: Review & Confirm</h2>
-                        <p className="text-slate-500 dark:text-slate-400">
-                            Review your campaign details before submitting
-                        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.25rem', paddingBottom: '2rem', alignItems: 'start' }}>
+
+            {/* Left column */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+
+                {/* Campaign details */}
+                <div style={card}>
+                    <p style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', marginBottom: '0.875rem' }}>Campaign Details</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.875rem' }}>
+                        {[
+                            { label: 'Campaign Name', value: data.campaignName || 'Untitled Campaign' },
+                            { label: 'Duration',       value: `${summary.durationDays} days` },
+                            { label: 'Start Date',     value: formatDate(data.dateRange?.start) },
+                            { label: 'End Date',       value: formatDate(data.dateRange?.end) },
+                        ].map(({ label, value }) => (
+                            <div key={label}>
+                                <p style={metaLabel}>{label}</p>
+                                <p style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', color: 'var(--color-text-primary)', margin: 0 }}>{value}</p>
+                            </div>
+                        ))}
                     </div>
                 </div>
-            </GlassCard>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Left Column - Details */}
-                <div className="lg:col-span-2 space-y-6">
-                    {/* Campaign Details */}
-                    <GlassCard>
-                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                            <span className="material-symbols-outlined text-primary">campaign</span>
-                            Campaign Details
-                        </h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Campaign Name</p>
-                                <p className="font-medium">{data.campaignName || 'Untitled Campaign'}</p>
+                {/* Placement summary */}
+                <div style={card}>
+                    <p style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', marginBottom: '0.875rem' }}>Placement Summary</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
+                        {[
+                            { value: summary.screenCount, label: 'Screens' },
+                            { value: summary.totalSlots,  label: 'Total Slots' },
+                            { value: pricingService.formatImpressions(summary.totalImpressions), label: 'Est. Impressions' },
+                        ].map(({ value, label }) => (
+                            <div key={label} style={{
+                                padding: '0.875rem', borderRadius: 'var(--radius-md)',
+                                backgroundColor: 'var(--color-bg-hover)', textAlign: 'center',
+                            }}>
+                                <p style={{ fontSize: '1.5rem', fontWeight: 'var(--font-bold)', color: 'var(--color-primary)', margin: 0, lineHeight: 1.1 }}>{value}</p>
+                                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', margin: 0 }}>{label}</p>
                             </div>
-                            <div>
-                                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Duration</p>
-                                <p className="font-medium">{summary.durationDays} days</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Start Date</p>
-                                <p className="font-medium">{formatDate(data.dateRange?.start)}</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">End Date</p>
-                                <p className="font-medium">{formatDate(data.dateRange?.end)}</p>
+                        ))}
+                    </div>
+                    {/* Slot distribution chips */}
+                    <p style={{ ...metaLabel, marginBottom: '0.5rem' }}>Slot Distribution</p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem' }}>
+                        {summary.byDateHour.slice(0, 10).map((item, i) => (
+                            <span key={i} style={{
+                                padding: '4px 10px', borderRadius: 'var(--radius-md)',
+                                backgroundColor: 'var(--color-bg-hover)',
+                                border: '1px solid var(--color-border-light)',
+                                fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)',
+                            }}>
+                                {formatDate(item.date)} @ {formatHour(item.hour)}
+                                <span style={{ marginLeft: 4, fontWeight: 'var(--font-bold)', color: 'var(--color-primary)' }}>×{item.count}</span>
+                            </span>
+                        ))}
+                        {summary.byDateHour.length > 10 && (
+                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', padding: '4px 6px' }}>+{summary.byDateHour.length - 10} more</span>
+                        )}
+                    </div>
+                </div>
+
+                {/* Creative preview */}
+                <div style={card}>
+                    <p style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', marginBottom: '0.75rem' }}>Creative Preview</p>
+                    <div style={{ aspectRatio: '16/9', borderRadius: 'var(--radius-md)', overflow: 'hidden', maxWidth: 480, backgroundColor: 'var(--color-bg-hover)', border: '1px solid var(--color-border)' }}>
+                        <img src={data.creativeUrl} alt="Campaign creative" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    </div>
+                </div>
+            </div>
+
+            {/* Right column — sticky order summary + actions */}
+            <div style={{ position: 'sticky', top: '1rem', display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+                <div style={{
+                    ...card,
+                    borderTop: '3px solid var(--color-border)',
+                    padding: '1.25rem',
+                }}>
+                    <p style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', marginBottom: '1rem' }}>Order Summary</p>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', marginBottom: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>{summary.totalSlots} slots</span>
+                            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', color: 'var(--color-text-primary)' }}>{pricingService.formatPrice(summary.totalCost)}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>Platform fee</span>
+                            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', color: 'var(--color-success)' }}>Included</span>
+                        </div>
+                        <div style={{ paddingTop: '0.75rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', color: 'var(--color-text-primary)' }}>Total</span>
+                            <div style={{ textAlign: 'right' }}>
+                                <p style={{ fontSize: '1.5rem', fontWeight: 'var(--font-bold)', color: 'var(--color-primary)', margin: 0, lineHeight: 1.1 }}>{pricingService.formatPrice(summary.totalCost)}</p>
+                                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', margin: 0 }}>~{pricingService.formatImpressions(summary.totalImpressions)} impressions</p>
                             </div>
                         </div>
-                    </GlassCard>
+                    </div>
 
-                    {/* Placement Summary */}
-                    <GlassCard>
-                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                            <span className="material-symbols-outlined text-primary">tv</span>
-                            Placement Summary
-                        </h3>
-                        <div className="grid grid-cols-3 gap-4 mb-4">
-                            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-center">
-                                <p className="text-3xl font-black text-primary">{summary.screenCount}</p>
-                                <p className="text-xs text-slate-500">Screens</p>
-                            </div>
-                            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-center">
-                                <p className="text-3xl font-black text-primary">{summary.totalSlots}</p>
-                                <p className="text-xs text-slate-500">Total Slots</p>
-                            </div>
-                            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-center">
-                                <p className="text-3xl font-black text-primary">{pricingService.formatImpressions(summary.totalImpressions)}</p>
-                                <p className="text-xs text-slate-500">Est. Impressions</p>
-                            </div>
-                        </div>
-
-                        {/* Slot Distribution */}
-                        <div className="space-y-2">
-                            <p className="text-sm font-medium text-slate-500">Slot Distribution</p>
-                            <div className="flex flex-wrap gap-2">
-                                {summary.byDateHour.slice(0, 10).map((item, idx) => {
-                                    const tier = pricingService.getTrafficTier(item.hour);
-                                    return (
-                                        <div
-                                            key={idx}
-                                            className="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-sm"
-                                        >
-                                            <span className="font-medium">{formatDate(item.date)}</span>
-                                            <span className="mx-1 text-slate-400">@</span>
-                                            <span>{formatHour(item.hour)}</span>
-                                            <span className="ml-2 text-primary font-bold">×{item.count}</span>
-                                        </div>
-                                    );
-                                })}
-                                {summary.byDateHour.length > 10 && (
-                                    <span className="px-3 py-2 text-sm text-slate-400">
-                                        +{summary.byDateHour.length - 10} more
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    </GlassCard>
-
-                    {/* Creative Preview */}
-                    <GlassCard>
-                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                            <span className="material-symbols-outlined text-primary">image</span>
-                            Creative Preview
-                        </h3>
-                        <div className="aspect-video bg-slate-900 rounded-xl overflow-hidden max-w-lg">
-                            <img
-                                src={data.creativeUrl}
-                                alt="Campaign creative"
-                                className="w-full h-full object-cover"
+                    {/* Terms */}
+                    <div style={{
+                        padding: '0.625rem 0.75rem',
+                        borderRadius: 'var(--radius-md)',
+                        backgroundColor: 'var(--color-bg-hover)',
+                        border: '1px solid var(--color-border-light)',
+                        marginBottom: '1rem',
+                    }}>
+                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer' }}>
+                            <input
+                                type="checkbox"
+                                data-testid="terms-checkbox"
+                                checked={termsChecked}
+                                onChange={e => setTermsChecked(e.target.checked)}
+                                style={{ marginTop: 2, accentColor: 'var(--color-primary)', flexShrink: 0 }}
                             />
-                        </div>
-                    </GlassCard>
-                </div>
+                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>
+                                I agree to the{' '}
+                                <a href="#" style={{ color: 'var(--color-primary)', textDecoration: 'none' }}>Terms of Service</a>
+                                {' '}and{' '}
+                                <a href="#" style={{ color: 'var(--color-primary)', textDecoration: 'none' }}>Advertising Policy</a>
+                            </span>
+                        </label>
+                    </div>
 
-                {/* Right Column - Price & Actions */}
-                <div className="space-y-6">
-                    {/* Price Summary */}
-                    <GlassCard className="sticky top-4">
-                        <h3 className="font-bold text-lg mb-4">Order Summary</h3>
+                    {/* Actions — confirm dominant, back ghost */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <button
+                            onClick={handleConfirm}
+                            data-testid="confirm-booking-btn"
+                            style={{
+                                width: '100%', padding: '0.875rem 1rem',
+                                backgroundColor: 'var(--color-primary)', color: '#fff',
+                                border: 'none', borderRadius: 'var(--radius-md)',
+                                fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)',
+                                cursor: 'pointer', boxShadow: 'var(--shadow-md)',
+                                transition: 'background-color var(--transition-fast)',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'}
+                            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--color-primary)'}
+                        >Confirm Booking</button>
 
-                        <div className="space-y-3 mb-6">
-                            <div className="flex justify-between text-sm">
-                                <span className="text-slate-500">{summary.totalSlots} slots</span>
-                                <span>{pricingService.formatPrice(summary.totalCost)}</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-slate-500">Platform fee</span>
-                                <span className="text-emerald-500">Included</span>
-                            </div>
-                            <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
-                                <div className="flex justify-between items-end">
-                                    <span className="font-medium">Total</span>
-                                    <span className="text-3xl font-black text-primary">
-                                        {pricingService.formatPrice(summary.totalCost)}
-                                    </span>
-                                </div>
-                                <p className="text-xs text-slate-500 text-right mt-1">
-                                    ~{pricingService.formatImpressions(summary.totalImpressions)} impressions
-                                </p>
-                            </div>
-                        </div>
+                        {/* Ghost back button — text-only, low visual weight */}
+                        <button
+                            onClick={onPrev}
+                            style={{
+                                width: '100%', padding: '0.5rem',
+                                background: 'none', border: 'none',
+                                fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)',
+                                cursor: 'pointer', borderRadius: 'var(--radius-md)',
+                                transition: 'color var(--transition-fast)',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.color = 'var(--color-text-secondary)'}
+                            onMouseLeave={e => e.currentTarget.style.color = 'var(--color-text-tertiary)'}
+                        >← Go Back</button>
+                    </div>
 
-                        {/* Terms */}
-                        <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 mb-4">
-                            <label className="flex items-start gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    data-testid="terms-checkbox"
-                                    className="mt-1 accent-primary"
-                                    defaultChecked
-                                />
-                                <span className="text-xs text-slate-500">
-                                    I agree to the <a href="#" className="text-primary hover:underline">Terms of Service</a> and <a href="#" className="text-primary hover:underline">Advertising Policy</a>
-                                </span>
-                            </label>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="space-y-3">
-                            <button
-                                onClick={() => {
-                                    const checkbox = document.querySelector('input[data-testid="terms-checkbox"]');
-                                    if (checkbox && checkbox.checked) {
-                                        onConfirm();
-                                    } else {
-                                        alert('Please agree to the Terms of Service to proceed.');
-                                    }
-                                }}
-                                data-testid="confirm-booking-btn"
-                                className="w-full py-4 rounded-xl bg-gradient-to-r from-primary to-primary-hover text-white font-bold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all flex items-center justify-center gap-2"
-                            >
-                                <span className="material-symbols-outlined">check_circle</span>
-                                Confirm Booking
-                            </button>
-                            <button
-                                onClick={onPrev}
-                                className="w-full py-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium transition-colors"
-                            >
-                                Go Back
-                            </button>
-                        </div>
-
-                        {/* Help */}
-                        <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
-                            <p className="text-xs text-slate-400 text-center">
-                                Need help? <a href="#" className="text-primary hover:underline">Contact Support</a>
-                            </p>
-                        </div>
-                    </GlassCard>
+                    <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', textAlign: 'center', marginTop: '0.875rem' }}>
+                        Need help?{' '}<a href="#" style={{ color: 'var(--color-primary)', textDecoration: 'none' }}>Contact Support</a>
+                    </p>
                 </div>
             </div>
         </div>
