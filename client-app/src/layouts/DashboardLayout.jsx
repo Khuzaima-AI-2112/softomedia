@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -19,18 +19,40 @@ import {
     Ticket,
     Activity,
     ChevronLeft,
+    ShieldCheck,
+    Tv2,
+    Wrench,
 } from 'lucide-react';
+
+// Persona definitions — label, route root, icon label, key
+const PERSONAS = [
+    { role: 'admin',    label: 'Admin',    route: '/dashboard/admin',    color: '#6366f1' },
+    { role: 'brand',    label: 'Brand',    route: '/dashboard/brand',    color: '#10b981' },
+    { role: 'retailer', label: 'Retailer', route: '/dashboard/retailer', color: '#f59e0b' },
+    { role: 'tech',     label: 'Tech',     route: '/dashboard/tech',     color: '#3b82f6' },
+];
 
 function DashboardLayout() {
     const navigate = useNavigate();
     const location = useLocation();
-    const role = localStorage.getItem('auth_role') || 'admin';
+
+    // Initialise from localStorage; fall back to 'admin'
+    const [role, setRole] = useState(
+        () => localStorage.getItem('auth_role') || 'admin'
+    );
 
     const handleLogout = () => {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_role');
         localStorage.removeItem('user_data');
         navigate('/login');
+    };
+
+    const switchPersona = (newRole) => {
+        localStorage.setItem('auth_role', newRole);
+        setRole(newRole);
+        const persona = PERSONAS.find(p => p.role === newRole);
+        navigate(persona.route);
     };
 
     const isActive = (path) => {
@@ -66,6 +88,8 @@ function DashboardLayout() {
         </li>
     );
 
+    const activePersona = PERSONAS.find(p => p.role === role) || PERSONAS[0];
+
     return (
         <div style={{ display: 'flex', height: '100vh', backgroundColor: '#f3f4f6' }}>
             {/* Sidebar */}
@@ -78,9 +102,46 @@ function DashboardLayout() {
                 flexShrink: 0,
                 overflowY: 'auto',
             }}>
-                <div style={{ padding: '1.5rem', borderBottom: '1px solid #374151' }}>
-                    <h1 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#f9fafb' }}>SoftoMedia</h1>
-                    <span style={{ fontSize: '0.75rem', color: '#9ca3af', textTransform: 'uppercase' }}>{role} Portal</span>
+                {/* Brand + persona switcher */}
+                <div style={{ padding: '1.5rem 1rem 1rem', borderBottom: '1px solid #374151' }}>
+                    <h1 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#f9fafb', marginBottom: '0.25rem' }}>SoftoMedia</h1>
+
+                    {/* Role pill row */}
+                    <div
+                        role="group"
+                        aria-label="Switch persona"
+                        style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(4, 1fr)',
+                            gap: '0.25rem',
+                            marginTop: '0.75rem',
+                        }}
+                    >
+                        {PERSONAS.map(p => (
+                            <button
+                                key={p.role}
+                                data-testid={`persona-${p.role}`}
+                                aria-label={`Switch to ${p.label} view`}
+                                aria-pressed={role === p.role}
+                                onClick={() => switchPersona(p.role)}
+                                style={{
+                                    padding: '0.3rem 0',
+                                    fontSize: '0.65rem',
+                                    fontWeight: '600',
+                                    letterSpacing: '0.03em',
+                                    textTransform: 'uppercase',
+                                    borderRadius: '0.25rem',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    transition: 'background-color 150ms, color 150ms',
+                                    backgroundColor: role === p.role ? p.color : '#374151',
+                                    color: role === p.role ? '#ffffff' : '#9ca3af',
+                                }}
+                            >
+                                {p.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
                 <nav style={{ flex: 1, padding: '1rem' }}>
@@ -90,29 +151,29 @@ function DashboardLayout() {
                         {role === 'admin' && (
                             <>
                                 {sectionLabel('Overview')}
-                                <li><Link to="/dashboard/admin" style={linkStyle('/dashboard/admin')}><LayoutDashboard size={20} />Dashboard</Link></li>
+                                <li><Link to="/dashboard/admin" style={linkStyle('/dashboard/admin')}><LayoutDashboard size={20} aria-hidden="true" />Dashboard</Link></li>
 
                                 {sectionLabel('Content')}
-                                <li><Link to="/dashboard/admin/screens" style={linkStyle('/dashboard/admin/screens')}><Monitor size={20} />Screens</Link></li>
-                                <li><Link to="/dashboard/admin/playlists" style={linkStyle('/dashboard/admin/playlists')}><Play size={20} />Playlists</Link></li>
-                                <li><Link to="/dashboard/admin/loops" style={linkStyle('/dashboard/admin/loops')}><List size={20} />Loops</Link></li>
+                                <li><Link to="/dashboard/admin/screens" style={linkStyle('/dashboard/admin/screens')}><Monitor size={20} aria-hidden="true" />Screens</Link></li>
+                                <li><Link to="/dashboard/admin/playlists" style={linkStyle('/dashboard/admin/playlists')}><Play size={20} aria-hidden="true" />Playlists</Link></li>
+                                <li><Link to="/dashboard/admin/loops" style={linkStyle('/dashboard/admin/loops')}><List size={20} aria-hidden="true" />Loops</Link></li>
 
                                 {sectionLabel('Network')}
-                                <li><Link to="/dashboard/admin/retailers" style={linkStyle('/dashboard/admin/retailers')}><Users size={20} />Retailers</Link></li>
-                                <li><Link to="/dashboard/admin/advertisers" style={linkStyle('/dashboard/admin/advertisers')}><Megaphone size={20} />Advertisers</Link></li>
-                                <li><Link to="/dashboard/admin/hours" style={linkStyle('/dashboard/admin/hours')}><Clock size={20} />Business Hours</Link></li>
+                                <li><Link to="/dashboard/admin/retailers" style={linkStyle('/dashboard/admin/retailers')}><Users size={20} aria-hidden="true" />Retailers</Link></li>
+                                <li><Link to="/dashboard/admin/advertisers" style={linkStyle('/dashboard/admin/advertisers')}><Megaphone size={20} aria-hidden="true" />Advertisers</Link></li>
+                                <li><Link to="/dashboard/admin/hours" style={linkStyle('/dashboard/admin/hours')}><Clock size={20} aria-hidden="true" />Business Hours</Link></li>
 
                                 {sectionLabel('Analytics')}
-                                <li><Link to="/dashboard/admin/analytics" style={linkStyle('/dashboard/admin/analytics')}><BarChart2 size={20} />Loop Analytics</Link></li>
-                                <li><Link to="/dashboard/admin/map" style={linkStyle('/dashboard/admin/map')}><Map size={20} />Network Map</Link></li>
+                                <li><Link to="/dashboard/admin/analytics" style={linkStyle('/dashboard/admin/analytics')}><BarChart2 size={20} aria-hidden="true" />Loop Analytics</Link></li>
+                                <li><Link to="/dashboard/admin/map" style={linkStyle('/dashboard/admin/map')}><Map size={20} aria-hidden="true" />Network Map</Link></li>
 
                                 {sectionLabel('Admin')}
-                                <li><Link to="/dashboard/admin/pricing" style={linkStyle('/dashboard/admin/pricing')}><DollarSign size={20} />CPM Pricing</Link></li>
-                                <li><Link to="/dashboard/admin/users" style={linkStyle('/dashboard/admin/users')}><Users size={20} />Users</Link></li>
-                                <li><Link to="/dashboard/admin/ai-log" style={linkStyle('/dashboard/admin/ai-log')}><Bot size={20} />AI Log</Link></li>
-                                <li><Link to="/dashboard/tech" style={linkStyle('/dashboard/tech')}><Monitor size={20} />Tech Ops</Link></li>
-                                <li><Link to="/dashboard/tech/tickets" style={linkStyle('/dashboard/tech/tickets')}><Ticket size={20} />Support Tickets</Link></li>
-                                <li><Link to="/dashboard/health" style={linkStyle('/dashboard/health')}><Settings size={20} />Health</Link></li>
+                                <li><Link to="/dashboard/admin/pricing" style={linkStyle('/dashboard/admin/pricing')}><DollarSign size={20} aria-hidden="true" />CPM Pricing</Link></li>
+                                <li><Link to="/dashboard/admin/users" style={linkStyle('/dashboard/admin/users')}><Users size={20} aria-hidden="true" />Users</Link></li>
+                                <li><Link to="/dashboard/admin/ai-log" style={linkStyle('/dashboard/admin/ai-log')}><Bot size={20} aria-hidden="true" />AI Log</Link></li>
+                                <li><Link to="/dashboard/tech" style={linkStyle('/dashboard/tech')}><Monitor size={20} aria-hidden="true" />Tech Ops</Link></li>
+                                <li><Link to="/dashboard/tech/tickets" style={linkStyle('/dashboard/tech/tickets')}><Ticket size={20} aria-hidden="true" />Support Tickets</Link></li>
+                                <li><Link to="/dashboard/health" style={linkStyle('/dashboard/health')}><Settings size={20} aria-hidden="true" />Health</Link></li>
                             </>
                         )}
 
@@ -120,8 +181,8 @@ function DashboardLayout() {
                         {role === 'brand' && (
                             <>
                                 {sectionLabel('Campaigns')}
-                                <li><Link to="/dashboard/brand" style={linkStyle('/dashboard/brand')}><LayoutDashboard size={20} />Dashboard</Link></li>
-                                <li><Link to="/dashboard/brand/campaign/new" style={linkStyle('/dashboard/brand/campaign/new')}><Megaphone size={20} />New Campaign</Link></li>
+                                <li><Link to="/dashboard/brand" style={linkStyle('/dashboard/brand')}><LayoutDashboard size={20} aria-hidden="true" />Dashboard</Link></li>
+                                <li><Link to="/dashboard/brand/campaign/new" style={linkStyle('/dashboard/brand/campaign/new')}><Megaphone size={20} aria-hidden="true" />New Campaign</Link></li>
                             </>
                         )}
 
@@ -129,10 +190,10 @@ function DashboardLayout() {
                         {role === 'retailer' && (
                             <>
                                 {sectionLabel('My Network')}
-                                <li><Link to="/dashboard/retailer" style={linkStyle('/dashboard/retailer')}><LayoutDashboard size={20} />Dashboard</Link></li>
-                                <li><Link to="/dashboard/retailer/schedule" style={linkStyle('/dashboard/retailer/schedule')}><CalendarDays size={20} />Schedule</Link></li>
-                                <li><Link to="/dashboard/retailer/schedule/calendar" style={linkStyle('/dashboard/retailer/schedule/calendar')}><CalendarDays size={20} />Calendar</Link></li>
-                                <li><Link to="/dashboard/retailer/history" style={linkStyle('/dashboard/retailer/history')}><History size={20} />History</Link></li>
+                                <li><Link to="/dashboard/retailer" style={linkStyle('/dashboard/retailer')}><LayoutDashboard size={20} aria-hidden="true" />Dashboard</Link></li>
+                                <li><Link to="/dashboard/retailer/schedule" style={linkStyle('/dashboard/retailer/schedule')}><CalendarDays size={20} aria-hidden="true" />Schedule</Link></li>
+                                <li><Link to="/dashboard/retailer/schedule/calendar" style={linkStyle('/dashboard/retailer/schedule/calendar')}><CalendarDays size={20} aria-hidden="true" />Calendar</Link></li>
+                                <li><Link to="/dashboard/retailer/history" style={linkStyle('/dashboard/retailer/history')}><History size={20} aria-hidden="true" />History</Link></li>
                             </>
                         )}
 
@@ -140,9 +201,9 @@ function DashboardLayout() {
                         {role === 'tech' && (
                             <>
                                 {sectionLabel('Operations')}
-                                <li><Link to="/dashboard/tech" style={linkStyle('/dashboard/tech')}><Monitor size={20} />Tech Ops</Link></li>
-                                <li><Link to="/dashboard/tech/tickets" style={linkStyle('/dashboard/tech/tickets')}><Ticket size={20} />Support Tickets</Link></li>
-                                <li><Link to="/dashboard/health" style={linkStyle('/dashboard/health')}><Activity size={20} />Health</Link></li>
+                                <li><Link to="/dashboard/tech" style={linkStyle('/dashboard/tech')}><Monitor size={20} aria-hidden="true" />Tech Ops</Link></li>
+                                <li><Link to="/dashboard/tech/tickets" style={linkStyle('/dashboard/tech/tickets')}><Ticket size={20} aria-hidden="true" />Support Tickets</Link></li>
+                                <li><Link to="/dashboard/health" style={linkStyle('/dashboard/health')}><Activity size={20} aria-hidden="true" />Health</Link></li>
                             </>
                         )}
 
@@ -206,6 +267,22 @@ function DashboardLayout() {
                             ?.replace(/-/g, ' ')
                             ?.replace(/\b\w/g, (c) => c.toUpperCase()) || 'Overview'}
                     </h2>
+
+                    {/* Active persona badge in header */}
+                    <span style={{
+                        marginLeft: 'auto',
+                        padding: '0.2rem 0.6rem',
+                        borderRadius: '9999px',
+                        fontSize: '0.7rem',
+                        fontWeight: '600',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        backgroundColor: activePersona.color + '22',
+                        color: activePersona.color,
+                        border: `1px solid ${activePersona.color}44`,
+                    }}>
+                        {activePersona.label} view
+                    </span>
                 </header>
 
                 <div style={{ flex: 1, padding: '2rem', overflow: 'auto' }}>
