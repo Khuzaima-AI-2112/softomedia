@@ -1,6 +1,6 @@
 import express from 'express';
 import { advertiserRepository } from '../repositories/AdvertiserRepository.js';
-import { logger } from '../utils/logger.js';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -60,20 +60,6 @@ router.put('/:id', async (req, res) => {
     } catch (error) {
         logger.error('Failed to update advertiser:', error);
         res.status(500).json({ error: 'Failed to update advertiser' });
-    }
-});
-
-/**
- * DELETE /api/advertisers/:id
- * Soft delete an advertiser
- */
-router.delete('/:id', async (req, res) => {
-    try {
-        const advertiser = await advertiserRepository.update(req.params.id, { status: 'inactive' });
-        res.json({ message: 'Advertiser deleted', id: req.params.id });
-    } catch (error) {
-        logger.error('Failed to delete advertiser:', error);
-        res.status(500).json({ error: 'Failed to delete advertiser' });
     }
 });
 

@@ -4,7 +4,7 @@
 import express from 'express';
 import StoreRepository from '../repositories/StoreRepository.js';
 import { BusinessHoursService } from '../services/BusinessHoursService.js';
-import { requireAuth as authenticate } from '../middleware/auth.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 

@@ -1,338 +1,226 @@
+// API Client
+// Centralized API communication layer with error handling and retry logic
+
 import { API_URL } from '../config.js';
 
 /**
- * API Service Layer
- * Centralized API calls with authentication
+ * API Client Configuration
  */
-
-// Get auth token from localStorage
-const getAuthToken = () => {
-    return localStorage.getItem('auth_token');
+const DEFAULT_CONFIG = {
+    timeout: 10000,           // 10 second timeout
+    retries: 3,               // Retry failed requests 3 times
+    retryDelay: 1000,         // 1 second between retries
+    retryOn: [408, 429, 500, 502, 503, 504], // Retry on these status codes
 };
 
-// Set auth token in localStorage
-export const setAuthToken = (token) => {
-    localStorage.setItem('auth_token', token);
-};
+/**
+ * Custom API Error
+ */
+export class APIError extends Error {
+    constructor(message, status, response) {
+        super(message);
+        this.name = 'APIError';
+        this.status = status;
+        this.response = response;
+    }
+}
 
-// Set auth role in localStorage
-export const setAuthRole = (role) => {
-    localStorage.setItem('auth_role', role);
-};
+/**
+ * Sleep utility for retry delays
+ */
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Remove auth token and role (atomic logout)
-export const removeAuthToken = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_role');
-};
+/**
+ * Base API Client
+ */
+class APIClient {
+    constructor(baseURL = API_URL, config = {}) {
+        this.baseURL = baseURL;
+        this.config = { ...DEFAULT_CONFIG, ...config };
+        this.requestInterceptors = [];
+        this.responseInterceptors = [];
+    }
 
-// Base fetch with auth headers
-const authFetch = async (url, options = {}) => {
-    const token = getAuthToken();
-    const headers = {
-        'Content-Type': 'application/json',
-        ...options.headers,
-    };
+    /**
+     * Add request interceptor
+     * @param {Function} interceptor - Function that receives and returns request options
+     */
+    addRequestInterceptor(interceptor) {
+        this.requestInterceptors.push(interceptor);
+    }
+
+    /**
+     * Add response interceptor
+     * @param {Function} interceptor - Function that receives and returns response
+     */
+    addResponseInterceptor(interceptor) {
+        this.responseInterceptors.push(interceptor);
+    }
+
+    /**
+     * Apply request interceptors
+     */
+    async applyRequestInterceptors(url, options) {
+        let modifiedOptions = { ...options };
+        for (const interceptor of this.requestInterceptors) {
+            modifiedOptions = await interceptor(url, modifiedOptions);
+        }
+        return modifiedOptions;
+    }
+
+    /**
+     * Apply response interceptors
+     */
+    async applyResponseInterceptors(response) {
+        let modifiedResponse = response;
+        for (const interceptor of this.responseInterceptors) {
+            modifiedResponse = await interceptor(modifiedResponse);
+        }
+        return modifiedResponse;
+    }
+
+    /**
+     * Make HTTP request with retry logic
+     */
+    async request(endpoint, options = {}, attempt = 1) {
+        const url = `${this.baseURL}${endpoint}`;
+
+        // Apply request interceptors
+        const modifiedOptions = await this.applyRequestInterceptors(url, {
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers,
+            },
+            ...options,
+        });
+
+        // Create abort controller for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+
+        try {
+            const response = await fetch(url, {
+                ...modifiedOptions,
+                signal: controller.signal,
+            });
+
+            clearTimeout(timeoutId);
+
+            // Apply response interceptors
+            const modifiedResponse = await this.applyResponseInterceptors(response);
+
+            // Handle non-OK responses
+            if (!modifiedResponse.ok) {
+                const shouldRetry =
+                    this.config.retryOn.includes(modifiedResponse.status) &&
+                    attempt < this.config.retries;
+
+                if (shouldRetry) {
+                    await sleep(this.config.retryDelay * attempt);
+                    return this.request(endpoint, options, attempt + 1);
+                }
+
+                const errorData = await modifiedResponse.json().catch(() => ({}));
+                throw new APIError(
+                    errorData.error || `HTTP ${modifiedResponse.status}`,
+                    modifiedResponse.status,
+                    errorData
+                );
+            }
+
+            // Parse JSON response
+            const data = await modifiedResponse.json();
+            return data;
+
+        } catch (error) {
+            clearTimeout(timeoutId);
+
+            // Handle timeout
+            if (error.name === 'AbortError') {
+                const shouldRetry = attempt < this.config.retries;
+                if (shouldRetry) {
+                    await sleep(this.config.retryDelay * attempt);
+                    return this.request(endpoint, options, attempt + 1);
+                }
+                throw new APIError('Request timeout', 408, null);
+            }
+
+            // Handle network errors
+            if (error instanceof TypeError) {
+                const shouldRetry = attempt < this.config.retries;
+                if (shouldRetry) {
+                    await sleep(this.config.retryDelay * attempt);
+                    return this.request(endpoint, options, attempt + 1);
+                }
+                throw new APIError('Network error', 0, null);
+            }
+
+            throw error;
+        }
+    }
+
+    /**
+     * GET request
+     */
+    async get(endpoint, options = {}) {
+        return this.request(endpoint, { ...options, method: 'GET' });
+    }
+
+    /**
+     * POST request
+     */
+    async post(endpoint, data, options = {}) {
+        return this.request(endpoint, {
+            ...options,
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    /**
+     * PUT request
+     */
+    async put(endpoint, data, options = {}) {
+        return this.request(endpoint, {
+            ...options,
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    }
+
+    /**
+     * DELETE request
+     */
+    async delete(endpoint, options = {}) {
+        return this.request(endpoint, { ...options, method: 'DELETE' });
+    }
+}
+
+// Create singleton instance
+const apiClient = new APIClient();
+
+// Add auth token interceptor
+apiClient.addRequestInterceptor((url, options) => {
+    const token = localStorage.getItem('auth_token');
+    // Robust persona detection: use demo_role OR active_persona as fallback
+    const demoRole = localStorage.getItem('demo_role') || localStorage.getItem('active_persona');
 
     if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    const response = await fetch(url, {
-        ...options,
-        headers,
-    });
-
-    if (response.status === 401) {
-        // Token expired or invalid — clear both keys before redirecting
-        removeAuthToken();
-        window.location.href = '/login';
-        throw new Error('Unauthorized');
-    }
-
-    return response;
-};
-
-// ===== HTTP CLIENT =====
-// Generic REST client used by ApiService.js (apiClient.get/post/put/patch/delete)
-
-const handleResponse = async (response) => {
-    if (!response.ok) {
-        let errorMsg = `HTTP ${response.status}`;
-        try {
-            const err = await response.json();
-            errorMsg = err.error || err.message || errorMsg;
-        } catch (_) { /* non-JSON body */ }
-        throw new Error(errorMsg);
-    }
-    // 204 No Content — nothing to parse
-    if (response.status === 204) return null;
-    return response.json();
-};
-
-const apiClient = {
-    get: (path) =>
-        authFetch(`${API_URL}${path}`).then(handleResponse),
-
-    post: (path, body, options = {}) => {
-        const isFormData = body instanceof FormData;
-        const fetchOptions = {
-            method: 'POST',
-            ...options,
+        options.headers = {
+            ...options.headers,
+            'Authorization': `Bearer ${token}`,
         };
-        if (!isFormData) {
-            fetchOptions.body = JSON.stringify(body);
-        } else {
-            // Let the browser set the multipart boundary automatically
-            fetchOptions.body = body;
-            fetchOptions.headers = { ...options.headers };
-            delete fetchOptions.headers['Content-Type'];
-        }
-        return authFetch(`${API_URL}${path}`, fetchOptions).then(handleResponse);
-    },
+    }
 
-    put: (path, body) =>
-        authFetch(`${API_URL}${path}`, {
-            method: 'PUT',
-            body: JSON.stringify(body),
-        }).then(handleResponse),
+    if (demoRole) {
+        options.headers = {
+            ...options.headers,
+            'x-demo-role': demoRole,
+        };
+    }
+    return options;
+});
 
-    patch: (path, body) =>
-        authFetch(`${API_URL}${path}`, {
-            method: 'PATCH',
-            body: JSON.stringify(body),
-        }).then(handleResponse),
-
-    delete: (path) =>
-        authFetch(`${API_URL}${path}`, { method: 'DELETE' }).then(handleResponse),
-};
-
-// ===== AUTH API =====
-
-export const authAPI = {
-    login: async (email, password) => {
-        const response = await fetch(`${API_URL}/api/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password }),
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Login failed');
-        }
-
-        const data = await response.json();
-        setAuthToken(data.token);
-        if (data.user?.role) {
-            setAuthRole(data.user.role);
-        }
-        return data;
-    },
-
-    logout: () => {
-        removeAuthToken();
-        window.location.href = '/login';
-    },
-};
-
-// ===== USERS API =====
-
-export const usersAPI = {
-    invite: async (email, role, name, business_name) => {
-        const response = await authFetch(`${API_URL}/api/users/invite`, {
-            method: 'POST',
-            body: JSON.stringify({ email, role, name, business_name }),
-        });
-        return response.json();
-    },
-
-    create: async (userData) => {
-        const response = await authFetch(`${API_URL}/api/users`, {
-            method: 'POST',
-            body: JSON.stringify(userData),
-        });
-
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({}));
-            throw new Error(error.error || 'Failed to create user');
-        }
-
-        return response.json();
-    },
-
-    list: async (role = null, status = null) => {
-        const params = new URLSearchParams();
-        if (role) params.append('role', role);
-        if (status) params.append('status', status);
-
-        const response = await authFetch(`${API_URL}/api/users?${params}`);
-        return response.json();
-    },
-
-    acceptInvitation: async (token, password, name) => {
-        const response = await fetch(`${API_URL}/api/users/accept-invitation`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token, password, name }),
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to accept invitation');
-        }
-
-        const data = await response.json();
-        setAuthToken(data.token);
-        if (data.user?.role) {
-            setAuthRole(data.user.role);
-        }
-        return data;
-    },
-
-    delete: async (userId) => {
-        const response = await authFetch(`${API_URL}/api/users/${userId}`, {
-            method: 'DELETE',
-        });
-
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({}));
-            throw new Error(error.error || 'Failed to delete user');
-        }
-
-        return response.json();
-    },
-};
-
-// ===== DASHBOARD API =====
-
-export const dashboardAPI = {
-    getRetailerDashboard: async (retailerId) => {
-        const response = await authFetch(`${API_URL}/api/dashboard/retailer/${retailerId}`);
-        return response.json();
-    },
-
-    getBrandDashboard: async (brandId) => {
-        const response = await authFetch(`${API_URL}/api/dashboard/brand/${brandId}`);
-        return response.json();
-    },
-};
-
-// ===== SCREENS API =====
-
-export const screensAPI = {
-    list: async () => {
-        const response = await authFetch(`${API_URL}/api/screens`);
-        return response.json();
-    },
-
-    getManagement: async (status = null, search = null, sort = 'last_seen', order = 'desc') => {
-        const params = new URLSearchParams({ sort, order });
-        if (status) params.append('status', status);
-        if (search) params.append('search', search);
-
-        const response = await authFetch(`${API_URL}/api/screens/management?${params}`);
-        return response.json();
-    },
-
-    getDiagnostics: async (screenId) => {
-        const response = await authFetch(`${API_URL}/api/screens/${screenId}/diagnostics`);
-        return response.json();
-    },
-};
-
-// ===== CAMPAIGNS API =====
-
-export const campaignsAPI = {
-    create: async (formData) => {
-        const token = getAuthToken();
-        const response = await fetch(`${API_URL}/api/campaigns/create`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                // Don't set Content-Type for multipart/form-data
-            },
-            body: formData, // FormData object
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to create campaign');
-        }
-
-        return response.json();
-    },
-
-    list: async (status = null) => {
-        const params = new URLSearchParams();
-        if (status) params.append('status', status);
-
-        const response = await authFetch(`${API_URL}/api/campaigns?${params}`);
-        return response.json();
-    },
-
-    get: async (campaignId) => {
-        const response = await authFetch(`${API_URL}/api/campaigns/${campaignId}`);
-        return response.json();
-    },
-
-    update: async (campaignId, updates) => {
-        const response = await authFetch(`${API_URL}/api/campaigns/${campaignId}`, {
-            method: 'PUT',
-            body: JSON.stringify(updates),
-        });
-        return response.json();
-    },
-
-    delete: async (campaignId) => {
-        const response = await authFetch(`${API_URL}/api/campaigns/${campaignId}`, {
-            method: 'DELETE',
-        });
-        return response.json();
-    },
-
-    getReport: async (campaignId) => {
-        const response = await authFetch(`${API_URL}/api/campaigns/${campaignId}/report`);
-        return response.json();
-    },
-};
-
-// ===== NOTIFICATIONS API =====
-
-export const notificationsAPI = {
-    subscribe: async (fcm_token, device_type = 'web') => {
-        const response = await authFetch(`${API_URL}/api/notifications/subscribe`, {
-            method: 'POST',
-            body: JSON.stringify({ fcm_token, device_type }),
-        });
-        return response.json();
-    },
-
-    unsubscribe: async () => {
-        const response = await authFetch(`${API_URL}/api/notifications/unsubscribe`, {
-            method: 'DELETE',
-        });
-        return response.json();
-    },
-
-    getPreferences: async () => {
-        const response = await authFetch(`${API_URL}/api/notifications/preferences`);
-        return response.json();
-    },
-
-    updatePreferences: async (preferences) => {
-        const response = await authFetch(`${API_URL}/api/notifications/preferences`, {
-            method: 'PUT',
-            body: JSON.stringify(preferences),
-        });
-        return response.json();
-    },
-
-    // FIX: removed erroneous double `async` keyword that caused a syntax error
-    getHistory: async (limit = 50) => {
-        const response = await authFetch(`${API_URL}/api/notifications/history?limit=${limit}`);
-        return response.json();
-    },
-};
-
+// Export singleton and class
+export { apiClient, APIClient };
 export default apiClient;

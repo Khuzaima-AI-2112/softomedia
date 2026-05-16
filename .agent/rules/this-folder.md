@@ -9,5 +9,6 @@ trigger: always_on
 # Google Cloud Project Limitation
 - You are strictly limited to the softomedia-live-2026 project.
 - **Requirement**: Always include the explicit --project softomedia-live-2026 flag in all gcloud and firebase CLI commands.
-- **CLI Configuration**: The active gcloud CLI configuration must always be pinned to the softomedia-live-2026 project. If it diverges, run gcloud config set project softomedia-live-2026 immediately.
+- **Profile Requirement**: Ensure the active gcloud configuration profile is set to `softomedia-live-2026` (via `gcloud config configurations activate softomedia-live-2026`).
 - **Safety**: Perform a check before any destructive operations (delete, replace, update) to ensure the target is within the approved project scope.
+

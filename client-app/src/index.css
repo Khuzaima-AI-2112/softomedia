@@ -1,15 +1,50 @@
-/* SoftoMedia AdManager — Entry stylesheet */
+@import "tailwindcss";
 
-/* 1. Tailwind v4 base */
-@import 'tailwindcss';
+@theme {
+  --color-primary: #3b82f6;
+  --color-secondary: #64748b;
+  --color-surface-light: #f8fafc;
+  --color-surface-dark: #1e293b;
+}
 
-/* 2. Design tokens (@theme block + backward-compat aliases) */
-@import './styles/tokens.css';
+:root {
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
 
-/* 3. Original token file — PRESERVED UNCHANGED as reference */
-/*    Components still using var(--color-bg-main) etc. continue to work */
-/*    via the compat aliases in tokens.css */
-@import './design-tokens.css';
+  color-scheme: light dark;
+  color: #1f2937;
+  background-color: #ffffff;
 
-/* 4. Base resets and global styles */
-@import './styles/base.css';
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#root {
+  width: 100%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+table {
+  width: 100%;
+}
+
+button {
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+button:active {
+  transform: scale(0.98);
+}

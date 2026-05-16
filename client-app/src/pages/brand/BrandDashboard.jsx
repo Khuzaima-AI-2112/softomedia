@@ -1,382 +1,228 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { dashboardAPI } from '../../services/api';
-import { useNavigate } from 'react-router-dom';
-import useCampaignStore from '../../stores/useCampaignStore';
-import CampaignUploadDrawer from '../../components/CampaignUploadDrawer';
-import ScheduleTimeline from '../../components/ScheduleTimeline';
-import { Megaphone, CalendarDays, Plus } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import KPICard from '../../components/KPICard';
+import DataTable from '../../components/DataTable';
+import GlassCard from '../../components/GlassCard';
+import apiService from '../../services/ApiService';
+import pricingService from '../../services/PricingService';
 
-// ─── Stat atom ─────────────────────────────────────────────────────────────────────
-function Stat({ label, value, sub }) {
-    return (
-        <div style={{
-            backgroundColor: 'var(--color-surface)',
-            border: '1px solid var(--color-border-alpha)',
-            borderRadius: '0.625rem',
-            boxShadow: 'var(--shadow-sm)',
-            padding: '1.125rem 1.375rem',
-        }}>
-            <p style={{
-                fontSize: '0.8125rem',
-                fontWeight: '500',
-                color: 'var(--color-text-muted)',
-                marginBottom: '0.375rem',
-            }}>
-                {label}
-            </p>
-            <p style={{
-                fontSize: '1.75rem',
-                fontWeight: '700',
-                color: 'var(--color-text)',
-                fontVariantNumeric: 'tabular-nums',
-                lineHeight: 1.1,
-                marginBottom: sub ? '0.25rem' : 0,
-            }}>
-                {value}
-            </p>
-            {sub && (
-                <p style={{ fontSize: '0.75rem', color: 'var(--color-text-faint)', margin: 0 }}>
-                    {sub}
-                </p>
-            )}
-        </div>
-    );
-}
-
-// ─── EmptyState atom ───────────────────────────────────────────────────────────────
-function EmptyState({ icon: Icon, heading, body, ctaLabel, onCta }) {
-    return (
-        <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '3rem 2rem',
-            gap: '0.75rem',
-            textAlign: 'center',
-        }}>
-            <div style={{
-                width: '48px', height: '48px',
-                borderRadius: '0.625rem',
-                backgroundColor: 'var(--color-surface-2)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                marginBottom: '0.25rem',
-            }}>
-                <Icon size={22} style={{ color: 'var(--color-text-muted)' }} aria-hidden="true" />
-            </div>
-            <p style={{ fontSize: '0.9375rem', fontWeight: '600', color: 'var(--color-text)', margin: 0 }}>
-                {heading}
-            </p>
-            {body && (
-                <p style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)', margin: 0, maxWidth: '320px' }}>
-                    {body}
-                </p>
-            )}
-            {ctaLabel && onCta && (
-                <button
-                    onClick={onCta}
-                    style={{
-                        marginTop: '0.5rem',
-                        display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
-                        height: '34px', padding: '0 0.875rem',
-                        backgroundColor: 'var(--color-primary)', color: '#fff',
-                        border: 'none', borderRadius: '0.4rem',
-                        fontSize: '0.8125rem', fontWeight: '600', cursor: 'pointer',
-                        transition: 'background-color 150ms',
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'}
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--color-primary)'}
-                >
-                    <Plus size={14} aria-hidden="true" />
-                    {ctaLabel}
-                </button>
-            )}
-        </div>
-    );
-}
-
-// ─── Status badge ───────────────────────────────────────────────────────────────────
-const STATUS_CFG = {
-    live:      { dot: 'var(--color-success)',        bg: 'var(--color-success-light)',  text: 'var(--color-success-text)',  label: 'Live' },
-    active:    { dot: 'var(--color-success)',        bg: 'var(--color-success-light)',  text: 'var(--color-success-text)',  label: 'Active' },
-    pending:   { dot: 'var(--color-warning)',        bg: 'var(--color-warning-light)',  text: 'var(--color-warning-text)',  label: 'Pending' },
-    scheduled: { dot: 'var(--color-warning)',        bg: 'var(--color-warning-light)',  text: 'var(--color-warning-text)',  label: 'Scheduled' },
-    completed: { dot: 'var(--color-text-faint)',     bg: 'var(--color-surface-2)',      text: 'var(--color-text-muted)',    label: 'Completed' },
-    paused:    { dot: 'var(--color-text-faint)',     bg: 'var(--color-surface-2)',      text: 'var(--color-text-muted)',    label: 'Paused' },
-    rejected:  { dot: 'var(--color-error)',          bg: 'var(--color-error-light)',    text: 'var(--color-error-text)',    label: 'Rejected' },
-};
-
-function StatusBadge({ status }) {
-    const cfg = STATUS_CFG[status?.toLowerCase()] || {
-        dot: 'var(--color-text-faint)', bg: 'var(--color-surface-2)',
-        text: 'var(--color-text-muted)', label: status || 'Unknown',
-    };
-    return (
-        <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: '5px',
-            padding: '2px 9px', borderRadius: '9999px',
-            fontSize: '0.75rem', fontWeight: '600',
-            backgroundColor: cfg.bg, color: cfg.text,
-        }}>
-            <span style={{
-                width: '6px', height: '6px', borderRadius: '50%',
-                backgroundColor: cfg.dot, flexShrink: 0,
-            }} />
-            {cfg.label}
-        </span>
-    );
-}
-
-// ─── Main component ──────────────────────────────────────────────────────────────────
-function BrandDashboard() {
-    const { user } = useAuth();
+const BrandDashboard = () => {
     const navigate = useNavigate();
-    const { setEditMode, setCampaignData } = useCampaignStore();
+    const [campaigns, setCampaigns] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [dashboardData, setDashboardData] = useState(null);
-    const [error, setError] = useState(null);
-    const [isUploadOpen, setIsUploadOpen] = useState(false);
-    const [showTimeline, setShowTimeline] = useState(false);
-    const [hoveredRow, setHoveredRow] = useState(null);
+    const [stats, setStats] = useState({
+        active: 0,
+        screens: 0,
+        impressions: 0,
+        spent: 0
+    });
 
-    const fetchDashboardData = async () => {
+    useEffect(() => {
+        loadData();
+    }, []);
+
+    const loadData = async () => {
         try {
             setLoading(true);
-            const data = await dashboardAPI.getBrandDashboard(user?.linked_entity_id);
-            setDashboardData(data);
-        } catch (err) {
-            setError(err.message);
+            await pricingService.init();
+
+            // Get campaigns for this advertiser (demo: use ALL for now, or filter if backend supports it)
+            const [allCampaigns, allScreens] = await Promise.all([
+                apiService.getCampaigns(),
+                apiService.getScreens()
+            ]);
+
+            setCampaigns(allCampaigns);
+
+            // Calculate stats (case-insensitive for robustness)
+            const liveCampaigns = allCampaigns.filter(c => c.status?.toLowerCase() === 'live');
+            const totalSpent = allCampaigns.reduce((sum, c) => sum + (c.spent || 0), 0);
+            const totalImpressions = allCampaigns.reduce((sum, c) => sum + (c.impressions || 0), 0);
+            const onlineScreens = allScreens.filter(s => s.status?.toLowerCase() === 'online' || s.status === 'ACTIVE').length;
+
+            setStats({
+                active: liveCampaigns.length,
+                screens: onlineScreens,
+                impressions: totalImpressions,
+                spent: totalSpent
+            });
+        } catch (error) {
+            console.error('Failed to load dashboard data:', error);
         } finally {
             setLoading(false);
         }
     };
 
-    useEffect(() => {
-        if (user?.linked_entity_id) fetchDashboardData();
-    }, [user]);
+    const kpis = [
+        { label: 'Active Campaigns', value: String(stats.active), trend: '+1', icon: 'campaign', color: 'text-primary' },
+        { label: 'Screens Available', value: String(stats.screens), trend: '+5', icon: 'tv', color: 'text-blue-400' },
+        { label: 'Total Spent', value: pricingService.formatPrice(stats.spent), trend: '+12%', icon: 'payments', color: 'text-emerald-400' },
+    ];
 
-    if (loading) {
-        return (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                Loading…
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-error-text)' }}>
-                <p style={{ fontWeight: '600' }}>Error loading dashboard</p>
-                <p style={{ fontSize: '0.875rem' }}>{error}</p>
-            </div>
-        );
-    }
-
-    const { summary, campaigns = [], credits = 0 } = dashboardData || {};
-
-    const thStyle = {
-        padding: '0.625rem 0.875rem',
-        textAlign: 'left',
-        fontSize: '0.75rem',
-        fontWeight: '600',
-        color: 'var(--color-text-muted)',
-        letterSpacing: '0.04em',
-        textTransform: 'uppercase',
-        whiteSpace: 'nowrap',
-        borderBottom: '1px solid var(--color-border)',
-        backgroundColor: 'var(--color-surface)',
-    };
-
-    const tdStyle = {
-        padding: '0.625rem 0.875rem',
-        fontSize: '0.875rem',
-        color: 'var(--color-text)',
-        verticalAlign: 'middle',
-    };
+    const columns = [
+        {
+            header: 'Campaign Name',
+            render: (cmp) => (
+                <div className="flex flex-col">
+                    <span className="text-base font-semibold">{cmp.name}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">ID: {cmp.id}</span>
+                </div>
+            )
+        },
+        {
+            header: 'Preview',
+            render: (cmp) => (
+                <div className="relative w-16 h-10 rounded-md overflow-hidden bg-slate-200 dark:bg-slate-700 ring-1 ring-slate-200 dark:ring-slate-700">
+                    <div
+                        className="absolute inset-0 bg-cover bg-center"
+                        style={{ backgroundImage: `url("${cmp.creative_url}")` }}
+                    />
+                </div>
+            )
+        },
+        {
+            header: 'Status',
+            render: (cmp) => (
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${cmp.status === 'live' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' :
+                    cmp.status === 'scheduled' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800' :
+                        cmp.status === 'pending_approval' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800' :
+                            'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                    }`}>
+                    {cmp.status === 'live' && <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>}
+                    {cmp.status === 'live' ? 'Live' : cmp.status === 'scheduled' ? 'Scheduled' : cmp.status === 'pending_approval' ? 'Pending' : 'Ended'}
+                </span>
+            )
+        },
+        {
+            header: 'Duration',
+            render: (cmp) => (
+                <span className="text-sm">
+                    {new Date(cmp.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(cmp.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </span>
+            )
+        },
+        {
+            header: 'Budget',
+            render: (cmp) => (
+                <div className="flex flex-col">
+                    <span className="font-medium">{pricingService.formatPrice(cmp.budget)}</span>
+                    <span className="text-xs text-slate-500">
+                        {pricingService.formatPrice(cmp.spent || 0)} spent
+                    </span>
+                </div>
+            )
+        },
+        {
+            header: 'Performance',
+            render: (cmp) => {
+                const progress = cmp.budget > 0 ? Math.round(((cmp.spent || 0) / cmp.budget) * 100) : 0;
+                return (
+                    <div className="flex flex-col gap-1 w-24">
+                        <span className="text-slate-900 dark:text-white font-medium">
+                            {pricingService.formatImpressions(cmp.impressions || 0)}
+                            <span className="text-xs font-normal text-slate-500"> Impr.</span>
+                        </span>
+                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5">
+                            <div
+                                className={`h-1.5 rounded-full ${cmp.status === 'ended' ? 'bg-slate-400' : 'bg-primary'}`}
+                                style={{ width: `${Math.min(progress, 100)}%` }}
+                            />
+                        </div>
+                    </div>
+                );
+            }
+        },
+        {
+            header: 'Actions',
+            className: 'text-right',
+            render: () => (
+                <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button className="p-1.5 text-slate-400 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors" title="Edit">
+                        <span className="material-symbols-outlined text-[20px]" aria-hidden="true">edit</span>
+                    </button>
+                    <button className="p-1.5 text-slate-400 hover:text-orange-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors" title="Pause">
+                        <span className="material-symbols-outlined text-[20px]" aria-hidden="true">pause_circle</span>
+                    </button>
+                    <button className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors" title="Settings">
+                        <span className="material-symbols-outlined text-[20px]" aria-hidden="true">more_vert</span>
+                    </button>
+                </div>
+            )
+        }
+    ];
 
     return (
-        <div style={{ minHeight: '100%' }}>
-
-            {/* ── Header ── */}
-            <div style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-                marginBottom: '1.5rem',
-            }}>
+        <div className="flex flex-col gap-8 animate-in fade-in duration-500">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h2 style={{ fontSize: '1.125rem', fontWeight: '700', color: 'var(--color-text)', margin: 0 }}>
-                        Brand Dashboard
-                    </h2>
-                    <p style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                        Campaign performance and analytics
-                    </p>
+                    <h1 className="text-2xl font-bold tracking-tight">Your Campaigns</h1>
+                    <p className="text-slate-500 dark:text-slate-400">Manage and monitor your advertising campaigns</p>
                 </div>
-                <div style={{ display: 'flex', gap: '0.625rem' }}>
-                    <button
-                        onClick={() => setShowTimeline(!showTimeline)}
-                        style={{
-                            display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
-                            height: '34px', padding: '0 0.875rem',
-                            backgroundColor: showTimeline ? 'var(--color-primary-light)' : 'var(--color-surface)',
-                            color: showTimeline ? 'var(--color-primary-text)' : 'var(--color-text)',
-                            border: '1px solid ' + (showTimeline ? 'rgba(37,99,235,0.3)' : 'var(--color-border)'),
-                            borderRadius: '0.4rem',
-                            fontSize: '0.8125rem', fontWeight: '500', cursor: 'pointer',
-                            transition: 'background-color 150ms',
-                        }}
+                <div className="flex items-center gap-3">
+                    <Link
+                        to="/player/demo"
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium transition-colors"
                     >
-                        <CalendarDays size={14} aria-hidden="true" />
-                        {showTimeline ? 'Hide Timeline' : 'Schedule Timeline'}
-                    </button>
+                        <span className="material-symbols-outlined text-[20px]">slideshow</span>
+                        Preview Demo
+                    </Link>
                     <button
-                        onClick={() => setIsUploadOpen(true)}
-                        style={{
-                            display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
-                            height: '34px', padding: '0 0.875rem',
-                            backgroundColor: 'var(--color-primary)', color: '#fff',
-                            border: 'none', borderRadius: '0.4rem',
-                            fontSize: '0.8125rem', fontWeight: '600', cursor: 'pointer',
-                            transition: 'background-color 150ms',
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'}
-                        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--color-primary)'}
+                        onClick={() => navigate('campaign/new')}
+                        data-testid="new-campaign-btn"
+                        className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white font-medium rounded-lg text-sm px-5 py-2.5 transition-colors shadow-lg shadow-primary/25"
                     >
-                        <Plus size={14} aria-hidden="true" />
-                        Create Campaign
+                        <span className="material-symbols-outlined text-[20px]" aria-hidden="true">add</span>
+                        <span>New Campaign</span>
                     </button>
                 </div>
             </div>
 
-            {/* ── Stat strip ── */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                gap: '0.875rem',
-                marginBottom: '1.5rem',
-            }}>
-                <Stat label="Active Campaigns"  value={summary?.total_campaigns ?? 0} />
-                <Stat label="Total Impressions" value={(summary?.total_impressions ?? 0).toLocaleString()} />
-                <Stat label="Ad Credits"        value={(credits ?? 0).toLocaleString()} />
-                <Stat label="Screens Reached"   value={summary?.screens_reached ?? 0} />
+            {/* KPI Stats Row */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {kpis.map((kpi, i) => (
+                    <KPICard
+                        key={i}
+                        label={kpi.label}
+                        value={kpi.value}
+                        trend={kpi.trend}
+                        icon={kpi.icon}
+                        color={kpi.color}
+                        description="Running across network"
+                    />
+                ))}
             </div>
 
-            {/* ── Schedule Timeline ── */}
-            {showTimeline && campaigns.length > 0 && (
-                <div style={{ marginBottom: '1.5rem' }}>
-                    <ScheduleTimeline campaigns={campaigns} />
-                </div>
+            {/* Quick Tip for new users */}
+            {campaigns.length === 0 && (
+                <GlassCard className="border-l-4 border-l-primary">
+                    <div className="flex items-center gap-4">
+                        <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                            <span className="material-symbols-outlined text-primary text-2xl">lightbulb</span>
+                        </div>
+                        <div className="flex-1">
+                            <p className="font-bold">Ready to advertise?</p>
+                            <p className="text-sm text-slate-500">Create your first campaign to start reaching customers across our retail network.</p>
+                        </div>
+                        <button
+                            onClick={() => navigate('campaign/new')}
+                            className="px-4 py-2 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover"
+                        >
+                            Get Started
+                        </button>
+                    </div>
+                </GlassCard>
             )}
 
-            {/* ── Campaigns table ── */}
-            <div style={{
-                backgroundColor: 'var(--color-surface)',
-                border: '1px solid var(--color-border-alpha)',
-                borderRadius: '0.625rem',
-                boxShadow: 'var(--shadow-sm)',
-                overflow: 'hidden',
-            }}>
-                <div style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '0.875rem 1.125rem',
-                    borderBottom: campaigns.length > 0 ? '1px solid var(--color-border)' : 'none',
-                }}>
-                    <span style={{ fontSize: '0.8125rem', fontWeight: '600', color: 'var(--color-text)' }}>
-                        Your Campaigns
-                    </span>
-                    {campaigns.length > 0 && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--color-text-faint)' }}>
-                            {campaigns.length} campaign{campaigns.length !== 1 ? 's' : ''}
-                        </span>
-                    )}
-                </div>
-
-                {campaigns.length === 0 ? (
-                    <EmptyState
-                        icon={Megaphone}
-                        heading="No campaigns yet"
-                        body="Create your first campaign to start reaching customers on screens across the network."
-                        ctaLabel="Create your first campaign"
-                        onCta={() => setIsUploadOpen(true)}
-                    />
-                ) : (
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                                <tr>
-                                    <th style={thStyle}>Campaign</th>
-                                    <th style={thStyle}>Status</th>
-                                    <th style={{ ...thStyle, textAlign: 'right' }}>Impressions</th>
-                                    <th style={{ ...thStyle, textAlign: 'right' }}>Duration</th>
-                                    <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {campaigns.map((campaign, idx) => (
-                                    <tr
-                                        key={campaign.id ?? idx}
-                                        onMouseEnter={() => setHoveredRow(idx)}
-                                        onMouseLeave={() => setHoveredRow(null)}
-                                        style={{
-                                            borderBottom: idx < campaigns.length - 1
-                                                ? '1px solid var(--color-border)'
-                                                : 'none',
-                                            backgroundColor: hoveredRow === idx
-                                                ? 'var(--color-surface-2)'
-                                                : 'transparent',
-                                            transition: 'background-color 100ms',
-                                        }}
-                                    >
-                                        <td style={{ ...tdStyle, fontWeight: '500' }}>
-                                            {campaign.title}
-                                        </td>
-                                        <td style={tdStyle}>
-                                            <StatusBadge status={campaign.status} />
-                                        </td>
-                                        <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                                            {(campaign.impressions || 0).toLocaleString()}
-                                        </td>
-                                        <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--color-text-muted)' }}>
-                                            {campaign.duration}s
-                                        </td>
-                                        <td style={{ ...tdStyle, textAlign: 'right' }}>
-                                            <button
-                                                onClick={() => {
-                                                    setEditMode(true);
-                                                    setCampaignData(campaign);
-                                                    navigate(`/brand/campaign/${campaign.id}/edit`);
-                                                }}
-                                                style={{
-                                                    height: '28px', padding: '0 0.625rem',
-                                                    fontSize: '0.75rem', fontWeight: '500',
-                                                    backgroundColor: 'var(--color-surface-2)',
-                                                    color: 'var(--color-text)',
-                                                    border: '1px solid var(--color-border)',
-                                                    borderRadius: '0.3rem',
-                                                    cursor: 'pointer',
-                                                    transition: 'background-color 120ms',
-                                                }}
-                                                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-border)'}
-                                                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--color-surface-2)'}
-                                            >
-                                                Edit
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
-
-            {/* ── Upload drawer ── */}
-            <CampaignUploadDrawer
-                isOpen={isUploadOpen}
-                onClose={() => setIsUploadOpen(false)}
-                onSuccess={fetchDashboardData}
-            />
+            {/* Main Table */}
+            {campaigns.length > 0 && (
+                <DataTable
+                    columns={columns}
+                    data={campaigns}
+                />
+            )}
         </div>
     );
-}
+};
 
 export default BrandDashboard;
+

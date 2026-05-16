@@ -1,20 +1,24 @@
 {
-  "type": "module",
-  "name": "softomedia",
+  "name": "softomedia-live2026",
   "version": "1.0.0",
-  "private": true,
-  "dependencies": {
-    "@google-cloud/storage": "^5.18.3",
-    "vite": "8.0.12"
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
   },
-  "workspaces": [
-    "client-app",
-    "ad-server"
-  ],
   "scripts": {
-    "start:client": "npm run dev --workspace=client-app",
-    "start:server": "npm run dev --workspace=ad-server",
-    "build": "npm run build --workspaces",
-    "test": "npm run test --workspaces"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "lint": "cd ad-server && npm run lint && cd ../client-app && npm run lint",
+    "db:seed": "cd ad-server && npm run seed"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.57.0"
   }
 }

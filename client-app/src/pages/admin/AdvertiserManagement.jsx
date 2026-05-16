@@ -108,17 +108,6 @@ function AdvertiserManagement() {
         }
     };
 
-    const handleDelete = async (advertiserId, advertiserName) => {
-        if (window.confirm(`Are you sure you want to remove advertiser ${advertiserName}?`)) {
-            try {
-                await apiService.deleteAdvertiser(advertiserId);
-                await loadData();
-            } catch (error) {
-                console.error('Failed to delete advertiser:', error);
-            }
-        }
-    };
-
     const getAdvertiserCampaigns = (advertiserId) => campaigns.filter(c => c.advertiser_id === advertiserId);
     const getLiveCampaigns = (advertiserId) => getAdvertiserCampaigns(advertiserId).filter(c => c.status === 'live');
     const getTotalSpent = (advertiserId) => getAdvertiserCampaigns(advertiserId).reduce((sum, c) => sum + (c.spent || 0), 0);
@@ -213,13 +202,6 @@ function AdvertiserManagement() {
                         <span className="material-symbols-outlined text-lg">
                             {advertiser.status === 'active' ? 'toggle_on' : 'toggle_off'}
                         </span>
-                    </button>
-                    <button
-                        onClick={() => handleDelete(advertiser.id, advertiser.name)}
-                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                        title="Delete"
-                    >
-                        <span className="material-symbols-outlined text-lg">delete</span>
                     </button>
                 </div>
             )

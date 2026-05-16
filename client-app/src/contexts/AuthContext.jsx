@@ -1,68 +1,63 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { authAPI, removeAuthToken } from '../services/api';
+import { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
 
-export const useAuth = () => {
-    const context = useContext(AuthContext);
-    if (!context) {
-        throw new Error('useAuth must be used within AuthProvider');
-    }
-    return context;
-};
-
-export function AuthProvider({ children }) {
+export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
+    const [persona, setPersonaState] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Restore session from localStorage on mount
-        const token = localStorage.getItem('auth_token');
-        const userData = localStorage.getItem('user_data');
+        const savedPersona = localStorage.getItem('active_persona');
+        const savedUser = localStorage.getItem('auth_user');
 
-        if (token && userData) {
-            try {
-                setUser(JSON.parse(userData));
-            } catch {
-                // Corrupt user_data — clear everything and force re-login
-                removeAuthToken();
-                localStorage.removeItem('user_data');
-            }
+        if (savedUser) {
+            setUser(JSON.parse(savedUser));
         }
 
+        if (savedPersona) {
+            setPersonaState(savedPersona);
+        } else if (savedUser) {
+            setPersonaState(JSON.parse(savedUser).role);
+        } else {
+            setPersonaState('brand');
+        }
         setLoading(false);
     }, []);
 
-    const login = async (email, password) => {
-        const data = await authAPI.login(email, password);
+    const login = (userData, token) => {
+        localStorage.setItem('auth_user', JSON.stringify(userData));
+        localStorage.setItem('auth_token', token);
+        localStorage.setItem('active_persona', userData.role);
+        setUser(userData);
+        setPersonaState(userData.role);
+    };
 
-        // Persist full user object for session restore on reload
-        localStorage.setItem('user_data', JSON.stringify(data.user));
-        setUser(data.user);
+    const setPersona = (type) => {
+        localStorage.setItem('active_persona', type);
+        localStorage.setItem('demo_role', type); // Sync role for backend bypass
 
-        return data;
+        // Ensure demo-token is set if no real token exists
+        if (!localStorage.getItem('auth_token')) {
+            localStorage.setItem('auth_token', 'demo-token');
+        }
+
+        setPersonaState(type);
     };
 
     const logout = () => {
-        // removeAuthToken clears both auth_token AND auth_role atomically
-        removeAuthToken();
-        localStorage.removeItem('user_data');
+        localStorage.removeItem('auth_user');
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('active_persona');
         setUser(null);
-        // authAPI.logout also calls removeAuthToken + redirects — keep in sync
-        window.location.href = '/login';
-    };
-
-    const value = {
-        user,
-        login,
-        logout,
-        isAuthenticated: !!user,
-        loading,
+        setPersonaState('brand');
     };
 
     return (
-        <AuthContext.Provider value={value}>
+        <AuthContext.Provider value={{ user, persona, loading, login, setPersona, logout }}>
             {children}
         </AuthContext.Provider>
     );
-}
+};
+
+export const useAuth = () => useContext(AuthContext);

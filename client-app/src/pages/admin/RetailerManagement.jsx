@@ -99,17 +99,6 @@ function RetailerManagement() {
         }
     };
 
-    const handleDelete = async (retailerId, retailerName) => {
-        if (window.confirm(`Are you sure you want to remove retailer ${retailerName}?`)) {
-            try {
-                await apiService.deleteRetailer(retailerId);
-                await loadData();
-            } catch (error) {
-                console.error('Failed to delete retailer:', error);
-            }
-        }
-    };
-
     const getRetailerStores = (retailerId) => stores.filter(s => s.retailer_id === retailerId);
     const getRetailerScreens = (retailerId) => screens.filter(s => s.retailer_id === retailerId);
     const getOnlineScreens = (retailerId) => getRetailerScreens(retailerId).filter(s => s.status === 'online');
@@ -201,13 +190,6 @@ function RetailerManagement() {
                         <span className="material-symbols-outlined text-lg">
                             {retailer.status === 'active' ? 'toggle_on' : 'toggle_off'}
                         </span>
-                    </button>
-                    <button
-                        onClick={() => handleDelete(retailer.id, retailer.name)}
-                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                        title="Delete"
-                    >
-                        <span className="material-symbols-outlined text-lg">delete</span>
                     </button>
                 </div>
             )

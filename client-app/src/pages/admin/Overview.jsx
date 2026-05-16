@@ -1,400 +1,307 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import {
-    DollarSign, Users, Store, Megaphone,
-    Play, Clock, Map, ArrowRight,
-    TrendingUp, TrendingDown, Minus,
-} from 'lucide-react';
-import '../../design-tokens.css';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import GlassCard from '../../components/GlassCard';
+import StatusBadge from '../../components/StatusBadge';
+import apiService from '../../services/ApiService';
+import pricingService from '../../services/PricingService';
 
-/**
- * Admin Overview — Platform Governance (Super Admin)
- * Spec: no icon grid, no colored left-border cards.
- * Actions: left-aligned 2-col action strip.
- * KPIs: neutral surface, large number, trend chip.
- */
-
-// ─── Action strip data ─────────────────────────────────────────────────────────────
-const ACTIONS = [
-    { icon: DollarSign, label: 'CPM Pricing',   desc: 'Set ad slot rates & floor prices',          route: '/dashboard/admin/pricing' },
-    { icon: Users,      label: 'Users',         desc: 'Manage platform accounts & roles',           route: '/dashboard/admin/users' },
-    { icon: Store,      label: 'Retailers',     desc: 'Onboard and configure retail partners',      route: '/dashboard/admin/retailers' },
-    { icon: Megaphone,  label: 'Advertisers',   desc: 'Review advertiser accounts & budgets',       route: '/dashboard/admin/advertisers' },
-    { icon: Play,       label: 'Demo Player',   desc: 'Preview live loop playback in-browser',      route: '/player/demo' },
-    { icon: Clock,      label: 'Store Hours',   desc: 'Configure business hours per location',      route: '/dashboard/admin/hours' },
-    { icon: Map,        label: 'Network Map',   desc: 'Visualise screen coverage across locations', route: '/dashboard/admin/map' },
-];
-
-// ─── Trend chip ──────────────────────────────────────────────────────────────────────
-function TrendChip({ direction = 'flat', label }) {
-    const cfg = {
-        up:   { Icon: TrendingUp,   bg: 'var(--color-success-light)', color: '#03543f' },
-        down: { Icon: TrendingDown, bg: 'var(--color-error-light)',   color: '#9b1c1c' },
-        flat: { Icon: Minus,        bg: 'var(--color-bg-hover)',      color: 'var(--color-text-secondary)' },
-    }[direction];
-    return (
-        <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
-            padding: '2px 7px', borderRadius: 'var(--radius-full)',
-            fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)',
-            backgroundColor: cfg.bg, color: cfg.color,
-        }}>
-            <cfg.Icon size={10} aria-hidden="true" />
-            {label}
-        </span>
-    );
-}
-
-// ─── KPI card ────────────────────────────────────────────────────────────────────────
-function KpiCard({ label, value, sub, trend, trendLabel }) {
-    return (
-        <div style={{
-            backgroundColor: 'var(--color-bg-card)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-lg)',
-            boxShadow: 'var(--shadow-sm)',
-            padding: '1.125rem 1.375rem',
-        }}>
-            <p style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', color: 'var(--color-text-secondary)', marginBottom: '0.375rem' }}>
-                {label}
-            </p>
-            <p style={{
-                fontSize: '1.75rem',
-                fontWeight: 'var(--font-bold)',
-                color: 'var(--color-text-primary)',
-                fontVariantNumeric: 'tabular-nums',
-                lineHeight: 1.1,
-                marginBottom: '0.5rem',
-            }}>
-                {value}
-            </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                {trend && trendLabel && <TrendChip direction={trend} label={trendLabel} />}
-                {sub && (
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>{sub}</span>
-                )}
-            </div>
-        </div>
-    );
-}
-
-// ─── Action row ───────────────────────────────────────────────────────────────────
-function ActionRow({ icon: Icon, label, desc, onClick, last }) {
-    return (
-        <button
-            onClick={onClick}
-            style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.875rem',
-                width: '100%',
-                padding: '0.75rem 1rem',
-                background: 'none',
-                border: 'none',
-                borderBottom: last ? 'none' : '1px solid var(--color-border-light)',
-                cursor: 'pointer',
-                textAlign: 'left',
-                transition: 'background-color var(--transition-fast)',
-            }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-        >
-            <span style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: '34px', height: '34px', borderRadius: 'var(--radius-md)', flexShrink: 0,
-                backgroundColor: 'var(--color-bg-hover)',
-                color: 'var(--color-primary)',
-            }}>
-                <Icon size={16} aria-hidden="true" />
-            </span>
-            <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', color: 'var(--color-text-primary)' }}>
-                    {label}
-                </span>
-                <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {desc}
-                </span>
-            </span>
-            <ArrowRight size={14} aria-hidden="true" style={{ color: 'var(--color-text-tertiary)', flexShrink: 0 }} />
-        </button>
-    );
-}
-
-// ─── Shared card style ────────────────────────────────────────────────────────────────
-const cardStyle = {
-    backgroundColor: 'var(--color-bg-card)',
-    border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-lg)',
-    boxShadow: 'var(--shadow-sm)',
-    overflow: 'hidden',
-};
-
-const cardHeaderStyle = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '0.875rem 1.125rem',
-    borderBottom: '1px solid var(--color-border-light)',
-    backgroundColor: 'var(--color-bg-card)',
-};
-
-const listRowStyle = (last) => ({
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '0.625rem 1.125rem',
-    borderBottom: last ? 'none' : '1px solid var(--color-border-light)',
-});
-
-// ─── Main component ──────────────────────────────────────────────────────────────────
-function DashboardOverview() {
+function AdminOverview() {
     const navigate = useNavigate();
+    const [stats, setStats] = useState({
+        retailers: 0,
+        advertisers: 0,
+        activeScreens: 0,
+        totalScreens: 0,
+        pendingLoops: 0,
+        totalUsers: 0
+    });
 
-    const [retailers, setRetailers]           = React.useState([]);
-    const [advertisers, setAdvertisers]       = React.useState([]);
-    const [screens, setScreens]               = React.useState([]);
-    const [platformUsers, setPlatformUsers]   = React.useState([]);
-    const [loading, setLoading]               = React.useState(true);
+    const [retailers, setRetailers] = useState([]);
+    const [advertisers, setAdvertisers] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [showRetailerModal, setShowRetailerModal] = useState(false);
+    const [newRetailerName, setNewRetailerName] = useState('');
+    const [newRetailerEmail, setNewRetailerEmail] = useState('');
 
-    React.useEffect(() => {
-        const API_URL = window.__API_URL__ || '';
-        const headers = { Authorization: `Bearer ${localStorage.getItem('auth_token') || ''}` };
-        Promise.allSettled([
-            fetch(`${API_URL}/api/retailers`,   { headers }).then(r => r.json()),
-            fetch(`${API_URL}/api/advertisers`, { headers }).then(r => r.json()),
-            fetch(`${API_URL}/api/screens`,     { headers }).then(r => r.json()),
-            fetch(`${API_URL}/api/users`,       { headers }).then(r => r.json()),
-        ]).then(([rRes, aRes, sRes, uRes]) => {
-            if (rRes.status === 'fulfilled') setRetailers(rRes.value?.retailers     || rRes.value?.data || []);
-            if (aRes.status === 'fulfilled') setAdvertisers(aRes.value?.advertisers || aRes.value?.data || []);
-            if (sRes.status === 'fulfilled') setScreens(sRes.value?.screens         || sRes.value?.data || []);
-            if (uRes.status === 'fulfilled') setPlatformUsers(uRes.value?.users     || uRes.value?.data || []);
-            setLoading(false);
-        });
+    useEffect(() => {
+        loadData();
     }, []);
 
-    const screensOnline = screens.filter(s => s.status === 'online' || s.status === 'active').length;
-    const val = (n) => loading ? '—' : n;
+    const loadData = async () => {
+        try {
+            setLoading(true);
 
-    const col1 = ACTIONS.filter((_, i) => i % 2 === 0);
-    const col2 = ACTIONS.filter((_, i) => i % 2 === 1);
+            // Safely initialize services
+            try {
+                await pricingService.init();
+            } catch (err) {
+                console.error('[AdminOverview] PricingService init failed:', err);
+            }
+
+            // Fetch data with error handling for each request to prevent one failure from breaking everything
+            const [allRetailers, allAdvertisers, allScreens, allLoops, allUsers] = await Promise.all([
+                apiService.getRetailers().catch(() => []),
+                apiService.getAdvertisers().catch(() => []),
+                apiService.getScreens().catch(() => []),
+                apiService.getLoops().catch(() => []),
+                apiService.getUsers().catch(() => [])
+            ]);
+
+            // Ensure we have arrays before slicing/filtering
+            const safeRetailers = Array.isArray(allRetailers) ? allRetailers : [];
+            const safeAdvertisers = Array.isArray(allAdvertisers) ? allAdvertisers : [];
+            const safeScreens = Array.isArray(allScreens) ? allScreens : [];
+            const safeLoops = Array.isArray(allLoops) ? allLoops : [];
+            const safeUsers = Array.isArray(allUsers) ? allUsers : [];
+
+            setRetailers(safeRetailers.slice(0, 4));
+            setAdvertisers(safeAdvertisers.slice(0, 4));
+
+            setStats({
+                retailers: safeRetailers.length,
+                advertisers: safeAdvertisers.length,
+                activeScreens: safeScreens.filter(s => s.status === 'online').length,
+                totalScreens: safeScreens.length,
+                pendingLoops: safeLoops.filter(l => l.status === 'PENDING_APPROVAL').length,
+                totalUsers: safeUsers.length
+            });
+        } catch (error) {
+            console.error('Failed to load admin overview data:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleCreateRetailer = async () => {
+        if (newRetailerName && newRetailerEmail) {
+            try {
+                await apiService.createRetailer({
+                    name: newRetailerName,
+                    contactEmail: newRetailerEmail,
+                    logo: '🏪',
+                    status: 'active'
+                });
+                await loadData();
+                setShowRetailerModal(false);
+                setNewRetailerName('');
+                setNewRetailerEmail('');
+            } catch (error) {
+                console.error('Failed to create retailer:', error);
+            }
+        }
+    };
+
+    const quickActions = [
+        { label: 'CPM Pricing', icon: 'attach_money', path: '/dashboard/admin/pricing', color: 'emerald' },
+        { label: 'Users', icon: 'people', path: '/dashboard/admin/users', color: 'blue' },
+        { label: 'Retailers', icon: 'storefront', path: '/dashboard/admin/retailers', color: 'amber' },
+        { label: 'Advertisers', icon: 'campaign', path: '/dashboard/admin/advertisers', color: 'rose' },
+        { label: 'Demo Player', icon: 'slideshow', path: '/player/demo', color: 'purple' },
+        { label: 'Store Hours', icon: 'schedule', path: '/dashboard/admin/hours', color: 'indigo' },
+        { label: 'Network Map', icon: 'map', path: '/dashboard/admin/map', color: 'cyan' }
+    ];
 
     return (
-        <div style={{ minHeight: '100%' }}>
-
-            {/* ── Page header ── */}
-            <div style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-                marginBottom: '1.5rem',
-            }}>
+        <div className="space-y-8 animate-in fade-in duration-500">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', margin: 0 }}>
-                        Platform Governance
-                    </h2>
-                    <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                        Softomedia Super Admin Control Center
-                    </p>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Platform Governance</h1>
+                    <p className="text-slate-500 dark:text-slate-400">Softomedia Super Admin Control Center</p>
                 </div>
-                <div style={{ display: 'flex', gap: '0.625rem' }}>
+                <div className="flex items-center gap-3">
                     <button
-                        onClick={() => navigate('/dashboard/admin/retailers')}
-                        style={{
-                            display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
-                            height: '34px', padding: '0 0.875rem',
-                            backgroundColor: 'var(--color-primary)', color: '#fff',
-                            border: 'none', borderRadius: 'var(--radius-md)',
-                            fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', cursor: 'pointer',
-                            transition: 'background-color var(--transition-fast)',
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'}
-                        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--color-primary)'}
+                        onClick={() => setShowRetailerModal(true)}
+                        className="px-4 py-2 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover transition-colors flex items-center gap-2"
                     >
-                        + New Retailer
+                        <span className="material-symbols-outlined text-[20px]">add</span>
+                        New Retailer
                     </button>
                     <button
                         onClick={() => navigate('/dashboard/admin/map')}
-                        style={{
-                            display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
-                            height: '34px', padding: '0 0.875rem',
-                            backgroundColor: 'var(--color-bg-card)', color: 'var(--color-text-primary)',
-                            border: '1px solid var(--color-border)',
-                            borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)',
-                            cursor: 'pointer', transition: 'background-color var(--transition-fast)',
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'}
-                        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--color-bg-card)'}
+                        className="px-4 py-2 bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-lg font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                     >
                         Network Map
                     </button>
                 </div>
             </div>
 
-            {/* ── KPI strip ── */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                gap: '0.875rem',
-                marginBottom: '1.5rem',
-            }}>
-                <KpiCard label="Retailers"      value={val(retailers.length)}      trend="flat" trendLabel="No change" />
-                <KpiCard label="Advertisers"    value={val(advertisers.length)}    trend="flat" trendLabel="No change" />
-                <KpiCard
-                    label="Screens Online"
-                    value={val(screensOnline)}
-                    sub={!loading ? `of ${screens.length} total` : undefined}
-                    trend={screensOnline > 0 ? 'up' : 'flat'}
-                    trendLabel={screensOnline > 0 ? `${screensOnline} live` : 'None live'}
-                />
-                <KpiCard label="Platform Users" value={val(platformUsers.length)} trend="flat" trendLabel="No change" />
+            {/* Quick Actions Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {quickActions.map(action => (
+                    <Link
+                        key={action.path}
+                        to={action.path}
+                        className={`
+                            p-4 rounded-xl border border-slate-200 dark:border-slate-700 
+                            bg-white dark:bg-slate-800/50 hover:border-${action.color}-400 
+                            hover:shadow-lg hover:shadow-${action.color}-500/10 transition-all 
+                            flex flex-col items-center gap-2 group
+                        `}
+                    >
+                        <div className={`size-10 rounded-lg bg-${action.color}-100 dark:bg-${action.color}-900/30 flex items-center justify-center text-${action.color}-600 dark:text-${action.color}-400 group-hover:scale-110 transition-transform`}>
+                            <span className="material-symbols-outlined">{action.icon}</span>
+                        </div>
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{action.label}</span>
+                    </Link>
+                ))}
             </div>
 
-            {/* ── Action strip + partner lists ── */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr 1fr',
-                gap: '1rem',
-                alignItems: 'start',
-            }}>
-
-                {/* Action strip — col 1 */}
-                <div style={cardStyle}>
-                    <div style={cardHeaderStyle}>
-                        <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-primary)' }}>Quick Actions</span>
-                    </div>
-                    {col1.map((a, i) => (
-                        <ActionRow
-                            key={a.label}
-                            icon={a.icon}
-                            label={a.label}
-                            desc={a.desc}
-                            onClick={() => navigate(a.route)}
-                            last={i === col1.length - 1}
-                        />
-                    ))}
-                </div>
-
-                {/* Action strip — col 2 */}
-                <div style={cardStyle}>
-                    <div style={{ ...cardHeaderStyle, visibility: 'hidden' }}>
-                        <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)' }}>&nbsp;</span>
-                    </div>
-                    {col2.map((a, i) => (
-                        <ActionRow
-                            key={a.label}
-                            icon={a.icon}
-                            label={a.label}
-                            desc={a.desc}
-                            onClick={() => navigate(a.route)}
-                            last={i === col2.length - 1}
-                        />
-                    ))}
-                </div>
-
-                {/* Partner lists — col 3, surface-2 (bg-card) to separate from page bg */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-
-                    {/* Retail Partners */}
-                    <div style={cardStyle}>
-                        <div style={cardHeaderStyle}>
-                            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-primary)' }}>Retail Partners</span>
-                            <button
-                                onClick={() => navigate('/dashboard/admin/retailers')}
-                                style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', cursor: 'pointer' }}
-                            >
-                                View all →
-                            </button>
-                        </div>
-                        {loading ? (
-                            <p style={{ padding: '0.75rem 1.125rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>Loading…</p>
-                        ) : retailers.length === 0 ? (
-                            <p style={{ padding: '0.75rem 1.125rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>No retailers yet.</p>
-                        ) : (
-                            retailers.slice(0, 4).map((r, i) => (
-                                <div key={r.id || r.retailer_id} style={listRowStyle(i === Math.min(retailers.length, 4) - 1)}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', minWidth: 0 }}>
-                                        <div style={{
-                                            width: '30px', height: '30px', borderRadius: 'var(--radius-md)', flexShrink: 0,
-                                            backgroundColor: 'var(--color-bg-hover)',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        }}>
-                                            {r.logo_url
-                                                ? <img src={r.logo_url} alt="" style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'cover' }} />
-                                                : <Store size={14} style={{ color: 'var(--color-text-secondary)' }} />}
-                                        </div>
-                                        <div style={{ minWidth: 0 }}>
-                                            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                {r.name || r.business_name || 'Unnamed'}
-                                            </div>
-                                            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
-                                                {r.location_count ?? 0} location{r.location_count !== 1 ? 's' : ''}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <span className="badge-active" style={{
-                                        display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                        padding: '2px 8px', borderRadius: 'var(--radius-full)',
-                                        fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', flexShrink: 0,
-                                    }}>
-                                        <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: 'var(--color-success)', display: 'inline-block' }} />
-                                        Active
-                                    </span>
-                                </div>
-                            ))
-                        )}
-                    </div>
-
-                    {/* Key Advertisers */}
-                    <div style={cardStyle}>
-                        <div style={cardHeaderStyle}>
-                            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-primary)' }}>Key Advertisers</span>
-                            <button
-                                onClick={() => navigate('/dashboard/admin/advertisers')}
-                                style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', cursor: 'pointer' }}
-                            >
-                                View all →
-                            </button>
-                        </div>
-                        {loading ? (
-                            <p style={{ padding: '0.75rem 1.125rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>Loading…</p>
-                        ) : advertisers.length === 0 ? (
-                            <p style={{ padding: '0.75rem 1.125rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>No advertisers yet.</p>
-                        ) : (
-                            advertisers.slice(0, 4).map((a, i) => (
-                                <div key={a.id || a.advertiser_id} style={listRowStyle(i === Math.min(advertisers.length, 4) - 1)}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', minWidth: 0 }}>
-                                        <div style={{
-                                            width: '30px', height: '30px', borderRadius: 'var(--radius-md)', flexShrink: 0,
-                                            backgroundColor: 'var(--color-bg-hover)',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        }}>
-                                            {a.logo_url
-                                                ? <img src={a.logo_url} alt="" style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'cover' }} />
-                                                : <Megaphone size={14} style={{ color: 'var(--color-text-secondary)' }} />}
-                                        </div>
-                                        <div style={{ minWidth: 0 }}>
-                                            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                {a.name || a.company_name || 'Unnamed'}
-                                            </div>
-                                            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
-                                                {a.active_campaigns ?? 0} active campaign{a.active_campaigns !== 1 ? 's' : ''}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                                        <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>
-                                            ${(a.budget || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                                        </div>
-                                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>budget</div>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-
-                </div>
+            {/* Stats Row */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <GlassCard className="border-l-4 border-l-primary" data-testid="stat-card-retailers">
+                    <p className="text-sm font-medium text-slate-500 mb-1 leading-none">Retailers</p>
+                    <p className="text-3xl font-bold text-slate-900 dark:text-white" data-testid="stat-value-retailers">{stats.retailers}</p>
+                </GlassCard>
+                <GlassCard className="border-l-4 border-l-amber-500" data-testid="stat-card-advertisers">
+                    <p className="text-sm font-medium text-slate-500 mb-1 leading-none">Advertisers</p>
+                    <p className="text-3xl font-bold text-slate-900 dark:text-white" data-testid="stat-value-advertisers">{stats.advertisers}</p>
+                </GlassCard>
+                <GlassCard className="border-l-4 border-l-emerald-500">
+                    <p className="text-sm font-medium text-slate-500 mb-1 leading-none">Screens Online</p>
+                    <p className="text-3xl font-bold text-emerald-500">{stats.activeScreens}</p>
+                    <p className="text-xs text-slate-400">of {stats.totalScreens} total</p>
+                </GlassCard>
+                <GlassCard className="border-l-4 border-l-blue-500">
+                    <p className="text-sm font-medium text-slate-500 mb-1 leading-none">Platform Users</p>
+                    <p className="text-3xl font-bold text-blue-500">{stats.totalUsers}</p>
+                </GlassCard>
             </div>
+
+            {/* Pending Alert */}
+            {stats.pendingLoops > 0 && (
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                    <span className="material-symbols-outlined text-amber-500">pending_actions</span>
+                    <div className="flex-1">
+                        <p className="font-medium text-amber-800 dark:text-amber-200">
+                            {stats.pendingLoops} loops awaiting retailer approval
+                        </p>
+                        <p className="text-sm text-amber-600 dark:text-amber-400">
+                            Retailers need to approve tomorrow&apos;s schedule
+                        </p>
+                    </div>
+                    <Link
+                        to="/dashboard/admin/loops"
+                        className="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600"
+                    >
+                        View Loops
+                    </Link>
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <GlassCard>
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="font-bold text-lg">Retail Partners</h3>
+                        <Link to="/dashboard/admin/retailers" className="text-primary text-sm font-medium hover:underline">
+                            View All →
+                        </Link>
+                    </div>
+                    <div className="space-y-3">
+                        {retailers.map(ret => {
+                            return (
+                                <Link
+                                    key={ret.id}
+                                    to="/dashboard/admin/retailers"
+                                    className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 hover:border-primary/30 transition-colors cursor-pointer group"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="size-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-2xl border border-slate-200 dark:border-slate-600">
+                                            {ret.logo}
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">{ret.name}</p>
+                                            <p className="text-[11px] text-slate-500">{ret.store_count || 0} Locations</p>
+                                        </div>
+                                    </div>
+                                    <StatusBadge status={ret.status === 'active' ? 'Active' : 'Inactive'} />
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </GlassCard>
+
+                <GlassCard>
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="font-bold text-lg">Key Advertisers</h3>
+                        <Link to="/dashboard/admin/advertisers" className="text-primary text-sm font-medium hover:underline">
+                            View All →
+                        </Link>
+                    </div>
+                    <div className="space-y-3">
+                        {advertisers.map(adv => {
+                            return (
+                                <Link
+                                    key={adv.id}
+                                    to="/dashboard/admin/advertisers"
+                                    className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 hover:border-amber-500/30 transition-colors cursor-pointer group"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="size-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-2xl border border-slate-200 dark:border-slate-600">
+                                            {adv.logo}
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-amber-500 transition-colors">{adv.name}</p>
+                                            <p className="text-[11px] text-slate-500">{adv.active_campaign_count || 0} Active Campaigns</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-sm font-bold text-slate-900 dark:text-white">{pricingService.formatPrice(adv.budget)}</p>
+                                        <p className="text-[10px] text-slate-500 uppercase tracking-tighter font-bold">Budget</p>
+                                    </div>
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </GlassCard>
+            </div>
+
+            {/* New Retailer Modal */}
+            {showRetailerModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <GlassCard className="w-full max-w-md">
+                        <h2 className="text-xl font-bold mb-4">Register New Retailer</h2>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Company Name</label>
+                                <input
+                                    type="text"
+                                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
+                                    placeholder="e.g. Acme Retail Corp"
+                                    value={newRetailerName}
+                                    onChange={(e) => setNewRetailerName(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Contact Email</label>
+                                <input
+                                    type="email"
+                                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
+                                    placeholder="admin@retailer.com"
+                                    value={newRetailerEmail}
+                                    onChange={(e) => setNewRetailerEmail(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex justify-end gap-3 mt-6">
+                                <button
+                                    onClick={() => setShowRetailerModal(false)}
+                                    className="px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 font-medium"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleCreateRetailer}
+                                    className="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover shadow-lg shadow-primary/20"
+                                >
+                                    Create Account
+                                </button>
+                            </div>
+                        </div>
+                    </GlassCard>
+                </div>
+            )}
         </div>
     );
 }
 
-export default DashboardOverview;
+export default AdminOverview;
+

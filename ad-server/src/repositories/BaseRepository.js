@@ -2,7 +2,7 @@
 // Provides common CRUD operations with in-memory fallback for offline testing
 
 import { getFirestore } from '../utils/firestore.js';
-import { logger } from '../utils/logger.js';
+import logger from '../utils/logger.js';
 import { CircuitBreaker } from '../utils/ResilienceUtility.js';
 
 // In-memory store for fallback
@@ -31,11 +31,6 @@ export class BaseRepository {
     }
 
     async create(id, data) {
-        // Auto-generate ID if not provided
-        if (!id) {
-            id = this.collection ? this.collection.doc().id : 'gen_' + Date.now().toString(36);
-        }
-
         const docData = {
             ...data,
             id,
@@ -68,13 +63,8 @@ export class BaseRepository {
                 if (doc.exists) return { id: doc.id, ...doc.data() };
             }
         } catch (e) {
-            // Error occurred, potentially fallback
+            // Fallback to memory
         }
-
-        if (process.env.DISABLE_MOCK_STORAGE === 'true') {
-            return null;
-        }
-
         return MOCK_STORAGE[this.collectionName].get(id) || null;
     }
 
@@ -100,14 +90,10 @@ export class BaseRepository {
                 if (results.length > 0) return results;
             }
         } catch (e) {
-            // Error occurred, potentially fallback
+            // Fallback to memory
         }
 
         // Memory Fallback
-        if (process.env.DISABLE_MOCK_STORAGE === 'true') {
-            return results;
-        }
-
         results = Array.from(MOCK_STORAGE[this.collectionName].values());
         if (options.where) {
             results = results.filter(item => {
@@ -195,10 +181,6 @@ export class BaseRepository {
         }
 
         // Memory Fallback
-        if (process.env.DISABLE_MOCK_STORAGE === 'true') {
-            return 0;
-        }
-
         const all = await this.findAll(options);
         return all.length;
     }

@@ -1,5 +1,5 @@
 ﻿import { adRepository, playlistRepository, mediaRepository } from '../repositories/index.js';
-import { logger } from '../utils/logger.js';
+import logger from '../utils/logger.js';
 
 const PLAYLIST_CACHE = new Map();
 let CACHE_HOUR = null;

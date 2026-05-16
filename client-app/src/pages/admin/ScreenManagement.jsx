@@ -1,218 +1,115 @@
-import React, { useState, useEffect } from 'react';
-import { screensAPI } from '../../services/api.js';
+import { useState, useEffect } from 'react';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
-import '../../design-tokens.css';
+import apiService from '../../services/ApiService';
 
-/**
- * ScreenManagement - State 7: Screen Management List
- * Dense data table with search, filtering, and real-time status
- */
 function ScreenManagement() {
     const [screens, setScreens] = useState([]);
-    const [filteredScreens, setFilteredScreens] = useState([]);
+    const [retailers, setRetailers] = useState([]);
+    const [stores, setStores] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'offline'
-    const [searchQuery, setSearchQuery] = useState('');
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [newScreen, setNewScreen] = useState({ screen_id: '', resolution: '1920x1080', user_agent: 'Manual Admin Entry', retailer_id: '', store_id: '' });
 
-    useEffect(() => {
-        fetchScreens();
-    }, [statusFilter, searchQuery]);
-
-    const fetchScreens = async () => {
+    const loadData = async () => {
         setLoading(true);
         try {
-            const data = await screensAPI.getManagement(
-                statusFilter === 'all' ? null : statusFilter,
-                searchQuery || null
-            );
-            setScreens(data.screens || []);
-            setFilteredScreens(data.screens || []);
+            const [screensData, retailersData, storesData] = await Promise.all([
+                apiService.getScreens(),
+                apiService.getRetailers(),
+                apiService.getStores()
+            ]);
+            setScreens(screensData || []);
+            setRetailers(retailersData || []);
+            setStores(storesData || []);
         } catch (error) {
-            console.error('Failed to fetch screens:', error);
-            setScreens([]);
-            setFilteredScreens([]);
+            console.error('Failed to fetch data:', error);
         } finally {
             setLoading(false);
         }
     };
 
-    const formatLastSeen = (timestamp) => {
-        if (!timestamp) return 'Never';
-        const date = new Date(timestamp);
-        const now = new Date();
-        const diffMs = now - date;
-        const diffMins = Math.floor(diffMs / 60000);
+    useEffect(() => {
+        loadData();
+    }, []);
 
-        if (diffMins < 1) return 'Just now';
-        if (diffMins < 60) return `${diffMins}m ago`;
-        if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
-        return date.toLocaleDateString();
+    const handleDelete = async (id) => {
+        if (!confirm('Are you sure you want to delete this screen? This action cannot be undone.')) return;
+        try {
+            await apiService.deleteScreen(id);
+            await loadData();
+        } catch (error) {
+            console.error('Failed to delete screen:', error);
+            alert('Failed to delete screen');
+        }
+    };
+
+    const handleCreateScreen = async (e) => {
+        e.preventDefault();
+        try {
+            await apiService.registerScreen(newScreen);
+            setShowAddModal(false);
+            setNewScreen({ screen_id: '', resolution: '1920x1080', user_agent: 'Manual Admin Entry', retailer_id: '', store_id: '' }); // Reset
+            await loadData(); // Refresh list
+        } catch (error) {
+            console.error('Failed to create screen:', error);
+        }
     };
 
     return (
-        <div className="dashboard-ui" style={{ padding: 'var(--space-6)' }}>
-            <GlassCard>
-                {/* Header */}
-                <div style={{ marginBottom: 'var(--space-6)' }}>
-                    <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 'var(--font-bold)', marginBottom: 'var(--space-2)' }}>
-                        Screen Management
-                    </h1>
-                    <p style={{ color: 'var(--color-text-secondary)' }}>
-                        Manage physical hardware across all locations
-                    </p>
+        <div className="space-y-8 animate-in fade-in duration-500">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Screen Management</h1>
+                    <p className="text-slate-500 dark:text-slate-400">Provision and monitor physical display units</p>
                 </div>
-
-                {/* Filters & Search */}
-                <div
-                    style={{
-                        display: 'flex',
-                        gap: 'var(--space-4)',
-                        marginBottom: 'var(--space-6)',
-                        flexWrap: 'wrap',
-                    }}
+                <button
+                    onClick={() => setShowAddModal(true)}
+                    className="px-4 py-2 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover transition-colors flex items-center gap-2"
                 >
-                    {/* Search */}
-                    <input
-                        type="text"
-                        placeholder="Search by Screen ID or Location..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        style={{
-                            flex: 1,
-                            minWidth: '250px',
-                            padding: 'var(--space-3)',
-                            fontSize: 'var(--text-sm)',
-                            border: '1px solid var(--color-border)',
-                            borderRadius: 'var(--radius-md)',
-                            outline: 'none',
-                            transition: 'border-color var(--transition-fast)',
-                        }}
-                        onFocus={(e) => {
-                            e.currentTarget.style.borderColor = 'var(--color-primary)';
-                        }}
-                        onBlur={(e) => {
-                            e.currentTarget.style.borderColor = 'var(--color-border)';
-                        }}
-                    />
+                    <span className="material-symbols-outlined text-[20px]">add_to_queue</span>
+                    Add Screen
+                </button>
+            </div>
 
-                    {/* Status Filter */}
-                    <select
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                        style={{
-                            padding: 'var(--space-3)',
-                            fontSize: 'var(--text-sm)',
-                            border: '1px solid var(--color-border)',
-                            borderRadius: 'var(--radius-md)',
-                            backgroundColor: 'var(--color-bg-card)',
-                            cursor: 'pointer',
-                        }}
-                    >
-                        <option value="all">All Status</option>
-                        <option value="active">Active</option>
-                        <option value="offline">Offline</option>
-                        <option value="pending">Pending</option>
-                    </select>
-
-                    {/* Results Count */}
-                    <div
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            color: 'var(--color-text-secondary)',
-                            fontSize: 'var(--text-sm)',
-                        }}
-                    >
-                        {filteredScreens.length} of {screens.length} screens
-                    </div>
-                </div>
-
-                {/* Table */}
-                <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+            <GlassCard>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
                         <thead>
-                            <tr style={{ borderBottom: '2px solid var(--color-border)' }}>
-                                <th style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)' }}>
-                                    Unit ID
-                                </th>
-                                <th style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)' }}>
-                                    Store Name
-                                </th>
-                                <th style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)' }}>
-                                    Status
-                                </th>
-                                <th style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)' }}>
-                                    Last Heartbeat
-                                </th>
-                                <th style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)' }}>
-                                    Actions
-                                </th>
+                            <tr className="border-b border-slate-200 dark:border-slate-700">
+                                <th className="py-3 px-4 font-semibold text-slate-900 dark:text-white">Screen ID</th>
+                                <th className="py-3 px-4 font-semibold text-slate-900 dark:text-white">Location</th>
+                                <th className="py-3 px-4 font-semibold text-slate-900 dark:text-white">Last Seen</th>
+                                <th className="py-3 px-4 font-semibold text-slate-900 dark:text-white">Status</th>
+                                <th className="py-3 px-4 font-semibold text-slate-900 dark:text-white text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                             {loading ? (
-                                <tr>
-                                    <td colSpan="5" style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>
-                                        Loading screens...
-                                    </td>
-                                </tr>
-                            ) : filteredScreens.length === 0 ? (
-                                <tr>
-                                    <td colSpan="5" style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>
-                                        No screens found matching your filters
-                                    </td>
-                                </tr>
+                                <tr><td colSpan="5" className="py-8 text-center text-slate-500">Loading fleet data...</td></tr>
+                            ) : screens.length === 0 ? (
+                                <tr><td colSpan="5" className="py-8 text-center text-slate-500">No screens registered. Add one to get started.</td></tr>
                             ) : (
-                                filteredScreens.map((screen) => (
-                                    <tr
-                                        key={screen.screen_id}
-                                        style={{
-                                            borderBottom: '1px solid var(--color-border-light)',
-                                            transition: 'background-color var(--transition-fast)',
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.currentTarget.style.backgroundColor = 'transparent';
-                                        }}
-                                    >
-                                        <td style={{ padding: 'var(--space-3)', fontWeight: 'var(--font-medium)', fontFamily: 'var(--font-mono)' }}>
-                                            {screen.screen_id}
+                                screens.map(screen => (
+                                    <tr key={screen.id || screen.screen_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                        <td className="py-3 px-4 font-medium text-slate-900 dark:text-white">{screen.screen_id}</td>
+                                        <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{screen.location_id || 'Unassigned'}</td>
+                                        <td className="py-3 px-4 text-slate-500 text-sm">
+                                            {screen.last_seen ? new Date(screen.last_seen).toLocaleString() : 'Never'}
                                         </td>
-                                        <td style={{ padding: 'var(--space-3)' }}>
-                                            {screen.location || 'Unknown Location'}
-                                        </td>
-                                        <td style={{ padding: 'var(--space-3)' }}>
+                                        <td className="py-3 px-4">
                                             <StatusBadge status={screen.status} />
                                         </td>
-                                        <td style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
-                                            {formatLastSeen(screen.last_seen)}
-                                        </td>
-                                        <td style={{ padding: 'var(--space-3)' }}>
+                                        <td className="py-3 px-4 text-right">
+                                            <button className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-500 transition-colors mr-1" title="Settings">
+                                                <span className="material-symbols-outlined text-[20px]">settings</span>
+                                            </button>
                                             <button
-                                                onClick={() => alert(`View details for ${screen.screen_id}`)}
-                                                style={{
-                                                    padding: 'var(--space-2) var(--space-3)',
-                                                    fontSize: 'var(--text-xs)',
-                                                    color: 'var(--color-primary)',
-                                                    backgroundColor: 'transparent',
-                                                    border: '1px solid var(--color-primary)',
-                                                    borderRadius: 'var(--radius-md)',
-                                                    cursor: 'pointer',
-                                                    transition: 'all var(--transition-fast)',
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    e.currentTarget.style.backgroundColor = 'var(--color-primary)';
-                                                    e.currentTarget.style.color = 'white';
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.currentTarget.style.backgroundColor = 'transparent';
-                                                    e.currentTarget.style.color = 'var(--color-primary)';
-                                                }}
+                                                onClick={() => handleDelete(screen.screen_id)}
+                                                className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-500 transition-colors"
+                                                title="Delete Screen"
                                             >
-                                                Details
+                                                <span className="material-symbols-outlined text-[20px]">delete</span>
                                             </button>
                                         </td>
                                     </tr>
@@ -222,6 +119,86 @@ function ScreenManagement() {
                     </table>
                 </div>
             </GlassCard>
+
+            {/* Add Screen Modal */}
+            {showAddModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <GlassCard className="w-full max-w-md relative">
+                        <h2 className="text-xl font-bold mb-4">Register New Screen</h2>
+                        <form onSubmit={handleCreateScreen} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Screen Hardware ID</label>
+                                <input
+                                    type="text"
+                                    required
+                                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
+                                    placeholder="e.g. lobby-disp-01"
+                                    value={newScreen.screen_id}
+                                    onChange={e => setNewScreen({ ...newScreen, screen_id: e.target.value })}
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Retailer</label>
+                                    <select
+                                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
+                                        value={newScreen.retailer_id}
+                                        onChange={e => setNewScreen({ ...newScreen, retailer_id: e.target.value, store_id: '' })}
+                                    >
+                                        <option value="">Select Retailer...</option>
+                                        {retailers.map(r => (
+                                            <option key={r.id} value={r.id}>{r.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Store</label>
+                                    <select
+                                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
+                                        value={newScreen.store_id}
+                                        onChange={e => setNewScreen({ ...newScreen, store_id: e.target.value })}
+                                        disabled={!newScreen.retailer_id}
+                                    >
+                                        <option value="">Select Store...</option>
+                                        {stores
+                                            .filter(s => s.retailer_id === newScreen.retailer_id)
+                                            .map(s => (
+                                                <option key={s.id} value={s.id}>{s.name} ({s.city})</option>
+                                            ))}
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Resolution</label>
+                                <select
+                                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
+                                    value={newScreen.resolution}
+                                    onChange={e => setNewScreen({ ...newScreen, resolution: e.target.value })}
+                                >
+                                    <option value="1920x1080">1080p (Landscape)</option>
+                                    <option value="1080x1920">1080p (Portrait)</option>
+                                    <option value="3840x2160">4K (Landscape)</option>
+                                </select>
+                            </div>
+                            <div className="flex justify-end gap-3 mt-6">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAddModal(false)}
+                                    className="px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 font-medium"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover shadow-lg shadow-primary/20"
+                                >
+                                    Register Device
+                                </button>
+                            </div>
+                        </form>
+                    </GlassCard>
+                </div>
+            )}
         </div>
     );
 }

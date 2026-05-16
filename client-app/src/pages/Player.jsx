@@ -1,220 +1,391 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import apiService from '../services/ApiService'; // Ensure this path is correct if ApiService is there
-import { API_URL } from '../config.js';
+import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { API_URL } from '../config.js'
+import { telemetryService } from '../services/TelemetryService.js'
+
+// Business hours configuration for loop playback
+const BUSINESS_HOURS = { START: 8, END: 22 };
+
+// Get current hour in business hours context
+const getCurrentHour = () => new Date().getHours();
+
+// Check if current time is within business hours
+const isBusinessHours = () => {
+    const hour = getCurrentHour();
+    return hour >= BUSINESS_HOURS.START && hour < BUSINESS_HOURS.END;
+};
+
+// Get today's date in YYYY-MM-DD format
+const getTodayDate = () => new Date().toISOString().split('T')[0];
 
 function Player() {
-    const [searchParams, setSearchParams] = useSearchParams();
+    const [searchParams] = useSearchParams()
+    const [screenId, setScreenId] = useState(null)
+    const [status, setStatus] = useState('initializing')
+    const [screenData, setScreenData] = useState(null)
 
-    // Cascading selection state
-    const [stores, setStores] = useState([]);
-    const [screens, setScreens] = useState([]);
-    const [selectedStore, setSelectedStore] = useState('');
-    const [selectedScreen, setSelectedScreen] = useState(searchParams.get('screen_id') || '');
-    const [selectedDate, setSelectedDate] = useState(searchParams.get('date') || new Date().toISOString().split('T')[0]);
+    // Loop-based playback state
+    const [playbackMode, setPlaybackMode] = useState('playlist') // 'loop' | 'playlist'
+    const [currentLoop, setCurrentLoop] = useState(null)
+    const [currentHour, setCurrentHour] = useState(getCurrentHour())
 
-    const [status, setStatus] = useState('idle');
-    const [playlist, setPlaylist] = useState([]);
-    const [currentAdIndex, setCurrentAdIndex] = useState(0);
+    // Playlist fallback state
+    const [playlist, setPlaylist] = useState([])
+    const [playlistMeta, setPlaylistMeta] = useState({ source: 'unknown', id: null })
+    const [currentAdIndex, setCurrentAdIndex] = useState(0)
+    const [currentSlotIndex, setCurrentSlotIndex] = useState(0)
 
-    // Initial load: fetch stores
-    useEffect(() => {
-        const fetchStores = async () => {
-            try {
-                const res = await apiService.getStores();
-                setStores(res.stores || res || []);
-            } catch (err) {
-                console.error('Failed to fetch stores', err);
-            }
-        };
-        fetchStores();
-    }, []);
-
-    // When store changes, fetch screens
-    useEffect(() => {
-        if (!selectedStore) {
-            setScreens([]);
-            return;
+    // Fetch loop for current hour
+    const fetchCurrentLoop = useCallback(async (screenId) => {
+        if (!isBusinessHours()) {
+            console.log('[Player] Outside business hours, using playlist fallback');
+            return null;
         }
-        const fetchScreens = async () => {
-            try {
-                const res = await apiService.getScreens({ storeId: selectedStore });
-                setScreens(res.screens || res || []);
-            } catch (err) {
-                console.error('Failed to fetch screens', err);
-            }
-        };
-        fetchScreens();
-    }, [selectedStore]);
-
-    const handlePlay = async () => {
-        if (!selectedScreen || !selectedDate) return;
-
-        // Update URL
-        setSearchParams({ screen_id: selectedScreen, date: selectedDate });
-        setStatus('loading_playlist');
 
         try {
-            // Fetch multiple loops for the day to get a full schedule of slots for this specific screen+date
-            const res = await fetch(`${API_URL}/api/loops?screenId=${selectedScreen}&date=${selectedDate}`);
+            const date = getTodayDate();
+            const hour = getCurrentHour();
+            const res = await fetch(`${API_URL}/api/loops?date=${date}`);
             const data = await res.json();
 
-            let allSlots = [];
-            if (data.loops && data.loops.length > 0) {
-                // Combine all slots from all hours if needed, or simply map the loops
-                // The instructions say "loop fetch by screenid + date; slot playback order"
-                data.loops.forEach(loop => {
-                    if (loop.slots && Array.isArray(loop.slots)) {
-                        allSlots = allSlots.concat(loop.slots.filter(s => s && s.creative_url));
-                    }
-                });
-            } else if (Array.isArray(data) && data.length > 0) {
-                data.forEach(loop => {
-                    if (loop.slots && Array.isArray(loop.slots)) {
-                        allSlots = allSlots.concat(loop.slots.filter(s => s && s.creative_url));
-                    }
-                });
-            }
+            // Find approved loop for current hour
+            const loop = (data.loops || []).find(l =>
+                l.hour === hour && l.status === 'APPROVED'
+            );
 
-            if (allSlots.length > 0) {
-                // Deduplicate consecutive or construct the playlist
-                setPlaylist(allSlots.map(s => ({
-                    id: s.id || s.asset_id,
-                    url: s.creative_url,
-                    title: s.campaign_name || 'Ad',
-                    duration: 5 // Default slot duration 5s
-                })));
-                setCurrentAdIndex(0);
-                setStatus('playing');
-            } else {
-                setStatus('no_content');
+            if (loop && loop.slots && loop.slots.length > 0) {
+                console.log(`[Player] Found approved loop for ${hour}:00`, loop.id);
+                return loop;
             }
         } catch (e) {
-            console.error('Playlist fetch failed', e);
-            setStatus('error');
+            console.error('[Player] Loop fetch failed', e);
+        }
+        return null;
+    }, []);
+
+    // Hour change detection
+    useEffect(() => {
+        const checkHourChange = () => {
+            const newHour = getCurrentHour();
+            if (newHour !== currentHour) {
+                console.log(`[Player] Hour changed: ${currentHour} → ${newHour}`);
+                setCurrentHour(newHour);
+                setCurrentSlotIndex(0); // Reset to first slot
+            }
+        };
+
+        const interval = setInterval(checkHourChange, 10000); // Check every 10s
+        return () => clearInterval(interval);
+    }, [currentHour]);
+
+    // Orchestrated Initialization (SRE Fix #2)
+    useEffect(() => {
+        const initializePlayer = async () => {
+            const id = searchParams.get('screen_id') || 'demo-screen-01';
+            setScreenId(id);
+
+            try {
+                // Step 1: Register Screen
+                setStatus('registering');
+                console.log('[Player] Status changed: registering');
+
+                const regRes = await fetch(`${API_URL}/api/screens/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        screen_id: id,
+                        resolution: `${window.innerWidth}x${window.innerHeight}`,
+                        user_agent: navigator.userAgent
+                    })
+                });
+
+                if (!regRes.ok) throw new Error(`Registration failed: ${regRes.status}`);
+                console.log('[Player] Registration success');
+
+                // Step 2: Try to load loop for current hour (Business Hours)
+                if (isBusinessHours()) {
+                    console.log('[Player] Business hours active, fetching loop...');
+                    const date = getTodayDate();
+                    const hour = getCurrentHour();
+                    const loopRes = await fetch(`${API_URL}/api/loops?date=${date}`);
+                    const loopData = await loopRes.json();
+
+                    const loop = (loopData.loops || []).find(l =>
+                        l.hour === hour && l.status === 'APPROVED'
+                    );
+
+                    if (loop && loop.slots?.length > 0) {
+                        console.log('[Player] Found approved loop:', loop.id);
+                        setCurrentLoop(loop);
+                        setPlaybackMode('loop');
+                        setStatus('playing');
+                        console.log('[Player] Status changed: playing (loop mode)');
+                        return; // Successfully initialized with loop
+                    }
+                }
+
+                // Step 3: Fallback to Playlist if no loop
+                console.log('[Player] No loop found or outside business hours, falling back to playlist');
+                const playRes = await fetch(`${API_URL}/api/playlist/${id}`);
+                const playData = await playRes.json();
+
+                if (playData.playlist?.length > 0) {
+                    setPlaylist(playData.playlist);
+                    setPlaylistMeta({ source: playData.source || 'assigned', id: playData.playlist_id || playData.id });
+                    setPlaybackMode('playlist');
+                    setStatus('playing');
+                    console.log('[Player] Status changed: playing (playlist mode)');
+                } else {
+                    setStatus('no_content');
+                    console.log('[Player] Status changed: no_content');
+                }
+
+            } catch (err) {
+                console.error('[Player] Initialization failed:', err.message);
+                setStatus('error');
+            }
+        };
+
+        initializePlayer();
+    }, [searchParams, fetchCurrentLoop, currentHour]); // Re-run if searchParams OR hour change
+
+    // --- SRE: White-Box Observability & Transport ---
+    const logTelemetryEvent = (type, payload) => {
+        // Enable logging if in Test Mode OR if URL has ?debug=true
+        const isDebug = new URLSearchParams(window.location.search).get('debug') === 'true';
+
+        if (import.meta.env.MODE === 'test' || isDebug || window.__FORCE_TEST_LOGGING__) {
+            if (!window.__TELEMETRY_LOG__) window.__TELEMETRY_LOG__ = [];
+            window.__TELEMETRY_LOG__.push({ type, timestamp: Date.now(), payload });
+            // Keep buffer small (Circular Buffer Pattern)
+            if (window.__TELEMETRY_LOG__.length > 50) window.__TELEMETRY_LOG__.shift();
         }
     };
 
-    // Auto-fetch if params are present
-    useEffect(() => {
-        if (selectedScreen && selectedDate && status === 'idle') {
-            handlePlay();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedScreen, selectedDate, status]);
+    const sendTelemetry = (endpoint, data) => {
+        const url = `${API_URL}${endpoint}`;
 
-    // Playback Loop
+        // Log intent (Synchronous, Deterministic)
+        logTelemetryEvent(endpoint.includes('heartbeat') ? 'HEARTBEAT' : 'IMPRESSION', data);
+
+        // Send via Beacon (Reliable Transport)
+        if (navigator.sendBeacon) {
+            const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+            navigator.sendBeacon(url, blob);
+        } else {
+            // Fallback for older browsers
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+                keepalive: true
+            }).catch(e => console.error('Telemetry fallback failed', e));
+        }
+    };
+
+    // Heartbeat (Every 30 seconds)
     useEffect(() => {
-        if (status !== 'playing' || !playlist || playlist.length === 0) return;
+        if (!screenId) return;
+
+        const sendHeartbeat = () => {
+            sendTelemetry('/api/monitoring/heartbeat', { screenId });
+        };
+
+        sendHeartbeat();
+        const interval = setInterval(sendHeartbeat, 30000);
+        return () => clearInterval(interval);
+    }, [screenId]);
+
+    // Playback Loop (Playlist Mode)
+    useEffect(() => {
+        if (status !== 'playing' || playbackMode !== 'playlist' || !playlist || playlist.length === 0) return;
 
         const currentAd = playlist[currentAdIndex];
         const duration = (currentAd.duration || 5) * 1000;
+
+        const recordImpression = (ad) => {
+            telemetryService.trackImpression({
+                screenId,
+                campaignId: ad.campaign_id || ad.id,
+                mediaId: ad.media_id || ad.id,
+                duration: ad.duration,
+                source: playlistMeta.source,
+                playlistId: playlistMeta.id
+            });
+        };
+
+        recordImpression(currentAd);
 
         const timer = setTimeout(() => {
             setCurrentAdIndex((prev) => (prev + 1) % playlist.length);
         }, duration);
 
         return () => clearTimeout(timer);
-    }, [status, playlist, currentAdIndex]);
+    }, [status, playbackMode, playlist, currentAdIndex, screenId, playlistMeta]);
 
-    const activeAd = playlist ? playlist[currentAdIndex] : null;
+    // Loop Slot Playback (Loop Mode - Sprint 4)
+    useEffect(() => {
+        if (status !== 'playing' || playbackMode !== 'loop' || !currentLoop) return;
 
-    if (status === 'playing' && activeAd) {
+        const slots = currentLoop.slots || [];
+        if (slots.length === 0) return;
+
+        const currentSlot = slots[currentSlotIndex];
+        const duration = (currentSlot?.duration || 5) * 1000;
+
+        // Record proof-of-play telemetry with loop context
+        telemetryService.trackImpression({
+            screenId,
+            campaignId: currentSlot?.campaign_id,
+            mediaId: currentSlot?.asset_id,
+            duration: currentSlot?.duration || 5,
+            source: 'loop',
+            playlistId: currentLoop.id,
+            // Loop-specific telemetry fields
+            loopId: currentLoop.id,
+            loopHour: currentLoop.hour,
+            slotPosition: currentSlotIndex
+        });
+
+        logTelemetryEvent('LOOP_SLOT_PLAY', {
+            loopId: currentLoop.id,
+            hour: currentLoop.hour,
+            slotPosition: currentSlotIndex,
+            assetId: currentSlot?.asset_id
+        });
+
+        const timer = setTimeout(() => {
+            setCurrentSlotIndex((prev) => (prev + 1) % slots.length);
+        }, duration);
+
+        return () => clearTimeout(timer);
+    }, [status, playbackMode, currentLoop, currentSlotIndex, screenId]);
+
+    // Current content to display
+    const getActiveContent = () => {
+        if (playbackMode === 'loop' && currentLoop) {
+            const slot = currentLoop.slots?.[currentSlotIndex];
+            if (slot?.asset_id) {
+                // Ensure URL is valid. If it's just a filename/ID, construct full path
+                let assetUrl = slot.url || `${API_URL}/api/assets/${slot.asset_id}`;
+                if (!assetUrl.startsWith('http')) {
+                    assetUrl = `${API_URL}/api/assets/${slot.asset_id}`;
+                }
+
+                return {
+                    url: assetUrl,
+                    title: slot.asset_name || `Slot ${currentSlotIndex + 1}`,
+                    duration: slot.duration || 5,
+                    isLoop: true,
+                    loopHour: currentLoop.hour,
+                    slotPosition: currentSlotIndex
+                };
+            }
+        }
+
+        if (playlist && playlist[currentAdIndex]) {
+            let assetUrl = playlist[currentAdIndex].url || `${API_URL}/api/assets/${playlist[currentAdIndex].media_id}`;
+            if (!assetUrl.startsWith('http')) {
+                assetUrl = `${API_URL}/api/assets/${playlist[currentAdIndex].media_id}`;
+            }
+
+            return {
+                ...playlist[currentAdIndex],
+                url: assetUrl,
+                isLoop: false
+            };
+        }
+
+        return null;
+    };
+
+    const activeContent = getActiveContent();
+
+    if (status === 'playing' && activeContent) {
         return (
-            <div style={{ width: '100vw', height: '100vh', backgroundColor: 'black', overflow: 'hidden', position: 'relative' }}>
+            <div
+                data-testid="player-root"
+                data-status={status}
+                style={{ width: '100vw', height: '100vh', backgroundColor: 'black', overflow: 'hidden' }}
+            >
                 <img
-                    key={currentAdIndex} // Force re-render animation
-                    src={activeAd.url}
-                    alt={activeAd.title}
-                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    data-testid="ad-image"
+                    src={activeContent.url}
+                    alt={activeContent.title}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
-
-                {/* Exit back to selection */}
-                <button
-                    onClick={() => setStatus('idle')}
-                    style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.5)', color: 'white', padding: '8px 16px', border: 'none', borderRadius: '4px', cursor: 'pointer', zIndex: 10 }}
+                {/* Debug overlay */}
+                <div
+                    data-testid="ad-debug-overlay"
+                    style={{ position: 'absolute', bottom: 10, right: 10, background: 'rgba(0,0,0,0.5)', color: 'white', padding: 5, fontSize: 10 }}
                 >
-                    Back to Setup
-                </button>
-
-                <div style={{ position: 'absolute', bottom: 10, right: 10, background: 'rgba(0,0,0,0.5)', color: 'white', padding: 5, fontSize: 10, zIndex: 10 }}>
-                    {activeAd.title} | {activeAd.duration}s
+                    {activeContent.isLoop ? (
+                        <span>🔄 Loop {activeContent.loopHour}:00 | Slot {activeContent.slotPosition + 1}/12 | {activeContent.duration}s</span>
+                    ) : (
+                        <span>{activeContent.title} | {activeContent.duration}s</span>
+                    )}
                 </div>
+                {/* Loop indicator */}
+                {activeContent.isLoop && (
+                    <div
+                        data-testid="loop-indicator"
+                        style={{
+                            position: 'absolute',
+                            top: 10,
+                            left: 10,
+                            background: 'rgba(59,130,246,0.8)',
+                            color: 'white',
+                            padding: '4px 12px',
+                            borderRadius: 20,
+                            fontSize: 12,
+                            fontWeight: 'bold'
+                        }}
+                    >
+                        LOOP MODE • {currentLoop?.hour}:00
+                    </div>
+                )}
             </div>
         );
     }
 
     return (
-        <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            minHeight: '100vh',
-            backgroundColor: '#000',
-            color: '#fff',
-            fontFamily: 'sans-serif'
-        }}>
-            <div style={{ textAlign: 'center', maxWidth: '600px', width: '100%' }}>
-                <h1 style={{ fontSize: '2.5rem', marginBottom: '2rem' }}>SoftoMedia Player setup</h1>
+        <div
+            data-testid="player-root"
+            data-status={status}
+            style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '100vh',
+                backgroundColor: '#000',
+                color: '#fff',
+                fontFamily: 'sans-serif'
+            }}
+        >
+            <div style={{ textAlign: 'center' }}>
+                <h1 style={{ fontSize: '3rem', margin: 0 }}>SoftoMedia Player</h1>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', background: '#111', padding: '2rem', borderRadius: '8px', border: '1px solid #333' }}>
+                <div style={{ margin: '2rem 0' }}>
+                    {status === 'registering' && <span style={{ color: '#fbbf24' }}>Connecting...</span>}
+                    {status === 'loading_playlist' && <span style={{ color: '#60a5fa' }}>Loading Content...</span>}
+                    {status === 'no_content' && <span style={{ color: '#9ca3af' }}>No ads scheduled.</span>}
+                    {status === 'offline' && <span style={{ color: '#ef4444' }}>● Offline</span>}
+                    {status === 'error' && <span style={{ color: '#ef4444' }}>Error occurred.</span>}
+                </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                        <label style={{ color: '#aaa', marginBottom: '0.5rem' }}>1. Select Store</label>
-                        <select
-                            value={selectedStore}
-                            onChange={(e) => setSelectedStore(e.target.value)}
-                            style={{ padding: '0.75rem', borderRadius: '4px', background: '#222', color: '#fff', border: '1px solid #444' }}
-                        >
-                            <option value="">-- Choose Store --</option>
-                            {stores.map(s => <option key={s.id} value={s.id}>{s.name || s.id}</option>)}
-                        </select>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                        <label style={{ color: '#aaa', marginBottom: '0.5rem' }}>2. Select Screen</label>
-                        <select
-                            value={selectedScreen}
-                            onChange={(e) => setSelectedScreen(e.target.value)}
-                            disabled={!selectedStore && !selectedScreen}
-                            style={{ padding: '0.75rem', borderRadius: '4px', background: '#222', color: '#fff', border: '1px solid #444' }}
-                        >
-                            <option value="">-- Choose Screen --</option>
-                            {screens.map(s => <option key={s.id || s.screen_id} value={s.id || s.screen_id}>{s.name || s.screen_id}</option>)}
-                            {!screens.find(s => (s.id || s.screen_id) === selectedScreen) && selectedScreen && (
-                                <option value={selectedScreen}>{selectedScreen} (From URL)</option>
-                            )}
-                        </select>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                        <label style={{ color: '#aaa', marginBottom: '0.5rem' }}>3. Select Date</label>
-                        <input
-                            type="date"
-                            value={selectedDate}
-                            onChange={(e) => setSelectedDate(e.target.value)}
-                            style={{ padding: '0.75rem', borderRadius: '4px', background: '#222', color: '#fff', border: '1px solid #444', colorScheme: 'dark' }}
-                        />
-                    </div>
-
-                    <button
-                        onClick={handlePlay}
-                        disabled={!selectedScreen || !selectedDate}
-                        style={{ marginTop: '1rem', padding: '1rem', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold' }}
-                    >
-                        Start Playback
-                    </button>
-
-                    <div style={{ marginTop: '1rem' }}>
-                        {status === 'loading_playlist' && <span style={{ color: '#60a5fa' }}>Loading Content...</span>}
-                        {status === 'no_content' && <span style={{ color: '#9ca3af' }}>No ads scheduled for this date/screen.</span>}
-                        {status === 'error' && <span style={{ color: '#ef4444' }}>Error occurred.</span>}
-                    </div>
-
+                <div style={{
+                    padding: '1rem',
+                    border: '1px solid #333',
+                    borderRadius: '8px',
+                    display: 'inline-block',
+                    backgroundColor: '#111'
+                }}>
+                    <p style={{ color: '#888', margin: 0 }}>Screen ID</p>
+                    <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: '0.5rem 0' }}>{screenId}</p>
                 </div>
             </div>
         </div>
     )
 }
 
-export default Player;
+export default Player

@@ -8,7 +8,7 @@
 import { loopRepository, BUSINESS_HOURS, LOOP_STATUS } from '../repositories/LoopRepository.js';
 import { campaignRepository } from '../repositories/CampaignRepository.js';
 import { BusinessHoursService } from './BusinessHoursService.js';
-import { logger } from '../utils/logger.js';
+import logger from '../utils/logger.js';
 
 // Slot configuration
 export const SLOT_CONFIG = {

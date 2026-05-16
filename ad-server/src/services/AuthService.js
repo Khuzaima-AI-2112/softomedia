@@ -1,6 +1,6 @@
 ﻿import jwt from 'jsonwebtoken';
 import { userRepository } from '../repositories/index.js';
-import { logger } from '../utils/logger.js';
+import logger from '../utils/logger.js';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 

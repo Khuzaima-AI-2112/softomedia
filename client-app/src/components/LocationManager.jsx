@@ -17,10 +17,10 @@ function LocationManager() {
 
     const fetchLocations = async () => {
         try {
-            const data = await apiService.getStores();
-            setLocations(data.stores || data || []);
+            const data = await apiService.getLocations();
+            setLocations(data);
         } catch (error) {
-            console.error('Failed to fetch stores:', error);
+            console.error('Failed to fetch locations:', error);
         } finally {
             setLoading(false);
         }
@@ -29,15 +29,13 @@ function LocationManager() {
     const handleAdd = async (e) => {
         e.preventDefault();
         try {
-            // Include user ID as retailer_id for store creation
-            const payload = { ...newLocation, retailer_id: user?.linked_entity_id || 'retailer_demo' };
-            const added = await apiService.createStore(payload);
-            setLocations([...locations, added.store || added]);
+            const added = await apiService.createLocation(newLocation);
+            setLocations([...locations, added]);
             setIsAdding(false);
             setNewLocation({ name: '', store_profile: 'standard' });
         } catch (error) {
-            console.error('Failed to add store:', error);
-            alert('Failed to add store');
+            console.error('Failed to add location:', error);
+            alert('Failed to add location');
         }
     };
 

@@ -5,16 +5,12 @@
  */
 
 import express from 'express';
-import { Firestore } from '@google-cloud/firestore';
 import { loopRepository, BUSINESS_HOURS } from '../repositories/LoopRepository.js';
 import { loopGenerationService } from '../services/LoopGenerationService.js';
 import { BusinessHoursService } from '../services/BusinessHoursService.js';
-import { logger } from '../utils/logger.js';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
-
-// Dedicated Firestore instance for raw aggregation queries in analytics
-const db = new Firestore();
 
 /**
  * GET /api/loops
@@ -71,160 +67,6 @@ router.get('/', async (req, res) => {
 });
 
 /**
- * GET /api/loops/analytics
- * Aggregate broadcast analytics from the loop_events Firestore collection.
- *
- * Query params:
- *   start_date  {string} YYYY-MM-DD  (default: today)
- *   end_date    {string} YYYY-MM-DD  (default: today)
- *
- * Response shape:
- *   {
- *     impressions_by_day: [{ date, impressions }],
- *     top_screens:        [{ screen_id, impressions }],
- *     fill_rate:          0.94,
- *     paid_vs_house_ratio: 0.72
- *   }
- *
- * Uses Firestore count() aggregation (BaseRepository pattern) to avoid
- * full collection scans on loop_events.
- */
-router.get('/analytics', async (req, res) => {
-    try {
-        const today = new Date().toISOString().split('T')[0];
-        const startDate = req.query.start_date || today;
-        const endDate   = req.query.end_date   || today;
-
-        const eventsCol = db.collection('loop_events');
-
-        // ── 1. Impressions by day ────────────────────────────────────────────
-        // Collect each day in the requested range, count events per day.
-        const impressions_by_day = [];
-        const msPerDay = 86_400_000;
-        const start = new Date(startDate);
-        const end   = new Date(endDate);
-
-        for (let d = new Date(start); d <= end; d = new Date(d.getTime() + msPerDay)) {
-            const dateStr   = d.toISOString().split('T')[0];
-            const dayStart  = `${dateStr}T00:00:00.000Z`;
-            const dayEnd    = `${dateStr}T23:59:59.999Z`;
-
-            let count = 0;
-            try {
-                const snap = await eventsCol
-                    .where('event_type', '==', 'impression')
-                    .where('timestamp', '>=', dayStart)
-                    .where('timestamp', '<=', dayEnd)
-                    .count()
-                    .get();
-                count = snap.data().count;
-            } catch (_) {
-                // Firestore unavailable — count stays 0 (circuit-breaker parity)
-            }
-
-            impressions_by_day.push({ date: dateStr, impressions: count });
-        }
-
-        // ── 2. Top screens ───────────────────────────────────────────────────
-        // Enumerate distinct screen IDs that appear in the range, then rank.
-        // We cap at 10 screens to bound the fan-out.
-        let top_screens = [];
-        try {
-            const screenSnap = await eventsCol
-                .where('event_type', '==', 'impression')
-                .where('timestamp', '>=', `${startDate}T00:00:00.000Z`)
-                .where('timestamp', '<=', `${endDate}T23:59:59.999Z`)
-                .select('screen_id')
-                .limit(5000)      // bounded scan — 5 k max
-                .get();
-
-            // Tally in memory (bounded by limit above)
-            const tally = {};
-            screenSnap.docs.forEach(doc => {
-                const sid = doc.data().screen_id;
-                if (sid) tally[sid] = (tally[sid] || 0) + 1;
-            });
-
-            top_screens = Object.entries(tally)
-                .sort(([, a], [, b]) => b - a)
-                .slice(0, 10)
-                .map(([screen_id, impressions]) => ({ screen_id, impressions }));
-        } catch (_) {
-            // Firestore unavailable — return empty list
-        }
-
-        // ── 3. Fill rate ─────────────────────────────────────────────────────
-        // fill_rate = filled slots / total slots across all loops in range.
-        // A slot is "filled" when its status is not AVAILABLE.
-        let fill_rate = 0;
-        try {
-            const loopsSnap = await db.collection('loops')
-                .where('date', '>=', startDate)
-                .where('date', '<=', endDate)
-                .get();
-
-            let totalSlots  = 0;
-            let filledSlots = 0;
-
-            loopsSnap.docs.forEach(doc => {
-                const slots = doc.data().slots || [];
-                totalSlots  += slots.length;
-                filledSlots += slots.filter(s => s.status && s.status !== 'AVAILABLE').length;
-            });
-
-            fill_rate = totalSlots > 0
-                ? parseFloat((filledSlots / totalSlots).toFixed(4))
-                : 0;
-        } catch (_) {
-            // Firestore unavailable
-        }
-
-        // ── 4. Paid vs house ratio ───────────────────────────────────────────
-        // paid_vs_house_ratio = paid impressions / (paid + house impressions)
-        // loop_events carry an ad_type field: 'paid' | 'house' | 'placeholder'
-        let paid_vs_house_ratio = 0;
-        try {
-            const [paidSnap, houseSnap] = await Promise.all([
-                eventsCol
-                    .where('event_type', '==', 'impression')
-                    .where('ad_type', '==', 'paid')
-                    .where('timestamp', '>=', `${startDate}T00:00:00.000Z`)
-                    .where('timestamp', '<=', `${endDate}T23:59:59.999Z`)
-                    .count()
-                    .get(),
-                eventsCol
-                    .where('event_type', '==', 'impression')
-                    .where('ad_type', 'in', ['house', 'placeholder'])
-                    .where('timestamp', '>=', `${startDate}T00:00:00.000Z`)
-                    .where('timestamp', '<=', `${endDate}T23:59:59.999Z`)
-                    .count()
-                    .get()
-            ]);
-
-            const paid  = paidSnap.data().count;
-            const house = houseSnap.data().count;
-            const total = paid + house;
-
-            paid_vs_house_ratio = total > 0
-                ? parseFloat((paid / total).toFixed(4))
-                : 0;
-        } catch (_) {
-            // Firestore unavailable
-        }
-
-        res.json({
-            impressions_by_day,
-            top_screens,
-            fill_rate,
-            paid_vs_house_ratio
-        });
-    } catch (error) {
-        logger.error('[Loops API] GET /analytics failed', { error: error.message });
-        res.status(500).json({ error: 'Failed to aggregate loop analytics' });
-    }
-});
-
-/**
  * GET /api/loops/:id
  * Get single loop with slots
  */
@@ -260,6 +102,7 @@ router.post('/generate', async (req, res) => {
 
         let loops;
         if (mock) {
+            // Use mock generation for testing
             loops = await loopGenerationService.generateMockLoops(targetDate, retailerId, locationId);
         } else {
             loops = await loopGenerationService.generateDailyLoops(targetDate, retailerId, locationId);

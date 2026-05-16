@@ -3,7 +3,7 @@
 
 import express from 'express';
 import PricingRepository from '../repositories/PricingRepository.js';
-import { requireAuth as authenticate } from '../middleware/auth.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 

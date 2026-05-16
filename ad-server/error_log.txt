@@ -1,5 +1,0 @@
-[TEST] FAILED: MOCK_STORAGE is not defined
-Stack: ReferenceError: MOCK_STORAGE is not defined
-    at SpecialHoursRepositoryClass.updateSpecialHours (file:///C:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/ad-server/src/repositories/SpecialHoursRepository.js:49:13)
-    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
-    at async runTest (file:///C:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/ad-server/tests/verify-special-hours-persistence.js:19:24)

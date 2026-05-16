@@ -1,22 +1,25 @@
-import { useState, useRef } from 'react';
-import { UploadCloud, Link2, Image } from 'lucide-react';
-import '../../../design-tokens.css';
+/**
+ * Step4CreativeUpload - Upload or select campaign creative
+ * Part of the advertiser campaign booking wizard
+ */
 
+import { useState } from 'react';
+import GlassCard from '../../../components/GlassCard';
+
+// Demo creative URLs for quick selection
 const DEMO_CREATIVES = [
     { id: 1, url: 'https://picsum.photos/seed/ad1/1920/1080', label: 'Product Launch' },
     { id: 2, url: 'https://picsum.photos/seed/ad2/1920/1080', label: 'Sale Promo' },
     { id: 3, url: 'https://picsum.photos/seed/ad3/1920/1080', label: 'Brand Awareness' },
     { id: 4, url: 'https://picsum.photos/seed/ad4/1920/1080', label: 'Event Announcement' },
     { id: 5, url: 'https://picsum.photos/seed/ad5/1920/1080', label: 'Seasonal Campaign' },
-    { id: 6, url: 'https://picsum.photos/seed/ad6/1920/1080', label: 'New Arrival' },
+    { id: 6, url: 'https://picsum.photos/seed/ad6/1920/1080', label: 'New Arrival' }
 ];
 
 function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
     const [selectedCreative, setSelectedCreative] = useState(data.creativeUrl || '');
-    const [customUrl, setCustomUrl]               = useState('');
-    const [dragActive, setDragActive]             = useState(false);
-    const [error, setError]                       = useState('');
-    const inputRef = useRef(null);
+    const [customUrl, setCustomUrl] = useState('');
+    const [error, setError] = useState('');
 
     const handleSelectDemo = (url) => {
         setSelectedCreative(url);
@@ -24,246 +27,175 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
         setError('');
     };
 
-    const handleApplyUrl = () => {
-        if (!customUrl.trim()) { setError('Please enter a valid URL'); return; }
-        setSelectedCreative(customUrl.trim());
-        setError('');
-    };
-
-    const handleDrop = (e) => {
-        e.preventDefault();
-        setDragActive(false);
-        const file = e.dataTransfer.files?.[0];
-        if (file) simulateFileUpload(file);
-    };
-
-    const handleFileInput = (e) => {
-        const file = e.target.files?.[0];
-        if (file) simulateFileUpload(file);
-    };
-
-    const simulateFileUpload = (file) => {
-        // In production this would upload to storage; for now use object URL as preview
-        const objectUrl = URL.createObjectURL(file);
-        setSelectedCreative(objectUrl);
+    const handleCustomUrl = () => {
+        if (!customUrl) {
+            setError('Please enter a valid URL');
+            return;
+        }
+        setSelectedCreative(customUrl);
         setError('');
     };
 
     const handleContinue = () => {
-        if (!selectedCreative) { setError('Please select or upload a creative'); return; }
+        if (!selectedCreative) {
+            setError('Please select or upload a creative');
+            return;
+        }
         updateData({ creativeUrl: selectedCreative });
         onNext();
     };
 
-    const card = {
-        backgroundColor: 'var(--color-bg-card)',
-        border: '1px solid var(--color-border)',
-        borderRadius: 'var(--radius-lg)',
-        boxShadow: 'var(--shadow-sm)',
-        padding: '1.25rem 1.375rem',
-    };
-
-    const inputStyle = {
-        flex: 1, padding: '0.625rem 0.875rem',
-        border: '1px solid var(--color-border)',
-        borderRadius: 'var(--radius-md)',
-        fontSize: 'var(--text-sm)',
-        backgroundColor: 'var(--color-bg-card)',
-        color: 'var(--color-text-primary)',
-        fontFamily: 'var(--font-body)',
-        outline: 'none',
-    };
-
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingBottom: '5rem' }}>
+        <div className="space-y-6">
+            {/* Step Header */}
+            <GlassCard className="border-l-4 border-l-primary">
+                <div className="flex items-center gap-4">
+                    <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-primary text-2xl">image</span>
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-bold">Step 4: Upload Creative</h2>
+                        <p className="text-slate-500 dark:text-slate-400">
+                            Select or upload your advertisement creative (1920×1080 recommended)
+                        </p>
+                    </div>
+                </div>
+            </GlassCard>
 
-            {/* Specs row */}
-            <div style={{ ...card, padding: '1rem 1.25rem' }}>
-                <p style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.75rem' }}>Creative Specifications</p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
-                    {[
-                        { icon: <Image size={18} />, label: '16:9 Ratio', sub: '1920×1080 px' },
-                        { icon: <UploadCloud size={18} />, label: 'JPG / PNG', sub: 'Max 5 MB' },
-                        { icon: <UploadCloud size={18} />, label: 'MP4 / WebM', sub: 'Coming soon' },
-                        { icon: <Image size={18} />, label: '5 seconds', sub: 'Per slot' },
-                    ].map(item => (
-                        <div key={item.label} style={{
-                            padding: '0.75rem', borderRadius: 'var(--radius-md)',
-                            backgroundColor: 'var(--color-bg-hover)', textAlign: 'center',
-                        }}>
-                            <span style={{ color: 'var(--color-primary)', display: 'flex', justifyContent: 'center', marginBottom: 4 }}>{item.icon}</span>
-                            <p style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-primary)', margin: 0 }}>{item.label}</p>
-                            <p style={{ fontSize: '0.6875rem', color: 'var(--color-text-tertiary)', margin: 0 }}>{item.sub}</p>
-                        </div>
+            {/* Creative Requirements */}
+            <GlassCard>
+                <h3 className="font-bold text-lg mb-4">Creative Specifications</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-center">
+                        <span className="material-symbols-outlined text-2xl text-primary mb-1">aspect_ratio</span>
+                        <p className="text-sm font-medium">16:9 Ratio</p>
+                        <p className="text-xs text-slate-500">1920×1080 px</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-center">
+                        <span className="material-symbols-outlined text-2xl text-primary mb-1">timer</span>
+                        <p className="text-sm font-medium">5 Seconds</p>
+                        <p className="text-xs text-slate-500">Per slot</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-center">
+                        <span className="material-symbols-outlined text-2xl text-primary mb-1">image</span>
+                        <p className="text-sm font-medium">JPG/PNG</p>
+                        <p className="text-xs text-slate-500">Max 5MB</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-center">
+                        <span className="material-symbols-outlined text-2xl text-primary mb-1">movie</span>
+                        <p className="text-sm font-medium">MP4/WebM</p>
+                        <p className="text-xs text-slate-500">Coming soon</p>
+                    </div>
+                </div>
+            </GlassCard>
+
+            {/* Demo Creatives */}
+            <GlassCard>
+                <h3 className="font-bold text-lg mb-4">Select Demo Creative</h3>
+                <p className="text-sm text-slate-500 mb-4">
+                    Choose from our demo creatives for testing purposes
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {DEMO_CREATIVES.map(creative => (
+                        <button
+                            key={creative.id}
+                            onClick={() => handleSelectDemo(creative.url)}
+                            data-testid={`demo-creative-${creative.id}`}
+                            className={`
+                                relative group overflow-hidden rounded-xl border-2 transition-all
+                                ${selectedCreative === creative.url
+                                    ? 'border-primary ring-4 ring-primary/20'
+                                    : 'border-slate-200 dark:border-slate-700 hover:border-primary/50'}
+                            `}
+                        >
+                            <div className="aspect-video bg-slate-100 dark:bg-slate-800">
+                                <img
+                                    src={creative.url}
+                                    alt={creative.label}
+                                    className="w-full h-full object-cover"
+                                />
+                            </div>
+                            <div className={`
+                                absolute inset-0 flex items-center justify-center transition-opacity
+                                ${selectedCreative === creative.url
+                                    ? 'bg-primary/20'
+                                    : 'bg-black/0 group-hover:bg-black/20'}
+                            `}>
+                                {selectedCreative === creative.url && (
+                                    <div className="size-12 rounded-full bg-primary flex items-center justify-center shadow-lg">
+                                        <span className="material-symbols-outlined text-white text-2xl">check</span>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
+                                <p className="text-white text-sm font-medium">{creative.label}</p>
+                            </div>
+                        </button>
                     ))}
                 </div>
-            </div>
+            </GlassCard>
 
-            {/* Drag & drop upload zone */}
-            <div
-                style={{
-                    ...card,
-                    padding: '2rem 1.5rem',
-                    border: `2px dashed ${dragActive ? 'var(--color-primary)' : 'rgba(99,102,241,0.3)'}`,
-                    backgroundColor: dragActive ? 'rgba(99,102,241,0.04)' : 'var(--color-bg-card)',
-                    textAlign: 'center', cursor: 'pointer',
-                    transition: 'all var(--transition-fast)',
-                }}
-                onDragOver={e => { e.preventDefault(); setDragActive(true); }}
-                onDragLeave={() => setDragActive(false)}
-                onDrop={handleDrop}
-                onClick={() => inputRef.current?.click()}
-                role="button"
-                tabIndex={0}
-                aria-label="Upload creative file"
-                onKeyDown={e => e.key === 'Enter' && inputRef.current?.click()}
-            >
-                <input ref={inputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={handleFileInput} />
-                <div style={{
-                    width: 52, height: 52, borderRadius: 'var(--radius-full)',
-                    backgroundColor: dragActive ? 'rgba(99,102,241,0.12)' : 'var(--color-bg-hover)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    margin: '0 auto 0.75rem', transition: 'background-color var(--transition-fast)',
-                }}>
-                    <UploadCloud size={24} style={{ color: 'var(--color-primary)' }} />
-                </div>
-                <p style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-primary)', margin: 0 }}>
-                    {dragActive ? 'Drop to upload' : 'Drag & drop your creative here'}
-                </p>
-                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 4 }}>JPG, PNG or MP4 · Max 5 MB</p>
-                <span style={{
-                    display: 'inline-block', marginTop: '0.75rem',
-                    padding: '4px 14px', borderRadius: 'var(--radius-full)',
-                    border: '1px solid var(--color-border)',
-                    fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)',
-                    color: 'var(--color-text-secondary)',
-                    backgroundColor: 'var(--color-bg-card)',
-                }}>Browse files</span>
-            </div>
-
-            {/* Demo grid */}
-            <div style={card}>
-                <p style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-primary)', marginBottom: '0.75rem' }}>Or pick a demo creative</p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
-                    {DEMO_CREATIVES.map(c => {
-                        const isSelected = selectedCreative === c.url;
-                        return (
-                            <button
-                                key={c.id}
-                                onClick={() => handleSelectDemo(c.url)}
-                                data-testid={`demo-creative-${c.id}`}
-                                style={{
-                                    position: 'relative', overflow: 'hidden',
-                                    borderRadius: 'var(--radius-md)',
-                                    border: 'none', padding: 0, cursor: 'pointer',
-                                    outline: isSelected ? '2px solid var(--color-primary)' : '2px solid transparent',
-                                    outlineOffset: 3,
-                                    transition: 'outline-color var(--transition-fast)',
-                                    boxShadow: isSelected ? 'var(--shadow-md)' : 'var(--shadow-sm)',
-                                }}
-                            >
-                                <div style={{ aspectRatio: '16/9', backgroundColor: 'var(--color-bg-hover)' }}>
-                                    <img src={c.url} alt={c.label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                                </div>
-                                <div style={{
-                                    position: 'absolute', bottom: 0, left: 0, right: 0,
-                                    padding: '0.375rem 0.5rem',
-                                    background: 'linear-gradient(to top, rgba(0,0,0,0.55), transparent)',
-                                }}>
-                                    <p style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', color: '#fff', margin: 0 }}>{c.label}</p>
-                                </div>
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
-
-            {/* Custom URL — lower visual weight */}
-            <div style={{ ...card, padding: '0.875rem 1.25rem' }}>
-                <p style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>Or enter a custom URL</p>
-                <div style={{ display: 'flex', gap: '0.625rem' }}>
+            {/* Custom URL */}
+            <GlassCard>
+                <h3 className="font-bold text-lg mb-4">Or Enter Custom URL</h3>
+                <div className="flex gap-3">
                     <input
                         type="url"
                         data-testid="custom-creative-url-input"
                         value={customUrl}
-                        onChange={e => setCustomUrl(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleApplyUrl()}
-                        placeholder="https://example.com/creative.jpg"
-                        style={inputStyle}
+                        onChange={(e) => setCustomUrl(e.target.value)}
+                        placeholder="https://example.com/your-creative.jpg"
+                        className="flex-1 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
                     />
                     <button
-                        onClick={handleApplyUrl}
-                        style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 5,
-                            padding: '0 1rem', height: 38, flexShrink: 0,
-                            border: '1px solid var(--color-border)',
-                            borderRadius: 'var(--radius-md)',
-                            backgroundColor: 'var(--color-bg-card)',
-                            fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)',
-                            color: 'var(--color-text-primary)', cursor: 'pointer',
-                            transition: 'background-color var(--transition-fast)',
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'}
-                        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--color-bg-card)'}
+                        onClick={handleCustomUrl}
+                        className="px-6 py-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium transition-colors flex items-center gap-2"
                     >
-                        <Link2 size={14} /> Apply
+                        <span className="material-symbols-outlined">link</span>
+                        Apply
                     </button>
                 </div>
-                {error && <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-error)', marginTop: '0.375rem' }}>{error}</p>}
-            </div>
+                {error && (
+                    <p className="text-rose-500 text-sm mt-2">{error}</p>
+                )}
+            </GlassCard>
 
             {/* Preview */}
             {selectedCreative && (
-                <div style={card}>
-                    <p style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-primary)', marginBottom: '0.75rem' }}>Preview</p>
-                    <div style={{ aspectRatio: '16/9', borderRadius: 'var(--radius-md)', overflow: 'hidden', maxWidth: 560, backgroundColor: 'var(--color-bg-hover)', border: '1px solid var(--color-border)' }}>
-                        <img src={selectedCreative} alt="Selected creative" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                <GlassCard>
+                    <h3 className="font-bold text-lg mb-4">Preview</h3>
+                    <div className="aspect-video bg-slate-900 rounded-xl overflow-hidden max-w-2xl mx-auto shadow-2xl">
+                        <img
+                            src={selectedCreative}
+                            alt="Selected creative preview"
+                            className="w-full h-full object-cover"
+                        />
                     </div>
-                    <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: '0.5rem' }}>This is how your ad will appear on screen</p>
-                </div>
+                    <p className="text-center text-sm text-slate-500 mt-4">
+                        This is how your ad will appear on screen
+                    </p>
+                </GlassCard>
             )}
 
-            {/* Sticky footer */}
-            <footer style={{
-                position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40,
-                backgroundColor: 'var(--color-bg-card)',
-                borderTop: '1px solid var(--color-border)',
-                boxShadow: '0 -4px 20px rgba(0,0,0,0.08)',
-                padding: '0.875rem 2.5rem',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            }}>
+            {/* Navigation */}
+            <div className="flex justify-between pt-4">
                 <button
                     onClick={onPrev}
-                    style={{
-                        height: 38, padding: '0 1.125rem',
-                        backgroundColor: 'var(--color-bg-card)',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: 'var(--radius-md)',
-                        fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)',
-                        color: 'var(--color-text-primary)', cursor: 'pointer',
-                        transition: 'background-color var(--transition-fast)',
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'}
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--color-bg-card)'}
-                >← Back</button>
+                    className="px-6 py-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium transition-colors flex items-center gap-2"
+                >
+                    <span className="material-symbols-outlined">arrow_back</span>
+                    Back
+                </button>
                 <button
                     onClick={handleContinue}
                     disabled={!selectedCreative}
                     data-testid="wizard-next-step"
-                    style={{
-                        display: 'inline-flex', alignItems: 'center', gap: '0.375rem',
-                        height: 38, padding: '0 1.25rem',
-                        backgroundColor: 'var(--color-primary)', color: '#fff',
-                        border: 'none', borderRadius: 'var(--radius-md)',
-                        fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)',
-                        cursor: !selectedCreative ? 'not-allowed' : 'pointer',
-                        opacity: !selectedCreative ? 0.5 : 1,
-                        transition: 'all var(--transition-fast)', boxShadow: 'var(--shadow-md)',
-                    }}
-                    onMouseEnter={e => { if (selectedCreative) e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'var(--color-primary)'; }}
-                >Review & Confirm →</button>
-            </footer>
+                    className="px-8 py-3 rounded-xl bg-primary text-white font-bold shadow-lg shadow-primary/25 hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                >
+                    Continue
+                    <span className="material-symbols-outlined">arrow_forward</span>
+                </button>
+            </div>
         </div>
     );
 }

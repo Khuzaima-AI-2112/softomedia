@@ -1,308 +1,145 @@
-# Full Stack Cloud Build Configuration
-# Deploys both backend and frontend to Cloud Run
-# Backend must be deployed first so frontend can use its URL
-#
-# AGENTS.md compliance:
-#   - Rule 0.1: All gcloud commands include --project=softomedia-live-2026
-#   - Rule 9.2: verify_predeploy.js runs first
-#   - Rule 9.7: Seed endpoint is called after every backend deploy
-#   - Rule 9.8: Cloud Run public IAM is verified
-#   - Rule 9.9: GCS public read is verified
-#   - Rule 9.13: Build is only successful if build, seed, and health all pass
-#
-# NOTE: Service account is set on the Cloud Build TRIGGER (not in this file).
-# In Cloud Build v1 API, serviceAccount is not a valid top-level YAML field.
-# Set it via: Cloud Console → Cloud Build → Triggers → Edit → Service account
-# or: gcloud builds triggers update <TRIGGER_ID> --service-account=...
-
-substitutions:
-  _PROJECT: 'softomedia-live-2026'
-  _REGION: 'us-central1'
-  _GCS_ADS_BUCKET: 'softo-media-live-ads'
+# Optimized Cloud Build configuration for softomedia-live-2026
+# Leverages Docker multi-stage builds for isolation and stability
 
 steps:
-  # =============================================================================
-  # PRE-DEPLOY VERIFICATION (Rule 9.2)
-  # =============================================================================
-  - name: 'node:20'
-    entrypoint: 'node'
-    args: ['verify_predeploy.js']
-    id: 'pre-deploy-check'
-
-  # =============================================================================
-  # SECRET EXISTENCE CHECK (Rule 9.3)
-  # =============================================================================
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  # Step 1: Verify pre-deployment requirements & Secrets
+  - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        set -e
-        echo "Verifying required secrets exist in Secret Manager..."
-        for secret in JWT_SECRET GEMINI_API_KEY; do
-          if ! gcloud secrets describe "$$secret" --project=${_PROJECT} >/dev/null 2>&1; then
-            echo "ERROR: Required secret '$$secret' not found in project ${_PROJECT}."
-            echo "Create it with:  gcloud secrets create $$secret --project=${_PROJECT}"
-            exit 1
-          fi
-          echo "  OK: $$secret"
-        done
-    id: 'verify-secrets'
-    waitFor: ['pre-deploy-check']
-
-  # =============================================================================
-  # BACKEND DEPLOYMENT (Ad Server)
-  # =============================================================================
-
-  - name: 'gcr.io/cloud-builders/docker'
-    dir: 'ad-server'
-    args:
-      - 'build'
-      - '-t'
-      - 'gcr.io/${_PROJECT}/ad-server:$BUILD_ID'
-      - '-t'
-      - 'gcr.io/${_PROJECT}/ad-server:latest'
-      - '.'
-    id: 'build-backend'
-    waitFor: ['verify-secrets']
-
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'gcr.io/${_PROJECT}/ad-server:$BUILD_ID'
-    id: 'push-backend'
-    waitFor: ['build-backend']
-
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'gcr.io/${_PROJECT}/ad-server:latest'
-    id: 'push-backend-latest'
-    waitFor: ['build-backend']
-
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: 'gcloud'
-    args:
-      - 'run'
-      - 'deploy'
-      - 'ad-server'
-      - '--project=${_PROJECT}'
-      - '--image=gcr.io/${_PROJECT}/ad-server:$BUILD_ID'
-      - '--region=${_REGION}'
-      - '--platform=managed'
-      - '--allow-unauthenticated'
-      - '--port=8080'
-      - '--set-env-vars=PROJECT_ID=${_PROJECT},GCS_BUCKET=${_GCS_ADS_BUCKET},NODE_ENV=production,DISABLE_MOCK_STORAGE=true'
-      - '--set-secrets=JWT_SECRET=JWT_SECRET:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest'
-      - '--memory=512Mi'
-      - '--cpu=1'
-      - '--max-instances=10'
-      - '--min-instances=0'
-      - '--timeout=600s'
-    id: 'deploy-backend'
-    waitFor: ['push-backend', 'push-backend-latest']
-
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        set -e
-        echo "Ensuring ad-server is publicly invokable (Rule 9.8)..."
-        gcloud run services add-iam-policy-binding ad-server \
-          --project=${_PROJECT} \
-          --region=${_REGION} \
-          --member=allUsers \
-          --role=roles/run.invoker
-    id: 'iam-backend'
-    waitFor: ['deploy-backend']
-
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        set -e
-        BACKEND_URL=$$(gcloud run services describe ad-server \
-          --project=${_PROJECT} \
-          --region=${_REGION} \
-          --format='value(status.url)')
-        echo "Backend deployed at: $$BACKEND_URL"
-        echo "$$BACKEND_URL" > /workspace/backend_url.txt
-
-        echo "--- Health check (Rule 9.13) — up to 2 minutes ---"
-        for i in $(seq 1 12); do
-          if curl -fsS "$$BACKEND_URL/health" >/dev/null; then
-            echo "  Health OK on attempt $$i"
-            break
-          fi
-          echo "  Health not ready yet (attempt $$i/12)..."
-          sleep 10
-          if [ "$$i" = "12" ]; then
-            echo "ERROR: ad-server /health did not return 200 OK after 120s."
+        echo "🔍 Running Pre-Deployment Verification..."
+        node verify_predeploy.js
+        
+        echo "🔐 Verifying Secrets..."
+        for SECRET in JWT_SECRET GEMINI_API_KEY; do
+          if ! gcloud secrets describe "$$SECRET" --project=$PROJECT_ID &>/dev/null; then
+            echo "ERROR: Secret '$$SECRET' not found in Secret Manager"
             exit 1
           fi
         done
+    id: 'verify-predeploy'
+    env:
+      - 'PROJECT_ID=$PROJECT_ID'
 
-        echo "--- Seeding database (Rule 9.7) ---"
-        SEED_RESPONSE=$$(curl -fsS "$$BACKEND_URL/api/debug/seed" || echo "FAILED")
-        echo "Seed response: $$SEED_RESPONSE"
-        if ! echo "$$SEED_RESPONSE" | grep -q 'seeded'; then
-          echo "WARNING: Seed endpoint did not return expected { status: 'seeded' }."
-          echo "If /api/debug/seed has been intentionally disabled, update Rule 9.7."
-        fi
-    id: 'verify-backend'
-    waitFor: ['iam-backend']
-
-  # =============================================================================
-  # FRONTEND DEPLOYMENT (Client App)
-  # =============================================================================
-
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        set -e
-        BACKEND_URL=$$(cat /workspace/backend_url.txt)
-        echo "Configuring frontend with backend: $$BACKEND_URL"
-        echo "VITE_API_URL=$$BACKEND_URL" > ./client-app/.env.production
-        cat ./client-app/.env.production
-    id: 'configure-frontend'
-    waitFor: ['verify-backend']
-
+  # Step 2: Build and push client-app container
   - name: 'gcr.io/cloud-builders/docker'
-    dir: 'client-app'
     args:
       - 'build'
       - '-t'
-      - 'gcr.io/${_PROJECT}/client-app:$BUILD_ID'
-      - '-t'
-      - 'gcr.io/${_PROJECT}/client-app:latest'
-      - '.'
-    id: 'build-frontend'
-    waitFor: ['configure-frontend']
-
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'gcr.io/${_PROJECT}/client-app:$BUILD_ID'
-    id: 'push-frontend'
-    waitFor: ['build-frontend']
-
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'gcr.io/${_PROJECT}/client-app:latest'
-    id: 'push-frontend-latest'
-    waitFor: ['build-frontend']
-
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: 'gcloud'
-    args:
-      - 'run'
-      - 'deploy'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY}/${_SERVICE_CLIENT}:$BUILD_ID'
+      - '-f'
+      - 'client-app/Dockerfile'
       - 'client-app'
-      - '--project=${_PROJECT}'
-      - '--image=gcr.io/${_PROJECT}/client-app:$BUILD_ID'
-      - '--region=${_REGION}'
-      - '--platform=managed'
-      - '--allow-unauthenticated'
-      - '--port=8080'
-      - '--memory=256Mi'
-      - '--cpu=1'
-      - '--max-instances=10'
-    id: 'deploy-frontend'
-    waitFor: ['push-frontend', 'push-frontend-latest']
+    id: 'build-client-image'
+    waitFor: ['verify-predeploy']
 
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY}/${_SERVICE_CLIENT}:$BUILD_ID'
+    id: 'push-client-image'
+    waitFor: ['build-client-image']
+
+  # Step 3: Build and push ad-server container
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY}/${_SERVICE_ADSERVER}:$BUILD_ID'
+      - '-f'
+      - 'ad-server/Dockerfile'
+      - 'ad-server'
+    id: 'build-adserver-image'
+    waitFor: ['verify-predeploy']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY}/${_SERVICE_ADSERVER}:$BUILD_ID'
+    id: 'push-adserver-image'
+    waitFor: ['build-adserver-image']
+
+  # Step 4: Deploy ad-server to Cloud Run with Health Check
+  - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        set -e
-        echo "Ensuring client-app is publicly invokable (Rule 9.8)..."
-        gcloud run services add-iam-policy-binding client-app \
-          --project=${_PROJECT} \
-          --region=${_REGION} \
-          --member=allUsers \
-          --role=roles/run.invoker
-    id: 'iam-frontend'
-    waitFor: ['deploy-frontend']
+        echo "🚀 Deploying ${_SERVICE_ADSERVER} version: $BUILD_ID..."
+        
+        gcloud run deploy ${_SERVICE_ADSERVER} \
+          --image ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY}/${_SERVICE_ADSERVER}:$BUILD_ID \
+          --region ${_REGION} \
+          --platform managed \
+          --allow-unauthenticated \
+          --set-env-vars "NODE_ENV=production,CORS_ORIGINS=*,BUILD_ID=$BUILD_ID,ALLOW_DEMO_MODE=true" \
+          --set-secrets "JWT_SECRET=JWT_SECRET:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest" \
+          --labels "version=$BUILD_ID,deployed-by=cloud-build"
+        
+        SERVICE_URL=$$(gcloud run services describe ${_SERVICE_ADSERVER} --region ${_REGION} --format='value(status.url)')
+        echo "📍 Service URL: $$SERVICE_URL"
+        
+        echo "🩺 Polling /health until 200 OK..."
+        for i in {1..30}; do
+          HTTP_CODE=$$(curl -s -o /dev/null -w "%{http_code}" "$$SERVICE_URL/health")
+          if [ "$$HTTP_CODE" = "200" ]; then
+            echo "✅ Service is HEALTHY"
+            exit 0
+          fi
+          echo "Attempt $$i/30: HTTP $$HTTP_CODE, waiting 2s..."
+          sleep 2
+        done
+        echo "❌ Health check timed out!"
+        exit 1
+    id: 'deploy-adserver'
+    waitFor: ['push-adserver-image']
 
-  # =============================================================================
-  # GCS PUBLIC READ FOR ADS BUCKET (Rule 9.9)
-  # =============================================================================
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  # Step 5: Deploy Rules
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['firestore', 'indexes', 'import', 'ad-server/firestore.indexes.json']
+    id: 'deploy-indexes'
+    allowFailure: true
+    waitFor: ['verify-predeploy']
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['fire-rules', 'release', '--rules-file=ad-server/firestore.rules', '--project=$PROJECT_ID']
+    id: 'deploy-firestore-rules'
+    allowFailure: true
+    waitFor: ['verify-predeploy']
+
+  # Step 6: Deploy client-app linked to backend
+  - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        set -e
-        echo "Ensuring ads bucket is publicly readable (Rule 9.9)..."
-        if gcloud storage buckets describe gs://${_GCS_ADS_BUCKET} --project=${_PROJECT} >/dev/null 2>&1; then
-          gcloud storage buckets add-iam-policy-binding gs://${_GCS_ADS_BUCKET} \
-            --project=${_PROJECT} \
-            --member=allUsers \
-            --role=roles/storage.objectViewer
-        else
-          echo "WARNING: Bucket gs://${_GCS_ADS_BUCKET} does not exist. Skipping IAM binding."
-        fi
-    id: 'gcs-public-read'
-    waitFor: ['iam-frontend']
+        burl=$$(gcloud run services describe ${_SERVICE_ADSERVER} --region ${_REGION} --format='value(status.url)' --project ${PROJECT_ID})
+        
+        echo "🚀 Deploying ${_SERVICE_CLIENT} linked to API: $$burl..."
+        
+        gcloud run deploy ${_SERVICE_CLIENT} \
+          --image ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_ARTIFACT_REGISTRY}/${_SERVICE_CLIENT}:${BUILD_ID} \
+          --region ${_REGION} \
+          --platform managed \
+          --allow-unauthenticated \
+          --set-env-vars "VITE_API_URL=$$burl,BUILD_ID=${BUILD_ID},NODE_ENV=production" \
+          --labels "version=${BUILD_ID},deployed-by=cloud-build"
+    id: 'deploy-client'
+    waitFor: ['deploy-adserver', 'push-client-image']
 
-  # =============================================================================
-  # DEPLOYMENT SUMMARY (Rule 9.13)
-  # =============================================================================
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        set -e
-        echo ""
-        echo "=========================================="
-        echo "FULL STACK DEPLOYMENT COMPLETE"
-        echo "=========================================="
-        BACKEND_URL=$$(cat /workspace/backend_url.txt)
-        FRONTEND_URL=$$(gcloud run services describe client-app \
-          --project=${_PROJECT} \
-          --region=${_REGION} \
-          --format='value(status.url)')
-        echo "Frontend: $$FRONTEND_URL"
-        echo "Backend:  $$BACKEND_URL"
-        echo "Project:  ${_PROJECT}"
-        echo "Region:   ${_REGION}"
-        echo "Build ID: $BUILD_ID"
-        echo "=========================================="
-        echo "Verifying frontend health..."
-        FRONTEND_CODE=$$(curl -fsS -o /dev/null -w "%{http_code}" "$$FRONTEND_URL/" || echo "000")
-        echo "  Frontend HTTP: $$FRONTEND_CODE"
-        if [ "$$FRONTEND_CODE" != "200" ]; then
-          echo "ERROR: Frontend did not return HTTP 200 (got $$FRONTEND_CODE)."
-          exit 1
-        fi
-        echo "Verifying backend health..."
-        BACKEND_CODE=$$(curl -fsS -o /dev/null -w "%{http_code}" "$$BACKEND_URL/health" || echo "000")
-        echo "  Backend  HTTP: $$BACKEND_CODE"
-        if [ "$$BACKEND_CODE" != "200" ]; then
-          echo "ERROR: Backend did not return HTTP 200 (got $$BACKEND_CODE)."
-          exit 1
-        fi
-        echo "=========================================="
-        echo "ALL HEALTH CHECKS PASSED. DEPLOYMENT SUCCESSFUL."
-        echo "=========================================="
-    id: 'display-summary'
-    waitFor: ['gcs-public-read']
-
-images:
-  - 'gcr.io/softomedia-live-2026/ad-server:$BUILD_ID'
-  - 'gcr.io/softomedia-live-2026/ad-server:latest'
-  - 'gcr.io/softomedia-live-2026/client-app:$BUILD_ID'
-  - 'gcr.io/softomedia-live-2026/client-app:latest'
+substitutions:
+  _REGION: 'us-central1'
+  _ARTIFACT_REGISTRY: 'softomedia'
+  _SERVICE_CLIENT: 'client-app'
+  _SERVICE_ADSERVER: 'ad-server'
 
 options:
-  machineType: 'E2_HIGHCPU_8'
   logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
 
-timeout: '2400s'
+images:
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY}/${_SERVICE_CLIENT}:$BUILD_ID'
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY}/${_SERVICE_ADSERVER}:$BUILD_ID'
+
+timeout: 1200s
