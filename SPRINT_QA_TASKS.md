@@ -7,7 +7,7 @@
 
 ## SPRINT 1 — Users Module (`/dashboard/admin/users`)
 
-### TASK 1.1 — Backend: Add POST handler to `users.js`
+✅ ### TASK 1.1 — Backend: Add POST handler to `users.js`
 - **File:** `ad-server/src/api/users.js`
 - **Action:** Add `router.post('/', ...)` handler
 - **Logic:**
@@ -17,7 +17,7 @@
   - Return `201` with the created user document on success
   - Return `400` with a validation error message on failure
 
-### TASK 1.2 — Backend: Add `create()` method to `UserRepository.js`
+### ✅ TASK 1.2 — Backend: Add `create()` method to `UserRepository.js`
 - **File:** `ad-server/src/repositories/UserRepository.js`
 - **Action:** Add a `create(data)` method
 - **Logic:**
@@ -25,21 +25,21 @@
   - Auto-populate `createdat` and `updatedat` using `new Date().toISOString()` or server timestamp
   - Return the created document with its generated `id`
 
-### TASK 1.3 — Backend: Add DELETE handler to `users.js`
+### ✅ TASK 1.3 — Backend: Add DELETE handler to `users.js`
 - **File:** `ad-server/src/api/users.js`
 - **Action:** Add `router.delete('/:id', ...)` handler
 - **Logic:**
   - Call `UserRepository.delete(id)`
   - Return `200` on success, `404` if document not found
 
-### TASK 1.4 — Backend: Add `delete()` method to `UserRepository.js`
+✅ ### TASK 1.4 — Backend: Add `delete()` method to `UserRepository.js`
 - **File:** `ad-server/src/repositories/UserRepository.js`
 - **Action:** Add a `delete(id)` method
 - **Logic:**
   - Call `this.db.collection('users').doc(id).delete()`
   - Return `true` on success; throw if doc does not exist
 
-### TASK 1.5 — Frontend: Wire "Create User" submit in `UserManagement.jsx`
+✅ ### TASK 1.5 — Frontend: Wire "Create User" submit in `UserManagement.jsx`
 - **File:** `client-app/src/pages/admin/UserManagement.jsx`
 - **Action:** Find the "Add User" modal's submit handler (currently does nothing on save)
 - **Logic:**
@@ -49,7 +49,7 @@
   - On error: display the error message inside the modal (do not close modal on error)
   - Reset form fields after successful creation
 
-### TASK 1.6 — Frontend: Add Delete icon to Users table in `UserManagement.jsx`
+✅ ### TASK 1.6 — Frontend: Add Delete icon to Users table in `UserManagement.jsx`
 - **File:** `client-app/src/pages/admin/UserManagement.jsx`
 - **Action:** In the Actions column of the users table, add a delete icon button
 - **Logic:**
@@ -59,14 +59,14 @@
   - On success: remove the user row from local state
   - On error: show an error toast/message
 
-### TASK 1.7 — Frontend: Add `deleteUser(id)` method to `ApiService.js` or `api.js`
+✅ ### TASK 1.7 — Frontend: Add `deleteUser(id)` method to `ApiService.js` or `api.js`
 - **File:** `client-app/src/services/api.js`
 - **Action:** Export a `deleteUser(id)` function
 - **Logic:**
   - Call `DELETE /api/users/${id}` using the existing axios/fetch instance
   - Return the response or throw on error
 
-### TASK 1.8 — Frontend: Add `createUser(data)` method to `api.js`
+✅ ### TASK 1.8 — Frontend: Add `createUser(data)` method to `api.js`
 - **File:** `client-app/src/services/api.js`
 - **Action:** Export a `createUser(data)` function
 - **Logic:**

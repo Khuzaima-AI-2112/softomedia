@@ -29,9 +29,15 @@ const useGeminiStore = create((set, get) => ({
     messages: [], // Array<{ role: 'user'|'assistant', content: string, timestamp: string, steps?: array }>
     isFollowUp: false,
     followUpText: '',
+    
+    // Section label overlay toggle for Super Admin debugging
+    showSectionLabels: false,
 
     // Actions
     toggleOpen: () => set((state) => ({ isOpen: !state.isOpen })),
+    
+    // Section label overlay toggle for Super Admin debugging
+    toggleSectionLabels: () => set((state) => ({ showSectionLabels: !state.showSectionLabels })),
 
     startRecording: () => set({
         isRecording: true,

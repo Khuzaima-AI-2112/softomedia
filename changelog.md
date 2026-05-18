@@ -21,6 +21,13 @@ Objectives: Document changes and progress milestones throughout the project life
 - **Visual Scannability**: Implemented a card-based layout for technology categories using Tufte-inspired typography.
 
 
+## [v3.0.0] - 2026-05-18
+### Fixed
+- **Cloud Build URL**: Resolved Cloud Build deployment pipeline URL configuration to ensure correct service endpoints.
+- **CORS Configuration**: Fixed CORS handling for cross-origin requests in cloud environments.
+- **ALLOW_DEMO_MODE**: Fixed `ALLOW_DEMO_MODE` environment variable logic to properly enable demo authentication bypass.
+- **Avatar Fix**: Resolved avatar display issue to ensure user profile images render correctly.
+
 ## Unreleased
 - **Infrastructure**:
     - **Runtime Configuration Injection**: Decoupled frontend builds from environment-specific URLs using a dynamic `config.js` generator.
