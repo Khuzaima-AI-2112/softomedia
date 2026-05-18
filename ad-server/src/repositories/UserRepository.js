@@ -1,4 +1,4 @@
-﻿import { BaseRepository } from './BaseRepository.js';
+import { BaseRepository } from './BaseRepository.js';
 
 export class UserRepository extends BaseRepository {
     constructor() {
@@ -7,7 +7,7 @@ export class UserRepository extends BaseRepository {
 
     /**
      * Find user by email
-     * @param {string} email 
+     * @param {string} email
      * @returns {Promise<object|null>}
      */
     async findByEmail(email) {
@@ -30,29 +30,44 @@ export class UserRepository extends BaseRepository {
     }
 
     /**
-     * Create a new user
-     * Generates an auto-ID and delegates to BaseRepository.create()
+     * Create a new user.
+     * Generates a Firestore-compatible auto-ID and delegates to BaseRepository.create().
+     * Timestamps (created_at / updated_at) are auto-populated by BaseRepository.
      * @param {object} data - User data (name, email, role, linkedentityid, status)
      * @returns {Promise<object>} Created user document with id
      */
     async create(data) {
-        // Generate a Firestore-compatible auto-ID
-        const id = this.collection ? this.collection.doc().id : `usr_${Date.now()}`;
+        const id = this.collection
+            ? this.collection.doc().id
+            : `usr_${Date.now()}`;
         return super.create(id, data);
     }
 
     /**
-     * Delete a user by ID
+     * Delete a user by ID.
+     * Throws if the document does not exist.
+     * Uses circuit breaker for Firestore resilience; falls back to in-memory store.
      * @param {string} id - User document ID
-     * @returns {Promise<boolean>} True on success; throws if doc does not exist
+     * @returns {Promise<boolean>} True on success
      */
     async delete(id) {
-        const doc = this.db.collection('users').doc(id);
-        const snapshot = await doc.get();
+        if (!this.collection) {
+            // Memory-only fallback
+            const existing = await this.findById(id);
+            if (!existing) {
+                throw new Error(`User document ${id} not found`);
+            }
+            return super.delete(id);
+        }
+
+        const docRef = this.collection.doc(id);
+
+        const snapshot = await this.breaker.execute(() => docRef.get());
         if (!snapshot.exists) {
             throw new Error(`User document ${id} not found`);
         }
-        await doc.delete();
+
+        await this.breaker.execute(() => docRef.delete());
         return true;
     }
 }
