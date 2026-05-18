@@ -21,6 +21,16 @@ Objectives: Document changes and progress milestones throughout the project life
 - **Visual Scannability**: Implemented a card-based layout for technology categories using Tufte-inspired typography.
 
 
+## [v3.3.3] - 2026-05-18
+
+### Added
+- **User Management System**: Implemented full CRUD operations for admin users.
+  - Backend: Added POST /api/users handler and UserRepository.create() in `ad-server/src/api/users.js` and `ad-server/src/repositories/UserRepository.js`.
+  - Backend: Added DELETE /api/users handler and UserRepository.delete() in `ad-server/src/api/users.js` and `ad-server/src/repositories/UserRepository.js`.
+  - Frontend: Wired "Create User" form and added Delete icon in `client-app/src/pages/admin/UserManagement.jsx`.
+  - API Service: Added createUser(data) and deleteUser(id) methods in `client-app/src/services/api.js`.
+- **Other**: (maybe nothing else)
+
 ## [v3.0.0] - 2026-05-18
 ### Fixed
 - **Cloud Build URL**: Resolved Cloud Build deployment pipeline URL configuration to ensure correct service endpoints.
