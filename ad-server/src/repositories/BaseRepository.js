@@ -1,4 +1,4 @@
-﻿// Base Repository Class
+// Base Repository Class
 // Provides common CRUD operations with in-memory fallback for offline testing
 
 import { getFirestore } from '../utils/firestore.js';
@@ -38,20 +38,14 @@ export class BaseRepository {
             updated_at: new Date().toISOString()
         };
 
-        try {
-            if (this.collection) {
-                // Use .create() instead of .set() to prevent overwriting existing data
-                await this.breaker.execute(() => this.collection.doc(id).create(docData));
-            }
-        } catch (e) {
-            logger.error(`Create failed for ${this.collectionName}`, {
-                error: e.message,
-                id,
-                breaker_state: this.breaker.state
-            });
-            // Fallback to memory is handled outside the catch or by continuing
+        if (this.collection) {
+            // Throws on duplicate ID or Firestore error — NOT swallowed.
+            // If this rejects, the calling route returns 500 and nothing is
+            // written to MOCK_STORAGE, ensuring memory never diverges from Firestore.
+            await this.breaker.execute(() => this.collection.doc(id).create(docData));
         }
 
+        // Only reached if Firestore write succeeded (or collection is null = memory-only mode)
         MOCK_STORAGE[this.collectionName].set(id, docData);
         return docData;
     }
@@ -80,7 +74,6 @@ export class BaseRepository {
                     });
                 }
 
-                // PERFORMANCE FIX: Apply limit to Firestore query
                 if (options.limit) {
                     query = query.limit(options.limit);
                 }

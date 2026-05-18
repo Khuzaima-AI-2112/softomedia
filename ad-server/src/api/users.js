@@ -1,4 +1,4 @@
-﻿import express from 'express';
+import express from 'express';
 import { userRepository } from '../repositories/index.js';
 import logger from '../utils/logger.js';
 
@@ -26,32 +26,26 @@ router.post('/', async (req, res) => {
     try {
         const { name, email, role, linkedentityid } = req.body;
 
-        // Validation
         const errors = [];
 
-        // Name validation
         if (!name || typeof name !== 'string' || name.trim().length < 1) {
             errors.push('Name is required and must be at least 1 character long');
         }
 
-        // Email validation
         if (!email || typeof email !== 'string') {
             errors.push('Email is required');
         } else {
-            // Basic email format validation
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!emailRegex.test(email)) {
                 errors.push('Email must be a valid email address');
             }
         }
 
-        // Role validation
         const allowedRoles = ['superadmin', 'contentmanager', 'techoperator', 'retaileradmin', 'advertiser'];
         if (!role || typeof role !== 'string' || !allowedRoles.includes(role)) {
             errors.push(`Role is required and must be one of: ${allowedRoles.join(', ')}`);
         }
 
-        // Linked entity ID validation (conditional)
         if (role === 'advertiser' || role === 'retaileradmin') {
             if (!linkedentityid || typeof linkedentityid !== 'string') {
                 errors.push('Linked entity ID is required when role is advertiser or retaileradmin');
@@ -62,7 +56,6 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ error: errors.join(' | ') });
         }
 
-        // Set default status
         const userData = {
             name: name.trim(),
             email: email.trim(),
@@ -71,14 +64,71 @@ router.post('/', async (req, res) => {
             status: 'active'
         };
 
-        // Call UserRepository.create(data) - implementation in TASK 1.2
         const createdUser = await userRepository.create(userData);
-
-        // Return 201 with the created user document
         res.status(201).json(createdUser);
     } catch (error) {
         logger.error('Failed to create user:', error);
         res.status(500).json({ error: 'Failed to create user' });
+    }
+});
+
+/**
+ * PUT /api/users/:id
+ * Update an existing user
+ */
+router.put('/:id', async (req, res) => {
+    try {
+        const existing = await userRepository.findById(req.params.id);
+        if (!existing) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const { name, email, role, linkedentityid, status } = req.body;
+        const errors = [];
+
+        if (name !== undefined) {
+            if (typeof name !== 'string' || name.trim().length < 1) {
+                errors.push('Name must be a non-empty string');
+            }
+        }
+
+        if (email !== undefined) {
+            if (typeof email !== 'string') {
+                errors.push('Email must be a string');
+            } else {
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) {
+                    errors.push('Email must be a valid email address');
+                }
+            }
+        }
+
+        const allowedRoles = ['superadmin', 'contentmanager', 'techoperator', 'retaileradmin', 'advertiser'];
+        if (role !== undefined && !allowedRoles.includes(role)) {
+            errors.push(`Role must be one of: ${allowedRoles.join(', ')}`);
+        }
+
+        const allowedStatuses = ['active', 'inactive'];
+        if (status !== undefined && !allowedStatuses.includes(status)) {
+            errors.push(`Status must be one of: ${allowedStatuses.join(', ')}`);
+        }
+
+        if (errors.length > 0) {
+            return res.status(400).json({ error: errors.join(' | ') });
+        }
+
+        const updates = {};
+        if (name !== undefined) updates.name = name.trim();
+        if (email !== undefined) updates.email = email.trim();
+        if (role !== undefined) updates.role = role;
+        if (linkedentityid !== undefined) updates.linkedentityid = linkedentityid ? linkedentityid.trim() : null;
+        if (status !== undefined) updates.status = status;
+
+        const updatedUser = await userRepository.update(req.params.id, updates);
+        res.status(200).json(updatedUser);
+    } catch (error) {
+        logger.error('Failed to update user:', error);
+        res.status(500).json({ error: 'Failed to update user' });
     }
 });
 

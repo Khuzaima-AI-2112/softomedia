@@ -199,7 +199,7 @@ function RetailerManagement() {
                     >
                         <span className="material-symbols-outlined text-lg">edit</span>
                     </button>
-                    {/* Status toggle — persistent colour reflects current state (Task 2.8) */}
+                    {/* Status toggle — persistent colour reflects current state */}
                     <button
                         onClick={() => toggleStatus(retailer)}
                         className={`p-1.5 rounded-lg transition-colors ${
@@ -285,8 +285,8 @@ function RetailerManagement() {
                 </GlassCard>
             </div>
 
-            {/* Retailers Table */}
-            <DataTable columns={columns} data={retailers} />
+            {/* Retailers Table — loading prop wired so spinner shows during initial fetch */}
+            <DataTable columns={columns} data={retailers} loading={loading} emptyMessage="No retailers found" />
 
             {/* Selected Retailer Details */}
             {selectedRetailer && (
