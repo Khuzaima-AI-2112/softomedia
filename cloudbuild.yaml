@@ -72,13 +72,10 @@ steps:
       - |
         echo "🚀 Deploying ${_SERVICE_ADSERVER} version: $BUILD_ID..."
 
-<<<<<<< HEAD
-=======
         # Resolve the existing client-app URL for CORS (falls back to '*' if not yet deployed)
         CLIENT_URL=$$(gcloud run services describe ${_SERVICE_CLIENT} --region ${_REGION} --project ${PROJECT_ID} --format='value(status.url)' 2>/dev/null || echo "*")
         echo "📍 CORS origin will be: $$CLIENT_URL"
-        
->>>>>>> restore-957a5b0
+
         gcloud run deploy ${_SERVICE_ADSERVER} \
           --image ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY}/${_SERVICE_ADSERVER}:$BUILD_ID \
           --region ${_REGION} \
@@ -139,7 +136,7 @@ steps:
     allowFailure: true
     waitFor: ['verify-predeploy']
 
-  # Step 8: Deploy client-app linked to backend (fixed: added --port 8080 so Cloud Run knows the listen port)
+  # Step 8: Deploy client-app linked to backend
   - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
     args:
@@ -158,7 +155,7 @@ steps:
           --set-env-vars "VITE_API_URL=$$burl,BUILD_ID=${BUILD_ID},NODE_ENV=production" \
           --labels "version=${BUILD_ID},deployed-by=cloud-build"
 
-        # Step 6b: Update ad-server CORS_ORIGINS now that client URL is known
+        # Update ad-server CORS_ORIGINS now that client URL is known
         CLIENT_URL=$$(gcloud run services describe ${_SERVICE_CLIENT} --region ${_REGION} --project ${PROJECT_ID} --format='value(status.url)')
         echo "🔄 Updating ad-server CORS_ORIGINS to: $$CLIENT_URL"
         gcloud run services update ${_SERVICE_ADSERVER} \
