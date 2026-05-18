@@ -6,42 +6,84 @@ export class RetailerRepository extends BaseRepository {
     }
 
     /**
-     * Soft-delete a retailer by setting status to 'inactive'
-     * Preserves referential integrity with stores, screens, loops, impressions
+     * Create a new retailer with a server-generated auto-ID.
+     * Use this from the API layer instead of BaseRepository.create(id, data)
+     * so the client never controls the document ID.
+     * @param {object} data - Retailer fields (name, contact_email, contract_start, logo, status)
+     * @returns {Promise<object>} Created retailer document with id
+     */
+    async createNew(data) {
+        const id = this.collection
+            ? this.collection.doc().id
+            : `ret_${Date.now()}`;
+        return super.create(id, data);
+    }
+
+    /**
+     * Soft-delete a retailer by setting status to 'inactive'.
+     * Preserves referential integrity with stores, screens, loops, impressions.
      * @param {string} id
      * @returns {Promise<object>} Updated snapshot
      */
     async softDelete(id) {
-        const docRef = this.db.collection('retailers').doc(id);
-        const snapshot = await docRef.get();
+        if (!this.collection) {
+            // Memory fallback: update in-memory store
+            const existing = await this.findById(id);
+            if (!existing) {
+                throw new Error(`Retailer document ${id} not found`);
+            }
+            return this.update(id, { status: 'inactive' });
+        }
+
+        const docRef = this.collection.doc(id);
+
+        const snapshot = await this.breaker.execute(() => docRef.get());
         if (!snapshot.exists) {
             throw new Error(`Retailer document ${id} not found`);
         }
-        await docRef.update({
-            status: 'inactive',
-            updatedat: new Date().toISOString()
-        });
-        const updated = await docRef.get();
+
+        await this.breaker.execute(() =>
+            docRef.update({
+                status: 'inactive',
+                updated_at: new Date().toISOString()
+            })
+        );
+
+        const updated = await this.breaker.execute(() => docRef.get());
         return { id: updated.id, ...updated.data() };
     }
 
     /**
-     * Update the status of a retailer
+     * Update the status of a retailer.
      * @param {string} id
      * @param {string} status - 'active' or 'inactive'
      * @returns {Promise<object>} Updated snapshot
      */
     async updateStatus(id, status) {
-        const docRef = this.db.collection('retailers').doc(id);
-        const snapshot = await docRef.get();
+        if (!this.collection) {
+            // Memory fallback
+            const existing = await this.findById(id);
+            if (!existing) {
+                throw new Error(`Retailer document ${id} not found`);
+            }
+            return this.update(id, { status });
+        }
+
+        const docRef = this.collection.doc(id);
+
+        const snapshot = await this.breaker.execute(() => docRef.get());
         if (!snapshot.exists) {
             throw new Error(`Retailer document ${id} not found`);
         }
-        await docRef.update({
-            status,
-            updatedat: new Date().toISOString()
-        });
-        const updated = await docRef.get();
+
+        await this.breaker.execute(() =>
+            docRef.update({
+                status,
+                updated_at: new Date().toISOString()
+            })
+        );
+
+        const updated = await this.breaker.execute(() => docRef.get());
         return { id: updated.id, ...updated.data() };
     }
 }
