@@ -25,26 +25,26 @@ try {
         'WHATS_AVAILABLE.md',
         'TEST_ACCESS.md'
       ];
-      
+
       const rawOutput = execSync(
-        'findstr /s /i /r "https://ad-server-.*\\.run\\.app https://client-app-.*\\.run\\.app" *.yaml *.js *.jsx *.json *.md',
+        'git grep -E -i -l "https://(ad-server|client-app)-.*\\.run\\.app" -- "*.yaml" "*.js" "*.jsx" "*.json" "*.md"',
         { stdio: ['pipe', 'pipe', 'pipe'] }
       ).toString();
 
       // Filter out excluded files manually since findstr /v is limited for multiple patterns
       output = rawOutput.split('\n')
         .filter(line => {
-          const filePath = line.split(':')[0].toLowerCase();
+          const filePath = line.split(':')[0].toLowerCase().replace(/\\/g, '/');
           return !excludePatterns.some(p => filePath.includes(p.toLowerCase())) &&
-                 !filePath.includes('node_modules') &&
-                 !filePath.includes('.git') &&
-                 !filePath.includes('dist') &&
-                 !filePath.includes('.agent') &&
-                 !filePath.includes('.archives') &&
-                 !filePath.includes('docs\\agents_archive') &&
-                 !filePath.includes('docs\\') &&
-                 !filePath.includes('claude\\') &&
-                 !filePath.includes('check_api.js');
+            !filePath.includes('node_modules') &&
+            !filePath.includes('.git') &&
+            !filePath.includes('dist') &&
+            !filePath.includes('.agent') &&
+            !filePath.includes('.archives') &&
+            !filePath.includes('docs/agents_archive') &&
+            !filePath.includes('docs/') &&
+            !filePath.includes('claude/') &&
+            !filePath.includes('check_api.js');
         })
         .join('\n');
     } catch (e) {
@@ -56,13 +56,13 @@ try {
     try {
       output = execSync(
         "grep -r -E 'https://(ad-server|client-app)-[a-z0-9]+\\.run\\.app' " +
-          "--include='*.yaml' --include='*.js' --include='*.jsx' --include='*.json' --include='*.md' " +
-          "--exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist " +
-          "--exclude='deployment_log.md' --exclude='lessons_learned.md' --exclude='changelog.md' " +
-          "--exclude='AGENTS.md' --exclude='DEPLOYMENT_README.md' --exclude='DEPLOY_GUIDE.md' " +
-          "--exclude='verify_predeploy.js' --exclude='WHATS_AVAILABLE.md' --exclude='TEST_ACCESS.md' " +
-          "--exclude-dir=docs --exclude-dir=Claude --exclude='check_api.js' " +
-          ".",
+        "--include='*.yaml' --include='*.js' --include='*.jsx' --include='*.json' --include='*.md' " +
+        "--exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist " +
+        "--exclude='deployment_log.md' --exclude='lessons_learned.md' --exclude='changelog.md' " +
+        "--exclude='AGENTS.md' --exclude='DEPLOYMENT_README.md' --exclude='DEPLOY_GUIDE.md' " +
+        "--exclude='verify_predeploy.js' --exclude='WHATS_AVAILABLE.md' --exclude='TEST_ACCESS.md' " +
+        "--exclude-dir=docs --exclude-dir=Claude --exclude='check_api.js' " +
+        ".",
         { stdio: ['pipe', 'pipe', 'pipe'] }
       ).toString();
     } catch (e) {
