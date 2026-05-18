@@ -3,6 +3,7 @@ import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import DataTable from '../../components/DataTable';
 import apiService from '../../services/ApiService';
+import { Trash2 } from 'lucide-react';
 
 function RetailerManagement() {
     const [retailers, setRetailers] = useState([]);
@@ -18,6 +19,8 @@ function RetailerManagement() {
         contact_email: '',
         contract_start: new Date().toISOString().split('T')[0]
     });
+    const [modalError, setModalError] = useState('');
+    const [pageError, setPageError] = useState('');
 
     useEffect(() => {
         loadData();
@@ -36,6 +39,7 @@ function RetailerManagement() {
             setScreens(allScreens);
         } catch (error) {
             console.error('Failed to load retailer management data:', error);
+            setPageError('Failed to load data. Please refresh.');
         } finally {
             setLoading(false);
         }
@@ -43,6 +47,7 @@ function RetailerManagement() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setModalError('');
         try {
             if (editingRetailer) {
                 await apiService.updateRetailer(editingRetailer.id, formData);
@@ -55,11 +60,39 @@ function RetailerManagement() {
             await loadData();
             closeModal();
         } catch (error) {
-            console.error('Failed to save retailer:', error);
+            setModalError(error.message || 'Failed to save retailer');
+        }
+    };
+
+    const handleDelete = async (retailer) => {
+        const confirmed = window.confirm(`Are you sure you want to remove "${retailer.name}"? This will set their status to inactive.`);
+        if (!confirmed) return;
+        try {
+            setPageError('');
+            await apiService.deleteRetailer(retailer.id);
+            setRetailers(prev => prev.map(r =>
+                r.id === retailer.id ? { ...r, status: 'inactive' } : r
+            ));
+        } catch (error) {
+            setPageError(error.message || 'Failed to remove retailer');
+        }
+    };
+
+    const toggleStatus = async (retailer) => {
+        const newStatus = retailer.status === 'active' ? 'inactive' : 'active';
+        try {
+            setPageError('');
+            await apiService.patchRetailer(retailer.id, { status: newStatus });
+            setRetailers(prev => prev.map(r =>
+                r.id === retailer.id ? { ...r, status: newStatus } : r
+            ));
+        } catch (error) {
+            setPageError(error.message || 'Failed to toggle retailer status');
         }
     };
 
     const openModal = (retailer = null) => {
+        setModalError('');
         if (retailer) {
             setEditingRetailer(retailer);
             setFormData({
@@ -83,20 +116,7 @@ function RetailerManagement() {
     const closeModal = () => {
         setShowModal(false);
         setEditingRetailer(null);
-    };
-
-    const toggleStatus = async (retailerId) => {
-        const retailer = retailers.find(r => r.id === retailerId);
-        if (retailer) {
-            try {
-                await apiService.updateRetailer(retailerId, {
-                    status: retailer.status === 'active' ? 'inactive' : 'active'
-                });
-                await loadData();
-            } catch (error) {
-                console.error('Failed to toggle retailer status:', error);
-            }
-        }
+        setModalError('');
     };
 
     const getRetailerStores = (retailerId) => stores.filter(s => s.retailer_id === retailerId);
@@ -180,16 +200,24 @@ function RetailerManagement() {
                         <span className="material-symbols-outlined text-lg">edit</span>
                     </button>
                     <button
-                        onClick={() => toggleStatus(retailer.id)}
-                        className={`p-1.5 rounded-lg transition-colors ${retailer.status === 'active'
-                            ? 'text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
-                            : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
-                            }`}
+                        onClick={() => toggleStatus(retailer)}
+                        className={`p-1.5 rounded-lg transition-colors ${
+                            retailer.status === 'active'
+                                ? 'text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                                : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                        }`}
                         title={retailer.status === 'active' ? 'Deactivate' : 'Activate'}
                     >
                         <span className="material-symbols-outlined text-lg">
                             {retailer.status === 'active' ? 'toggle_on' : 'toggle_off'}
                         </span>
+                    </button>
+                    <button
+                        onClick={() => handleDelete(retailer)}
+                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                        title="Remove"
+                    >
+                        <Trash2 className="w-4 h-4" />
                     </button>
                 </div>
             )
@@ -220,6 +248,13 @@ function RetailerManagement() {
                     Add Retailer
                 </button>
             </div>
+
+            {/* Page-level error */}
+            {pageError && (
+                <div className="px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">
+                    {pageError}
+                </div>
+            )}
 
             {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -285,12 +320,13 @@ function RetailerManagement() {
                                             <p className="font-semibold text-sm">{store.name}</p>
                                             <p className="text-xs text-slate-500">{store.address}</p>
                                         </div>
-                                        <span className={`text-xs px-2 py-0.5 rounded-full ${store.traffic_level === 'high'
-                                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                            : store.traffic_level === 'low'
-                                                ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                                                : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                                            }`}>
+                                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                            store.traffic_level === 'high'
+                                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                                : store.traffic_level === 'low'
+                                                    ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                                        }`}>
                                             {store.traffic_level} traffic
                                         </span>
                                     </div>
@@ -318,6 +354,11 @@ function RetailerManagement() {
                         <h2 className="text-xl font-bold mb-4">
                             {editingRetailer ? 'Edit Retailer' : 'Add New Retailer'}
                         </h2>
+                        {modalError && (
+                            <div className="mb-4 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">
+                                {modalError}
+                            </div>
+                        )}
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div className="flex gap-4">
                                 <div className="flex-shrink-0">
