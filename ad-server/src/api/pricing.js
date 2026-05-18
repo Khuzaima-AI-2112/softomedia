@@ -8,6 +8,31 @@ import { authenticate } from '../middleware/auth.js';
 const router = express.Router();
 
 /**
+ * GET /api/pricing
+ * Root stub — returns empty structure so PricingService initialises
+ * without a 404 crash. Replace with real implementation in Sprint 3.
+ */
+router.get('/', async (req, res) => {
+    try {
+        const config = await PricingRepository.getConfig();
+        res.json({
+            ...config,
+            tiers: config.tiers || [],
+            meta: { stub: false }
+        });
+    } catch {
+        // PricingRepository not yet seeded — return safe empty response
+        res.status(200).json({
+            tiers: [],
+            currency: 'USD',
+            billingCycles: [],
+            features: {},
+            meta: { stub: true, message: 'Pricing not yet configured.' }
+        });
+    }
+});
+
+/**
  * GET /api/pricing/config
  * Get current pricing configuration
  */
