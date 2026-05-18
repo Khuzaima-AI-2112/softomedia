@@ -1,4 +1,3 @@
-
 const DataTable = ({ columns, data, loading, emptyMessage = 'No data available' }) => {
     if (loading) {
         return (
@@ -8,6 +7,27 @@ const DataTable = ({ columns, data, loading, emptyMessage = 'No data available' 
         );
     }
 
+    const renderCell = (col, row) => {
+        if (col.render) {
+            // Support both single-arg render(row) [RetailerManagement style]
+            // and two-arg render(value, row) [UserManagement style]
+            const accessor = col.accessor || col.key;
+            const value = accessor ? row[accessor] : row;
+            return col.render(value, row);
+        }
+
+        // No render fn — resolve value via accessor or key
+        const accessor = col.accessor || col.key;
+        const value = accessor ? row[accessor] : undefined;
+
+        // Guard: never render a plain object as a React child (causes Minified Error #31)
+        if (value !== null && typeof value === 'object') {
+            return JSON.stringify(value);
+        }
+
+        return value ?? '';
+    };
+
     return (
         <div data-testid="data-table" className="bg-white dark:bg-surface-dark rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="overflow-x-auto">
@@ -16,7 +36,7 @@ const DataTable = ({ columns, data, loading, emptyMessage = 'No data available' 
                         <tr>
                             {columns.map((col, idx) => (
                                 <th key={idx} className={`px-6 py-4 font-semibold ${col.className || ''}`}>
-                                    {col.header}
+                                    {col.header || col.label || ''}
                                 </th>
                             ))}
                         </tr>
@@ -30,10 +50,10 @@ const DataTable = ({ columns, data, loading, emptyMessage = 'No data available' 
                             </tr>
                         ) : (
                             data.map((row, rowIdx) => (
-                                <tr key={rowIdx} className="bg-white dark:bg-surface-dark hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                                <tr key={row.id ?? rowIdx} className="bg-white dark:bg-surface-dark hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
                                     {columns.map((col, colIdx) => (
                                         <td key={colIdx} className={`px-6 py-4 ${col.className || ''}`}>
-                                            {col.render ? col.render(row) : row[col.accessor]}
+                                            {renderCell(col, row)}
                                         </td>
                                     ))}
                                 </tr>

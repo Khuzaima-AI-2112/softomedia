@@ -26,7 +26,6 @@ function UserManagement() {
         linkedentityid: ''
     });
     const [filterRole, setFilterRole] = useState('all');
-    // Single string error replaces the list — matches the modal "Network error" banner pattern
     const [modalError, setModalError] = useState('');
     const [pageError, setPageError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
@@ -104,7 +103,6 @@ function UserManagement() {
             await loadData();
             closeModal();
         } catch (err) {
-            // Surface API / network errors as a single inline banner in the modal
             setModalError(err.message || 'Network error');
         }
     };
@@ -118,18 +116,54 @@ function UserManagement() {
 
     const filteredUsers = filterRole === 'all' ? users : users.filter(u => u.role === filterRole);
 
+    // Columns use { key, label, render(value, row) } — compatible with updated DataTable
+    const columns = [
+        { key: 'name', label: 'Name' },
+        { key: 'email', label: 'Email' },
+        {
+            key: 'role',
+            label: 'Role',
+            render: (value) => {
+                const roleObj = ROLES.find(r => r.value === value);
+                return roleObj
+                    ? <span className={`font-medium ${roleObj.color}`}>{roleObj.label}</span>
+                    : value ?? '';
+            }
+        },
+        { key: 'linkedentityid', label: 'Linked Entity' },
+        {
+            key: 'status',
+            label: 'Status',
+            render: (value) => <StatusBadge status={value ? (value.charAt(0).toUpperCase() + value.slice(1)) : 'Unknown'} />
+        },
+        {
+            key: 'id',
+            label: 'Actions',
+            render: (value) => (
+                <button
+                    onClick={() => handleDelete(value)}
+                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                    title="Delete user"
+                >
+                    <Trash2 className="w-4 h-4" />
+                </button>
+            )
+        }
+    ];
+
     return (
         <GlassCard>
-            <StatusBadge status={loading ? 'loading' : 'ready'} />
+            <div className="flex items-center gap-3 mb-4">
+                <StatusBadge status={loading ? 'Loading' : 'Ready'} />
+            </div>
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold">User Management</h2>
                 <button
-                    className="px-4 py-2 bg-blue-600 text-white rounded"
+                    className="px-4 py-2 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover transition-colors"
                     onClick={() => setShowModal(true)}
                 >Add User</button>
             </div>
 
-            {/* Page-level error banner */}
             {pageError && (
                 <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">
                     {pageError}
@@ -137,113 +171,95 @@ function UserManagement() {
             )}
 
             <div className="mb-4">
-                <label className="mr-2">Filter by Role:</label>
+                <label className="mr-2 text-sm font-medium text-slate-600 dark:text-slate-400">Filter by Role:</label>
                 <select
-                    className="border rounded px-2 py-1"
+                    className="border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-slate-800"
                     value={filterRole}
                     onChange={(e) => setFilterRole(e.target.value)}
                 >
                     <option value="all">All Roles</option>
                     {ROLES.map((r) => (
-                        <option key={r.value} value={r.value}>
-                            {r.label}
-                        </option>
+                        <option key={r.value} value={r.value}>{r.label}</option>
                     ))}
                 </select>
             </div>
-            <DataTable
-                columns={[
-                    { key: 'name', label: 'Name' },
-                    { key: 'email', label: 'Email' },
-                    { key: 'role', label: 'Role', render: (role) => {
-                        const roleObj = ROLES.find(r => r.value === role);
-                        return roleObj ? roleObj.label : role;
-                    }},
-                    { key: 'linkedentityid', label: 'Linked Entity ID' },
-                    { key: 'status', label: 'Status' },
-                    { key: 'actions', label: 'Actions', render: (_, row) => (
-                        <button
-                            onClick={() => handleDelete(row.id)}
-                            className="mr-2"
-                        >
-                            <Trash2 className="w-5 h-5 text-red-600" />
-                        </button>
-                    )}
-                ]}
-                data={filteredUsers}
-            />
-            {showModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-lg w-full max-w-md">
-                        <h3 className="text-lg font-medium mb-4">Add / Edit User</h3>
 
-                        {/* Inline error banner — single line, matches "Network error" pattern in screenshot */}
+            <DataTable
+                columns={columns}
+                data={filteredUsers}
+                loading={loading}
+                emptyMessage="No users found"
+            />
+
+            {showModal && (
+                <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-lg w-full max-w-md">
+                        <h3 className="text-lg font-semibold mb-4">Add / Edit User</h3>
+
                         {modalError && (
                             <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm font-medium">
                                 {modalError}
                             </div>
                         )}
 
-                        <form onSubmit={handleSubmit}>
-                            <div className="mb-3">
-                                <label className="block mb-1">Name</label>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Name</label>
                                 <input
                                     type="text"
-                                    className="w-full border rounded px-2 py-1"
+                                    className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
                                     value={formData.name}
                                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                     required
                                 />
                             </div>
-                            <div className="mb-3">
-                                <label className="block mb-1">Email</label>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Email</label>
                                 <input
                                     type="email"
-                                    className="w-full border rounded px-2 py-1"
+                                    className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
                                     value={formData.email}
                                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                     required
                                 />
                             </div>
-                            <div className="mb-3">
-                                <label className="block mb-1">Role</label>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Role</label>
                                 <select
-                                    className="w-full border rounded px-2 py-1"
+                                    className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
                                     value={formData.role}
                                     onChange={(e) => setFormData({ ...formData, role: e.target.value, linkedentityid: '' })}
                                 >
                                     {ROLES.map((r) => (
-                                        <option key={r.value} value={r.value}>
-                                            {r.label}
-                                        </option>
+                                        <option key={r.value} value={r.value}>{r.label}</option>
                                     ))}
                                 </select>
                             </div>
                             {(formData.role === 'advertiser' || formData.role === 'retaileradmin') && (
-                                <div className="mb-3">
-                                    <label className="block mb-1">Linked Entity ID</label>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Linked Entity ID</label>
                                     <input
                                         type="text"
-                                        className="w-full border rounded px-2 py-1"
+                                        className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
                                         value={formData.linkedentityid}
                                         onChange={(e) => setFormData({ ...formData, linkedentityid: e.target.value })}
                                         required
                                     />
                                 </div>
                             )}
-                            <div className="flex justify-end space-x-2">
+                            <div className="flex justify-end gap-3 pt-2">
                                 <button
                                     type="button"
-                                    className="px-4 py-2 bg-gray-300 rounded"
+                                    className="px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 font-medium"
                                     onClick={closeModal}
                                 >Cancel</button>
                                 <button
                                     type="submit"
-                                    className="px-4 py-2 bg-green-600 text-white rounded"
+                                    className="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover shadow-lg shadow-primary/20"
                                 >Save</button>
                             </div>
                             {successMessage && (
-                                <p className="mt-2 text-green-600">{successMessage}</p>
+                                <p className="mt-2 text-emerald-600 text-sm">{successMessage}</p>
                             )}
                         </form>
                     </div>
