@@ -25,3 +25,6 @@ class ApiService {
         return apiClient.delete(`/api/users/${id}`);
     }
 }
+
+const apiService = new ApiService();
+export default apiService;
