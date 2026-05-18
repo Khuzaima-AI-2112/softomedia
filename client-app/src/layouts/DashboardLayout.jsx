@@ -7,7 +7,7 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import SafeWidgetLoader from '../components/SafeWidgetLoader';
 
 function DashboardLayout() {
-    const { persona, loading } = useAuth();
+    const { persona, user, loading } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -20,6 +20,13 @@ function DashboardLayout() {
     }, [persona, loading, location.pathname, navigate]);
 
     if (loading) return null;
+
+    // Derive avatar: prefer user-supplied URL, fall back to initial letter
+    const avatarUrl = user?.avatarUrl || user?.photoURL || null;
+    const avatarInitial = user?.name ? user.name[0].toUpperCase()
+        : user?.email ? user.email[0].toUpperCase()
+        : persona ? persona[0].toUpperCase()
+        : '?';
 
     return (
         <div className={`min-h-screen bg-slate-50 dark:bg-background-dark text-slate-900 dark:text-white relative ${!loading ? 'main-content-loaded' : ''}`}>
@@ -42,8 +49,12 @@ function DashboardLayout() {
                         </span>
                         <span className="text-[10px] text-slate-500">Live Infrastructure</span>
                     </div>
-                    <div className="size-10 rounded-full bg-slate-200 bg-center bg-cover border-2 border-primary/20"
-                        style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuDIf29faZUdAOHSrg73fRjKadBDM-5EF4bdvDm-PKmuZoalok9AQizOwZuVz5uBc4NbonpQN_sNa7vx4QBd9jrnL0ypn9aE8vWXv2HMxhcYKBQ9LcU8KHbn8HuP8uBNIAH3Pni-9WiJbvI1eyOIfEcdBJg3tpNx83COxh59IADm3lfD3Fe50jUVrtQ_Qnuhlbsrl1FNX0A04o61JShF8tGClqhrGqQQxeJYVxsl5Sf6FQAV1Wc10SAg9W5j_cdaGPa4OgeHezI4MA")' }}>
+                    <div
+                        className="size-10 rounded-full bg-slate-300 dark:bg-slate-600 bg-center bg-cover border-2 border-primary/20 flex items-center justify-center text-sm font-bold text-slate-600 dark:text-slate-200"
+                        style={avatarUrl ? { backgroundImage: `url("${avatarUrl}")` } : {}}
+                        aria-label={user?.name || persona || 'User avatar'}
+                    >
+                        {!avatarUrl && avatarInitial}
                     </div>
                 </div>
             </header>
