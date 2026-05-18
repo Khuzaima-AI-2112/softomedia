@@ -72,16 +72,29 @@ steps:
       - |
         echo "🚀 Deploying ${_SERVICE_ADSERVER} version: $BUILD_ID..."
 
-        # Resolve the existing client-app URL for CORS (falls back to '*' if not yet deployed)
-        CLIENT_URL=$$(gcloud run services describe ${_SERVICE_CLIENT} --region ${_REGION} --project ${PROJECT_ID} --format='value(status.url)' 2>/dev/null || echo "*")
-        echo "📍 CORS origin will be: $$CLIENT_URL"
+        # Fetch both URL formats for the client-app and whitelist both
+        # Cloud Run exposes two URL formats: hash-based (kiieh7nmwa) and project-number-based (524693967756)
+        # We collect both to avoid CORS failures regardless of which URL the browser uses
+        CLIENT_URL_PRIMARY=$$(gcloud run services describe ${_SERVICE_CLIENT} --region ${_REGION} --project ${PROJECT_ID} --format='value(status.url)' 2>/dev/null || echo "")
+        CLIENT_URL_SECONDARY=$$(gcloud run services describe ${_SERVICE_CLIENT} --region ${_REGION} --project ${PROJECT_ID} --format='value(status.address.url)' 2>/dev/null || echo "")
+
+        # Build CORS string — include both if they differ, fall back to wildcard if neither found
+        if [ -z "$$CLIENT_URL_PRIMARY" ]; then
+          CORS_VALUE="*"
+        elif [ -n "$$CLIENT_URL_SECONDARY" ] && [ "$$CLIENT_URL_SECONDARY" != "$$CLIENT_URL_PRIMARY" ]; then
+          CORS_VALUE="$$CLIENT_URL_PRIMARY,$$CLIENT_URL_SECONDARY"
+        else
+          CORS_VALUE="$$CLIENT_URL_PRIMARY"
+        fi
+
+        echo "📍 CORS origins will be: $$CORS_VALUE"
 
         gcloud run deploy ${_SERVICE_ADSERVER} \
           --image ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY}/${_SERVICE_ADSERVER}:$BUILD_ID \
           --region ${_REGION} \
           --platform managed \
           --allow-unauthenticated \
-          --set-env-vars "NODE_ENV=production,CORS_ORIGINS=$$CLIENT_URL,BUILD_ID=$BUILD_ID,ALLOW_DEMO_MODE=${_ALLOW_DEMO_MODE}" \
+          --set-env-vars "NODE_ENV=production,CORS_ORIGINS=$$CORS_VALUE,BUILD_ID=$BUILD_ID,ALLOW_DEMO_MODE=${_ALLOW_DEMO_MODE}" \
           --set-secrets "JWT_SECRET=JWT_SECRET:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest" \
           --labels "version=$BUILD_ID,deployed-by=cloud-build"
 
@@ -103,7 +116,7 @@ steps:
     id: 'deploy-adserver'
     waitFor: ['push-adserver-image']
 
-  # Step 6: Deploy Firestore composite indexes (fixed: was 'indexes import' which is invalid)
+  # Step 6: Deploy Firestore composite indexes
   - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
     args:
@@ -121,7 +134,7 @@ steps:
     allowFailure: true
     waitFor: ['verify-predeploy']
 
-  # Step 7: Deploy Firestore security rules (fixed: 'fire-rules' is not a valid gcloud command; use firebase CLI)
+  # Step 7: Deploy Firestore security rules
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'bash'
     args:
@@ -136,7 +149,7 @@ steps:
     allowFailure: true
     waitFor: ['verify-predeploy']
 
-  # Step 8: Deploy client-app linked to backend
+  # Step 8: Deploy client-app linked to backend, then lock CORS with both URL formats
   - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
     args:
@@ -155,13 +168,21 @@ steps:
           --set-env-vars "VITE_API_URL=$$burl,BUILD_ID=${BUILD_ID},NODE_ENV=production" \
           --labels "version=${BUILD_ID},deployed-by=cloud-build"
 
-        # Update ad-server CORS_ORIGINS now that client URL is known
-        CLIENT_URL=$$(gcloud run services describe ${_SERVICE_CLIENT} --region ${_REGION} --project ${PROJECT_ID} --format='value(status.url)')
-        echo "🔄 Updating ad-server CORS_ORIGINS to: $$CLIENT_URL"
+        # Collect both URL formats for the newly deployed client
+        CLIENT_URL_PRIMARY=$$(gcloud run services describe ${_SERVICE_CLIENT} --region ${_REGION} --project ${PROJECT_ID} --format='value(status.url)')
+        CLIENT_URL_SECONDARY=$$(gcloud run services describe ${_SERVICE_CLIENT} --region ${_REGION} --project ${PROJECT_ID} --format='value(status.address.url)' 2>/dev/null || echo "")
+
+        if [ -n "$$CLIENT_URL_SECONDARY" ] && [ "$$CLIENT_URL_SECONDARY" != "$$CLIENT_URL_PRIMARY" ]; then
+          CORS_VALUE="$$CLIENT_URL_PRIMARY,$$CLIENT_URL_SECONDARY"
+        else
+          CORS_VALUE="$$CLIENT_URL_PRIMARY"
+        fi
+
+        echo "🔄 Updating ad-server CORS_ORIGINS to: $$CORS_VALUE"
         gcloud run services update ${_SERVICE_ADSERVER} \
           --region ${_REGION} \
-          --update-env-vars "CORS_ORIGINS=$$CLIENT_URL"
-        echo "✅ CORS locked to $$CLIENT_URL"
+          --update-env-vars "CORS_ORIGINS=$$CORS_VALUE"
+        echo "✅ CORS locked to $$CORS_VALUE"
     id: 'deploy-client'
     waitFor: ['deploy-adserver', 'push-client-image']
 
