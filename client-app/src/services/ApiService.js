@@ -126,6 +126,43 @@ class ApiService {
     async deleteScreen(id) {
         return apiClient.delete(`/api/screens/${id}`);
     }
+
+    // ============================================
+    // LOOPS
+    // ============================================
+
+    async getLoops(params = {}) {
+        const query = new URLSearchParams(params).toString();
+        return apiClient.get(`/api/loops${query ? '?' + query : ''}`);
+    }
+
+    async getLoop(id) {
+        return apiClient.get(`/api/loops/${id}`);
+    }
+
+    async createLoop(data) {
+        return apiClient.post('/api/loops', data);
+    }
+
+    async updateLoop(id, data) {
+        return apiClient.put(`/api/loops/${id}`, data);
+    }
+
+    async deleteLoop(id) {
+        return apiClient.delete(`/api/loops/${id}`);
+    }
+
+    // ============================================
+    // PRICING
+    // ============================================
+
+    async getPricingConfig() {
+        return apiClient.get('/api/pricing');
+    }
+
+    async updatePricingConfig(data) {
+        return apiClient.put('/api/pricing', data);
+    }
 }
 
 const apiService = new ApiService();
