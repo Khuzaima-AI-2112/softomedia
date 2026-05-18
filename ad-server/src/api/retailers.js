@@ -41,8 +41,50 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/', async (req, res) => {
     try {
-        const retailer = await retailerRepository.create(req.body.id, req.body);
-        res.status(201).json(retailer);
+        const { name, contact_email, contract_start, logo, status } = req.body;
+
+        // Validation
+        const errors = [];
+
+        // Name validation
+        if (!name || typeof name !== 'string' || name.trim().length < 1) {
+            errors.push('Name is required and must be a non-empty string');
+        }
+
+        // Contact email validation
+        if (!contact_email || typeof contact_email !== 'string') {
+            errors.push('Contact email is required');
+        } else {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(contact_email)) {
+                errors.push('Contact email must be a valid email address');
+            }
+        }
+
+        // Contract start date validation
+        if (!contract_start || typeof contract_start !== 'string') {
+            errors.push('Contract start date is required');
+        } else if (isNaN(Date.parse(contract_start))) {
+            errors.push('Contract start date must be a valid date string (YYYY-MM-DD)');
+        }
+
+        if (errors.length > 0) {
+            return res.status(400).json({ error: errors.join(' | ') });
+        }
+
+        // Build retailer data — server controls ID and status default
+        const retailerData = {
+            name: name.trim(),
+            contact_email: contact_email.trim(),
+            contract_start: contract_start.trim(),
+            logo: logo || '\uD83C\uDFEA',
+            status: status && ['active', 'inactive'].includes(status) ? status : 'active'
+        };
+
+        // Auto-generate ID — never trust client-supplied ID
+        const createdRetailer = await retailerRepository.createNew(retailerData);
+
+        res.status(201).json(createdRetailer);
     } catch (error) {
         logger.error('Failed to create retailer:', error);
         res.status(500).json({ error: 'Failed to create retailer' });
