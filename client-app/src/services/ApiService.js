@@ -45,6 +45,10 @@ class ApiService {
         return apiClient.put(`/api/retailers/${id}`, data);
     }
 
+    async patchRetailer(id, data) {
+        return apiClient.patch(`/api/retailers/${id}`, data);
+    }
+
     async deleteRetailer(id) {
         return apiClient.delete(`/api/retailers/${id}`);
     }
@@ -71,6 +75,56 @@ class ApiService {
 
     async deleteAdvertiser(id) {
         return apiClient.delete(`/api/advertisers/${id}`);
+    }
+
+    // ============================================
+    // STORES
+    // ============================================
+
+    async getStores(params = {}) {
+        const query = new URLSearchParams(params).toString();
+        return apiClient.get(`/api/stores${query ? '?' + query : ''}`);
+    }
+
+    async getStore(id) {
+        return apiClient.get(`/api/stores/${id}`);
+    }
+
+    async createStore(data) {
+        return apiClient.post('/api/stores', data);
+    }
+
+    async updateStore(id, data) {
+        return apiClient.put(`/api/stores/${id}`, data);
+    }
+
+    async deleteStore(id) {
+        return apiClient.delete(`/api/stores/${id}`);
+    }
+
+    // ============================================
+    // SCREENS
+    // ============================================
+
+    async getScreens(params = {}) {
+        const query = new URLSearchParams(params).toString();
+        return apiClient.get(`/api/screens${query ? '?' + query : ''}`);
+    }
+
+    async getScreen(id) {
+        return apiClient.get(`/api/screens/${id}`);
+    }
+
+    async createScreen(data) {
+        return apiClient.post('/api/screens', data);
+    }
+
+    async updateScreen(id, data) {
+        return apiClient.put(`/api/screens/${id}`, data);
+    }
+
+    async deleteScreen(id) {
+        return apiClient.delete(`/api/screens/${id}`);
     }
 }
 
