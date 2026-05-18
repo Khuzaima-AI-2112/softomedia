@@ -7,10 +7,10 @@ import { API_URL } from '../config.js';
  * API Client Configuration
  */
 const DEFAULT_CONFIG = {
-    timeout: 10000,           // 10 second timeout
-    retries: 3,               // Retry failed requests 3 times
-    retryDelay: 1000,         // 1 second between retries
-    retryOn: [408, 429, 500, 502, 503, 504], // Retry on these status codes
+    timeout: 10000,
+    retries: 3,
+    retryDelay: 1000,
+    retryOn: [408, 429, 500, 502, 503, 504],
 };
 
 /**
@@ -41,25 +41,14 @@ class APIClient {
         this.responseInterceptors = [];
     }
 
-    /**
-     * Add request interceptor
-     * @param {Function} interceptor - Function that receives and returns request options
-     */
     addRequestInterceptor(interceptor) {
         this.requestInterceptors.push(interceptor);
     }
 
-    /**
-     * Add response interceptor
-     * @param {Function} interceptor - Function that receives and returns response
-     */
     addResponseInterceptor(interceptor) {
         this.responseInterceptors.push(interceptor);
     }
 
-    /**
-     * Apply request interceptors
-     */
     async applyRequestInterceptors(url, options) {
         let modifiedOptions = { ...options };
         for (const interceptor of this.requestInterceptors) {
@@ -68,9 +57,6 @@ class APIClient {
         return modifiedOptions;
     }
 
-    /**
-     * Apply response interceptors
-     */
     async applyResponseInterceptors(response) {
         let modifiedResponse = response;
         for (const interceptor of this.responseInterceptors) {
@@ -79,13 +65,9 @@ class APIClient {
         return modifiedResponse;
     }
 
-    /**
-     * Make HTTP request with retry logic
-     */
     async request(endpoint, options = {}, attempt = 1) {
         const url = `${this.baseURL}${endpoint}`;
 
-        // Apply request interceptors
         const modifiedOptions = await this.applyRequestInterceptors(url, {
             headers: {
                 'Content-Type': 'application/json',
@@ -94,7 +76,6 @@ class APIClient {
             ...options,
         });
 
-        // Create abort controller for timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
@@ -106,10 +87,8 @@ class APIClient {
 
             clearTimeout(timeoutId);
 
-            // Apply response interceptors
             const modifiedResponse = await this.applyResponseInterceptors(response);
 
-            // Handle non-OK responses
             if (!modifiedResponse.ok) {
                 const shouldRetry =
                     this.config.retryOn.includes(modifiedResponse.status) &&
@@ -128,14 +107,12 @@ class APIClient {
                 );
             }
 
-            // Parse JSON response
             const data = await modifiedResponse.json();
             return data;
 
         } catch (error) {
             clearTimeout(timeoutId);
 
-            // Handle timeout
             if (error.name === 'AbortError') {
                 const shouldRetry = attempt < this.config.retries;
                 if (shouldRetry) {
@@ -145,7 +122,6 @@ class APIClient {
                 throw new APIError('Request timeout', 408, null);
             }
 
-            // Handle network errors
             if (error instanceof TypeError) {
                 const shouldRetry = attempt < this.config.retries;
                 if (shouldRetry) {
@@ -159,16 +135,10 @@ class APIClient {
         }
     }
 
-    /**
-     * GET request
-     */
     async get(endpoint, options = {}) {
         return this.request(endpoint, { ...options, method: 'GET' });
     }
 
-    /**
-     * POST request
-     */
     async post(endpoint, data, options = {}) {
         return this.request(endpoint, {
             ...options,
@@ -177,9 +147,6 @@ class APIClient {
         });
     }
 
-    /**
-     * PUT request
-     */
     async put(endpoint, data, options = {}) {
         return this.request(endpoint, {
             ...options,
@@ -188,9 +155,14 @@ class APIClient {
         });
     }
 
-    /**
-     * DELETE request
-     */
+    async patch(endpoint, data, options = {}) {
+        return this.request(endpoint, {
+            ...options,
+            method: 'PATCH',
+            body: JSON.stringify(data),
+        });
+    }
+
     async delete(endpoint, options = {}) {
         return this.request(endpoint, { ...options, method: 'DELETE' });
     }
@@ -199,10 +171,26 @@ class APIClient {
 // Create singleton instance
 const apiClient = new APIClient();
 
-// Add auth token interceptor
+// ---------------------------------------------------------------------------
+// Auth interceptor
+// ---------------------------------------------------------------------------
+// The server's auth middleware accepts `Bearer demo-token` when
+// ALLOW_DEMO_MODE=true OR NODE_ENV !== 'production'.
+// The client must send this token + an x-demo-role header so that
+// protected routes (/api/users, /api/monitoring, etc.) don't return 401.
+//
+// Token seeding: if nothing is stored yet, pre-seed `demo-token` so the
+// app works immediately after a fresh page load without requiring a login.
+// ---------------------------------------------------------------------------
+if (!localStorage.getItem('auth_token')) {
+    localStorage.setItem('auth_token', 'demo-token');
+}
+if (!localStorage.getItem('demo_role')) {
+    localStorage.setItem('demo_role', 'superadmin');
+}
+
 apiClient.addRequestInterceptor((url, options) => {
     const token = localStorage.getItem('auth_token');
-    // Robust persona detection: use demo_role OR active_persona as fallback
     const demoRole = localStorage.getItem('demo_role') || localStorage.getItem('active_persona');
 
     if (token) {
@@ -221,6 +209,5 @@ apiClient.addRequestInterceptor((url, options) => {
     return options;
 });
 
-// Export singleton and class
 export { apiClient, APIClient };
 export default apiClient;
