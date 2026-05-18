@@ -63,4 +63,44 @@ router.put('/:id', async (req, res) => {
     }
 });
 
+/**
+ * DELETE /api/retailers/:id
+ * Soft-delete a retailer (sets status to 'inactive')
+ * Preserves referential integrity with stores, screens, loops, impressions
+ */
+router.delete('/:id', async (req, res) => {
+    try {
+        const updated = await retailerRepository.softDelete(req.params.id);
+        res.status(200).json(updated);
+    } catch (error) {
+        if (error.message && error.message.includes('not found')) {
+            return res.status(404).json({ error: 'Retailer not found' });
+        }
+        logger.error('Failed to delete retailer:', error);
+        res.status(500).json({ error: 'Failed to delete retailer' });
+    }
+});
+
+/**
+ * PATCH /api/retailers/:id
+ * Toggle retailer status between 'active' and 'inactive'
+ */
+router.patch('/:id', async (req, res) => {
+    try {
+        const { status } = req.body;
+        const allowedStatuses = ['active', 'inactive'];
+        if (!status || !allowedStatuses.includes(status)) {
+            return res.status(400).json({ error: `Status must be one of: ${allowedStatuses.join(', ')}` });
+        }
+        const updated = await retailerRepository.updateStatus(req.params.id, status);
+        res.status(200).json(updated);
+    } catch (error) {
+        if (error.message && error.message.includes('not found')) {
+            return res.status(404).json({ error: 'Retailer not found' });
+        }
+        logger.error('Failed to update retailer status:', error);
+        res.status(500).json({ error: 'Failed to update retailer status' });
+    }
+});
+
 export default router;
