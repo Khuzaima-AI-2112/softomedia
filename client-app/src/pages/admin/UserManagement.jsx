@@ -26,7 +26,9 @@ function UserManagement() {
         linkedentityid: ''
     });
     const [filterRole, setFilterRole] = useState('all');
-    const [errors, setErrors] = useState([]);
+    // Single string error replaces the list — matches the modal "Network error" banner pattern
+    const [modalError, setModalError] = useState('');
+    const [pageError, setPageError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
 
     useEffect(() => {
@@ -46,6 +48,7 @@ function UserManagement() {
             setAdvertisers(allAdvertisers);
         } catch (err) {
             console.error('Failed to load data', err);
+            setPageError('Failed to load users. Please refresh.');
         } finally {
             setLoading(false);
         }
@@ -54,7 +57,12 @@ function UserManagement() {
     const validate = () => {
         const errs = [];
         if (!formData.name.trim()) errs.push('Name is required');
-        if (!formData.email.trim()) errs.push('Email is required');
+        if (!formData.email.trim()) {
+            errs.push('Email is required');
+        } else {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(formData.email)) errs.push('Email must be a valid address');
+        }
         if (formData.role === 'advertiser' || formData.role === 'retaileradmin') {
             if (!formData.linkedentityid.trim()) {
                 errs.push('Linked entity ID is required for selected role');
@@ -67,20 +75,22 @@ function UserManagement() {
         const confirmed = window.confirm('Are you sure you want to delete this user?');
         if (confirmed) {
             try {
+                setPageError('');
                 await apiService.deleteUser(id);
                 setSuccessMessage('User deleted');
                 await loadData();
             } catch (err) {
-                setErrors([err.message || 'Failed to delete user']);
+                setPageError(err.message || 'Failed to delete user');
             }
         }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setModalError('');
         const validationErrors = validate();
         if (validationErrors.length) {
-            setErrors(validationErrors);
+            setModalError(validationErrors.join(' | '));
             return;
         }
         try {
@@ -94,13 +104,14 @@ function UserManagement() {
             await loadData();
             closeModal();
         } catch (err) {
-            setErrors([err.message || 'Failed to save user']);
+            // Surface API / network errors as a single inline banner in the modal
+            setModalError(err.message || 'Network error');
         }
     };
 
     const closeModal = () => {
         setShowModal(false);
-        setErrors([]);
+        setModalError('');
         setFormData({ name: '', email: '', role: 'advertiser', linkedentityid: '' });
         setSuccessMessage('');
     };
@@ -117,6 +128,14 @@ function UserManagement() {
                     onClick={() => setShowModal(true)}
                 >Add User</button>
             </div>
+
+            {/* Page-level error banner */}
+            {pageError && (
+                <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">
+                    {pageError}
+                </div>
+            )}
+
             <div className="mb-4">
                 <label className="mr-2">Filter by Role:</label>
                 <select
@@ -155,15 +174,16 @@ function UserManagement() {
             />
             {showModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center">
-                    <div className="bg-white p-6 rounded shadow-lg w-full max-w-md">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-lg w-full max-w-md">
                         <h3 className="text-lg font-medium mb-4">Add / Edit User</h3>
-                        {errors.length > 0 && (
-                            <ul className="mb-2 text-red-600">
-                                {errors.map((err, idx) => (
-                                    <li key={idx}>{err}</li>
-                                ))}
-                            </ul>
+
+                        {/* Inline error banner — single line, matches "Network error" pattern in screenshot */}
+                        {modalError && (
+                            <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm font-medium">
+                                {modalError}
+                            </div>
                         )}
+
                         <form onSubmit={handleSubmit}>
                             <div className="mb-3">
                                 <label className="block mb-1">Name</label>

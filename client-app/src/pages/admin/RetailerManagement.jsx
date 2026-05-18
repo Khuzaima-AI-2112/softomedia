@@ -199,12 +199,13 @@ function RetailerManagement() {
                     >
                         <span className="material-symbols-outlined text-lg">edit</span>
                     </button>
+                    {/* Status toggle — persistent colour reflects current state (Task 2.8) */}
                     <button
                         onClick={() => toggleStatus(retailer)}
                         className={`p-1.5 rounded-lg transition-colors ${
                             retailer.status === 'active'
-                                ? 'text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
-                                : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                                ? 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                                : 'text-slate-400 bg-slate-100 dark:bg-slate-800 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
                         }`}
                         title={retailer.status === 'active' ? 'Deactivate' : 'Activate'}
                     >
