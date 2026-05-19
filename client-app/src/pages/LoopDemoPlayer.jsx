@@ -151,7 +151,15 @@ function LoopDemoPlayer() {
                 screenid: selectedScreenId,
                 date: selectedDate,
             });
-            const loops = Array.isArray(data) ? data : [];
+
+            // Backend returns { loops: [...], business_hours: {...} }
+            // Guard also handles a bare array in case of legacy/mock callers
+            const loops = Array.isArray(data)
+                ? data
+                : Array.isArray(data?.loops)
+                ? data.loops
+                : [];
+
             if (loops.length === 0) {
                 setError('No loops scheduled for this screen and date.');
                 setPlaybackLoading(false);
@@ -575,7 +583,7 @@ function LoopDemoPlayer() {
                                 className="size-12 rounded-full bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 text-white transition-all flex items-center justify-center hover:scale-110"
                             >
                                 <span className="material-symbols-outlined text-3xl">skip_previous</span>
-                            </button>
+</button>
                             <button
                                 onClick={togglePlayPause}
                                 className="size-20 rounded-full bg-primary text-white hover:bg-primary/90 transition-all shadow-[0_0_30px_rgba(var(--primary-rgb),0.4)] flex items-center justify-center hover:scale-105"

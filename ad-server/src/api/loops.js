@@ -15,23 +15,26 @@ const router = express.Router();
 /**
  * GET /api/loops
  * List loops with optional filters
- * Query params: date, retailer_id, location_id, status
+ * Query params: date, retailer_id, location_id, screen_id, screenid, status
  */
 router.get('/', async (req, res) => {
     try {
-        const { date, retailer_id, location_id, status } = req.query;
+        const { date, retailer_id, location_id, screen_id, screenid, status } = req.query;
+
+        // Normalise — accept both ?screen_id= and ?screenid= from any caller
+        const effectiveScreenId = screen_id || screenid || null;
 
         let loops;
         if (date) {
             loops = await loopRepository.findByDate(date);
-            if (location_id) {
-                loops = loops.filter(l => l.location_id === location_id);
-            }
+            if (location_id)       loops = loops.filter(l => l.location_id === location_id);
+            if (effectiveScreenId) loops = loops.filter(l => l.screen_id  === effectiveScreenId);
         } else {
             const where = [];
-            if (retailer_id) where.push(['retailer_id', '==', retailer_id]);
-            if (location_id) where.push(['location_id', '==', location_id]);
-            if (status) where.push(['status', '==', status]);
+            if (retailer_id)      where.push(['retailer_id', '==', retailer_id]);
+            if (location_id)      where.push(['location_id', '==', location_id]);
+            if (effectiveScreenId) where.push(['screen_id',  '==', effectiveScreenId]);
+            if (status)           where.push(['status',      '==', status]);
             loops = await loopRepository.findAll({ where });
         }
 
