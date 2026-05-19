@@ -1,13 +1,13 @@
-﻿import express from 'express';
+import express from 'express';
 import { screenRepository } from '../repositories/index.js';
-
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
 /**
  * POST /api/screens/register
- * Register a new screen in the network
+ * Register a new screen in the network.
+ * Stores store_id as location_id in Firestore (internal field name).
  */
 router.post('/register', authenticate, async (req, res) => {
     try {
@@ -23,10 +23,9 @@ router.post('/register', authenticate, async (req, res) => {
         };
 
         if (retailer_id) screenData.retailer_id = retailer_id;
-        if (store_id) screenData.location_id = store_id;
+        if (store_id)    screenData.location_id  = store_id;   // canonical internal field
 
         const screen = await screenRepository.create(screen_id, screenData);
-
         res.json(screen);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -35,11 +34,22 @@ router.post('/register', authenticate, async (req, res) => {
 
 /**
  * GET /api/screens
- * List all screens managed by the tenant
+ * List screens, optionally filtered by store.
+ *
+ * Accepts all three spellings for backwards compatibility:
+ *   ?store_id=   (snake_case — canonical, matches POST body)
+ *   ?storeId=    (camelCase  — original backend convention)
+ *   ?storeid=    (lowercase  — mirrors retailerid/screenid pattern)
+ *
+ * ScreenRepository.findByLocation() filters Firestore on 'location_id',
+ * which is exactly what POST /register writes when store_id is supplied.
  */
 router.get('/', async (req, res) => {
     try {
-        const screens = await screenRepository.findAll();
+        const storeId = req.query.store_id || req.query.storeId || req.query.storeid;
+        const screens = storeId
+            ? await screenRepository.findByLocation(storeId)
+            : await screenRepository.findAll();
         res.json(screens);
     } catch (error) {
         res.status(500).json({ error: error.message });
