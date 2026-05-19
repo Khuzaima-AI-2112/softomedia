@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Trash2 } from 'lucide-react';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import DataTable from '../../components/DataTable';
@@ -20,6 +21,8 @@ function AdvertiserManagement() {
     const [showModal, setShowModal] = useState(false);
     const [editingAdvertiser, setEditingAdvertiser] = useState(null);
     const [selectedAdvertiser, setSelectedAdvertiser] = useState(null);
+    const [modalError, setModalError] = useState('');
+    const [toastMessage, setToastMessage] = useState('');
     const [formData, setFormData] = useState({
         name: '',
         logo: '🏢',
@@ -31,6 +34,11 @@ function AdvertiserManagement() {
     useEffect(() => {
         loadData();
     }, []);
+
+    const showToast = (message) => {
+        setToastMessage(message);
+        setTimeout(() => setToastMessage(''), 4000);
+    };
 
     const loadData = async () => {
         try {
@@ -48,32 +56,38 @@ function AdvertiserManagement() {
         }
     };
 
+    // Task 3.4 fix: display error inside modal, do not close on error
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setModalError('');
         try {
             if (editingAdvertiser) {
                 await apiService.updateAdvertiser(editingAdvertiser.id, formData);
             } else {
                 await apiService.createAdvertiser({
                     ...formData,
+                    contactemail: formData.contact_email,
                     status: 'active'
                 });
             }
             await loadData();
             closeModal();
         } catch (error) {
-            console.error('Failed to save advertiser:', error);
+            const message = error?.response?.data?.error || error?.message || 'Failed to save advertiser. Please try again.';
+            setModalError(message);
+            // Modal stays open — do NOT call closeModal()
         }
     };
 
     const openModal = (advertiser = null) => {
+        setModalError('');
         if (advertiser) {
             setEditingAdvertiser(advertiser);
             setFormData({
                 name: advertiser.name,
                 logo: advertiser.logo,
                 industry: advertiser.industry,
-                contact_email: advertiser.contact_email,
+                contact_email: advertiser.contact_email || advertiser.contactemail || '',
                 budget: advertiser.budget
             });
         } else {
@@ -92,6 +106,7 @@ function AdvertiserManagement() {
     const closeModal = () => {
         setShowModal(false);
         setEditingAdvertiser(null);
+        setModalError('');
     };
 
     const toggleStatus = async (advertiserId) => {
@@ -104,7 +119,25 @@ function AdvertiserManagement() {
                 await loadData();
             } catch (error) {
                 console.error('Failed to toggle advertiser status:', error);
+                showToast('Failed to update status. Please try again.');
             }
+        }
+    };
+
+    // Task 3.5: soft-delete handler
+    const handleDelete = async (advertiser) => {
+        const confirmed = window.confirm(
+            `Are you sure you want to remove "${advertiser.name}"? This action will suspend the advertiser and cannot be undone.`
+        );
+        if (!confirmed) return;
+
+        try {
+            await apiService.deleteAdvertiser(advertiser.id);
+            setAdvertisers(prev => prev.filter(a => a.id !== advertiser.id));
+            if (selectedAdvertiser?.id === advertiser.id) setSelectedAdvertiser(null);
+        } catch (error) {
+            const message = error?.response?.data?.error || error?.message || 'Failed to remove advertiser.';
+            showToast(message);
         }
     };
 
@@ -176,7 +209,10 @@ function AdvertiserManagement() {
         {
             header: 'Status',
             render: (advertiser) => (
-                <StatusBadge status={advertiser.status === 'active' ? 'Active' : 'Inactive'} />
+                <StatusBadge status={
+                    advertiser.status === 'active' ? 'Active' :
+                    advertiser.status === 'suspended' ? 'Suspended' : 'Inactive'
+                } />
             )
         },
         {
@@ -193,15 +229,24 @@ function AdvertiserManagement() {
                     </button>
                     <button
                         onClick={() => toggleStatus(advertiser.id)}
-                        className={`p-1.5 rounded-lg transition-colors ${advertiser.status === 'active'
-                            ? 'text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
-                            : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
-                            }`}
+                        className={`p-1.5 rounded-lg transition-colors ${
+                            advertiser.status === 'active'
+                                ? 'text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                                : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                        }`}
                         title={advertiser.status === 'active' ? 'Deactivate' : 'Activate'}
                     >
                         <span className="material-symbols-outlined text-lg">
                             {advertiser.status === 'active' ? 'toggle_on' : 'toggle_off'}
                         </span>
+                    </button>
+                    {/* Task 3.5 — Remove / soft-delete */}
+                    <button
+                        onClick={() => handleDelete(advertiser)}
+                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                        title="Remove advertiser"
+                    >
+                        <Trash2 size={16} />
                     </button>
                 </div>
             )
@@ -214,6 +259,13 @@ function AdvertiserManagement() {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
+            {/* Error Toast */}
+            {toastMessage && (
+                <div className="fixed bottom-6 right-6 z-50 px-5 py-3 bg-red-600 text-white rounded-xl shadow-xl animate-in fade-in duration-200">
+                    {toastMessage}
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -400,6 +452,13 @@ function AdvertiserManagement() {
                                     />
                                 </div>
                             </div>
+
+                            {/* Task 3.4 — in-modal error display */}
+                            {modalError && (
+                                <div className="px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400">
+                                    {modalError}
+                                </div>
+                            )}
 
                             <div className="flex justify-end gap-3 mt-6">
                                 <button
