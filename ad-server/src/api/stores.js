@@ -10,11 +10,16 @@ const router = express.Router();
 
 /**
  * GET /api/stores
- * List all stores, optionally filtered by retailer
+ * List all stores, optionally filtered by retailer.
+ *
+ * Accepts all three spellings for backwards compatibility:
+ *   ?retailer_id=  (snake_case — canonical, matches POST body convention)
+ *   ?retailerId=   (camelCase  — original backend convention)
+ *   ?retailerid=   (lowercase  — sent by LoopDemoPlayer cascade selector)
  */
 router.get('/', async (req, res) => {
     try {
-        const { retailerId } = req.query;
+        const retailerId = req.query.retailer_id || req.query.retailerId || req.query.retailerid;
         let stores;
 
         if (retailerId) {
