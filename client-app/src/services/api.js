@@ -179,14 +179,18 @@ const apiClient = new APIClient();
 // The client must send this token + an x-demo-role header so that
 // protected routes (/api/users, /api/monitoring, etc.) don't return 401.
 //
-// Token seeding: if nothing is stored yet, pre-seed `demo-token` so the
-// app works immediately after a fresh page load without requiring a login.
+// Token seeding: pre-seed `demo-token` in DEV only so the app works
+// immediately after a fresh page load without requiring a login.
+// In production builds this block is stripped entirely — no credentials
+// are ever auto-injected for real users.
 // ---------------------------------------------------------------------------
-if (!localStorage.getItem('auth_token')) {
-    localStorage.setItem('auth_token', 'demo-token');
-}
-if (!localStorage.getItem('demo_role')) {
-    localStorage.setItem('demo_role', 'superadmin');
+if (import.meta.env.DEV) {
+    if (!localStorage.getItem('auth_token')) {
+        localStorage.setItem('auth_token', 'demo-token');
+    }
+    if (!localStorage.getItem('demo_role')) {
+        localStorage.setItem('demo_role', 'superadmin');
+    }
 }
 
 apiClient.addRequestInterceptor((url, options) => {

@@ -20,8 +20,10 @@ function getRole() {
     return localStorage.getItem('demo_role') || localStorage.getItem('active_persona') || '';
 }
 
+// Use locale-aware date string (YYYY-MM-DD) to avoid UTC drift for timezones
+// behind UTC — toISOString() would return yesterday after midnight UTC.
 function todayISO() {
-    return new Date().toISOString().split('T')[0];
+    return new Date().toLocaleDateString('en-CA');
 }
 
 // ---------------------------------------------------------------------------
@@ -62,9 +64,13 @@ function LoopDemoPlayer() {
     const intervalRef = useRef(null);
     const progressRef = useRef(null);
 
+    // ── Cascade fetch-dedup refs ────────────────────────────────────────────
+    // Prevents redundant network calls when the user re-selects the same
+    // retailer or store that is already loaded.
+    const lastFetchedRetailerRef = useRef(null);
+    const lastFetchedStoreRef = useRef(null);
+
     // ── Load retailers on mount ─────────────────────────────────────────────
-    // Task 4.1 step 1 + Task 4.3: fetch all active retailers for both the
-    // cascade selector and the superadmin Retailer Context selector.
     useEffect(() => {
         (async () => {
             setRetailersLoading(true);
@@ -82,10 +88,15 @@ function LoopDemoPlayer() {
     // ── Task 4.1 step 2: load stores when retailer changes ──────────────────
     useEffect(() => {
         if (!selectedRetailerId) return;
+        // Skip fetch if we already have stores for this retailer
+        if (lastFetchedRetailerRef.current === selectedRetailerId) return;
+
+        lastFetchedRetailerRef.current = selectedRetailerId;
         setStores([]);
         setSelectedStoreId('');
         setScreens([]);
         setSelectedScreenId('');
+        lastFetchedStoreRef.current = null;
         setAllLoops([]);
         setIsPlaying(false);
 
@@ -105,6 +116,10 @@ function LoopDemoPlayer() {
     // ── Task 4.1 step 3: load screens when store changes ────────────────────
     useEffect(() => {
         if (!selectedStoreId) return;
+        // Skip fetch if we already have screens for this store
+        if (lastFetchedStoreRef.current === selectedStoreId) return;
+
+        lastFetchedStoreRef.current = selectedStoreId;
         setScreens([]);
         setSelectedScreenId('');
         setAllLoops([]);
@@ -195,8 +210,6 @@ function LoopDemoPlayer() {
     }, [isPlaying, allLoops, handlePlay]);
 
     // ── Task 4.2: slot + loop advancement ──────────────────────────────────
-    // Play all slots of the current loop in order (0→11), then advance to
-    // the next loop. After all loops in the day have played, restart cycle.
     useEffect(() => {
         if (!isPlaying || allLoops.length === 0) return;
 
@@ -210,7 +223,6 @@ function LoopDemoPlayer() {
                 if (nextSlot < TOTAL_SLOTS) {
                     return nextSlot;
                 }
-                // Slot cycle done — advance to next loop
                 setCurrentLoopIndex(prevLoop => (prevLoop + 1) % allLoops.length);
                 return 0;
             });
@@ -304,7 +316,7 @@ function LoopDemoPlayer() {
                                     className="bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary min-w-[160px]"
                                 >
                                     <option value="">
-                                        {retailersLoading ? 'Loading…' : '— Select Retailer —'}
+                                        {retailersLoading ? 'Loading\u2026' : '\u2014 Select Retailer \u2014'}
                                     </option>
                                     {retailers.map(r => (
                                         <option key={r.id || r.retailerid} value={r.id || r.retailerid}>
@@ -344,7 +356,7 @@ function LoopDemoPlayer() {
                     {!isSuperAdmin && (
                         <div className="flex flex-col gap-1">
                             <label className="text-xs text-white/40 font-bold uppercase tracking-widest">
-                                1 · Retailer
+                                1 \u00b7 Retailer
                             </label>
                             <select
                                 value={selectedRetailerId}
@@ -353,7 +365,7 @@ function LoopDemoPlayer() {
                                 className="bg-slate-800 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
                             >
                                 <option value="">
-                                    {retailersLoading ? 'Loading…' : '— Select Retailer —'}
+                                    {retailersLoading ? 'Loading\u2026' : '\u2014 Select Retailer \u2014'}
                                 </option>
                                 {retailers.map(r => (
                                     <option key={r.id || r.retailerid} value={r.id || r.retailerid}>
@@ -367,7 +379,7 @@ function LoopDemoPlayer() {
                     {/* Step 2 — Store */}
                     <div className={`flex flex-col gap-1 ${!isSuperAdmin ? '' : 'col-span-1'}`}>
                         <label className="text-xs text-white/40 font-bold uppercase tracking-widest">
-                            {isSuperAdmin ? '1' : '2'} · Store
+                            {isSuperAdmin ? '1' : '2'} \u00b7 Store
                         </label>
                         <select
                             value={selectedStoreId}
@@ -379,10 +391,10 @@ function LoopDemoPlayer() {
                                 {!selectedRetailerId
                                     ? 'Select a Retailer first'
                                     : storesLoading
-                                    ? 'Loading…'
+                                    ? 'Loading\u2026'
                                     : stores.length === 0
                                     ? 'No stores found'
-                                    : '— Select Store —'}
+                                    : '\u2014 Select Store \u2014'}
                             </option>
                             {stores.map(s => (
                                 <option key={s.id || s.storeid} value={s.id || s.storeid}>
@@ -395,7 +407,7 @@ function LoopDemoPlayer() {
                     {/* Step 3 — Screen */}
                     <div className="flex flex-col gap-1">
                         <label className="text-xs text-white/40 font-bold uppercase tracking-widest">
-                            {isSuperAdmin ? '2' : '3'} · Screen
+                            {isSuperAdmin ? '2' : '3'} \u00b7 Screen
                         </label>
                         <select
                             value={selectedScreenId}
@@ -407,10 +419,10 @@ function LoopDemoPlayer() {
                                 {!selectedStoreId
                                     ? 'Select a Store first'
                                     : screensLoading
-                                    ? 'Loading…'
+                                    ? 'Loading\u2026'
                                     : screens.length === 0
                                     ? 'No screens found'
-                                    : '— Select Screen —'}
+                                    : '\u2014 Select Screen \u2014'}
                             </option>
                             {screens.map(s => (
                                 <option
@@ -432,7 +444,7 @@ function LoopDemoPlayer() {
                         className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-primary font-bold text-sm hover:bg-primary/90 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]"
                     >
                         <span className="material-symbols-outlined text-xl">play_circle</span>
-                        {playbackLoading ? 'Loading Schedule…' : 'Play Full Day'}
+                        {playbackLoading ? 'Loading Schedule\u2026' : 'Play Full Day'}
                     </button>
 
                     {isPlaying && (
@@ -447,7 +459,7 @@ function LoopDemoPlayer() {
 
                     {!selectionComplete && (
                         <p className="text-xs text-white/30 italic">
-                            Select Retailer → Store → Screen to enable playback
+                            Select Retailer \u2192 Store \u2192 Screen to enable playback
                         </p>
                     )}
 
@@ -583,7 +595,7 @@ function LoopDemoPlayer() {
                                 className="size-12 rounded-full bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 text-white transition-all flex items-center justify-center hover:scale-110"
                             >
                                 <span className="material-symbols-outlined text-3xl">skip_previous</span>
-</button>
+                            </button>
                             <button
                                 onClick={togglePlayPause}
                                 className="size-20 rounded-full bg-primary text-white hover:bg-primary/90 transition-all shadow-[0_0_30px_rgba(var(--primary-rgb),0.4)] flex items-center justify-center hover:scale-105"
@@ -637,7 +649,7 @@ function LoopDemoPlayer() {
                     </p>
                     {selectionComplete && (
                         <p className="text-sm">
-                            {selectedRetailerName} → {selectedStoreName} → {selectedScreenName}
+                            {selectedRetailerName} \u2192 {selectedStoreName} \u2192 {selectedScreenName}
                         </p>
                     )}
                 </div>
