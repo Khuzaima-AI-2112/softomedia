@@ -31,7 +31,6 @@ router.use('/assets', assetsRouter);
 // Note: 'playlist' (singular) is the Player endpoint, 'playlists' (plural) is the Admin CRUD
 router.use('/playlist', playlistRouter);
 router.use('/playlists', playlistsRouter);
-router.use('/loops', loopsRouter);
 router.use('/telemetry', telemetryRouter);
 router.use('/stores', storesRouter);
 router.use('/pricing', pricingRouter);
@@ -41,6 +40,7 @@ router.use('/advertisers', advertisersRouter);
 router.use('/screens', screensRouter);
 
 // --- Protected Routes ---
+router.use('/loops', authenticate, loopsRouter);
 router.use('/monitoring', authenticate, monitoringRouter);
 router.use('/dashboard', authenticate, dashboardRouter);
 router.use('/locations', authenticate, locationsRouter);

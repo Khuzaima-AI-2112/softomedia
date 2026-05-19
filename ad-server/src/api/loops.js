@@ -2,12 +2,17 @@
  * Loops API Routes
  * Manages hourly broadcast loops (12 ads × 5 seconds)
  * Business Hours: 8:00 AM - 10:00 PM (14 loops per day)
+ *
+ * Auth: entire router is mounted behind authenticate in api/index.js.
+ * Mutation routes (POST /generate, PATCH approve/reject/replace) also
+ * carry an inline authenticate guard for defence-in-depth.
  */
 
 import express from 'express';
 import { loopRepository, BUSINESS_HOURS } from '../repositories/LoopRepository.js';
 import { loopGenerationService } from '../services/LoopGenerationService.js';
 import { BusinessHoursService } from '../services/BusinessHoursService.js';
+import { authenticate } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -90,8 +95,9 @@ router.get('/:id', async (req, res) => {
  * POST /api/loops/generate
  * Trigger D-1 loop generation
  * Body: { targetDate, retailerId, locationId }
+ * Requires authentication (defence-in-depth — router is also behind authenticate).
  */
-router.post('/generate', async (req, res) => {
+router.post('/generate', authenticate, async (req, res) => {
     try {
         const { targetDate, retailerId, locationId, mock } = req.body;
 
@@ -105,7 +111,6 @@ router.post('/generate', async (req, res) => {
 
         let loops;
         if (mock) {
-            // Use mock generation for testing
             loops = await loopGenerationService.generateMockLoops(targetDate, retailerId, locationId);
         } else {
             loops = await loopGenerationService.generateDailyLoops(targetDate, retailerId, locationId);
@@ -128,10 +133,11 @@ router.post('/generate', async (req, res) => {
 /**
  * PATCH /api/loops/:id/approve
  * Approve entire loop (retailer action)
+ * Requires authentication.
  */
-router.patch('/:id/approve', async (req, res) => {
+router.patch('/:id/approve', authenticate, async (req, res) => {
     try {
-        const userId = req.body.userId || 'anonymous';
+        const userId = req.body.userId || req.user?.uid || 'anonymous';
         const updated = await loopRepository.approveLoop(req.params.id, userId);
 
         logger.info('[Loops API] Loop approved', { loopId: req.params.id, userId });
@@ -146,8 +152,9 @@ router.patch('/:id/approve', async (req, res) => {
  * PATCH /api/loops/:id/slots/:position/reject
  * Reject a single slot
  * Body: { reason }
+ * Requires authentication.
  */
-router.patch('/:id/slots/:position/reject', async (req, res) => {
+router.patch('/:id/slots/:position/reject', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
         const position = parseInt(req.params.position, 10);
@@ -171,8 +178,9 @@ router.patch('/:id/slots/:position/reject', async (req, res) => {
  * PATCH /api/loops/:id/slots/:position/replace
  * Replace a rejected slot with new asset
  * Body: { assetId }
+ * Requires authentication.
  */
-router.patch('/:id/slots/:position/replace', async (req, res) => {
+router.patch('/:id/slots/:position/replace', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
         const position = parseInt(req.params.position, 10);
