@@ -9,9 +9,7 @@ import apiClient from '../services/api';
  *  1. Show a clear, navigable 404 page so users are never stuck on
  *     a blank white screen.
  *  2. POST a broken_route entry to /api/ai-log so every unmatched
- *     path is captured and visible in Admin → AI Log. This makes
- *     broken internal links discoverable without needing error
- *     monitoring tooling.
+ *     path is captured and visible in Admin → AI Log.
  *
  * The log POST is fire-and-forget: if it fails (e.g. user is offline)
  * we silently swallow the error so the 404 UI still renders cleanly.
@@ -20,8 +18,6 @@ function NotFound() {
     const location = useLocation();
 
     useEffect(() => {
-        // Log the broken route to the AI log endpoint.
-        // fire-and-forget — never let a failed log call break the UI.
         apiClient
             .post('/api/ai-log', {
                 event_type: 'broken_route',
@@ -52,7 +48,6 @@ function NotFound() {
                 fontFamily: 'system-ui, sans-serif',
             }}
         >
-            {/* Large 404 */}
             <div
                 style={{
                     fontSize: 'clamp(5rem, 20vw, 10rem)',

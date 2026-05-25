@@ -1,37 +1,23 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+
+const personaSwatchDefs = [
+    { label: 'Super Admin', role: 'super_admin', color: 'bg-purple-500' },
+    { label: 'Admin',       role: 'admin',       color: 'bg-blue-500'   },
+    { label: 'Brand',       role: 'brand',       color: 'bg-rose-500'   },
+    { label: 'Retailer',    role: 'retailer',    color: 'bg-amber-500'  },
+];
 
 function HamburgerMenu() {
     const [isOpen, setIsOpen] = useState(false);
-    const { user, login } = useAuth();
+    const { user, login, logout } = useAuth();
     const navigate = useNavigate();
 
-    const menuItems = [
-        { label: 'Dashboard', path: `/dashboard/${user?.role || 'admin'}`, icon: 'dashboard' },
-        { label: 'Ad Player', path: '/player', icon: 'play_circle' },
+    const navItems = [
+        { label: 'Dashboard', path: '/dashboard/admin', icon: 'dashboard' },
         { label: 'Demo Player', path: '/player/demo', icon: 'slideshow' },
-        ...(user?.role === 'admin' || user?.role === 'super_admin' ? [
-            { label: 'Overview', path: '/dashboard/admin', icon: 'dashboard' },
-            { label: 'Screens', path: '/dashboard/admin/screens', icon: 'monitor' },
-            { label: 'Playlists', path: '/dashboard/admin/playlists', icon: 'playlist_play' },
-            { label: 'Loops', path: '/dashboard/admin/loops', icon: 'loop' },
-            { label: 'Analytics', path: '/dashboard/admin/analytics', icon: 'analytics' },
-            { label: 'Pricing', path: '/dashboard/admin/pricing', icon: 'attach_money' },
-            { label: 'Users', path: '/dashboard/admin/users', icon: 'people' },
-            { label: 'Retailers', path: '/dashboard/admin/retailers', icon: 'storefront' },
-            { label: 'Business Hours', path: '/dashboard/admin/hours', icon: 'schedule' },
-            { label: 'Advertisers', path: '/dashboard/admin/advertisers', icon: 'campaign' },
-            { label: 'Network Map', path: '/dashboard/admin/map', icon: 'map' },
-            { label: 'System Health', path: '/dashboard/health', icon: 'health_metrics' },
-            { label: 'Ticket Index', path: '/dashboard/tickets', icon: 'history_edu' },
-            { label: 'AI Log', path: '/dashboard/admin/ai-log', icon: 'psychology' }
-        ] : []),
-        ...(user?.role === 'retailer' ? [
-            { label: 'Schedule Manager', path: '/dashboard/retailer/schedule', icon: 'calendar_today' },
-            { label: 'Schedule Calendar', path: '/dashboard/retailer/schedule/calendar', icon: 'event' },
-            { label: 'History', path: '/dashboard/retailer/history', icon: 'history' }
-        ] : []),
+        { label: 'Health', path: '/dashboard/health', icon: 'monitor_heart' },
         ...(user?.role === 'brand' ? [
             { label: 'New Campaign', path: '/dashboard/brand/campaign/new', icon: 'add_circle' }
         ] : []),
@@ -40,129 +26,109 @@ function HamburgerMenu() {
     ];
 
     const personaSwatches = [
-        { role: 'admin', label: '🔐 Admin View', color: '#6366f1', path: '/dashboard/admin' },
-        { role: 'brand', label: '📺 Brand View', color: '#10b981', path: '/dashboard/brand' },
-        { role: 'retailer', label: '🏪 Retailer View', color: '#f59e0b', path: '/dashboard/retailer' },
+        ...personaSwatchDefs,
     ];
 
-    const handlePersonaSwitch = (swatch) => {
+    const switchPersona = (swatch) => {
         const mockUser = {
             id: `demo-${swatch.role}`,
-            email: `${swatch.role}@demo.com`,
+            name: swatch.label,
+            email: `${swatch.role}@demo.softomedia.com`,
             role: swatch.role,
             linked_entity_id: `entity-${swatch.role}`
         };
         localStorage.setItem('demo_role', swatch.role);
         login(mockUser, 'demo-token');
         setIsOpen(false);
-        navigate(swatch.path);
+        navigate('/dashboard/admin');
     };
 
     return (
         <>
-            {/* Toggle Button */}
             <button
-                onClick={() => setIsOpen(!isOpen)}
-                data-testid="menu-toggle"
-                style={{
-                    position: 'fixed',
-                    top: '1rem',
-                    left: '1rem',
-                    zIndex: 1001,
-                    backgroundColor: 'white',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '0.5rem',
-                    padding: '0.5rem',
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                }}
+                onClick={() => setIsOpen(true)}
+                aria-label="Open menu"
+                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
-                <span className="material-symbols-outlined" style={{ fontSize: '20px' }} aria-hidden="true">{isOpen ? 'close' : 'menu'}</span>
+                <span className="material-symbols-outlined">menu</span>
             </button>
 
-            {/* Backdrop */}
             {isOpen && (
-                <div
-                    onClick={() => setIsOpen(false)}
-                    style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 999 }}
-                />
-            )}
-
-            {/* Sidebar */}
-            <div
-                style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: isOpen ? 0 : '-300px',
-                    width: '280px',
-                    height: '100vh',
-                    backgroundColor: 'white',
-                    zIndex: 1000,
-                    transition: 'left 0.3s ease',
-                    padding: '2rem 1.5rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    boxShadow: '4px 0 10px rgba(0,0,0,0.1)'
-                }}
-            >
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '2rem', color: '#111827' }}>SoftoMedia</h3>
-
-                <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {menuItems.map(item => (
-                        <Link
-                            key={item.label}
-                            to={item.path}
-                            onClick={() => setIsOpen(false)}
-                            data-testid={`nav-link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.75rem',
-                                padding: '0.75rem',
-                                color: '#4b5563',
-                                textDecoration: 'none',
-                                borderRadius: '0.5rem',
-                                transition: 'background 0.2s'
-                            }}
-                            onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
-                            onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                        >
-                            <span className="material-symbols-outlined" style={{ fontSize: '20px' }} aria-hidden="true">{item.icon}</span>
-                            {item.label}
-                        </Link>
-                    ))}
-                </nav>
-
-                <div style={{ marginTop: 'auto', borderTop: '1px solid #e5e7eb', paddingTop: '1.5rem' }}>
-                    <p style={{ fontSize: '0.75rem', color: '#9ca3af', fontWeight: '600', textTransform: 'uppercase', marginBottom: '1rem' }}>Persona Switch</p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        {personaSwatches.map(swatch => (
+                <div className="fixed inset-0 z-50 flex">
+                    <div
+                        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                        onClick={() => setIsOpen(false)}
+                    />
+                    <div className="relative ml-auto w-72 h-full bg-white dark:bg-slate-900 shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+                        <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+                            <span className="font-bold text-slate-900 dark:text-white">Menu</span>
                             <button
-                                key={swatch.role}
-                                onClick={() => handlePersonaSwitch(swatch)}
-                                data-testid={`menu-persona-${swatch.role}`}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.75rem',
-                                    padding: '0.5rem',
-                                    border: `1px solid ${swatch.color}`,
-                                    borderRadius: '0.5rem',
-                                    backgroundColor: 'white',
-                                    color: swatch.color,
-                                    cursor: 'pointer',
-                                    fontSize: '0.875rem'
-                                }}
+                                onClick={() => setIsOpen(false)}
+                                aria-label="Close menu"
+                                className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
                             >
-                                {swatch.label}
+                                <span className="material-symbols-outlined">close</span>
                             </button>
-                        ))}
+                        </div>
+
+                        <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+                            {navItems.map(item => (
+                                <Link
+                                    key={item.path}
+                                    to={item.path}
+                                    onClick={() => setIsOpen(false)}
+                                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-slate-400">{item.icon}</span>
+                                    {item.label}
+                                </Link>
+                            ))}
+                        </nav>
+
+                        {/* Demo persona switcher */}
+                        <div className="p-4 border-t border-slate-200 dark:border-slate-700">
+                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Switch Demo Role</p>
+                            <div className="grid grid-cols-2 gap-2">
+                                {personaSwatches.map(swatch => (
+                                    <button
+                                        key={swatch.role}
+                                        onClick={() => switchPersona(swatch)}
+                                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                            user?.role === swatch.role
+                                                ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white ring-1 ring-slate-300 dark:ring-slate-600'
+                                                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                        }`}
+                                    >
+                                        <span className={`size-2.5 rounded-full ${swatch.color}`} />
+                                        {swatch.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {user && (
+                            <div className="p-4 border-t border-slate-200 dark:border-slate-700">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <div className="size-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold">
+                                        {user.name?.[0]?.toUpperCase() ?? '?'}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{user.name}</p>
+                                        <p className="text-xs text-slate-400 truncate">{user.email}</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => { logout(); setIsOpen(false); navigate('/login'); }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-[18px]">logout</span>
+                                    Log out
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
-            </div>
+            )}
         </>
     );
 }
