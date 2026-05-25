@@ -54,6 +54,8 @@ function BusinessHoursManagement() {
             }
         } catch (error) {
             console.error('Failed to load stores:', error);
+            // T5: Surface error to user instead of swallowing it silently
+            setMessage({ type: 'error', text: 'Failed to load stores. Please refresh the page.' });
         } finally {
             setLoading(false);
         }
@@ -81,6 +83,8 @@ function BusinessHoursManagement() {
             setSpecialHours(special || []);
         } catch (error) {
             console.error('Failed to load store hours:', error);
+            // T5: Surface error to user instead of swallowing it silently
+            setMessage({ type: 'error', text: 'Failed to load schedule for this store. Please try again.' });
         }
     };
 
@@ -198,6 +202,18 @@ function BusinessHoursManagement() {
                     </p>
                 </div>
             </div>
+
+            {/* T5: Page-level error shown outside the store selector so it's always visible */}
+            {message && !selectedStore && (
+                <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${
+                    message.type === 'error' ? 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400' : 'bg-blue-50 text-blue-700'
+                }`}>
+                    <span className="material-symbols-outlined text-lg">
+                        {message.type === 'error' ? 'error' : 'info'}
+                    </span>
+                    {message.text}
+                </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                 {/* Store Sidebar */}

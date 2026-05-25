@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import GlassCard from '../../../components/GlassCard';
 import { PriceSummary } from '../../../components/PriceDisplay';
@@ -8,6 +8,8 @@ import pricingService from '../../../services/PricingService';
 
 function Step5ReviewConfirm({ data, onConfirm, onPrev }) {
     const navigate = useNavigate();
+    // T4: Use React state for checkbox — avoids fragile DOM query on confirm
+    const [termsAgreed, setTermsAgreed] = useState(true);
 
     // Calculate totals
     const summary = useMemo(() => {
@@ -42,7 +44,7 @@ function Step5ReviewConfirm({ data, onConfirm, onPrev }) {
             byDateHour: Object.values(byDateHour),
             screenCount: screens.length,
             durationDays: data.dateRange ?
-                Math.ceil((new Date(data.dateRange.end) - new Date(data.dateRange.start)) / (1000 * 60 * 60 * 24)) + 1
+                Math.ceil((new Date(data.dateRange.end + 'T00:00:00') - new Date(data.dateRange.start + 'T00:00:00')) / (1000 * 60 * 60 * 24)) + 1
                 : 0
         };
     }, [data.selectedSlots, data.dateRange]);
@@ -53,8 +55,11 @@ function Step5ReviewConfirm({ data, onConfirm, onPrev }) {
         return `${displayHour}:00 ${suffix}`;
     };
 
+    // T4: Append T00:00:00 so the date is parsed in local time, not UTC midnight.
+    // Without this, '2026-06-01' parses as 00:00 UTC which renders as May 31 in EDT.
     const formatDate = (dateStr) => {
-        return new Date(dateStr).toLocaleDateString('en-US', {
+        if (!dateStr) return '';
+        return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
             weekday: 'short',
             month: 'short',
             day: 'numeric'
@@ -206,7 +211,8 @@ function Step5ReviewConfirm({ data, onConfirm, onPrev }) {
                                     type="checkbox"
                                     data-testid="terms-checkbox"
                                     className="mt-1 accent-primary"
-                                    defaultChecked
+                                    checked={termsAgreed}
+                                    onChange={(e) => setTermsAgreed(e.target.checked)}
                                 />
                                 <span className="text-xs text-slate-500">
                                     I agree to the <a href="#" className="text-primary hover:underline">Terms of Service</a> and <a href="#" className="text-primary hover:underline">Advertising Policy</a>
@@ -218,8 +224,7 @@ function Step5ReviewConfirm({ data, onConfirm, onPrev }) {
                         <div className="space-y-3">
                             <button
                                 onClick={() => {
-                                    const checkbox = document.querySelector('input[data-testid="terms-checkbox"]');
-                                    if (checkbox && checkbox.checked) {
+                                    if (termsAgreed) {
                                         onConfirm();
                                     } else {
                                         alert('Please agree to the Terms of Service to proceed.');

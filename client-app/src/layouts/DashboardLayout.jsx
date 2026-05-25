@@ -5,6 +5,7 @@ import PersonaSwitcher from '../components/PersonaSwitcher';
 import { useAuth } from '../contexts/AuthContext';
 import ErrorBoundary from '../components/ErrorBoundary';
 import SafeWidgetLoader from '../components/SafeWidgetLoader';
+import NetworkErrorBanner from '../components/NetworkErrorBanner';
 
 function DashboardLayout() {
     const { persona, user, loading } = useAuth();
@@ -30,6 +31,9 @@ function DashboardLayout() {
 
     return (
         <div className={`min-h-screen bg-slate-50 dark:bg-background-dark text-slate-900 dark:text-white relative ${!loading ? 'main-content-loaded' : ''}`}>
+            {/* T1: Network error banner — fixed position, zero layout shift */}
+            <NetworkErrorBanner />
+
             <HamburgerMenu />
 
             <header className="sticky top-0 z-50 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-background-dark/90 backdrop-blur-md px-6 py-3 lg:px-10">
