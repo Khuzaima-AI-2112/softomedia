@@ -65,16 +65,18 @@ function RetailerManagement() {
     };
 
     const handleDelete = async (retailer) => {
-        const confirmed = window.confirm(`Are you sure you want to remove "${retailer.name}"? This will set their status to inactive.`);
+        if (!retailer?.id) return;
+        const confirmed = window.confirm(`Are you sure you want to delete "${retailer.name}"? This action cannot be undone.`);
         if (!confirmed) return;
         try {
             setPageError('');
             await apiService.deleteRetailer(retailer.id);
-            setRetailers(prev => prev.map(r =>
-                r.id === retailer.id ? { ...r, status: 'inactive' } : r
-            ));
+            // Remove the row from the list immediately
+            setRetailers(prev => prev.filter(r => r.id !== retailer.id));
+            // Deselect if the deleted retailer was expanded
+            if (selectedRetailer?.id === retailer.id) setSelectedRetailer(null);
         } catch (error) {
-            setPageError(error.message || 'Failed to remove retailer');
+            setPageError(error.message || 'Failed to delete retailer');
         }
     };
 
@@ -216,7 +218,7 @@ function RetailerManagement() {
                     <button
                         onClick={() => handleDelete(retailer)}
                         className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                        title="Remove"
+                        title="Delete"
                     >
                         <Trash2 className="w-4 h-4" />
                     </button>
