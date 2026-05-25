@@ -92,9 +92,7 @@ function AdminOverview() {
         }
     };
 
-    // ---------------------------------------------------
     // Quick actions visible to ALL admin roles
-    // ---------------------------------------------------
     const quickActions = [
         { label: 'CPM Pricing',  icon: 'attach_money',  path: '/dashboard/admin/pricing',     color: 'emerald' },
         { label: 'Users',        icon: 'people',        path: '/dashboard/admin/users',        color: 'blue'    },
@@ -105,22 +103,12 @@ function AdminOverview() {
         { label: 'Network Map',  icon: 'map',           path: '/dashboard/admin/map',          color: 'cyan'    },
     ];
 
-    // ---------------------------------------------------
-    // Super-admin-only quick actions
-    // Screens is first, followed by the same set as above
-    // ---------------------------------------------------
+    // super_admin also sees Screens as the first tile
     const superAdminActions = [
         { label: 'Screens',      icon: 'monitor',       path: '/dashboard/admin/screens',      color: 'slate'   },
-        { label: 'CPM Pricing',  icon: 'attach_money',  path: '/dashboard/admin/pricing',      color: 'emerald' },
-        { label: 'Users',        icon: 'people',        path: '/dashboard/admin/users',        color: 'blue'    },
-        { label: 'Retailers',    icon: 'storefront',    path: '/dashboard/admin/retailers',    color: 'amber'   },
-        { label: 'Advertisers',  icon: 'campaign',      path: '/dashboard/admin/advertisers',  color: 'rose'    },
-        { label: 'Demo Player',  icon: 'slideshow',     path: '/player/demo',                  color: 'purple'  },
-        { label: 'Store Hours',  icon: 'schedule',      path: '/dashboard/admin/hours',        color: 'indigo'  },
-        { label: 'Network Map',  icon: 'map',           path: '/dashboard/admin/map',          color: 'cyan'    },
+        ...quickActions,
     ];
 
-    // Render the grid using the appropriate action set for this user
     const activeActions = isSuperAdmin ? superAdminActions : quickActions;
 
     return (
@@ -133,7 +121,7 @@ function AdminOverview() {
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => setShowRetailerModal(true)}
-                        className="px4 py bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover transition-colors flex items-center gap-2"
+                        className="px-4 py-2 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover transition-colors flex items-center gap-2"
                     >
                         <span className="material-symbols-outlined text-[20px]">add</span>
                         New Retailer
@@ -157,9 +145,9 @@ function AdminOverview() {
                         key={action.path}
                         to={action.path}
                         className={`
-                            p-4 rounded-xl border border-slate-200 dark:border-slate-700 
-                            bg-white dark:bg-slate-800/50 hover:border-${action.color}-400 
-                            hover:shadow-lg hover:shadow-${action.color}-500/10 transition-all 
+                            p-4 rounded-xl border border-slate-200 dark:border-slate-700
+                            bg-white dark:bg-slate-800/50 hover:border-${action.color}-400
+                            hover:shadow-lg hover:shadow-${action.color}-500/10 transition-all
                             flex flex-col items-center gap-2 group
                         `}
                     >
@@ -218,30 +206,28 @@ function AdminOverview() {
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="font-bold text-lg">Retail Partners</h3>
                         <Link to="/dashboard/admin/retailers" className="text-primary text-sm font-medium hover:underline">
-                            View All &#8619;
+                            View All →
                         </Link>
                     </div>
                     <div className="space-y-3">
-                        {retailers.map(ret => {
-                            return (
-                                <Link
-                                    key={ret.id}
-                                    to="/dashboard/admin/retailers"
-                                    className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 hover:border-primary/30 transition-colors cursor-pointer group"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="size-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-2xl border border-slate-200 dark:border-slate-600">
-                                            {ret.logo}
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">{ret.name}</p>
-                                            <p className="text-[11px] text-slate-500">{ret.store_count || 0} Locations</p>
-                                        </div>
+                        {retailers.map(ret => (
+                            <Link
+                                key={ret.id}
+                                to="/dashboard/admin/retailers"
+                                className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 hover:border-primary/30 transition-colors cursor-pointer group"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="size-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-2xl border border-slate-200 dark:border-slate-600">
+                                        {ret.logo}
                                     </div>
-                                    <StatusBadge status={ret.status === 'active' ? 'Active' : 'Inactive'} />
-                                </Link>
-                            );
-                        })}
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">{ret.name}</p>
+                                        <p className="text-[11px] text-slate-500">{ret.store_count || 0} Locations</p>
+                                    </div>
+                                </div>
+                                <StatusBadge status={ret.status === 'active' ? 'Active' : 'Inactive'} />
+                            </Link>
+                        ))}
                     </div>
                 </GlassCard>
 
@@ -249,33 +235,31 @@ function AdminOverview() {
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="font-bold text-lg">Key Advertisers</h3>
                         <Link to="/dashboard/admin/advertisers" className="text-primary text-sm font-medium hover:underline">
-                            View All &#8619;
+                            View All →
                         </Link>
                     </div>
                     <div className="space-y-3">
-                        {advertisers.map(adv => {
-                            return (
-                                <Link
-                                    key={adv.id}
-                                    to="/dashboard/admin/advertisers"
-                                    className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 hover:border-amber-500/30 transition-colors cursor-pointer group"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="size-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-2xl border border-slate-200 dark:border-slate-600">
-                                            {adv.logo}
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-amber-500 transition-colors">{adv.name}</p>
-                                            <p className="text-[11px] text-slate-500">{adv.active_campaign_count || 0} Active Campaigns</p>
-                                        </div>
+                        {advertisers.map(adv => (
+                            <Link
+                                key={adv.id}
+                                to="/dashboard/admin/advertisers"
+                                className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 hover:border-amber-500/30 transition-colors cursor-pointer group"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="size-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-2xl border border-slate-200 dark:border-slate-600">
+                                        {adv.logo}
                                     </div>
-                                    <div className="text-right">
-                                        <p className="text-sm font-bold text-slate-900 dark:text-white">{pricingService.formatPrice(adv.budget)}</p>
-                                        <p className="text-[10px] text-slate-500 uppercase tracking-tighter font-bold">Budget</p>
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-amber-500 transition-colors">{adv.name}</p>
+                                        <p className="text-[11px] text-slate-500">{adv.active_campaign_count || 0} Active Campaigns</p>
                                     </div>
-                                </Link>
-                            );
-                        })}
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-sm font-bold text-slate-900 dark:text-white">{pricingService.formatPrice(adv.budget)}</p>
+                                    <p className="text-[10px] text-slate-500 uppercase tracking-tighter font-bold">Budget</p>
+                                </div>
+                            </Link>
+                        ))}
                     </div>
                 </GlassCard>
             </div>
@@ -283,7 +267,7 @@ function AdminOverview() {
             {/* New Retailer Modal */}
             {showRetailerModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <GlassCard className="w5full max-w-md">
+                    <GlassCard className="w-full max-w-md">
                         <h2 className="text-xl font-bold mb-4">Register New Retailer</h2>
                         <div className="space-y-4">
                             <div>
