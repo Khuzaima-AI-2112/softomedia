@@ -123,6 +123,10 @@ class ApiService {
         return apiClient.put(`/api/screens/${id}`, data);
     }
 
+    async patchScreen(id, data) {
+        return apiClient.patch(`/api/screens/${id}`, data);
+    }
+
     async deleteScreen(id) {
         return apiClient.delete(`/api/screens/${id}`);
     }
@@ -150,6 +154,55 @@ class ApiService {
 
     async deleteLoop(id) {
         return apiClient.delete(`/api/loops/${id}`);
+    }
+
+    // ============================================
+    // CAMPAIGNS
+    // ============================================
+
+    async getCampaigns(params = {}) {
+        const query = new URLSearchParams(params).toString();
+        return apiClient.get(`/api/campaigns${query ? '?' + query : ''}`);
+    }
+
+    async getCampaign(id) {
+        return apiClient.get(`/api/campaigns/${id}`);
+    }
+
+    async createCampaign(data) {
+        return apiClient.post('/api/campaigns', data);
+    }
+
+    async updateCampaign(id, data) {
+        return apiClient.put(`/api/campaigns/${id}`, data);
+    }
+
+    async deleteCampaign(id) {
+        return apiClient.delete(`/api/campaigns/${id}`);
+    }
+
+    async bookSlots(campaignId, slots) {
+        return apiClient.post(`/api/campaigns/${campaignId}/slots`, slots);
+    }
+
+    // ============================================
+    // BUSINESS HOURS
+    // ============================================
+
+    async getWeeklyHours(storeId) {
+        return apiClient.get(`/api/stores/${storeId}/hours`);
+    }
+
+    async updateWeeklyHours(storeId, data) {
+        return apiClient.put(`/api/stores/${storeId}/hours`, data);
+    }
+
+    async listSpecialHours(storeId) {
+        return apiClient.get(`/api/stores/${storeId}/hours/special`);
+    }
+
+    async updateSpecialHours(storeId, date, data) {
+        return apiClient.put(`/api/stores/${storeId}/hours/special/${date}`, data);
     }
 
     // ============================================
