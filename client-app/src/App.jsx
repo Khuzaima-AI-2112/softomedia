@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import NetworkErrorBanner from './components/NetworkErrorBanner';
+import NotFound from './pages/NotFound';
 
 const Player = lazy(() => import('./pages/Player'));
 const LoopDemoPlayer = lazy(() => import('./pages/LoopDemoPlayer'));
@@ -36,7 +37,7 @@ function App() {
     return (
         <Router>
             <AuthProvider>
-                {/* T3: Global network-error banner — listens for api:network-error events
+                {/* Global network-error banner — listens for api:network-error events
                     fired by api.js when all retries are exhausted (Wi-Fi off / no connection).
                     Rendered outside <Suspense> so it stays visible even while a page is loading. */}
                 <NetworkErrorBanner />
@@ -71,8 +72,12 @@ function App() {
                             <Route path="health" element={<Health />} />
                             <Route path="tickets" element={<TicketDashboard />} />
                             <Route path="tickets/:id" element={<TicketDetail />} />
+                            {/* Catch-all for unknown /dashboard/* paths */}
+                            <Route path="*" element={<NotFound />} />
                         </Route>
                         <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                        {/* Catch-all for completely unknown top-level paths */}
+                        <Route path="*" element={<NotFound />} />
                     </Routes>
                 </Suspense>
             </AuthProvider>

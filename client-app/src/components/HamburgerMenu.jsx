@@ -35,7 +35,8 @@ function HamburgerMenu() {
         ...(user?.role === 'brand' ? [
             { label: 'New Campaign', path: '/dashboard/brand/campaign/new', icon: 'add_circle' }
         ] : []),
-        { label: 'Settings', path: '#', icon: 'settings' },
+        // Settings removed — no /dashboard/settings route exists yet.
+        // Add back once the Settings page is built.
     ];
 
     const personaSwatches = [
@@ -51,7 +52,6 @@ function HamburgerMenu() {
             role: swatch.role,
             linked_entity_id: `entity-${swatch.role}`
         };
-        // Signal the demo role to the backend bypass
         localStorage.setItem('demo_role', swatch.role);
         login(mockUser, 'demo-token');
         setIsOpen(false);
