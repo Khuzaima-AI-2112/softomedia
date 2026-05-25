@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import NetworkErrorBanner from './components/NetworkErrorBanner';
 
 const Player = lazy(() => import('./pages/Player'));
 const LoopDemoPlayer = lazy(() => import('./pages/LoopDemoPlayer'));
@@ -35,6 +36,10 @@ function App() {
     return (
         <Router>
             <AuthProvider>
+                {/* T3: Global network-error banner — listens for api:network-error events
+                    fired by api.js when all retries are exhausted (Wi-Fi off / no connection).
+                    Rendered outside <Suspense> so it stays visible even while a page is loading. */}
+                <NetworkErrorBanner />
                 <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center bg-slate-50 dark:bg-background-dark"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>}>
                     <Routes>
                         <Route path="/player" element={<Player />} />
