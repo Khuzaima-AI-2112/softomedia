@@ -8,11 +8,13 @@ function ScreenManagement() {
     const [retailers, setRetailers] = useState([]);
     const [stores, setStores] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [pageError, setPageError] = useState('');
     const [showAddModal, setShowAddModal] = useState(false);
     const [newScreen, setNewScreen] = useState({ screen_id: '', resolution: '1920x1080', user_agent: 'Manual Admin Entry', retailer_id: '', store_id: '' });
 
     const loadData = async () => {
         setLoading(true);
+        setPageError('');
         try {
             const [screensData, retailersData, storesData] = await Promise.all([
                 apiService.getScreens(),
@@ -24,6 +26,7 @@ function ScreenManagement() {
             setStores(storesData || []);
         } catch (error) {
             console.error('Failed to fetch data:', error);
+            setPageError('Failed to load screens. Please refresh.');
         } finally {
             setLoading(false);
         }
@@ -33,27 +36,52 @@ function ScreenManagement() {
         loadData();
     }, []);
 
-    const handleDelete = async (id) => {
+    const handleToggleStatus = async (screen) => {
+        const newStatus = screen.status === 'online' ? 'offline' : 'online';
+        try {
+            setPageError('');
+            // Use numeric id for the API call
+            await apiService.patchScreen(screen.id, { status: newStatus });
+            setScreens(prev => prev.map(s =>
+                s.id === screen.id ? { ...s, status: newStatus } : s
+            ));
+        } catch (error) {
+            console.error('Failed to toggle screen status:', error);
+            setPageError(error.message || 'Failed to update screen status.');
+        }
+    };
+
+    const handleDelete = async (screen) => {
         if (!confirm('Are you sure you want to delete this screen? This action cannot be undone.')) return;
         try {
-            await apiService.deleteScreen(id);
-            await loadData();
+            setPageError('');
+            // Use numeric id, not the string screen_id hardware identifier
+            await apiService.deleteScreen(screen.id);
+            setScreens(prev => prev.filter(s => s.id !== screen.id));
         } catch (error) {
             console.error('Failed to delete screen:', error);
-            alert('Failed to delete screen');
+            setPageError(error.message || 'Failed to delete screen.');
         }
     };
 
     const handleCreateScreen = async (e) => {
         e.preventDefault();
         try {
-            await apiService.registerScreen(newScreen);
+            await apiService.createScreen(newScreen);
             setShowAddModal(false);
-            setNewScreen({ screen_id: '', resolution: '1920x1080', user_agent: 'Manual Admin Entry', retailer_id: '', store_id: '' }); // Reset
-            await loadData(); // Refresh list
+            setNewScreen({ screen_id: '', resolution: '1920x1080', user_agent: 'Manual Admin Entry', retailer_id: '', store_id: '' });
+            await loadData();
         } catch (error) {
             console.error('Failed to create screen:', error);
+            setPageError(error.message || 'Failed to register screen.');
         }
+    };
+
+    const getStoreName = (screen) => {
+        const store = stores.find(s => s.id === screen.store_id);
+        const retailer = retailers.find(r => r.id === screen.retailer_id);
+        if (store) return `${store.name}${retailer ? ` — ${retailer.name}` : ''}`;
+        return screen.location_id || 'Unassigned';
     };
 
     return (
@@ -71,6 +99,12 @@ function ScreenManagement() {
                     Add Screen
                 </button>
             </div>
+
+            {pageError && (
+                <div className="px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">
+                    {pageError}
+                </div>
+            )}
 
             <GlassCard>
                 <div className="overflow-x-auto">
@@ -93,7 +127,7 @@ function ScreenManagement() {
                                 screens.map(screen => (
                                     <tr key={screen.id || screen.screen_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                                         <td className="py-3 px-4 font-medium text-slate-900 dark:text-white">{screen.screen_id}</td>
-                                        <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{screen.location_id || 'Unassigned'}</td>
+                                        <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{getStoreName(screen)}</td>
                                         <td className="py-3 px-4 text-slate-500 text-sm">
                                             {screen.last_seen ? new Date(screen.last_seen).toLocaleString() : 'Never'}
                                         </td>
@@ -101,11 +135,23 @@ function ScreenManagement() {
                                             <StatusBadge status={screen.status} />
                                         </td>
                                         <td className="py-3 px-4 text-right">
-                                            <button className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-500 transition-colors mr-1" title="Settings">
-                                                <span className="material-symbols-outlined text-[20px]">settings</span>
-                                            </button>
+                                            {/* Status toggle */}
                                             <button
-                                                onClick={() => handleDelete(screen.screen_id)}
+                                                onClick={() => handleToggleStatus(screen)}
+                                                className={`p-2 rounded-lg transition-colors mr-1 ${
+                                                    screen.status === 'online'
+                                                        ? 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                                                        : 'text-slate-400 bg-slate-100 dark:bg-slate-800 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                                                }`}
+                                                title={screen.status === 'online' ? 'Set Offline' : 'Set Online'}
+                                            >
+                                                <span className="material-symbols-outlined text-[20px]">
+                                                    {screen.status === 'online' ? 'toggle_on' : 'toggle_off'}
+                                                </span>
+                                            </button>
+                                            {/* Delete */}
+                                            <button
+                                                onClick={() => handleDelete(screen)}
                                                 className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-500 transition-colors"
                                                 title="Delete Screen"
                                             >
