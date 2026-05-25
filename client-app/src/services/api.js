@@ -128,6 +128,8 @@ class APIClient {
                     await sleep(this.config.retryDelay * attempt);
                     return this.request(endpoint, options, attempt + 1);
                 }
+                // Emit global event so NetworkErrorBanner can react
+                window.dispatchEvent(new CustomEvent('api:network-error'));
                 throw new APIError('Network error', 0, null);
             }
 
