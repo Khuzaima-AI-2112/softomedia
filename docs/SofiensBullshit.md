@@ -74,14 +74,114 @@ Update it whenever a new page file is created or deleted.
 | `./pages/admin/BusinessHoursManagement` | `client-app/src/pages/admin/BusinessHoursManagement.jsx` | ✅ |
 | `./pages/admin/NetworkMap` | `client-app/src/pages/admin/NetworkMap.jsx` | ✅ |
 | `./pages/admin/AILog` | `client-app/src/pages/admin/AILog.jsx` | ✅ |
+| `./pages/admin/CPMCalendar` | `client-app/src/pages/admin/CPMCalendar.jsx` | ✅ (served at `/dashboard/admin/pricing`) |
 | `./pages/brand/BrandDashboard` | `client-app/src/pages/brand/BrandDashboard.jsx` | ✅ |
 | `./pages/brand/BrandCampaignWizard` | `client-app/src/pages/brand/BrandCampaignWizard.jsx` | ✅ |
 | `./pages/retailer/RetailerDashboard` | `client-app/src/pages/retailer/RetailerDashboard.jsx` | ✅ |
 | `./pages/retailer/ScheduleCalendar` | `client-app/src/pages/retailer/ScheduleCalendar.jsx` | ✅ |
-| `./pages/tickets/TicketDashboard` | ❌ does not exist | **OMIT** |
-| `./pages/tickets/TicketDetail` | ❌ does not exist | **OMIT** |
-| `./pages/admin/PricingManagement` | ❌ does not exist | **OMIT** |
+| `./pages/tickets/TicketDashboard` | ❌ does not exist as a page | **OMIT** — see Backlog #1 |
+| `./pages/tickets/TicketDetail` | ❌ does not exist as a page | **OMIT** — see Backlog #1 |
 | `./pages/retailer/Loops` | ❌ does not exist | **OMIT** |
+
+---
+
+## Wiring Audit Backlog — 2026-05-26
+
+Found during audit on 2026-05-26. None of these are build-breakers
+(no missing imports). They are silent dead-ends or broken UX flows
+that need to be fixed in a future sprint.
+
+### 🔴 C1 — Ticket pages exist as components but have no routes
+
+**Severity:** Critical — testers will 404 on QA checklist items 6.14–6.15
+
+`TicketDashboard.jsx` and `TicketDetail.jsx` exist at:
+- `client-app/src/components/TicketDashboard.jsx`
+- `client-app/src/components/TicketDetail.jsx`
+
+They are built components, not page stubs. However they live in `components/`
+not `pages/`, and `App.jsx` has no routes for `/dashboard/tickets` or
+`/dashboard/tickets/:id`. `SupportTicketModal.jsx` submits tickets but there
+is nowhere to view them.
+
+**Fix:** Move both files to `pages/tickets/`, add routes in `App.jsx`:
+```jsx
+const TicketDashboard = lazy(() => import('./pages/tickets/TicketDashboard'));
+const TicketDetail    = lazy(() => import('./pages/tickets/TicketDetail'));
+// ...
+<Route path="tickets"     element={<TicketDashboard />} />
+<Route path="tickets/:id" element={<TicketDetail />} />
+```
+
+---
+
+### 🔴 C2 — Three admin pages exist on disk but have no routes
+
+**Severity:** Critical — completely unreachable, no nav link reaches them
+
+The following files exist in `pages/admin/` but are not routed in `App.jsx`
+and have no nav link anywhere in the UI:
+
+| File | Natural route |
+|---|---|
+| `pages/admin/LoopAnalytics.jsx` | `/dashboard/admin/analytics` |
+| `pages/admin/PlaylistEditor.jsx` | `/dashboard/admin/playlists/:id/edit` |
+| `pages/admin/PlaylistManagement.jsx` | `/dashboard/admin/playlists` |
+
+**Fix:** Add routes in `App.jsx` and add tiles/nav links in `Overview.jsx`
+or `HamburgerMenu.jsx` as appropriate. Do not add the routes until you
+have confirmed the pages are in a shippable state (per Rule 2).
+
+---
+
+### 🔴 C3 — Persona switcher always redirects to `/dashboard/admin`
+
+**Severity:** Critical — Brand and Retailer users land on the wrong dashboard
+
+In `HamburgerMenu.jsx`, `switchPersona()` always calls:
+```js
+navigate('/dashboard/admin');
+```
+This means switching to a Brand or Retailer persona dumps the user
+into the Admin overview instead of their own dashboard.
+
+**Fix:** Route by role:
+```js
+const destination = {
+    super_admin: '/dashboard/admin',
+    admin:       '/dashboard/admin',
+    brand:       '/dashboard/brand',
+    retailer:    '/dashboard/retailer',
+};
+navigate(destination[swatch.role] ?? '/dashboard/admin');
+```
+
+---
+
+### 🟡 M1 — LoopBuilder.jsx exists on disk with no route or nav link
+
+**Severity:** Medium — dead code, no user can reach it
+
+`pages/admin/LoopBuilder.jsx` exists but has no route in `App.jsx`
+and no tile or link anywhere. Either wire it up or delete it to
+avoid confusion.
+
+**Natural route:** `/dashboard/admin/loops/builder` or as a modal
+launched from `LoopManagement.jsx`.
+
+---
+
+### 🟡 M2 — Retailer users have no nav link to their Schedule page
+
+**Severity:** Medium — Retailer users can only reach `/dashboard/retailer/schedule`
+if they know the URL directly. `HamburgerMenu.jsx` has no nav item for it.
+
+**Fix:** Add to `navItems` in `HamburgerMenu.jsx` conditionally:
+```js
+...(user?.role === 'retailer' ? [
+    { label: 'My Schedule', path: '/dashboard/retailer/schedule', icon: 'calendar_month' }
+] : []),
+```
 
 ---
 
@@ -103,6 +203,7 @@ Update it whenever a new page file is created or deleted.
 - ✅ HamburgerMenu — broken Settings link removed
 - ✅ Screens page gated to `super_admin` role only
 - ✅ All admin/brand/retailer routes wired in App.jsx
+- ✅ CPMCalendar wired to `/dashboard/admin/pricing` (2026-05-26)
 
 ### Known issue at this commit
 
