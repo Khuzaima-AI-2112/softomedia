@@ -6,7 +6,7 @@ import NotFound from './pages/NotFound';
 
 const Player = lazy(() => import('./pages/Player'));
 const LoopDemoPlayer = lazy(() => import('./pages/LoopDemoPlayer'));
-const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Dashboard = lazy(() => import('./layouts/DashboardLayout'));
 const AdminOverview = lazy(() => import('./pages/admin/Overview'));
 const RetailerManagement = lazy(() => import('./pages/admin/RetailerManagement'));
 const AdvertiserManagement = lazy(() => import('./pages/admin/AdvertiserManagement'));
