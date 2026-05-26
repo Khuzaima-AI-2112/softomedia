@@ -12,11 +12,14 @@ function DashboardLayout() {
     const location = useLocation();
     const navigate = useNavigate();
 
-    // Role-based routing: Ensure the URL matches the persona
+    // Role-based routing: map persona to an existing route.
+    // super_admin shares /dashboard/admin — user.role is preserved as
+    // 'super_admin' so privilege checks (e.g. isSuperAdmin in Overview)
+    // continue to work correctly.
     React.useEffect(() => {
         if (!loading && persona && location.pathname === '/dashboard') {
-            // Default landing redirect
-            navigate(`/dashboard/${persona}`, { replace: true });
+            const routePersona = persona === 'super_admin' ? 'admin' : persona;
+            navigate(`/dashboard/${routePersona}`, { replace: true });
         }
     }, [persona, loading, location.pathname, navigate]);
 
@@ -34,10 +37,11 @@ function DashboardLayout() {
             {/* T1: Network error banner — fixed position, zero layout shift */}
             <NetworkErrorBanner />
 
-            <HamburgerMenu />
-
             <header className="sticky top-0 z-50 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-background-dark/90 backdrop-blur-md px-6 py-3 lg:px-10">
                 <div className="flex items-center gap-4">
+                    {/* Hamburger lives here so it participates in the left
+                        flex group and stays pinned to the left edge */}
+                    <HamburgerMenu />
                     <div className="size-8 text-primary">
                         <span className="material-symbols-outlined text-[32px]">campaign</span>
                     </div>
