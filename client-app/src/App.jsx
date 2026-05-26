@@ -23,6 +23,7 @@
  *   pages/admin/BusinessHoursManagement.jsx ✅
  *   pages/admin/NetworkMap.jsx           ✅
  *   pages/admin/AILog.jsx                ✅
+ *   pages/admin/CPMCalendar.jsx          ✅  (served at /dashboard/admin/pricing)
  *   pages/brand/BrandDashboard.jsx       ✅
  *   pages/brand/BrandCampaignWizard.jsx  ✅
  *   pages/retailer/RetailerDashboard.jsx ✅
@@ -30,7 +31,6 @@
  *
  *   pages/tickets/TicketDashboard.jsx    ❌ NOT ON DISK — route omitted
  *   pages/tickets/TicketDetail.jsx       ❌ NOT ON DISK — route omitted
- *   pages/admin/PricingManagement.jsx    ❌ NOT ON DISK — route omitted
  *   pages/retailer/Loops.jsx             ❌ NOT ON DISK — route omitted
  */
 
@@ -59,6 +59,7 @@ const UserManagement          = lazy(() => import('./pages/admin/UserManagement'
 const BusinessHoursManagement = lazy(() => import('./pages/admin/BusinessHoursManagement'));
 const NetworkMap              = lazy(() => import('./pages/admin/NetworkMap'));
 const AILog                   = lazy(() => import('./pages/admin/AILog'));
+const CPMCalendar             = lazy(() => import('./pages/admin/CPMCalendar'));
 
 // ── Brand pages ───────────────────────────────────────────────────────────────
 const BrandOverview  = lazy(() => import('./pages/brand/BrandDashboard'));
@@ -100,6 +101,7 @@ function App() {
                             <Route path="admin/hours"       element={<BusinessHoursManagement />} />
                             <Route path="admin/map"         element={<NetworkMap />} />
                             <Route path="admin/ai-log"      element={<AILog />} />
+                            <Route path="admin/pricing"     element={<CPMCalendar />} />
 
                             {/* Brand */}
                             <Route path="brand"              element={<BrandOverview />} />
