@@ -42,6 +42,16 @@ export const AuthProvider = ({ children }) => {
             localStorage.setItem('auth_token', 'demo-token');
         }
 
+        // Sync user.role so role-based checks (e.g. isSuperAdmin in Overview)
+        // stay accurate when switching persona via PersonaSwitcher.
+        setUser(prev => prev ? { ...prev, role: type } : {
+            id: `demo-${type}`,
+            name: type.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase()),
+            email: `${type}@demo.softomedia.com`,
+            role: type,
+            linked_entity_id: `entity-${type}`
+        });
+
         setPersonaState(type);
     };
 
