@@ -1,21 +1,55 @@
+/**
+ * App.jsx — Route table
+ *
+ * ARCHITECTURE RULE (read before editing):
+ * Every lazy import here MUST correspond to a real file on disk.
+ * Before adding a route, verify the file exists in the repo.
+ * See docs/SofiensBullshit.md for the full prevention plan.
+ *
+ * Verified file map (as of 2026-05-25 commit 230c2cb):
+ *
+ *   layouts/DashboardLayout.jsx          ✅
+ *   pages/Login.jsx                      ✅
+ *   pages/Player.jsx                     ✅
+ *   pages/LoopDemoPlayer.jsx             ✅
+ *   pages/NotFound.jsx                   ✅
+ *   pages/Health.jsx                     ✅
+ *   pages/admin/Overview.jsx             ✅
+ *   pages/admin/RetailerManagement.jsx   ✅
+ *   pages/admin/AdvertiserManagement.jsx ✅
+ *   pages/admin/ScreenManagement.jsx     ✅
+ *   pages/admin/LoopManagement.jsx       ✅
+ *   pages/admin/UserManagement.jsx       ✅
+ *   pages/admin/BusinessHoursManagement.jsx ✅
+ *   pages/admin/NetworkMap.jsx           ✅
+ *   pages/admin/AILog.jsx                ✅
+ *   pages/brand/BrandDashboard.jsx       ✅
+ *   pages/brand/BrandCampaignWizard.jsx  ✅
+ *   pages/retailer/RetailerDashboard.jsx ✅
+ *   pages/retailer/ScheduleCalendar.jsx  ✅
+ *
+ *   pages/tickets/TicketDashboard.jsx    ❌ NOT ON DISK — route omitted
+ *   pages/tickets/TicketDetail.jsx       ❌ NOT ON DISK — route omitted
+ *   pages/admin/PricingManagement.jsx    ❌ NOT ON DISK — route omitted
+ *   pages/retailer/Loops.jsx             ❌ NOT ON DISK — route omitted
+ */
+
 import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import NetworkErrorBanner from './components/NetworkErrorBanner';
 import NotFound from './pages/NotFound';
 
-// ─── Layout shell ────────────────────────────────────────────────────────────
-// IMPORTANT: the layout lives at layouts/DashboardLayout.jsx, NOT pages/Dashboard.
-// Do NOT change this back to './pages/Dashboard' — that file does not exist and
-// will cause the Vite production build to fail with "Could not resolve" error.
+// ── Layout shell ──────────────────────────────────────────────────────────────
 const Dashboard = lazy(() => import('./layouts/DashboardLayout'));
 
-// ─── Top-level pages ─────────────────────────────────────────────────────────
+// ── Top-level pages ───────────────────────────────────────────────────────────
 const Player         = lazy(() => import('./pages/Player'));
 const LoopDemoPlayer = lazy(() => import('./pages/LoopDemoPlayer'));
 const Login          = lazy(() => import('./pages/Login'));
+const Health         = lazy(() => import('./pages/Health'));
 
-// ─── Admin pages ─────────────────────────────────────────────────────────────
+// ── Admin pages ───────────────────────────────────────────────────────────────
 const AdminOverview           = lazy(() => import('./pages/admin/Overview'));
 const RetailerManagement      = lazy(() => import('./pages/admin/RetailerManagement'));
 const AdvertiserManagement    = lazy(() => import('./pages/admin/AdvertiserManagement'));
@@ -25,31 +59,21 @@ const UserManagement          = lazy(() => import('./pages/admin/UserManagement'
 const BusinessHoursManagement = lazy(() => import('./pages/admin/BusinessHoursManagement'));
 const NetworkMap              = lazy(() => import('./pages/admin/NetworkMap'));
 const AILog                   = lazy(() => import('./pages/admin/AILog'));
-const Health                  = lazy(() => import('./pages/Health'));
 
-// ─── Brand pages ─────────────────────────────────────────────────────────────
+// ── Brand pages ───────────────────────────────────────────────────────────────
 const BrandOverview  = lazy(() => import('./pages/brand/BrandDashboard'));
 const CampaignWizard = lazy(() => import('./pages/brand/BrandCampaignWizard'));
 
-// ─── Retailer pages ──────────────────────────────────────────────────────────
+// ── Retailer pages ────────────────────────────────────────────────────────────
 const RetailerOverview = lazy(() => import('./pages/retailer/RetailerDashboard'));
-const RetailerSchedule = lazy(() => import('./pages/retailer/ScheduleCalendar'));
-
-// ─── Ticket / support pages ──────────────────────────────────────────────────
-// NOTE: pages/tickets/ was added in sprint-4 commit 5c680924 but was NOT
-// present in the May 16 "new main release" reset. These routes are registered
-// here so the router is ready; if the files are absent Vite will error —
-// restore from branch sprint-4-ticket-support-system if needed.
-const TicketDashboard = lazy(() => import('./pages/tickets/TicketDashboard'));
-const TicketDetail    = lazy(() => import('./pages/tickets/TicketDetail'));
+const ScheduleCalendar = lazy(() => import('./pages/retailer/ScheduleCalendar'));
 
 function App() {
     return (
         <Router>
             <AuthProvider>
-                {/* Global network-error banner — listens for api:network-error events
-                    fired by api.js when all retries are exhausted (Wi-Fi off / no connection).
-                    Rendered outside <Suspense> so it stays visible even while a page is loading. */}
+                {/* Global network-error banner — outside Suspense so it survives
+                    page loading states. Listens for api:network-error events. */}
                 <NetworkErrorBanner />
                 <Suspense fallback={
                     <div className="h-screen w-screen flex items-center justify-center bg-slate-50 dark:bg-background-dark">
@@ -57,12 +81,12 @@ function App() {
                     </div>
                 }>
                     <Routes>
-                        {/* Public / standalone routes */}
+                        {/* ── Public / standalone ── */}
                         <Route path="/player"      element={<Player />} />
                         <Route path="/player/demo" element={<LoopDemoPlayer />} />
                         <Route path="/login"       element={<Login />} />
 
-                        {/* Dashboard shell — all sub-routes render into its <Outlet> */}
+                        {/* ── Dashboard shell ── */}
                         <Route path="/dashboard" element={<Dashboard />}>
                             <Route index element={<Navigate to="admin" replace />} />
 
@@ -83,14 +107,10 @@ function App() {
 
                             {/* Retailer */}
                             <Route path="retailer"          element={<RetailerOverview />} />
-                            <Route path="retailer/schedule" element={<RetailerSchedule />} />
+                            <Route path="retailer/schedule" element={<ScheduleCalendar />} />
 
                             {/* Health */}
                             <Route path="health" element={<Health />} />
-
-                            {/* Tickets — requires pages/tickets/ to exist on disk */}
-                            <Route path="tickets"     element={<TicketDashboard />} />
-                            <Route path="tickets/:id" element={<TicketDetail />} />
 
                             {/* Catch-all for unknown /dashboard/* paths */}
                             <Route path="*" element={<NotFound />} />
@@ -99,7 +119,7 @@ function App() {
                         {/* Root redirect */}
                         <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-                        {/* Catch-all for completely unknown top-level paths */}
+                        {/* Catch-all for unknown top-level paths */}
                         <Route path="*" element={<NotFound />} />
                     </Routes>
                 </Suspense>
