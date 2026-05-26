@@ -6,15 +6,17 @@ const PersonaSwitcher = () => {
     const navigate = useNavigate();
 
     const personas = [
-        { id: 'admin', label: 'Super Admin', icon: 'shield_person', color: 'bg-red-600' },
-        { id: 'brand', label: 'Brand', icon: 'campaign', color: 'bg-primary' },
-        { id: 'retailer', label: 'Retailer', icon: 'storefront', color: 'bg-emerald-500' },
-        { id: 'tech', label: 'Tech Op', icon: 'build', color: 'bg-slate-600' }
+        { id: 'super_admin', label: 'Super Admin', icon: 'shield_person', color: 'bg-red-600'      },
+        { id: 'brand',       label: 'Brand',       icon: 'campaign',      color: 'bg-primary'      },
+        { id: 'retailer',    label: 'Retailer',    icon: 'storefront',    color: 'bg-emerald-500'  },
+        { id: 'tech',        label: 'Tech Op',     icon: 'build',         color: 'bg-slate-600'    },
     ];
 
     const handleSwitch = (p) => {
         setPersona(p.id);
-        navigate(`/dashboard/${p.id}`);
+        // super_admin shares /dashboard/admin — mirrors DashboardLayout normalisation
+        const routeTarget = p.id === 'super_admin' ? 'admin' : p.id;
+        navigate(`/dashboard/${routeTarget}`);
     };
 
     return (
@@ -25,10 +27,11 @@ const PersonaSwitcher = () => {
                     onClick={() => handleSwitch(p)}
                     data-testid={`persona-${p.id}`}
                     aria-label={`${p.label} View`}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-semibold transition-all ${persona === p.id
-                        ? `${p.color} text-white shadow-sm shadow-blue-500/30`
-                        : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white dark:hover:bg-slate-700'
-                        }`}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-semibold transition-all ${
+                        persona === p.id
+                            ? `${p.color} text-white shadow-sm shadow-blue-500/30`
+                            : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white dark:hover:bg-slate-700'
+                    }`}
                 >
                     <span className="material-symbols-outlined text-[18px]" aria-hidden="true">{p.icon}</span>
                     <span className="hidden sm:inline">{p.label}</span>
