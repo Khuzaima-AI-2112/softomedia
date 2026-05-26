@@ -15,18 +15,12 @@ function HamburgerMenu() {
     const navigate = useNavigate();
 
     const navItems = [
-        { label: 'Dashboard', path: '/dashboard/admin', icon: 'dashboard' },
-        { label: 'Demo Player', path: '/player/demo', icon: 'slideshow' },
-        { label: 'Health', path: '/dashboard/health', icon: 'monitor_heart' },
+        { label: 'Dashboard',   path: '/dashboard/admin', icon: 'dashboard'      },
+        { label: 'Demo Player', path: '/player/demo',     icon: 'slideshow'      },
+        { label: 'Health',      path: '/dashboard/health',icon: 'monitor_heart'  },
         ...(user?.role === 'brand' ? [
             { label: 'New Campaign', path: '/dashboard/brand/campaign/new', icon: 'add_circle' }
         ] : []),
-        // Settings removed — no /dashboard/settings route exists yet.
-        // Add back once the Settings page is built.
-    ];
-
-    const personaSwatches = [
-        ...personaSwatchDefs,
     ];
 
     const switchPersona = (swatch) => {
@@ -54,12 +48,15 @@ function HamburgerMenu() {
             </button>
 
             {isOpen && (
-                <div className="fixed inset-0 z-50 flex">
+                // z-[100] keeps the drawer above the sticky header (z-50)
+                <div className="fixed inset-0 z-[100] flex">
+                    {/* Backdrop */}
                     <div
                         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
                         onClick={() => setIsOpen(false)}
                     />
-                    <div className="relative ml-auto w-72 h-full bg-white dark:bg-slate-900 shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+                    {/* Left-side drawer */}
+                    <div className="relative w-72 h-full bg-white dark:bg-slate-900 shadow-2xl flex flex-col animate-in slide-in-from-left duration-200">
                         <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
                             <span className="font-bold text-slate-900 dark:text-white">Menu</span>
                             <button
@@ -89,7 +86,7 @@ function HamburgerMenu() {
                         <div className="p-4 border-t border-slate-200 dark:border-slate-700">
                             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Switch Demo Role</p>
                             <div className="grid grid-cols-2 gap-2">
-                                {personaSwatches.map(swatch => (
+                                {personaSwatchDefs.map(swatch => (
                                     <button
                                         key={swatch.role}
                                         onClick={() => switchPersona(swatch)}
