@@ -59,10 +59,22 @@
       <span class="material-symbols-outlined text-primary text-[22px]">menu_open</span>
       <span class="font-bold text-slate-900 dark:text-white text-sm">Hamburger · Variant Lab</span>
     </div>
-    <!-- dark mode toggle -->
-    <button id="theme-toggle" aria-label="Toggle dark mode" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500">
-      <span class="material-symbols-outlined text-[20px]">dark_mode</span>
-    </button>
+    <div class="flex items-center gap-2">
+      <!-- Open App link -->
+      <a
+        href="https://client-app-524693967756.us-central1.run.app/dashboard/admin"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-primary border border-primary/30 hover:bg-primary/5 transition-colors"
+      >
+        <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+        Open App
+      </a>
+      <!-- dark mode toggle -->
+      <button id="theme-toggle" aria-label="Toggle dark mode" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500">
+        <span class="material-symbols-outlined text-[20px]">dark_mode</span>
+      </button>
+    </div>
   </header>
 
   <!-- Variant cards -->
@@ -131,6 +143,9 @@
     <span class="font-bold text-slate-900 dark:text-white text-sm">AdManager</span>
     <div class="ml-auto flex items-center gap-2">
       <span class="text-xs text-slate-400">Variant A</span>
+      <a href="https://client-app-524693967756.us-central1.run.app/dashboard/admin" target="_blank" rel="noopener noreferrer" class="flex items-center gap-1 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400 text-xs">
+        <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+      </a>
       <button onclick="backToHub()" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400 text-xs flex items-center gap-1">
         <span class="material-symbols-outlined text-[16px]">arrow_back</span> Hub
       </button>
@@ -207,6 +222,9 @@
     <span class="font-bold text-slate-900 dark:text-white text-sm">AdManager</span>
     <div class="ml-auto flex items-center gap-2">
       <span class="text-xs text-slate-400">Variant B</span>
+      <a href="https://client-app-524693967756.us-central1.run.app/dashboard/admin" target="_blank" rel="noopener noreferrer" class="flex items-center gap-1 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400">
+        <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+      </a>
       <button onclick="backToHub()" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400 text-xs flex items-center gap-1">
         <span class="material-symbols-outlined text-[16px]">arrow_back</span> Hub
       </button>
@@ -276,6 +294,9 @@
     <span class="font-bold text-slate-900 dark:text-white text-sm">AdManager</span>
     <div class="ml-auto flex items-center gap-3">
       <span class="text-xs text-slate-400">Variant C</span>
+      <a href="https://client-app-524693967756.us-central1.run.app/dashboard/admin" target="_blank" rel="noopener noreferrer" class="flex items-center gap-1 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400">
+        <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+      </a>
       <button onclick="backToHub()" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400 text-xs flex items-center gap-1">
         <span class="material-symbols-outlined text-[16px]">arrow_back</span> Hub
       </button>
@@ -355,6 +376,9 @@
     <span class="font-bold text-slate-900 dark:text-white text-sm">AdManager</span>
     <div class="ml-auto flex items-center gap-2">
       <span class="text-xs text-slate-400">Variant D</span>
+      <a href="https://client-app-524693967756.us-central1.run.app/dashboard/admin" target="_blank" rel="noopener noreferrer" class="flex items-center gap-1 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400">
+        <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+      </a>
       <button onclick="backToHub()" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400 text-xs flex items-center gap-1">
         <span class="material-symbols-outlined text-[16px]">arrow_back</span> Hub
       </button>
@@ -500,12 +524,10 @@
     document.getElementById('hub').style.display = 'none';
     document.querySelectorAll('.variant-frame').forEach(f => f.classList.remove('active'));
     document.getElementById('frame-' + v).classList.add('active');
-    // apply dark class carried over from hub theme
     syncDark();
   }
 
   function backToHub() {
-    // Close any open drawers/sheets
     ['A','C','D'].forEach(v => {
       const d = document.getElementById('drawer-' + v);
       if (d) d.classList.add('hidden');
