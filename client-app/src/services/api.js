@@ -128,7 +128,6 @@ class APIClient {
                     await sleep(this.config.retryDelay * attempt);
                     return this.request(endpoint, options, attempt + 1);
                 }
-                // Emit global event so NetworkErrorBanner can react
                 window.dispatchEvent(new CustomEvent('api:network-error'));
                 throw new APIError('Network error', 0, null);
             }
@@ -174,29 +173,30 @@ class APIClient {
 const apiClient = new APIClient();
 
 // ---------------------------------------------------------------------------
-// Auth interceptor
-// ---------------------------------------------------------------------------
-// The server's auth middleware accepts `Bearer demo-token` when
-// ALLOW_DEMO_MODE=true OR NODE_ENV !== 'production'.
-// The client must send this token + an x-demo-role header so that
-// protected routes (/api/users, /api/monitoring, etc.) don't return 401.
+// Phase 2 – Secure demo token seeding
 //
-// Token seeding: pre-seed `demo-token` in DEV only so the app works
-// immediately after a fresh page load without requiring a login.
-// In production builds this block is stripped entirely — no credentials
-// are ever auto-injected for real users.
+// BEFORE: demo-token + role='superadmin' were seeded unconditionally in DEV,
+//         meaning any DEV page load silently gained super-admin API access.
+//
+// AFTER:
+//   • Token seeding is still DEV-only (import.meta.env.DEV guard kept).
+//   • The auto-seeded role is 'admin' (not 'superadmin').
+//   • Elevating to 'superadmin' requires the user to explicitly switch persona
+//     via the HamburgerMenu (which calls login() with the chosen role) — there
+//     is no longer a silent path to superadmin on page load.
 // ---------------------------------------------------------------------------
 if (import.meta.env.DEV) {
     if (!localStorage.getItem('auth_token')) {
         localStorage.setItem('auth_token', 'demo-token');
     }
+    // Phase 2: default demo role is 'admin', NOT 'superadmin'
     if (!localStorage.getItem('demo_role')) {
-        localStorage.setItem('demo_role', 'superadmin');
+        localStorage.setItem('demo_role', 'admin');
     }
 }
 
 apiClient.addRequestInterceptor((url, options) => {
-    const token = localStorage.getItem('auth_token');
+    const token    = localStorage.getItem('auth_token');
     const demoRole = localStorage.getItem('demo_role') || localStorage.getItem('active_persona');
 
     if (token) {

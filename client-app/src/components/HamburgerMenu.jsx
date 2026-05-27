@@ -2,14 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
-// All demo roles available in the drawer persona switcher.
-// route: the actual /dashboard/<route> path to navigate to after switch.
+// Phase 1: role strings normalised to canonical values.
+// 'super_admin' → 'superadmin'  (matches server ROLE_HIERARCHY)
 const PERSONA_SWATCHES = [
-    { label: 'Super Admin', role: 'super_admin', color: 'bg-purple-500', route: 'admin'    },
+    { label: 'Super Admin', role: 'superadmin', color: 'bg-purple-500', route: 'admin'    },
     { label: 'Admin',       role: 'admin',       color: 'bg-blue-500',   route: 'admin'    },
-    { label: 'Brand',       role: 'brand',       color: 'bg-rose-500',   route: 'brand'    },
-    { label: 'Retailer',    role: 'retailer',    color: 'bg-amber-500',  route: 'retailer' },
-    { label: 'Tech Op',     role: 'tech',        color: 'bg-slate-500',  route: 'admin'    },
+    { label: 'Brand',       role: 'advertiser',  color: 'bg-rose-500',   route: 'brand'    },
+    { label: 'Retailer',    role: 'retaileradmin', color: 'bg-amber-500', route: 'retailer' },
+    { label: 'Tech Op',     role: 'techoperator', color: 'bg-slate-500', route: 'admin'    },
 ];
 
 function HamburgerMenu() {
@@ -19,7 +19,6 @@ function HamburgerMenu() {
 
     const close = useCallback(() => setIsOpen(false), []);
 
-    // Close on Escape key
     useEffect(() => {
         if (!isOpen) return;
         const onKey = (e) => { if (e.key === 'Escape') close(); };
@@ -27,7 +26,6 @@ function HamburgerMenu() {
         return () => window.removeEventListener('keydown', onKey);
     }, [isOpen, close]);
 
-    // Prevent body scroll while drawer is open
     useEffect(() => {
         document.body.style.overflow = isOpen ? 'hidden' : '';
         return () => { document.body.style.overflow = ''; };
@@ -37,7 +35,7 @@ function HamburgerMenu() {
         { label: 'Dashboard',   path: '/dashboard/admin',               icon: 'dashboard'     },
         { label: 'Demo Player', path: '/player/demo',                   icon: 'slideshow'     },
         { label: 'Health',      path: '/dashboard/health',              icon: 'monitor_heart' },
-        ...(user?.role === 'brand' ? [
+        ...(user?.role === 'advertiser' ? [
             { label: 'New Campaign', path: '/dashboard/brand/campaign/new', icon: 'add_circle' }
         ] : []),
     ];
@@ -50,6 +48,8 @@ function HamburgerMenu() {
             role: swatch.role,
             linked_entity_id: `entity-${swatch.role}`
         };
+        // Phase 2: explicitly set demo_role so the API interceptor
+        // sends the correct x-demo-role header after persona switch
         localStorage.setItem('demo_role', swatch.role);
         login(mockUser, 'demo-token');
         close();
@@ -72,17 +72,6 @@ function HamburgerMenu() {
             </button>
 
             {isOpen && (
-                /*
-                 * Overlay + drawer
-                 * z-[100] sits above the sticky header (z-50).
-                 * The drawer is a flex column:
-                 *   - header  → flex-shrink-0  (never compresses)
-                 *   - nav     → flex-1 min-h-0 overflow-y-auto  (scrolls when needed)
-                 *   - roles   → flex-shrink-0  (never compresses)
-                 *   - footer  → flex-shrink-0  (never compresses)
-                 * This is the standard pattern to prevent bottom sections
-                 * being squished on short viewports.
-                 */
                 <div
                     className="fixed inset-0 z-[100] flex"
                     role="dialog"
@@ -90,17 +79,15 @@ function HamburgerMenu() {
                     aria-label="Navigation menu"
                     id="hamburger-drawer"
                 >
-                    {/* Backdrop */}
                     <div
                         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
                         onClick={close}
                         aria-hidden="true"
                     />
 
-                    {/* Drawer panel — left side */}
                     <div className="relative flex flex-col w-72 h-full bg-white dark:bg-slate-900 shadow-2xl animate-in slide-in-from-left duration-200">
 
-                        {/* ── Header (flex-shrink-0) ── */}
+                        {/* Header */}
                         <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700">
                             <div className="flex items-center gap-2">
                                 <span className="material-symbols-outlined text-primary text-[22px]" aria-hidden="true">campaign</span>
@@ -115,7 +102,7 @@ function HamburgerMenu() {
                             </button>
                         </div>
 
-                        {/* ── Nav links (flex-1, scrollable) ── */}
+                        {/* Nav links */}
                         <nav
                             className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-0.5"
                             aria-label="Main navigation"
@@ -133,7 +120,7 @@ function HamburgerMenu() {
                             ))}
                         </nav>
 
-                        {/* ── Role switcher (flex-shrink-0) ── */}
+                        {/* Role switcher */}
                         <div className="flex-shrink-0 px-4 py-4 border-t border-slate-200 dark:border-slate-700">
                             <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">Switch Demo Role</p>
                             <div className="grid grid-cols-2 gap-1.5">
@@ -158,7 +145,7 @@ function HamburgerMenu() {
                             </div>
                         </div>
 
-                        {/* ── User footer (flex-shrink-0) ── */}
+                        {/* User footer */}
                         {user && (
                             <div className="flex-shrink-0 px-4 py-4 border-t border-slate-200 dark:border-slate-700">
                                 <div className="flex items-center gap-3 mb-3">
