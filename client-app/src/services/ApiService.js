@@ -215,20 +215,31 @@ class ApiService {
     // BUSINESS HOURS
     // ============================================
 
+    /**
+     * Weekly hours for a store.
+     * Backend contract (stores.js):
+     *   GET  /api/stores/:id/weekly-hours
+     *   PUT  /api/stores/:id/weekly-hours { weekly_hours: { mon: {...}, ... } }
+     *   GET  /api/stores/:id/special-hours
+     *   PUT  /api/stores/:id/special-hours { date, ...hours }
+     */
     async getWeeklyHours(storeId) {
-        return apiClient.get(`/api/stores/${storeId}/hours`);
+        return apiClient.get(`/api/stores/${storeId}/weekly-hours`);
     }
 
-    async updateWeeklyHours(storeId, data) {
-        return apiClient.put(`/api/stores/${storeId}/hours`, data);
+    async updateWeeklyHours(storeId, weeklyHours) {
+        return apiClient.put(`/api/stores/${storeId}/weekly-hours`, {
+            weekly_hours: weeklyHours,
+        });
     }
 
     async listSpecialHours(storeId) {
-        return apiClient.get(`/api/stores/${storeId}/hours/special`);
+        return apiClient.get(`/api/stores/${storeId}/special-hours`);
     }
 
-    async updateSpecialHours(storeId, date, data) {
-        return apiClient.put(`/api/stores/${storeId}/hours/special/${date}`, data);
+    async updateSpecialHours(storeId, payload) {
+        // payload should contain at least { date, ...hours }
+        return apiClient.put(`/api/stores/${storeId}/special-hours`, payload);
     }
 
     // ============================================
