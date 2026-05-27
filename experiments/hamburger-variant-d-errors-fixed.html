@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hamburger Variant D — Left Hand, Errors Fixed</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Satoshi', sans-serif; }
+    .material-symbols-outlined {
+      font-family: 'Material Symbols Outlined';
+      font-weight: normal; font-style: normal; font-size: 24px;
+      line-height: 1; letter-spacing: normal; text-transform: none;
+      display: inline-block; white-space: nowrap; word-wrap: normal;
+      direction: ltr; -webkit-font-smoothing: antialiased;
+    }
+    /*
+     * FIX 1: Animation must re-trigger on every open.
+     * Variant A keeps the panel in the DOM, so the @keyframes only fires
+     * once. Fix: remove + re-add the class so the browser restarts the animation.
+     * The JS below handles this via data-animate attribute swap.
+     */
+    @keyframes slide-in-from-left {
+      from { transform: translateX(-100%); }
+      to   { transform: translateX(0); }
+    }
+    [data-animate="slide-left"] {
+      animation: slide-in-from-left 200ms cubic-bezier(0.16,1,0.3,1) both;
+    }
+    /*
+     * FIX 2: Respect prefers-reduced-motion (Variant A ignores it entirely).
+     */
+    @media (prefers-reduced-motion: reduce) {
+      [data-animate="slide-left"] { animation: none; }
+    }
+  </style>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { colors: { primary: '#01696f' } } }
+    }
+  </script>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 min-h-full">
+
+  <!-- Variant label -->
+  <div class="fixed top-0 right-0 z-[200] bg-violet-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">Variant D — Errors Fixed</div>
+
+  <!-- Sticky Header -->
+  <header class="sticky top-0 z-50 flex items-center gap-2 px-4 h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 shadow-sm">
+    <!--
+      FIX 3: In Variant A the trigger sits BEFORE the logo div, but both are
+      bare children of the flex header so the trigger ends up visually
+      before the logo — correct. However aria-controls pointed to an id
+      that only exists after the <header> (in the overlay div). This is
+      fine per spec, but the aria-expanded state was only set on open, never
+      synced on backdrop/Escape close. Fixed below in JS.
+    -->
+    <button
+      id="triggerD"
+      aria-label="Open navigation menu"
+      aria-expanded="false"
+      aria-controls="drawerD"
+      class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors
+             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#01696f]"
+    >
+      <span class="material-symbols-outlined" style="font-size:22px" aria-hidden="true">menu</span>
+    </button>
+
+    <div class="flex items-center gap-2">
+      <svg aria-label="Softomedia" viewBox="0 0 28 28" fill="none" width="28" height="28">
+        <rect width="28" height="28" rx="6" fill="#01696f"/>
+        <path d="M7 10h14M7 14h10M7 18h12" stroke="white" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <span class="font-bold text-slate-900 dark:text-white text-sm">AdManager</span>
+    </div>
+    <div class="flex-1"></div>
+    <button id="themeToggleD" aria-label="Toggle dark mode"
+      class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+      <span class="material-symbols-outlined" style="font-size:20px">dark_mode</span>
+    </button>
+  </header>
+
+  <!-- Page content -->
+  <main id="mainD" class="p-8 max-w-2xl mx-auto">
+    <h1 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Variant D — Errors Fixed</h1>
+    <p class="text-slate-500 dark:text-slate-400 text-sm mb-4">Same left-hand drawer as Variant A with the following bugs resolved:</p>
+    <ul class="text-sm text-slate-600 dark:text-slate-400 space-y-2 mb-6 list-none">
+      <li class="flex gap-2"><span class="text-[#01696f] font-bold mt-0.5">✓</span><span><strong class="text-slate-800 dark:text-slate-200">Body scroll lock</strong> — <code class="bg-slate-100 dark:bg-slate-800 px-1 rounded text-xs">overflow:hidden</code> applied to <code class="bg-slate-100 dark:bg-slate-800 px-1 rounded text-xs">&lt;body&gt;</code> while open; restored on close.</span></li>
+      <li class="flex gap-2"><span class="text-[#01696f] font-bold mt-0.5">✓</span><span><strong class="text-slate-800 dark:text-slate-200">Animation re-fires every open</strong> — class is stripped and re-added so <code class="bg-slate-100 dark:bg-slate-800 px-1 rounded text-xs">@keyframes</code> restarts each time.</span></li>
+      <li class="flex gap-2"><span class="text-[#01696f] font-bold mt-0.5">✓</span><span><strong class="text-slate-800 dark:text-slate-200">aria-expanded synced on all close paths</strong> — backdrop click, Escape key, and close button all call the same <code class="bg-slate-100 dark:bg-slate-800 px-1 rounded text-xs">close()</code> which updates the trigger attribute.</span></li>
+      <li class="flex gap-2"><span class="text-[#01696f] font-bold mt-0.5">✓</span><span><strong class="text-slate-800 dark:text-slate-200">Tech Op col-span orphan</strong> — 5th swatch used <code class="bg-slate-100 dark:bg-slate-800 px-1 rounded text-xs">col-span-2</code> making it full-width and visually misaligned. Switched swatch grid to <code class="bg-slate-100 dark:bg-slate-800 px-1 rounded text-xs">grid-cols-3</code> so all 5 fit evenly (2+2+1 → 3+2).</span></li>
+      <li class="flex gap-2"><span class="text-[#01696f] font-bold mt-0.5">✓</span><span><strong class="text-slate-800 dark:text-slate-200">Focus trap</strong> — Tab key cycles only within the open drawer; Shift+Tab wraps correctly.</span></li>
+      <li class="flex gap-2"><span class="text-[#01696f] font-bold mt-0.5">✓</span><span><strong class="text-slate-800 dark:text-slate-200">Focus returns to trigger</strong> — on close, focus is programmatically returned to the hamburger button.</span></li>
+      <li class="flex gap-2"><span class="text-[#01696f] font-bold mt-0.5">✓</span><span><strong class="text-slate-800 dark:text-slate-200">prefers-reduced-motion</strong> — slide animation is skipped for users with reduced motion enabled.</span></li>
+      <li class="flex gap-2"><span class="text-[#01696f] font-bold mt-0.5">✓</span><span><strong class="text-slate-800 dark:text-slate-200">Active nav link highlight</strong> — current page link gets <code class="bg-slate-100 dark:bg-slate-800 px-1 rounded text-xs">bg-slate-100 text-slate-900 font-semibold</code> state.</span></li>
+    </ul>
+    <div class="grid gap-3">
+      <div class="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/60 dark:border-slate-700/60 shadow-sm">
+        <div class="h-3 w-2/3 bg-slate-200 dark:bg-slate-700 rounded mb-2"></div>
+        <div class="h-3 w-1/2 bg-slate-100 dark:bg-slate-800 rounded"></div>
+      </div>
+      <div class="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/60 dark:border-slate-700/60 shadow-sm">
+        <div class="h-3 w-3/4 bg-slate-200 dark:bg-slate-700 rounded mb-2"></div>
+        <div class="h-3 w-1/3 bg-slate-100 dark:bg-slate-800 rounded"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Drawer overlay -->
+  <div
+    id="drawerD"
+    class="fixed inset-0 z-[100] flex hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Navigation menu"
+  >
+    <!-- Backdrop -->
+    <div id="backdropD" class="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true"></div>
+
+    <!-- Drawer panel -->
+    <div id="panelD" class="relative flex flex-col w-72 h-full bg-white dark:bg-slate-900 shadow-2xl">
+
+      <!-- Header -->
+      <div class="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-[#01696f] text-[22px]" aria-hidden="true">campaign</span>
+          <span class="font-bold text-slate-900 dark:text-white">AdManager</span>
+        </div>
+        <button
+          id="closeD"
+          aria-label="Close menu"
+          class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors
+                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#01696f]"
+        >
+          <span class="material-symbols-outlined text-[20px]" aria-hidden="true">close</span>
+        </button>
+      </div>
+
+      <!-- Nav links -->
+      <nav class="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-0.5" aria-label="Main navigation">
+        <!-- FIX: active link highlighted -->
+        <a href="#" aria-current="page"
+          class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold
+                 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white transition-colors">
+          <span class="material-symbols-outlined text-[20px] text-[#01696f]" aria-hidden="true">dashboard</span>Dashboard
+        </a>
+        <a href="#"
+          class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <span class="material-symbols-outlined text-[20px] text-slate-400" aria-hidden="true">slideshow</span>Demo Player
+        </a>
+        <a href="#"
+          class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <span class="material-symbols-outlined text-[20px] text-slate-400" aria-hidden="true">monitor_heart</span>Health
+        </a>
+      </nav>
+
+      <!-- Role switcher — FIX: grid-cols-3 so 5 swatches fit without orphan -->
+      <div class="flex-shrink-0 px-4 py-4 border-t border-slate-200 dark:border-slate-700">
+        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">Switch Demo Role</p>
+        <div class="grid grid-cols-3 gap-1.5">
+          <button class="flex items-center gap-1.5 px-2 py-2 rounded-lg text-xs font-medium
+            bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white
+            ring-1 ring-slate-300 dark:ring-slate-600 transition-colors col-span-1">
+            <span class="size-2 rounded-full flex-shrink-0 bg-purple-500" aria-hidden="true"></span>
+            <span class="truncate">Super Admin</span>
+          </button>
+          <button class="flex items-center gap-1.5 px-2 py-2 rounded-lg text-xs font-medium
+            text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+            <span class="size-2 rounded-full flex-shrink-0 bg-blue-500" aria-hidden="true"></span>
+            <span class="truncate">Admin</span>
+          </button>
+          <button class="flex items-center gap-1.5 px-2 py-2 rounded-lg text-xs font-medium
+            text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+            <span class="size-2 rounded-full flex-shrink-0 bg-rose-500" aria-hidden="true"></span>
+            <span class="truncate">Brand</span>
+          </button>
+          <button class="flex items-center gap-1.5 px-2 py-2 rounded-lg text-xs font-medium
+            text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+            <span class="size-2 rounded-full flex-shrink-0 bg-amber-500" aria-hidden="true"></span>
+            <span class="truncate">Retailer</span>
+          </button>
+          <button class="flex items-center gap-1.5 px-2 py-2 rounded-lg text-xs font-medium
+            text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+            <span class="size-2 rounded-full flex-shrink-0 bg-slate-500" aria-hidden="true"></span>
+            <span class="truncate">Tech Op</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- User footer -->
+      <div class="flex-shrink-0 px-4 py-4 border-t border-slate-200 dark:border-slate-700">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="size-8 rounded-full bg-[#01696f] flex-shrink-0 flex items-center justify-center text-white text-sm font-bold">S</div>
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-slate-900 dark:text-white truncate">Super Admin</p>
+            <p class="text-xs text-slate-400 truncate">super_admin@demo.softomedia.com</p>
+          </div>
+        </div>
+        <button
+          class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
+                 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+          <span class="material-symbols-outlined text-[18px]" aria-hidden="true">logout</span>Log out
+        </button>
+      </div>
+    </div><!-- /panel -->
+  </div><!-- /overlay -->
+
+  <script>
+    const trigger  = document.getElementById('triggerD');
+    const overlay  = document.getElementById('drawerD');
+    const panel    = document.getElementById('panelD');
+    const backdrop = document.getElementById('backdropD');
+    const closeBtn = document.getElementById('closeD');
+    const themeBtn = document.getElementById('themeToggleD');
+
+    // FIX: collect all focusable elements inside the panel for focus trap
+    function getFocusable() {
+      return Array.from(panel.querySelectorAll(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      ));
+    }
+
+    // FIX: animation re-triggers every open by removing/re-adding data-animate
+    function triggerAnimation() {
+      panel.removeAttribute('data-animate');
+      // Force reflow so browser registers the removal
+      void panel.offsetWidth;
+      panel.setAttribute('data-animate', 'slide-left');
+    }
+
+    const open = () => {
+      overlay.classList.remove('hidden');
+      trigger.setAttribute('aria-expanded', 'true');
+      // FIX: body scroll lock
+      document.body.style.overflow = 'hidden';
+      triggerAnimation();
+      // Move focus into drawer
+      const focusable = getFocusable();
+      if (focusable.length) focusable[0].focus();
+    };
+
+    const close = () => {
+      overlay.classList.add('hidden');
+      // FIX: aria-expanded synced on ALL close paths
+      trigger.setAttribute('aria-expanded', 'false');
+      // FIX: restore body scroll
+      document.body.style.overflow = '';
+      // FIX: return focus to trigger
+      trigger.focus();
+    };
+
+    trigger.addEventListener('click', open);
+    closeBtn.addEventListener('click', close);
+    backdrop.addEventListener('click', close);
+
+    window.addEventListener('keydown', (e) => {
+      if (!overlay.classList.contains('hidden')) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          close();
+          return;
+        }
+        // FIX: focus trap
+        if (e.key === 'Tab') {
+          const focusable = getFocusable();
+          if (!focusable.length) return;
+          const first = focusable[0];
+          const last  = focusable[focusable.length - 1];
+          if (e.shiftKey) {
+            if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+          } else {
+            if (document.activeElement === last)  { e.preventDefault(); first.focus(); }
+          }
+        }
+      }
+    });
+
+    themeBtn.addEventListener('click', () => document.documentElement.classList.toggle('dark'));
+  </script>
+</body>
+</html>
