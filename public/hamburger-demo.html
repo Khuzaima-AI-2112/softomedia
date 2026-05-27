@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hamburger Menu · Variant Lab</title>
+
+  <!-- Tailwind v3 CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: '#01696f',
+          },
+          keyframes: {
+            'slide-from-left':  { from: { transform: 'translateX(-100%)' }, to: { transform: 'translateX(0)' } },
+            'slide-from-right': { from: { transform: 'translateX(100%)' },  to: { transform: 'translateX(0)' } },
+            'slide-from-top':   { from: { transform: 'translateY(-8px)', opacity:'0' }, to: { transform: 'translateY(0)', opacity:'1' } },
+            'fade-in':          { from: { opacity: '0' }, to: { opacity: '1' } },
+          },
+          animation: {
+            'slide-from-left':  'slide-from-left  200ms cubic-bezier(0.16,1,0.3,1) both',
+            'slide-from-right': 'slide-from-right 200ms cubic-bezier(0.16,1,0.3,1) both',
+            'slide-from-top':   'slide-from-top   180ms cubic-bezier(0.16,1,0.3,1) both',
+            'fade-in':          'fade-in          150ms ease both',
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Material Symbols -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  <!-- Satoshi -->
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet" />
+
+  <style>
+    body { font-family: 'Satoshi', sans-serif; }
+    .material-symbols-outlined { font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal; font-size: 24px; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; word-wrap: normal; direction: ltr; -webkit-font-feature-settings: 'liga'; -webkit-font-smoothing: antialiased; }
+    /* hide all variant frames, show only active */
+    .variant-frame { display: none; }
+    .variant-frame.active { display: flex; }
+  </style>
+</head>
+
+<body class="min-h-screen bg-slate-100 dark:bg-slate-950 transition-colors">
+
+<!-- ═══════════════════════════════════════════════════
+     HUB — variant selector
+═══════════════════════════════════════════════════ -->
+<div id="hub" class="min-h-screen flex flex-col">
+
+  <!-- Hub header -->
+  <header class="sticky top-0 z-10 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <span class="material-symbols-outlined text-primary text-[22px]">menu_open</span>
+      <span class="font-bold text-slate-900 dark:text-white text-sm">Hamburger · Variant Lab</span>
+    </div>
+    <!-- dark mode toggle -->
+    <button id="theme-toggle" aria-label="Toggle dark mode" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500">
+      <span class="material-symbols-outlined text-[20px]">dark_mode</span>
+    </button>
+  </header>
+
+  <!-- Variant cards -->
+  <main class="flex-1 p-8 max-w-3xl mx-auto w-full">
+    <h1 class="text-2xl font-bold text-slate-900 dark:text-white mb-1">Pick a variant to preview</h1>
+    <p class="text-sm text-slate-400 mb-8">All variants use real PERSONA_SWATCHES + NAV_ITEMS from <code class="bg-slate-100 dark:bg-slate-800 px-1 rounded text-xs">HamburgerMenu.jsx</code>.</p>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+      <!-- Card A -->
+      <button onclick="showVariant('A')" class="group text-left p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-primary/40 hover:shadow-lg transition-all">
+        <div class="flex items-center gap-3 mb-3">
+          <span class="material-symbols-outlined text-primary">dock_to_left</span>
+          <span class="font-semibold text-slate-900 dark:text-white">Variant A</span>
+          <span class="ml-auto text-[10px] font-semibold tracking-wide uppercase bg-primary/10 text-primary px-2 py-0.5 rounded-full">Current</span>
+        </div>
+        <p class="text-sm text-slate-500 dark:text-slate-400">Left slide-in drawer · <code class="text-xs">w-72</code> · 2-col swatch grid · production build</p>
+      </button>
+
+      <!-- Card B -->
+      <button onclick="showVariant('B')" class="group text-left p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-primary/40 hover:shadow-lg transition-all">
+        <div class="flex items-center gap-3 mb-3">
+          <span class="material-symbols-outlined text-primary">expand_more</span>
+          <span class="font-semibold text-slate-900 dark:text-white">Variant B</span>
+          <span class="ml-auto text-[10px] font-semibold tracking-wide uppercase bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">New</span>
+        </div>
+        <p class="text-sm text-slate-500 dark:text-slate-400">Compact top-sheet · drops below header · 3-col desktop grid layout</p>
+      </button>
+
+      <!-- Card C -->
+      <button onclick="showVariant('C')" class="group text-left p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-primary/40 hover:shadow-lg transition-all">
+        <div class="flex items-center gap-3 mb-3">
+          <span class="material-symbols-outlined text-primary">dock_to_right</span>
+          <span class="font-semibold text-slate-900 dark:text-white">Variant C</span>
+          <span class="ml-auto text-[10px] font-semibold tracking-wide uppercase bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">New</span>
+        </div>
+        <p class="text-sm text-slate-500 dark:text-slate-400">Right slide-in drawer · <code class="text-xs">w-80</code> · trigger right-aligned · single-col swatch list</p>
+      </button>
+
+      <!-- Card D -->
+      <button onclick="showVariant('D')" class="group text-left p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-primary/40 hover:shadow-lg transition-all">
+        <div class="flex items-center gap-3 mb-3">
+          <span class="material-symbols-outlined text-primary">dock_to_left</span>
+          <span class="font-semibold text-slate-900 dark:text-white">Variant D</span>
+          <span class="ml-auto text-[10px] font-semibold tracking-wide uppercase bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">New</span>
+        </div>
+        <p class="text-sm text-slate-500 dark:text-slate-400">Wide left drawer · <code class="text-xs">w-80</code> · single-col swatch list · ring avatar · bordered logout</p>
+      </button>
+
+    </div>
+  </main>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════
+     VARIANT A — current production left drawer
+═══════════════════════════════════════════════════ -->
+<div id="frame-A" class="variant-frame flex-col min-h-screen">
+
+  <!-- Mock app header -->
+  <header class="sticky top-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 h-14 flex items-center px-4 gap-3">
+    <!-- Trigger -->
+    <button id="a-trigger" onclick="openDrawer('A')" aria-label="Open navigation menu" aria-expanded="false" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+      <span class="material-symbols-outlined" aria-hidden="true">menu</span>
+    </button>
+    <span class="font-bold text-slate-900 dark:text-white text-sm">AdManager</span>
+    <div class="ml-auto flex items-center gap-2">
+      <span class="text-xs text-slate-400">Variant A</span>
+      <button onclick="backToHub()" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400 text-xs flex items-center gap-1">
+        <span class="material-symbols-outlined text-[16px]">arrow_back</span> Hub
+      </button>
+    </div>
+  </header>
+
+  <!-- Page body -->
+  <main class="flex-1 p-8 text-center">
+    <p class="text-slate-400 text-sm mt-16">Click the <strong class="text-slate-700 dark:text-slate-200">☰ menu</strong> button in the header to open the drawer.</p>
+  </main>
+
+  <!-- Drawer overlay -->
+  <div id="drawer-A" class="hidden fixed inset-0 z-[100] flex" role="dialog" aria-modal="true" aria-label="Navigation menu">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeDrawer('A')"></div>
+    <div class="relative flex flex-col w-72 h-full bg-white dark:bg-slate-900 shadow-2xl animate-slide-from-left">
+
+      <!-- Header -->
+      <div class="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary text-[22px]">campaign</span>
+          <span class="font-bold text-slate-900 dark:text-white">AdManager</span>
+        </div>
+        <button onclick="closeDrawer('A')" aria-label="Close menu" class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+
+      <!-- Nav -->
+      <nav class="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-0.5">
+        <a href="#" onclick="closeDrawer('A')" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <span class="material-symbols-outlined text-[20px] text-slate-400">dashboard</span>Dashboard
+        </a>
+        <a href="#" onclick="closeDrawer('A')" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <span class="material-symbols-outlined text-[20px] text-slate-400">slideshow</span>Demo Player
+        </a>
+        <a href="#" onclick="closeDrawer('A')" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <span class="material-symbols-outlined text-[20px] text-slate-400">monitor_heart</span>Health
+        </a>
+      </nav>
+
+      <!-- Role switcher -->
+      <div class="flex-shrink-0 px-4 py-4 border-t border-slate-200 dark:border-slate-700">
+        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">Switch Demo Role</p>
+        <div class="grid grid-cols-2 gap-1.5" id="a-swatches"></div>
+      </div>
+
+      <!-- User footer -->
+      <div class="flex-shrink-0 px-4 py-4 border-t border-slate-200 dark:border-slate-700">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="size-8 rounded-full bg-primary flex-shrink-0 flex items-center justify-center text-white text-sm font-bold" id="a-avatar">S</div>
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-slate-900 dark:text-white truncate" id="a-name">Super Admin</p>
+            <p class="text-xs text-slate-400 truncate">super_admin@demo.softomedia.com</p>
+          </div>
+        </div>
+        <button onclick="closeDrawer('A')" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+          <span class="material-symbols-outlined text-[18px]">logout</span>Log out
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════
+     VARIANT B — compact top sheet
+═══════════════════════════════════════════════════ -->
+<div id="frame-B" class="variant-frame flex-col min-h-screen">
+
+  <header class="sticky top-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 h-14 flex items-center px-4 gap-3">
+    <button id="b-trigger" onclick="toggleSheet('B')" aria-label="Open navigation menu" aria-expanded="false" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+      <span id="b-icon" class="material-symbols-outlined">menu</span>
+    </button>
+    <span class="font-bold text-slate-900 dark:text-white text-sm">AdManager</span>
+    <div class="ml-auto flex items-center gap-2">
+      <span class="text-xs text-slate-400">Variant B</span>
+      <button onclick="backToHub()" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400 text-xs flex items-center gap-1">
+        <span class="material-symbols-outlined text-[16px]">arrow_back</span> Hub
+      </button>
+    </div>
+  </header>
+
+  <!-- Sheet drops here, below header -->
+  <div id="sheet-B" class="hidden relative z-40">
+    <div class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 shadow-lg animate-slide-from-top">
+      <div class="max-w-3xl mx-auto px-4 py-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        <!-- Nav links -->
+        <div>
+          <p class="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Navigation</p>
+          <nav class="space-y-0.5">
+            <a href="#" onclick="closeSheet('B')" class="flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+              <span class="material-symbols-outlined text-[18px] text-slate-400">dashboard</span>Dashboard
+            </a>
+            <a href="#" onclick="closeSheet('B')" class="flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+              <span class="material-symbols-outlined text-[18px] text-slate-400">slideshow</span>Demo Player
+            </a>
+            <a href="#" onclick="closeSheet('B')" class="flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+              <span class="material-symbols-outlined text-[18px] text-slate-400">monitor_heart</span>Health
+            </a>
+          </nav>
+        </div>
+
+        <!-- Roles -->
+        <div>
+          <p class="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Switch Demo Role</p>
+          <div class="space-y-0.5" id="b-swatches"></div>
+        </div>
+
+        <!-- Account -->
+        <div>
+          <p class="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Account</p>
+          <div class="flex items-center gap-3 px-2 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 mb-2">
+            <div class="size-8 rounded-full bg-primary flex-shrink-0 flex items-center justify-center text-white text-sm font-bold">S</div>
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-slate-900 dark:text-white truncate">Super Admin</p>
+              <p class="text-xs text-slate-400 truncate">super_admin@demo.softomedia.com</p>
+            </div>
+          </div>
+          <button onclick="closeSheet('B')" class="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+            <span class="material-symbols-outlined text-[18px]">logout</span>Log out
+          </button>
+        </div>
+
+      </div>
+    </div>
+    <!-- Backdrop (below header) -->
+    <div class="fixed inset-0 top-14 bg-black/30 backdrop-blur-sm -z-[1]" onclick="closeSheet('B')"></div>
+  </div>
+
+  <main class="flex-1 p-8 text-center">
+    <p class="text-slate-400 text-sm mt-16">Click <strong class="text-slate-700 dark:text-slate-200">☰</strong> to drop the sheet below the header.</p>
+  </main>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════
+     VARIANT C — right slide drawer
+═══════════════════════════════════════════════════ -->
+<div id="frame-C" class="variant-frame flex-col min-h-screen">
+
+  <header class="sticky top-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 h-14 flex items-center px-4 gap-3">
+    <span class="font-bold text-slate-900 dark:text-white text-sm">AdManager</span>
+    <div class="ml-auto flex items-center gap-3">
+      <span class="text-xs text-slate-400">Variant C</span>
+      <button onclick="backToHub()" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400 text-xs flex items-center gap-1">
+        <span class="material-symbols-outlined text-[16px]">arrow_back</span> Hub
+      </button>
+      <!-- Trigger right-aligned -->
+      <button id="c-trigger" onclick="openDrawer('C')" aria-label="Open navigation menu" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+        <span class="material-symbols-outlined">menu</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="flex-1 p-8 text-center">
+    <p class="text-slate-400 text-sm mt-16">The <strong class="text-slate-700 dark:text-slate-200">☰ trigger</strong> is right-aligned. Drawer slides from the right.</p>
+  </main>
+
+  <!-- Right drawer overlay -->
+  <div id="drawer-C" class="hidden fixed inset-0 z-[100] flex justify-end" role="dialog" aria-modal="true">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeDrawer('C')"></div>
+    <div class="relative flex flex-col w-80 h-full bg-white dark:bg-slate-900 shadow-2xl animate-slide-from-right">
+
+      <!-- Header -->
+      <div class="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+        <button onclick="closeDrawer('C')" aria-label="Close menu" class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-slate-900 dark:text-white">AdManager</span>
+          <span class="material-symbols-outlined text-primary text-[22px]">campaign</span>
+        </div>
+      </div>
+
+      <!-- Nav -->
+      <nav class="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-0.5">
+        <a href="#" onclick="closeDrawer('C')" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <span class="material-symbols-outlined text-[20px] text-slate-400">dashboard</span>Dashboard
+        </a>
+        <a href="#" onclick="closeDrawer('C')" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <span class="material-symbols-outlined text-[20px] text-slate-400">slideshow</span>Demo Player
+        </a>
+        <a href="#" onclick="closeDrawer('C')" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <span class="material-symbols-outlined text-[20px] text-slate-400">monitor_heart</span>Health
+        </a>
+      </nav>
+
+      <!-- Role switcher — full-width single col + check icon -->
+      <div class="flex-shrink-0 px-4 py-4 border-t border-slate-200 dark:border-slate-700">
+        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">Switch Demo Role</p>
+        <div class="space-y-1" id="c-swatches"></div>
+      </div>
+
+      <!-- User footer -->
+      <div class="flex-shrink-0 px-4 py-4 border-t border-slate-200 dark:border-slate-700">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="size-9 rounded-full bg-primary ring-2 ring-primary/30 flex-shrink-0 flex items-center justify-center text-white text-sm font-bold">S</div>
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-slate-900 dark:text-white truncate">Super Admin</p>
+            <p class="text-xs text-slate-400 truncate">super_admin@demo.softomedia.com</p>
+          </div>
+        </div>
+        <button onclick="closeDrawer('C')" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-red-100 dark:border-red-900/40 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+          <span class="material-symbols-outlined text-[18px]">logout</span>Log out
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════
+     VARIANT D — wide left drawer
+═══════════════════════════════════════════════════ -->
+<div id="frame-D" class="variant-frame flex-col min-h-screen">
+
+  <header class="sticky top-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 h-14 flex items-center px-4 gap-3">
+    <button id="d-trigger" onclick="openDrawer('D')" aria-label="Open navigation menu" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+      <span class="material-symbols-outlined">menu</span>
+    </button>
+    <span class="font-bold text-slate-900 dark:text-white text-sm">AdManager</span>
+    <div class="ml-auto flex items-center gap-2">
+      <span class="text-xs text-slate-400">Variant D</span>
+      <button onclick="backToHub()" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400 text-xs flex items-center gap-1">
+        <span class="material-symbols-outlined text-[16px]">arrow_back</span> Hub
+      </button>
+    </div>
+  </header>
+
+  <main class="flex-1 p-8 text-center">
+    <p class="text-slate-400 text-sm mt-16">Wider left drawer (<code class="text-xs bg-slate-100 dark:bg-slate-800 px-1 rounded">w-80</code>) with single-col swatch list, ring avatar, and bordered logout.</p>
+  </main>
+
+  <!-- Wide left drawer overlay -->
+  <div id="drawer-D" class="hidden fixed inset-0 z-[100] flex" role="dialog" aria-modal="true">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeDrawer('D')"></div>
+    <div class="relative flex flex-col w-80 h-full bg-white dark:bg-slate-900 shadow-2xl animate-slide-from-left">
+
+      <!-- Header -->
+      <div class="flex-shrink-0 flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-700">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary text-[22px]">campaign</span>
+          <span class="font-bold text-slate-900 dark:text-white">AdManager</span>
+        </div>
+        <button onclick="closeDrawer('D')" aria-label="Close menu" class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+
+      <!-- Nav -->
+      <nav class="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-0.5">
+        <a href="#" onclick="closeDrawer('D')" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <span class="material-symbols-outlined text-[20px] text-slate-400">dashboard</span>Dashboard
+        </a>
+        <a href="#" onclick="closeDrawer('D')" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <span class="material-symbols-outlined text-[20px] text-slate-400">slideshow</span>Demo Player
+        </a>
+        <a href="#" onclick="closeDrawer('D')" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <span class="material-symbols-outlined text-[20px] text-slate-400">monitor_heart</span>Health
+        </a>
+      </nav>
+
+      <!-- Role switcher — single col, full width, check icon -->
+      <div class="flex-shrink-0 px-4 py-4 border-t border-slate-200 dark:border-slate-700">
+        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">Switch Demo Role</p>
+        <div class="space-y-1" id="d-swatches"></div>
+      </div>
+
+      <!-- User footer -->
+      <div class="flex-shrink-0 px-5 py-4 border-t border-slate-200 dark:border-slate-700">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="size-9 rounded-full bg-primary ring-2 ring-primary/30 flex-shrink-0 flex items-center justify-center text-white text-sm font-bold">S</div>
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-slate-900 dark:text-white truncate">Super Admin</p>
+            <div class="flex items-center gap-1.5 mt-0.5">
+              <span class="size-1.5 rounded-full bg-purple-500"></span>
+              <p class="text-xs text-slate-400 truncate">super_admin</p>
+            </div>
+          </div>
+        </div>
+        <button onclick="closeDrawer('D')" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-red-100 dark:border-red-900/40 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+          <span class="material-symbols-outlined text-[18px]">logout</span>Log out
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+  // ── Data (mirrors HamburgerMenu.jsx exactly) ──
+  const PERSONA_SWATCHES = [
+    { label: 'Super Admin', role: 'super_admin', color: 'bg-purple-500', route: 'admin'    },
+    { label: 'Admin',       role: 'admin',       color: 'bg-blue-500',   route: 'admin'    },
+    { label: 'Brand',       role: 'brand',       color: 'bg-rose-500',   route: 'brand'    },
+    { label: 'Retailer',    role: 'retailer',    color: 'bg-amber-500',  route: 'retailer' },
+    { label: 'Tech Op',     role: 'tech',        color: 'bg-slate-500',  route: 'admin'    },
+  ];
+
+  let activeRole = 'super_admin';
+
+  // ── Populate swatch grids ──
+  function buildSwatches2col(containerId) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = PERSONA_SWATCHES.map(s => {
+      const active = s.role === activeRole;
+      return `<button onclick="switchRole('${s.role}','${s.label}','${s.color}')" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+        active ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white ring-1 ring-slate-300 dark:ring-slate-600'
+               : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+      }">
+        <span class="size-2 rounded-full flex-shrink-0 ${s.color}"></span>
+        <span class="truncate">${s.label}</span>
+      </button>`;
+    }).join('');
+  }
+
+  function buildSwatches1col(containerId) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = PERSONA_SWATCHES.map(s => {
+      const active = s.role === activeRole;
+      return `<button onclick="switchRole('${s.role}','${s.label}','${s.color}')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+        active ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white'
+               : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+      }">
+        <span class="size-3 rounded-full flex-shrink-0 ${s.color}"></span>
+        <span class="flex-1 text-left">${s.label}</span>
+        ${active ? '<span class="material-symbols-outlined text-[16px] text-primary">check</span>' : ''}
+      </button>`;
+    }).join('');
+  }
+
+  function buildSwatchesB(containerId) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = PERSONA_SWATCHES.map(s => {
+      const active = s.role === activeRole;
+      return `<button onclick="switchRole('${s.role}','${s.label}','${s.color}')" class="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm font-medium transition-colors ${
+        active ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white'
+               : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+      }">
+        <span class="size-2 rounded-full flex-shrink-0 ${s.color}"></span>
+        ${s.label}
+        ${active ? '<span class="material-symbols-outlined text-[14px] text-primary ml-auto">check_small</span>' : ''}
+      </button>`;
+    }).join('');
+  }
+
+  function rebuildAllSwatches() {
+    buildSwatches2col('a-swatches');
+    buildSwatchesB('b-swatches');
+    buildSwatches1col('c-swatches');
+    buildSwatches1col('d-swatches');
+  }
+
+  function switchRole(role, label, color) {
+    activeRole = role;
+    rebuildAllSwatches();
+  }
+
+  rebuildAllSwatches();
+
+  // ── Navigation ──
+  function showVariant(v) {
+    document.getElementById('hub').style.display = 'none';
+    document.querySelectorAll('.variant-frame').forEach(f => f.classList.remove('active'));
+    document.getElementById('frame-' + v).classList.add('active');
+    // apply dark class carried over from hub theme
+    syncDark();
+  }
+
+  function backToHub() {
+    // Close any open drawers/sheets
+    ['A','C','D'].forEach(v => {
+      const d = document.getElementById('drawer-' + v);
+      if (d) d.classList.add('hidden');
+    });
+    const sb = document.getElementById('sheet-B');
+    if (sb) sb.classList.add('hidden');
+
+    document.querySelectorAll('.variant-frame').forEach(f => f.classList.remove('active'));
+    document.getElementById('hub').style.display = 'flex';
+    document.getElementById('hub').style.flexDirection = 'column';
+  }
+
+  // ── Drawer helpers (A, C, D) ──
+  function openDrawer(v) {
+    document.getElementById('drawer-' + v).classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeDrawer(v) {
+    document.getElementById('drawer-' + v).classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+
+  // ── Sheet helpers (B) ──
+  function toggleSheet(v) {
+    const sheet = document.getElementById('sheet-' + v);
+    const icon  = document.getElementById(v.toLowerCase() + '-icon');
+    const open  = sheet.classList.contains('hidden');
+    if (open) {
+      sheet.classList.remove('hidden');
+      if (icon) icon.textContent = 'close';
+    } else {
+      closeSheet(v);
+    }
+  }
+  function closeSheet(v) {
+    const sheet = document.getElementById('sheet-' + v);
+    const icon  = document.getElementById(v.toLowerCase() + '-icon');
+    sheet.classList.add('hidden');
+    if (icon) icon.textContent = 'menu';
+  }
+
+  // ── Escape key ──
+  window.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    ['A','C','D'].forEach(v => closeDrawer(v));
+    closeSheet('B');
+  });
+
+  // ── Dark mode ──
+  let dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  function syncDark() {
+    document.documentElement.classList.toggle('dark', dark);
+  }
+  syncDark();
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    dark = !dark;
+    syncDark();
+    const icon = document.querySelector('#theme-toggle .material-symbols-outlined');
+    icon.textContent = dark ? 'light_mode' : 'dark_mode';
+  });
+</script>
+
+</body>
+</html>
