@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hamburger Experiments — Tech Op</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { colors: { primary: '#01696f' }, fontFamily: { sans: ['Inter','sans-serif'] } } }
+    };
+  </script>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
+
+  <header class="sticky top-0 z-50 flex items-center gap-3 px-4 py-3 bg-slate-900 border-b border-slate-800 shadow-sm">
+    <span class="material-symbols-outlined text-primary text-[22px]">campaign</span>
+    <span class="font-bold text-white">AdManager</span>
+    <span class="ml-2 text-xs font-semibold uppercase tracking-widest text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">Tech Op</span>
+    <div class="ml-auto">
+      <button onclick="document.documentElement.classList.toggle('dark')" class="p-2 rounded-lg hover:bg-slate-800 transition-colors" aria-label="Toggle dark mode">
+        <span class="material-symbols-outlined text-[20px] text-slate-400">dark_mode</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto px-6 py-16">
+    <p class="text-xs font-semibold uppercase tracking-widest text-primary mb-3">Hamburger Menu Experiments</p>
+    <h1 class="text-3xl font-bold text-white mb-3">4 Variants to Review</h1>
+    <p class="text-slate-400 mb-12 max-w-lg">Each page is a live, interactive prototype built from the current <code class="text-slate-300 bg-slate-800 px-1.5 py-0.5 rounded text-sm">HamburgerMenu.jsx</code>. Same data, same Tailwind classes — different interaction model.</p>
+
+    <div class="grid gap-4">
+
+      <a href="./hamburger-v1-current.html" class="group flex items-start gap-5 p-5 rounded-xl bg-slate-900 border border-slate-800 hover:border-primary/40 hover:bg-slate-800 transition-all">
+        <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-lg">A</div>
+        <div>
+          <p class="font-semibold text-white group-hover:text-primary transition-colors">Variant A — Current Production</p>
+          <p class="text-sm text-slate-400 mt-1">Left slide-in drawer · <code class="text-slate-300">w-72</code> · <code class="text-slate-300">bg-black/40 backdrop-blur-sm</code> overlay · 2-col swatch grid · exact repo classes</p>
+          <p class="text-xs text-slate-500 mt-2">→ Faithful replica of what's live</p>
+        </div>
+        <span class="material-symbols-outlined text-slate-600 group-hover:text-primary ml-auto flex-shrink-0 transition-colors">arrow_forward</span>
+      </a>
+
+      <a href="./hamburger-v2-top-sheet.html" class="group flex items-start gap-5 p-5 rounded-xl bg-slate-900 border border-slate-800 hover:border-primary/40 hover:bg-slate-800 transition-all">
+        <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 font-bold text-lg">B</div>
+        <div>
+          <p class="font-semibold text-white group-hover:text-primary transition-colors">Variant B — Compact Top Sheet</p>
+          <p class="text-sm text-slate-400 mt-1">Drops down below sticky header · desktop 3-col layout (nav / roles / account) · no full-screen overlay</p>
+          <p class="text-xs text-slate-500 mt-2">→ Lower visual weight, faster access</p>
+        </div>
+        <span class="material-symbols-outlined text-slate-600 group-hover:text-primary ml-auto flex-shrink-0 transition-colors">arrow_forward</span>
+      </a>
+
+      <a href="./hamburger-v3-right-drawer.html" class="group flex items-start gap-5 p-5 rounded-xl bg-slate-900 border border-slate-800 hover:border-primary/40 hover:bg-slate-800 transition-all">
+        <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 font-bold text-lg">C</div>
+        <div>
+          <p class="font-semibold text-white group-hover:text-primary transition-colors">Variant C — Right-Side Wide Drawer</p>
+          <p class="text-sm text-slate-400 mt-1">Trigger on right · <code class="text-slate-300">w-80</code> slide-in-right · single-col role list with check icon · bordered avatar card</p>
+          <p class="text-xs text-slate-500 mt-2">→ Common media/live dashboard pattern</p>
+        </div>
+        <span class="material-symbols-outlined text-slate-600 group-hover:text-primary ml-auto flex-shrink-0 transition-colors">arrow_forward</span>
+      </a>
+
+      <a href="./hamburger-v4-bottom-sheet.html" class="group flex items-start gap-5 p-5 rounded-xl bg-slate-900 border border-slate-800 hover:border-primary/40 hover:bg-slate-800 transition-all">
+        <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 font-bold text-lg">D</div>
+        <div>
+          <p class="font-semibold text-white group-hover:text-primary transition-colors">Variant D — Bottom Sheet (Mobile-first)</p>
+          <p class="text-sm text-slate-400 mt-1">Slides up from bottom · <code class="text-slate-300">rounded-t-2xl</code> · full-width nav list · thumb-zone swatch row · snaps to 70vh max</p>
+          <p class="text-xs text-slate-500 mt-2">→ Natural thumb reach on phone</p>
+        </div>
+        <span class="material-symbols-outlined text-slate-600 group-hover:text-primary ml-auto flex-shrink-0 transition-colors">arrow_forward</span>
+      </a>
+
+    </div>
+  </main>
+</body>
+</html>

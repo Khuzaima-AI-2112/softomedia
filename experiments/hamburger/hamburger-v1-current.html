@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Variant A — Current Production</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode:'class',
+      theme:{ extend:{ colors:{ primary:'#01696f' }, fontFamily:{ sans:['Inter','sans-serif'] },
+        keyframes:{ slideInLeft:{ from:{ transform:'translateX(-100%)' }, to:{ transform:'translateX(0)' } } },
+        animation:{ 'slide-in-left':'slideInLeft 200ms cubic-bezier(0.16,1,0.3,1)' }
+      }}
+    };
+  </script>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
+
+  <header class="sticky top-0 z-50 flex items-center gap-3 px-4 py-3 bg-slate-900 border-b border-slate-800">
+    <button id="trigger" onclick="openDrawer()"
+      aria-label="Open navigation menu" aria-expanded="false" aria-controls="hamburger-drawer"
+      class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+      <span class="material-symbols-outlined" aria-hidden="true">menu</span>
+    </button>
+    <span class="material-symbols-outlined text-primary text-[22px]">campaign</span>
+    <span class="font-bold text-white">AdManager</span>
+    <div class="ml-auto flex items-center gap-2">
+      <a href="./hamburger-hub.html" class="text-xs text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-1">
+        <span class="material-symbols-outlined text-[16px]">arrow_back</span> Hub
+      </a>
+      <button onclick="document.documentElement.classList.toggle('dark')" class="p-2 rounded-lg hover:bg-slate-800 transition-colors" aria-label="Toggle dark mode">
+        <span class="material-symbols-outlined text-[20px] text-slate-400">dark_mode</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="p-8">
+    <p class="text-slate-500 text-sm mb-1 font-semibold">Variant A — Current Production</p>
+    <p class="text-slate-500 text-sm">Exact classes from <code class="text-slate-300">HamburgerMenu.jsx</code>. Tap the menu icon to open.</p>
+    <div class="mt-6 p-4 bg-slate-900 rounded-lg border border-slate-800 text-xs text-slate-400 max-w-sm">
+      <p class="font-semibold text-slate-300 mb-2">Key classes (from repo)</p>
+      <ul class="space-y-1 list-disc list-inside">
+        <li>Drawer: <code>w-72 h-full bg-white dark:bg-slate-900 shadow-2xl animate-in slide-in-from-left duration-200</code></li>
+        <li>Overlay: <code>bg-black/40 backdrop-blur-sm</code></li>
+        <li>Swatch grid: <code>grid grid-cols-2 gap-1.5</code></li>
+        <li>Active swatch: <code>ring-1 ring-slate-300 dark:ring-slate-600</code></li>
+        <li>Avatar: <code>size-8 rounded-full bg-primary</code></li>
+        <li>Logout: <code>text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20</code></li>
+      </ul>
+    </div>
+  </main>
+
+  <div id="overlay" class="hidden fixed inset-0 z-[100] flex">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeDrawer()" aria-hidden="true"></div>
+    <div id="drawer" class="relative flex flex-col w-72 h-full bg-white dark:bg-slate-900 shadow-2xl animate-slide-in-left"
+      role="dialog" aria-modal="true" aria-label="Navigation menu">
+
+      <div class="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary text-[22px]">campaign</span>
+          <span class="font-bold text-slate-900 dark:text-white">AdManager</span>
+        </div>
+        <button onclick="closeDrawer()" aria-label="Close menu"
+          class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+
+      <nav class="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-0.5" aria-label="Main navigation">
+        <a href="#" onclick="closeDrawer()" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <span class="material-symbols-outlined text-[20px] text-slate-400" aria-hidden="true">dashboard</span>Dashboard
+        </a>
+        <a href="#" onclick="closeDrawer()" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <span class="material-symbols-outlined text-[20px] text-slate-400" aria-hidden="true">slideshow</span>Demo Player
+        </a>
+        <a href="#" onclick="closeDrawer()" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <span class="material-symbols-outlined text-[20px] text-slate-400" aria-hidden="true">monitor_heart</span>Health
+        </a>
+      </nav>
+
+      <div class="flex-shrink-0 px-4 py-4 border-t border-slate-200 dark:border-slate-700">
+        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">Switch Demo Role</p>
+        <div class="grid grid-cols-2 gap-1.5" id="swatches-a"></div>
+      </div>
+
+      <div class="flex-shrink-0 px-4 py-4 border-t border-slate-200 dark:border-slate-700">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-8 h-8 rounded-full bg-primary flex-shrink-0 flex items-center justify-center text-white text-sm font-bold">T</div>
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-slate-900 dark:text-white truncate">Tech Op</p>
+            <p class="text-xs text-slate-400 truncate">tech@demo.softomedia.com</p>
+          </div>
+        </div>
+        <button onclick="closeDrawer()"
+          class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+          <span class="material-symbols-outlined text-[18px]" aria-hidden="true">logout</span>Log out
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SWATCHES = [
+      { label:'Super Admin', role:'super_admin', color:'bg-purple-500' },
+      { label:'Admin',       role:'admin',       color:'bg-blue-500'   },
+      { label:'Brand',       role:'brand',       color:'bg-rose-500'   },
+      { label:'Retailer',    role:'retailer',    color:'bg-amber-500'  },
+      { label:'Tech Op',     role:'tech',        color:'bg-slate-500'  },
+    ];
+    let activeRole = 'tech';
+    function buildSwatches() {
+      const c = document.getElementById('swatches-a');
+      c.innerHTML = SWATCHES.map(s => `
+        <button data-swatch="${s.role}" onclick="setRole('${s.role}')" aria-pressed="${s.role===activeRole}"
+          class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+          ${s.role===activeRole ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white ring-1 ring-slate-300 dark:ring-slate-600'
+                                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}">
+          <span class="w-2 h-2 rounded-full flex-shrink-0 ${s.color}"></span>
+          <span class="truncate">${s.label}</span>
+        </button>`).join('');
+    }
+    function setRole(role) {
+      activeRole = role;
+      buildSwatches();
+    }
+    function openDrawer() {
+      document.getElementById('overlay').classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+      document.getElementById('trigger').setAttribute('aria-expanded','true');
+      buildSwatches();
+    }
+    function closeDrawer() {
+      document.getElementById('overlay').classList.add('hidden');
+      document.body.style.overflow = '';
+      document.getElementById('trigger').setAttribute('aria-expanded','false');
+    }
+    document.addEventListener('keydown', e => { if(e.key==='Escape') closeDrawer(); });
+  </script>
+</body>
+</html>

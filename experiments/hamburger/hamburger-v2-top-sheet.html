@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Variant B — Compact Top Sheet</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode:'class',
+      theme:{ extend:{ colors:{ primary:'#01696f' }, fontFamily:{ sans:['Inter','sans-serif'] },
+        keyframes:{ slideDown:{ from:{ transform:'translateY(-8px)', opacity:'0' }, to:{ transform:'translateY(0)', opacity:'1' } } },
+        animation:{ 'slide-down':'slideDown 180ms cubic-bezier(0.16,1,0.3,1)' }
+      }}
+    };
+  </script>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
+
+  <header class="sticky top-0 z-50 bg-slate-900 border-b border-slate-800">
+    <div class="flex items-center gap-3 px-4 py-3">
+      <button id="trigger" onclick="toggleDrawer()"
+        aria-label="Open navigation menu" aria-expanded="false"
+        class="p-2 rounded-lg hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+        <span id="trigger-icon" class="material-symbols-outlined transition-all">menu</span>
+      </button>
+      <span class="material-symbols-outlined text-primary text-[22px]">campaign</span>
+      <span class="font-bold text-white">AdManager</span>
+      <div class="ml-auto flex items-center gap-2">
+        <a href="./hamburger-hub.html" class="text-xs text-slate-500 hover:text-slate-300 flex items-center gap-1">
+          <span class="material-symbols-outlined text-[16px]">arrow_back</span> Hub
+        </a>
+        <button onclick="document.documentElement.classList.toggle('dark')" class="p-2 rounded-lg hover:bg-slate-800 transition-colors">
+          <span class="material-symbols-outlined text-[20px] text-slate-400">dark_mode</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="top-sheet" class="hidden border-t border-slate-800 bg-slate-900 animate-slide-down">
+      <div class="max-w-4xl mx-auto px-4 py-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div>
+          <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-2">Navigate</p>
+          <nav class="space-y-0.5">
+            <a href="#" onclick="closeSheet()" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 transition-colors">
+              <span class="material-symbols-outlined text-[20px] text-slate-500">dashboard</span>Dashboard
+            </a>
+            <a href="#" onclick="closeSheet()" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 transition-colors">
+              <span class="material-symbols-outlined text-[20px] text-slate-500">slideshow</span>Demo Player
+            </a>
+            <a href="#" onclick="closeSheet()" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 transition-colors">
+              <span class="material-symbols-outlined text-[20px] text-slate-500">monitor_heart</span>Health
+            </a>
+          </nav>
+        </div>
+        <div>
+          <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-2">Switch Demo Role</p>
+          <div class="grid grid-cols-2 gap-1.5" id="swatches-b"></div>
+        </div>
+        <div>
+          <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-2">Account</p>
+          <div class="flex items-center gap-3 p-3 rounded-lg bg-slate-800 mb-3">
+            <div class="w-8 h-8 rounded-full bg-primary flex-shrink-0 flex items-center justify-center text-white text-sm font-bold">T</div>
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-white truncate">Tech Op</p>
+              <p class="text-xs text-slate-400 truncate">tech@demo.softomedia.com</p>
+            </div>
+          </div>
+          <button onclick="closeSheet()"
+            class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-red-500 hover:bg-red-900/20 transition-colors">
+            <span class="material-symbols-outlined text-[18px]">logout</span>Log out
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div id="backdrop" class="hidden fixed inset-0 z-40 bg-black/20" onclick="closeSheet()"></div>
+
+  <main class="p-8 relative z-0">
+    <p class="text-slate-500 text-sm mb-1 font-semibold">Variant B — Compact Top Sheet</p>
+    <p class="text-slate-500 text-sm">Sheet drops below the sticky header. No full-screen overlay. Desktop shows 3-col layout.</p>
+  </main>
+
+  <script>
+    const SWATCHES = [
+      { label:'Super Admin', role:'super_admin', color:'bg-purple-500' },
+      { label:'Admin',       role:'admin',       color:'bg-blue-500'   },
+      { label:'Brand',       role:'brand',       color:'bg-rose-500'   },
+      { label:'Retailer',    role:'retailer',    color:'bg-amber-500'  },
+      { label:'Tech Op',     role:'tech',        color:'bg-slate-500'  },
+    ];
+    let activeRole = 'tech', sheetOpen = false;
+    function buildSwatches() {
+      const c = document.getElementById('swatches-b');
+      c.innerHTML = SWATCHES.map(s => `
+        <button data-swatch="${s.role}" onclick="setRole('${s.role}')" aria-pressed="${s.role===activeRole}"
+          class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+          ${s.role===activeRole ? 'bg-slate-700 text-white ring-1 ring-slate-500'
+                                : 'text-slate-400 hover:bg-slate-800'}">
+          <span class="w-2 h-2 rounded-full flex-shrink-0 ${s.color}"></span>
+          <span class="truncate">${s.label}</span>
+        </button>`).join('');
+    }
+    function setRole(role) { activeRole = role; buildSwatches(); }
+    function toggleDrawer() { sheetOpen ? closeSheet() : openSheet(); }
+    function openSheet() {
+      sheetOpen = true;
+      document.getElementById('top-sheet').classList.remove('hidden');
+      document.getElementById('backdrop').classList.remove('hidden');
+      document.getElementById('trigger-icon').textContent = 'close';
+      document.getElementById('trigger').setAttribute('aria-expanded','true');
+      buildSwatches();
+    }
+    function closeSheet() {
+      sheetOpen = false;
+      document.getElementById('top-sheet').classList.add('hidden');
+      document.getElementById('backdrop').classList.add('hidden');
+      document.getElementById('trigger-icon').textContent = 'menu';
+      document.getElementById('trigger').setAttribute('aria-expanded','false');
+    }
+    document.addEventListener('keydown', e => { if(e.key==='Escape') closeSheet(); });
+  </script>
+</body>
+</html>
