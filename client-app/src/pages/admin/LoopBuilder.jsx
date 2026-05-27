@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import apiService from '../../services/ApiService';
+import { ToastContainer, useToasts } from '../../components/Toast';
 
-// Get slot status styling
 const getSlotStyle = (slot) => {
     if (!slot?.asset_id) return 'border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50';
     if (slot.status === 'REJECTED') return 'border-red-400 bg-red-50 dark:bg-red-900/20';
@@ -22,11 +22,9 @@ function LoopBuilder() {
     const [selectedSlot, setSelectedSlot] = useState(null);
     const [showAssetPicker, setShowAssetPicker] = useState(false);
 
-    useEffect(() => {
-        if (id) loadData();
-    }, [id]);
+    const { toasts, addToast, removeToast } = useToasts();
 
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         setLoading(true);
         try {
             const [loopData, assetsData] = await Promise.all([
@@ -37,10 +35,15 @@ function LoopBuilder() {
             setAssets(assetsData || []);
         } catch (error) {
             console.error('Failed to load loop data:', error);
+            addToast('Failed to load loop data. Please refresh.', 'error');
         } finally {
             setLoading(false);
         }
-    };
+    }, [id]);
+
+    useEffect(() => {
+        if (id) loadData();
+    }, [id, loadData]);
 
     const handleSlotClick = (position) => {
         setSelectedSlot(position);
@@ -50,7 +53,7 @@ function LoopBuilder() {
     const handleAssetSelect = async (asset) => {
         if (selectedSlot === null || !loop) return;
 
-        // Update local state optimistically
+        // Optimistic update
         const newSlots = [...loop.slots];
         newSlots[selectedSlot] = {
             ...newSlots[selectedSlot],
@@ -66,9 +69,13 @@ function LoopBuilder() {
         try {
             await apiService.replaceLoopSlot(id, selectedSlot, asset.id);
             await loadData();
+            addToast(`Slot ${selectedSlot + 1} updated with "${asset.filename}".`, 'success');
         } catch (error) {
             console.error('Failed to replace slot:', error);
-            alert('Failed to replace slot');
+            const message = error?.response?.data?.error || error?.message || 'Failed to replace slot.';
+            addToast(message, 'error');
+            // Revert optimistic update
+            await loadData();
         }
     };
 
@@ -77,8 +84,11 @@ function LoopBuilder() {
         try {
             await apiService.approveLoop(id);
             await loadData();
+            addToast('Loop approved.', 'success');
         } catch (error) {
             console.error('Failed to approve loop:', error);
+            const message = error?.response?.data?.error || error?.message || 'Failed to approve loop.';
+            addToast(message, 'error');
         } finally {
             setSaving(false);
         }
@@ -120,6 +130,7 @@ function LoopBuilder() {
                     <div className="flex items-center gap-3 mb-2">
                         <button
                             onClick={() => navigate('/dashboard/admin/loops')}
+                            aria-label="Back to Loop Management"
                             className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                         >
                             <span className="material-symbols-outlined">arrow_back</span>
@@ -127,15 +138,14 @@ function LoopBuilder() {
                         <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
                             Loop Builder — {formatHour(loop.hour)}
                         </h1>
-                        <StatusBadge status={loop.status === 'APPROVED' ? 'Active' :
-                            loop.status === 'PENDING_APPROVAL' ? 'Warning' : 'Offline'} />
+                        <StatusBadge status={
+                            loop.status === 'APPROVED' ? 'Active' :
+                            loop.status === 'PENDING_APPROVAL' ? 'Warning' : 'Offline'
+                        } />
                     </div>
                     <p className="text-slate-500 dark:text-slate-400 ml-12">
                         {new Date(loop.date).toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
+                            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
                         })} • 12 slots × 5 seconds = 60 second loop
                     </p>
                 </div>
@@ -144,10 +154,13 @@ function LoopBuilder() {
                         <button
                             onClick={handleApproveAll}
                             disabled={saving}
-                            className="px-4 py-2 bg-emerald-500 text-white rounded-lg font-medium shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-colors flex items-center gap-2 disabled:opacity-50"
+                            aria-label={saving ? 'Approving loop...' : 'Approve all slots in this loop'}
+                            className="px-4 py-2 bg-emerald-500 text-white rounded-lg font-medium shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             data-testid="approve-loop-btn"
                         >
-                            <span className="material-symbols-outlined text-[20px]">check_circle</span>
+                            <span className="material-symbols-outlined text-[20px]">
+                                {saving ? 'progress_activity' : 'check_circle'}
+                            </span>
                             {saving ? 'Approving...' : 'Approve Loop'}
                         </button>
                     )}
@@ -175,15 +188,16 @@ function LoopBuilder() {
                             <button
                                 key={position}
                                 onClick={() => handleSlotClick(position)}
+                                aria-label={slot.asset_id
+                                    ? `Slot ${position + 1}: ${slot.asset_name || asset?.filename || slot.asset_id} — click to replace`
+                                    : `Slot ${position + 1}: empty — click to add asset`
+                                }
                                 className={`relative p-4 rounded-xl border-2 transition-all hover:shadow-md hover:scale-105 ${getSlotStyle(slot)}`}
                                 data-testid={`slot-${position}`}
                             >
-                                {/* Position Badge */}
                                 <div className="absolute -top-2 -left-2 w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center">
                                     {position + 1}
                                 </div>
-
-                                {/* Slot Content */}
                                 <div className="h-20 flex flex-col items-center justify-center">
                                     {slot.asset_id ? (
                                         <>
@@ -204,8 +218,6 @@ function LoopBuilder() {
                                         </>
                                     )}
                                 </div>
-
-                                {/* Duration */}
                                 <div className="text-[10px] text-center text-slate-400 mt-2 border-t border-slate-200 dark:border-slate-700 pt-2">
                                     5 seconds
                                 </div>
@@ -227,12 +239,13 @@ function LoopBuilder() {
                         return (
                             <div
                                 key={i}
-                                className={`flex-1 flex items-center justify-center text-xs font-bold transition-colors ${slot.asset_id
-                                    ? slot.status === 'REJECTED'
-                                        ? 'bg-red-400 text-white'
-                                        : 'bg-primary text-white'
-                                    : 'bg-slate-200 dark:bg-slate-700 text-slate-500'
-                                    }`}
+                                className={`flex-1 flex items-center justify-center text-xs font-bold transition-colors ${
+                                    slot.asset_id
+                                        ? slot.status === 'REJECTED'
+                                            ? 'bg-red-400 text-white'
+                                            : 'bg-primary text-white'
+                                        : 'bg-slate-200 dark:bg-slate-700 text-slate-500'
+                                }`}
                                 title={`Slot ${i + 1}: ${slot.asset_id || 'Empty'}`}
                             >
                                 {i + 1}
@@ -257,6 +270,7 @@ function LoopBuilder() {
                             <h3 className="font-bold text-lg">Select Asset for Slot {selectedSlot + 1}</h3>
                             <button
                                 onClick={() => setShowAssetPicker(false)}
+                                aria-label="Close asset picker"
                                 className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
                             >
                                 <span className="material-symbols-outlined">close</span>
@@ -267,6 +281,7 @@ function LoopBuilder() {
                                 <button
                                     key={asset.id}
                                     onClick={() => handleAssetSelect(asset)}
+                                    aria-label={`Select ${asset.filename}`}
                                     className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary hover:shadow-lg transition-all text-center"
                                     data-testid={`asset-${asset.id}`}
                                 >
@@ -279,6 +294,8 @@ function LoopBuilder() {
                     </div>
                 </div>
             )}
+
+            <ToastContainer toasts={toasts} onDismiss={removeToast} />
         </div>
     );
 }
