@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hamburger Variant B — Compact Top Sheet</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Satoshi', sans-serif; }
+    .material-symbols-outlined { font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal; font-size: 24px; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; word-wrap: normal; direction: ltr; -webkit-font-smoothing: antialiased; }
+    @keyframes slide-down { from { opacity:0; transform: translateY(-8px); } to { opacity:1; transform: translateY(0); } }
+    .animate-sheet-down { animation: slide-down 180ms cubic-bezier(0.16,1,0.3,1) both; }
+  </style>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { colors: { primary: '#01696f' } } }
+    }
+  </script>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 min-h-full">
+
+  <div class="fixed top-0 right-0 z-[200] bg-sky-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">Variant B — Compact Top Sheet</div>
+
+  <!-- Sticky Header -->
+  <header class="sticky top-0 z-50 flex items-center gap-2 px-4 h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 shadow-sm">
+    <button
+      id="triggerB"
+      aria-label="Open navigation menu"
+      aria-expanded="false"
+      aria-controls="sheetB"
+      class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#01696f] relative"
+    >
+      <span id="triggerIconB" class="material-symbols-outlined" style="font-size:22px" aria-hidden="true">menu</span>
+    </button>
+    <div class="flex items-center gap-2">
+      <svg aria-label="Softomedia" viewBox="0 0 28 28" fill="none" width="28" height="28">
+        <rect width="28" height="28" rx="6" fill="#01696f"/>
+        <path d="M7 10h14M7 14h10M7 18h12" stroke="white" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <span class="font-bold text-slate-900 dark:text-white text-sm">AdManager</span>
+    </div>
+    <div class="flex-1"></div>
+    <button id="themeToggleB" aria-label="Toggle dark mode" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+      <span class="material-symbols-outlined" style="font-size:20px">dark_mode</span>
+    </button>
+  </header>
+
+  <!-- Top sheet panel — drops from below the header -->
+  <div
+    id="sheetB"
+    class="hidden sticky top-14 z-40 w-full bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 shadow-lg animate-sheet-down"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Navigation menu"
+  >
+    <div class="max-w-5xl mx-auto px-4 py-5 grid grid-cols-1 sm:grid-cols-3 gap-6">
+
+      <!-- Nav links -->
+      <div>
+        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Navigate</p>
+        <nav class="space-y-0.5" aria-label="Main navigation">
+          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+            <span class="material-symbols-outlined text-[20px] text-slate-400" aria-hidden="true">dashboard</span>Dashboard
+          </a>
+          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+            <span class="material-symbols-outlined text-[20px] text-slate-400" aria-hidden="true">slideshow</span>Demo Player
+          </a>
+          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+            <span class="material-symbols-outlined text-[20px] text-slate-400" aria-hidden="true">monitor_heart</span>Health
+          </a>
+        </nav>
+      </div>
+
+      <!-- Role switcher -->
+      <div>
+        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Switch Demo Role</p>
+        <div class="grid grid-cols-2 gap-1.5">
+          <button class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white ring-1 ring-slate-300 dark:ring-slate-600 transition-colors">
+            <span class="size-2 rounded-full flex-shrink-0 bg-purple-500" aria-hidden="true"></span>
+            <span class="truncate">Super Admin</span>
+          </button>
+          <button class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+            <span class="size-2 rounded-full flex-shrink-0 bg-blue-500" aria-hidden="true"></span>
+            <span class="truncate">Admin</span>
+          </button>
+          <button class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+            <span class="size-2 rounded-full flex-shrink-0 bg-rose-500" aria-hidden="true"></span>
+            <span class="truncate">Brand</span>
+          </button>
+          <button class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+            <span class="size-2 rounded-full flex-shrink-0 bg-amber-500" aria-hidden="true"></span>
+            <span class="truncate">Retailer</span>
+          </button>
+          <button class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+            <span class="size-2 rounded-full flex-shrink-0 bg-slate-500" aria-hidden="true"></span>
+            <span class="truncate">Tech Op</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Account -->
+      <div>
+        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Account</p>
+        <div class="flex items-center gap-3 mb-3 px-1">
+          <div class="size-8 rounded-full bg-[#01696f] flex-shrink-0 flex items-center justify-center text-white text-sm font-bold">S</div>
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-slate-900 dark:text-white truncate">Super Admin</p>
+            <p class="text-xs text-slate-400 truncate">super_admin@demo.softomedia.com</p>
+          </div>
+        </div>
+        <button class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+          <span class="material-symbols-outlined text-[18px]" aria-hidden="true">logout</span>Log out
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Backdrop (below header) -->
+  <div id="backdropB" class="hidden fixed top-14 inset-x-0 bottom-0 z-30 bg-black/20" aria-hidden="true"></div>
+
+  <!-- Page content -->
+  <main class="p-8 max-w-2xl mx-auto">
+    <h1 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Variant B</h1>
+    <p class="text-slate-500 dark:text-slate-400 text-sm mb-6">The panel drops <em>down</em> from below the sticky header — no full-screen overlay. Desktop shows nav / roles / account in a <code class="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-xs">grid-cols-3</code> layout. Trigger icon morphs between <code class="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-xs">menu</code> ↔ <code class="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-xs">close</code>.</p>
+    <div class="grid gap-3">
+      <div class="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/60 dark:border-slate-700/60 shadow-sm">
+        <div class="h-3 w-2/3 bg-slate-200 dark:bg-slate-700 rounded mb-2"></div>
+        <div class="h-3 w-1/2 bg-slate-100 dark:bg-slate-800 rounded"></div>
+      </div>
+      <div class="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/60 dark:border-slate-700/60 shadow-sm">
+        <div class="h-3 w-3/4 bg-slate-200 dark:bg-slate-700 rounded mb-2"></div>
+        <div class="h-3 w-1/3 bg-slate-100 dark:bg-slate-800 rounded"></div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const trigger   = document.getElementById('triggerB');
+    const icon      = document.getElementById('triggerIconB');
+    const sheet     = document.getElementById('sheetB');
+    const backdrop  = document.getElementById('backdropB');
+    const themeBtn  = document.getElementById('themeToggleB');
+    let isOpen = false;
+
+    const open = () => {
+      isOpen = true;
+      sheet.classList.remove('hidden');
+      backdrop.classList.remove('hidden');
+      icon.textContent = 'close';
+      trigger.setAttribute('aria-expanded','true');
+    };
+    const close = () => {
+      isOpen = false;
+      sheet.classList.add('hidden');
+      backdrop.classList.add('hidden');
+      icon.textContent = 'menu';
+      trigger.setAttribute('aria-expanded','false');
+    };
+
+    trigger.addEventListener('click', () => isOpen ? close() : open());
+    backdrop.addEventListener('click', close);
+    window.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+    themeBtn.addEventListener('click', () => document.documentElement.classList.toggle('dark'));
+  </script>
+</body>
+</html>
