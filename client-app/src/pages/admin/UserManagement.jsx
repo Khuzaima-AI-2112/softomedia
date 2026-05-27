@@ -17,15 +17,17 @@ const ROLES = [
 
 function UserManagement() {
     const navigate  = useNavigate();
-    const { user }  = useAuth();
+    const { user, loading }  = useAuth();
 
-    // Phase 3: gate entire page behind superadmin
+    // Phase 3: gate entire page behind superadmin.
+    // Guard behind loading so we never redirect during the auth hydration
+    // window when user is still null and isSuperAdmin would be a false negative.
     const isSuperAdmin = user?.role === 'superadmin';
 
     const [users,       setUsers]       = useState([]);
     const [retailers,   setRetailers]   = useState([]);
     const [advertisers, setAdvertisers] = useState([]);
-    const [loading,     setLoading]     = useState(true);
+    const [dataLoading, setDataLoading] = useState(true);
     const [showModal,   setShowModal]   = useState(false);
     const [formData,    setFormData]    = useState({
         name: '', email: '', role: 'advertiser', linkedentityid: ''
@@ -37,16 +39,18 @@ function UserManagement() {
     const [successMessage,setSuccessMessage]= useState('');
 
     useEffect(() => {
+        // Wait for auth to finish hydrating before making access decisions
+        if (loading) return;
         if (!isSuperAdmin) {
             navigate('/dashboard/admin', { replace: true });
             return;
         }
         loadData();
-    }, [isSuperAdmin]);
+    }, [loading, isSuperAdmin]);
 
     const loadData = async () => {
         try {
-            setLoading(true);
+            setDataLoading(true);
             const [allUsers, allRetailers, allAdvertisers] = await Promise.all([
                 apiService.getUsers(),
                 apiService.getRetailers(),
@@ -59,7 +63,7 @@ function UserManagement() {
             setPageError('Failed to load data. Please try again.');
             console.error('UserManagement loadData error:', err);
         } finally {
-            setLoading(false);
+            setDataLoading(false);
         }
     };
 
@@ -173,7 +177,10 @@ function UserManagement() {
         }
     ];
 
-    if (loading) {
+    // Still hydrating auth — render nothing to avoid redirect flash
+    if (loading) return null;
+
+    if (dataLoading) {
         return (
             <div className="flex items-center justify-center h-64">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500" />
