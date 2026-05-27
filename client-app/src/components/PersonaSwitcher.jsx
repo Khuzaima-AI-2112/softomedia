@@ -1,32 +1,36 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
+// Role ids must match the server's ROLE_HIERARCHY keys in requireRole.js
+// and the PERSONA_SWATCHES in HamburgerMenu.jsx exactly.
+const PERSONAS = [
+    { id: 'superadmin',   label: 'Super Admin', icon: 'shield_person', color: 'bg-red-600',     route: 'admin'    },
+    { id: 'advertiser',   label: 'Brand',       icon: 'campaign',      color: 'bg-primary',     route: 'brand'    },
+    { id: 'retaileradmin',label: 'Retailer',    icon: 'storefront',    color: 'bg-emerald-500', route: 'retailer' },
+    { id: 'techoperator', label: 'Tech Op',     icon: 'build',         color: 'bg-slate-600',   route: 'admin'    },
+];
+
 const PersonaSwitcher = () => {
     const { persona, setPersona } = useAuth();
     const navigate = useNavigate();
 
-    const personas = [
-        { id: 'super_admin', label: 'Super Admin', icon: 'shield_person', color: 'bg-red-600'      },
-        { id: 'brand',       label: 'Brand',       icon: 'campaign',      color: 'bg-primary'      },
-        { id: 'retailer',    label: 'Retailer',    icon: 'storefront',    color: 'bg-emerald-500'  },
-        { id: 'tech',        label: 'Tech Op',     icon: 'build',         color: 'bg-slate-600'    },
-    ];
-
     const handleSwitch = (p) => {
+        // Keep localStorage in sync so the API interceptor sends the
+        // correct x-demo-role header on subsequent requests.
+        localStorage.setItem('demo_role', p.id);
         setPersona(p.id);
-        // super_admin shares /dashboard/admin — mirrors DashboardLayout normalisation
-        const routeTarget = p.id === 'super_admin' ? 'admin' : p.id;
-        navigate(`/dashboard/${routeTarget}`);
+        navigate(`/dashboard/${p.route}`);
     };
 
     return (
         <div className="flex items-center gap-2 p-1 bg-slate-100 dark:bg-surface-dark rounded-lg border border-slate-200 dark:border-slate-700">
-            {personas.map((p) => (
+            {PERSONAS.map((p) => (
                 <button
                     key={p.id}
                     onClick={() => handleSwitch(p)}
                     data-testid={`persona-${p.id}`}
                     aria-label={`${p.label} View`}
+                    aria-pressed={persona === p.id}
                     className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-semibold transition-all ${
                         persona === p.id
                             ? `${p.color} text-white shadow-sm shadow-blue-500/30`
