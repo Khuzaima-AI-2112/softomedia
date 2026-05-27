@@ -98,6 +98,15 @@ class ApiService {
         return apiClient.put(`/api/stores/${id}`, data);
     }
 
+    /**
+     * Partial update for a store — e.g. status toggle.
+     * @param {number|string} id
+     * @param {object} data - Partial store fields.
+     */
+    async patchStore(id, data) {
+        return apiClient.patch(`/api/stores/${id}`, data);
+    }
+
     async deleteStore(id) {
         return apiClient.delete(`/api/stores/${id}`);
     }
