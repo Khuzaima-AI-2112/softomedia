@@ -2,71 +2,121 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
+// Maps canonical ROLE_HIERARCHY keys to their dashboard route segment.
+// Keep in sync with PersonaSwitcher.jsx and HamburgerMenu.jsx.
+const ROLE_ROUTE = {
+    superadmin:    'admin',
+    admin:         'admin',
+    advertiser:    'brand',
+    retaileradmin: 'retailer',
+    techoperator:  'admin',
+};
+
+const QUICK_LOGINS = [
+    { role: 'superadmin',   label: 'Super Admin', icon: '🛡️', border: 'border-purple-600', text: 'text-purple-600', hover: 'hover:bg-purple-50' },
+    { role: 'admin',        label: 'Admin',       icon: '🔐', border: 'border-indigo-500', text: 'text-indigo-500', hover: 'hover:bg-indigo-50' },
+    { role: 'advertiser',   label: 'Brand',       icon: '📺', border: 'border-emerald-500', text: 'text-emerald-600', hover: 'hover:bg-emerald-50' },
+    { role: 'retaileradmin',label: 'Retailer',    icon: '🏪', border: 'border-amber-500',   text: 'text-amber-600',   hover: 'hover:bg-amber-50'   },
+    { role: 'techoperator', label: 'Tech Op',     icon: '🔧', border: 'border-slate-500',   text: 'text-slate-600',   hover: 'hover:bg-slate-50'   },
+];
+
+function makeMockUser(role) {
+    return {
+        id:               `demo-${role}`,
+        name:             role.replace(/([a-z])([A-Z])/g, '$1 $2')
+                              .replace(/^./, c => c.toUpperCase()),
+        email:            `${role}@demo.softomedia.com`,
+        role,
+        linked_entity_id: `entity-${role}`,
+    };
+}
+
 function Login() {
-    const [email, setEmail] = useState('');
-    const { login } = useAuth();
-    const navigate = useNavigate();
+    const [email, setEmail]     = useState('');
+    const [error, setError]     = useState('');
+    const { login }             = useAuth();
+    const navigate              = useNavigate();
 
-    const getDashRoute = (role) => (role === 'superadmin') ? 'admin' : role;
-
-    const handleLogin = (e) => {
-        e.preventDefault();
-        // superadmin must be checked before admin (substring match)
-        const role = email.includes('superadmin') ? 'superadmin'
-                   : email.includes('admin')      ? 'admin'
-                   : email.includes('brand')      ? 'brand'
-                   : 'retailer';
-        const mockUser = {
-            id: `demo-${role}`,
-            email: email,
-            role: role,
-            linked_entity_id: `entity-${role}`
-        };
-        login(mockUser, 'demo-token');
-        navigate(`/dashboard/${getDashRoute(role)}`);
+    const resolveRole = (emailVal) => {
+        const e = emailVal.toLowerCase();
+        if (e.includes('superadmin'))   return 'superadmin';
+        if (e.includes('admin'))        return 'admin';
+        if (e.includes('advertiser') || e.includes('brand')) return 'advertiser';
+        if (e.includes('retailer'))     return 'retaileradmin';
+        if (e.includes('tech'))         return 'techoperator';
+        return 'advertiser'; // safe default
     };
 
-    const handleDemoLogin = (role) => {
-        const mockUser = {
-            id: `demo-${role}`,
-            email: `${role}@demo.com`,
-            role: role,
-            linked_entity_id: `entity-${role}`
-        };
+    const doLogin = (role) => {
+        const mockUser = makeMockUser(role);
         login(mockUser, 'demo-token');
-        navigate(`/dashboard/${getDashRoute(role)}`);
+        navigate(`/dashboard/${ROLE_ROUTE[role]}`);
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!email.trim()) { setError('Please enter an email address.'); return; }
+        setError('');
+        doLogin(resolveRole(email));
     };
 
     return (
-        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3f4f6', fontFamily: 'Inter, sans-serif' }}>
-            <div style={{ backgroundColor: 'white', padding: '2.5rem', borderRadius: '1rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', width: '100%', maxWidth: '400px' }}>
-                <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', textAlign: 'center', marginBottom: '1.5rem', color: '#111827' }}>SoftoMedia</h1>
-                <p style={{ textAlign: 'center', color: '#6b7280', marginBottom: '2rem' }}>Sign in to your dashboard</p>
+        <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
+            <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg p-8">
 
-                <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {/* Logo / title */}
+                <div className="flex flex-col items-center mb-8">
+                    <span className="material-symbols-outlined text-primary text-4xl mb-2" aria-hidden="true">campaign</span>
+                    <h1 className="text-xl font-bold text-slate-900">SoftoMedia</h1>
+                    <p className="text-sm text-slate-500 mt-1">Sign in to your dashboard</p>
+                </div>
+
+                {/* Email form */}
+                <form onSubmit={handleSubmit} noValidate className="space-y-4">
                     <div>
-                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>Email Adress</label>
+                        <label
+                            htmlFor="email"
+                            className="block text-sm font-medium text-slate-700 mb-1"
+                        >
+                            Email Address
+                        </label>
                         <input
+                            id="email"
                             type="email"
-                            placeholder="retailer@demo.com"
+                            placeholder="admin@demo.softomedia.com"
                             value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                            style={{ width: '100%', padding: '0.625rem', borderRadius: '0.5rem', border: '1px solid #d1d5db', outline: 'none' }}
+                            onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                         />
+                        {error && (
+                            <p className="mt-1.5 text-xs text-red-600" role="alert">{error}</p>
+                        )}
                     </div>
-                    <button type="submit" style={{ width: '100%', padding: '0.625rem', borderRadius: '0.5rem', backgroundColor: '#6366f1', color: 'white', fontWeight: 'bold' }}>
+                    <button
+                        type="submit"
+                        className="w-full py-2.5 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-colors"
+                    >
                         Enter Dashboard
                     </button>
                 </form>
 
-                <div style={{ marginTop: '2rem', borderTop: '1px solid #e5e7eb', paddingTop: '1.5rem' }}>
-                    <p style={{ fontSize: '0.875rem', color: '#6b7280', textAlign: 'center', marginBottom: '1rem' }}>Quick Demo Access</p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <button onClick={() => handleDemoLogin('superadmin')} style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #7c3aed', color: '#7c3aed' }}>🛡️ Super Admin Persona</button>
-                        <button onClick={() => handleDemoLogin('admin')} style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #6366f1', color: '#6366f1' }}>🔐 Admin Persona</button>
-                        <button onClick={() => handleDemoLogin('brand')} style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #10b981', color: '#10b981' }}>📺 Brand Persona</button>
-                        <button onClick={() => handleDemoLogin('retailer')} style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #f59e0b', color: '#f59e0b' }}>🏪 Retailer Persona</button>
+                {/* Quick demo access */}
+                <div className="mt-6 pt-5 border-t border-slate-200">
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest text-center mb-3">
+                        Quick Demo Access
+                    </p>
+                    <div className="flex flex-col gap-2">
+                        {QUICK_LOGINS.map(({ role, label, icon, border, text, hover }) => (
+                            <button
+                                key={role}
+                                onClick={() => doLogin(role)}
+                                data-testid={`quick-login-${role}`}
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${border} ${text} ${hover}`}
+                            >
+                                <span aria-hidden="true">{icon}</span>
+                                {label} Persona
+                            </button>
+                        ))}
                     </div>
                 </div>
             </div>
