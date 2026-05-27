@@ -7,9 +7,9 @@ import apiService from '../../services/ApiService';
 // Allowed screen statuses (matches backend enum).
 const SCREEN_STATUS = Object.freeze({ ACTIVE: 'active', INACTIVE: 'inactive' });
 
-// Error code returned by the backend when a status change is rejected
-// because of active / upcoming campaigns on that screen.
-const ERR_ACTIVE_CAMPAIGNS = 'SCREEN_STATUS_CHANGE_REJECTED_ACTIVE_CAMPAIGNS';
+// Error codes returned by the backend for campaign-aware rejections.
+const ERR_STATUS_ACTIVE_CAMPAIGNS  = 'SCREEN_STATUS_CHANGE_REJECTED_ACTIVE_CAMPAIGNS';
+const ERR_DELETE_ACTIVE_CAMPAIGNS  = 'SCREEN_DELETE_REJECTED_ACTIVE_CAMPAIGNS';
 
 function ScreenManagement() {
     const [screens, setScreens] = useState([]);
@@ -90,7 +90,7 @@ function ScreenManagement() {
             );
 
             const errorCode = error?.data?.error ?? error?.code ?? '';
-            if (errorCode === ERR_ACTIVE_CAMPAIGNS) {
+            if (errorCode === ERR_STATUS_ACTIVE_CAMPAIGNS) {
                 addToast(
                     `Cannot set "${screen.screen_id}" to inactive — it is part of active or upcoming campaigns. ` +
                     'Adjust those campaigns first.',
@@ -113,16 +113,39 @@ function ScreenManagement() {
         }
     }, [togglingIds, addToast]);
 
+    /**
+     * Delete a screen.
+     *
+     * Steps:
+     *  1. Confirmation dialog.
+     *  2. Call DELETE /api/screens/:id.
+     *  3a. Success  → remove row, show success toast.
+     *  3b. Campaign conflict (409) → row stays, show admin-friendly error toast.
+     *  3c. Other error → row stays, show generic error toast.
+     */
     const handleDelete = useCallback(async (screen) => {
         if (!confirm(`Delete screen "${screen.screen_id}"? This action cannot be undone.`)) return;
+
         try {
-            setPageError('');
             await apiService.deleteScreen(screen.id);
             setScreens(prev => prev.filter(s => s.id !== screen.id));
             addToast(`Screen "${screen.screen_id}" deleted.`, 'success');
         } catch (error) {
-            console.error('Failed to delete screen:', error);
-            setPageError(error?.data?.message || error?.message || 'Failed to delete screen.');
+            const errorCode = error?.data?.error ?? error?.code ?? '';
+
+            if (errorCode === ERR_DELETE_ACTIVE_CAMPAIGNS) {
+                addToast(
+                    `"${screen.screen_id}" can't be deleted — it's used by an active or upcoming campaign. End or reassign those campaigns first.`,
+                    'error',
+                    8000
+                );
+            } else {
+                console.error('Failed to delete screen:', error);
+                addToast(
+                    error?.data?.message || error?.message || 'Failed to delete screen.',
+                    'error'
+                );
+            }
         }
     }, [addToast]);
 
