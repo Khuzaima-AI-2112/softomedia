@@ -15,6 +15,45 @@ const EMPTY_STORE_FORM = {
     traffic_level: 'medium'
 };
 
+/** Returns an object of field-level error strings. Empty object = valid. */
+function validateStoreForm(data) {
+    const errors = {};
+    const name = data.name.trim();
+    const address = data.address.trim();
+    const city = data.city.trim();
+
+    if (!name) {
+        errors.name = 'Store name is required.';
+    } else if (name.length < 3) {
+        errors.name = 'Store name must be at least 3 characters.';
+    } else if (name.length > 80) {
+        errors.name = 'Store name must be 80 characters or fewer.';
+    }
+
+    if (!address) {
+        errors.address = 'Address is required.';
+    } else if (address.length < 5) {
+        errors.address = 'Address must be at least 5 characters.';
+    } else if (address.length > 120) {
+        errors.address = 'Address must be 120 characters or fewer.';
+    }
+
+    if (!city) {
+        errors.city = 'City is required.';
+    } else if (!/^[A-Za-z\s\-']+$/.test(city)) {
+        errors.city = 'City must contain only letters, spaces, or hyphens.';
+    } else if (city.length > 60) {
+        errors.city = 'City must be 60 characters or fewer.';
+    }
+
+    return errors;
+}
+
+function FieldError({ message }) {
+    if (!message) return null;
+    return <p className="mt-1 text-xs text-red-500 dark:text-red-400">{message}</p>;
+}
+
 function RetailerManagement() {
     const [retailers, setRetailers] = useState([]);
     const [stores, setStores] = useState([]);
@@ -38,6 +77,9 @@ function RetailerManagement() {
     const [storeParentRetailer, setStoreParentRetailer] = useState(null);
     const [storeFormData, setStoreFormData] = useState(EMPTY_STORE_FORM);
     const [storeModalError, setStoreModalError] = useState('');
+    const [storeFieldErrors, setStoreFieldErrors] = useState({});
+    const [storeSubmitting, setStoreSubmitting] = useState(false);
+    const [storeSubmitAttempted, setStoreSubmitAttempted] = useState(false);
 
     const [selectedRetailer, setSelectedRetailer] = useState(null);
     const [pageError, setPageError] = useState('');
@@ -68,7 +110,7 @@ function RetailerManagement() {
 
     useEffect(() => { loadData(); }, [loadData]);
 
-    // ── Retailer CRUD ──────────────────────────────────────────────────
+    // ── Retailer CRUD ───────────────────────────────────────────────
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -142,10 +184,13 @@ function RetailerManagement() {
 
     const closeModal = () => { setShowModal(false); setEditingRetailer(null); setModalError(''); };
 
-    // ── Store CRUD ─────────────────────────────────────────────────────
+    // ── Store CRUD ────────────────────────────────────────────────────
 
     const openStoreModal = (retailer, store = null) => {
         setStoreModalError('');
+        setStoreFieldErrors({});
+        setStoreSubmitAttempted(false);
+        setStoreSubmitting(false);
         setStoreParentRetailer(retailer);
         if (store) {
             setEditingStore(store);
@@ -167,10 +212,28 @@ function RetailerManagement() {
         setEditingStore(null);
         setStoreParentRetailer(null);
         setStoreModalError('');
+        setStoreFieldErrors({});
+        setStoreSubmitAttempted(false);
+        setStoreSubmitting(false);
+    };
+
+    /** Update a single store form field; re-run validation live once user has attempted submit */
+    const updateStoreField = (field, value) => {
+        const updated = { ...storeFormData, [field]: value };
+        setStoreFormData(updated);
+        if (storeSubmitAttempted) {
+            setStoreFieldErrors(validateStoreForm(updated));
+        }
     };
 
     const handleStoreSubmit = async (e) => {
         e.preventDefault();
+        setStoreSubmitAttempted(true);
+        const errors = validateStoreForm(storeFormData);
+        setStoreFieldErrors(errors);
+        if (Object.keys(errors).length > 0) return;  // block submit — show inline errors
+
+        setStoreSubmitting(true);
         setStoreModalError('');
         try {
             if (editingStore) {
@@ -186,6 +249,8 @@ function RetailerManagement() {
         } catch (error) {
             console.error('Failed to save store:', error);
             setStoreModalError(error?.data?.message || error.message || 'Failed to save store');
+        } finally {
+            setStoreSubmitting(false);
         }
     };
 
@@ -206,7 +271,7 @@ function RetailerManagement() {
         }
     };
 
-    // ── Derived helpers ────────────────────────────────────────────────
+    // ── Derived helpers ──────────────────────────────────────────────
 
     const getRetailerStores = (retailerId) => stores.filter(s => s.retailer_id === retailerId);
     const getRetailerScreens = (retailerId) => screens.filter(s => s.retailer_id === retailerId);
@@ -216,7 +281,9 @@ function RetailerManagement() {
     const totalScreens = screens.length;
     const onlineScreens = screens.filter(s => s.status === 'online').length;
 
-    // ── Table columns ──────────────────────────────────────────────────
+    const storeFormHasErrors = storeSubmitAttempted && Object.keys(storeFieldErrors).length > 0;
+
+    // ── Table columns ────────────────────────────────────────────────
 
     const columns = [
         {
@@ -312,7 +379,15 @@ function RetailerManagement() {
         }
     ];
 
-    // ── Render ─────────────────────────────────────────────────────────
+    // helper: input border class
+    const inputClass = (fieldError) =>
+        `w-full px-3 py-2 rounded-lg border ${
+            fieldError
+                ? 'border-red-400 dark:border-red-500 focus:ring-red-400'
+                : 'border-slate-300 dark:border-slate-600 focus:ring-primary'
+        } bg-white dark:bg-slate-800 focus:ring-2 outline-none transition-colors`;
+
+    // ── Render ────────────────────────────────────────────────────────
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -332,9 +407,7 @@ function RetailerManagement() {
             </div>
 
             {pageError && (
-                <div className="px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">
-                    {pageError}
-                </div>
+                <div className="px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">{pageError}</div>
             )}
 
             {/* Stats */}
@@ -416,28 +489,22 @@ function RetailerManagement() {
                                 const storeOnline = storeScreens.filter(s => s.status === 'online').length;
                                 const isDeleting = deletingStoreIds.has(store.id);
                                 return (
-                                    <div
-                                        key={store.id}
-                                        className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30"
-                                    >
+                                    <div key={store.id} className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30">
                                         <div className="flex items-start justify-between mb-2">
                                             <div className="flex-1 min-w-0 mr-2">
                                                 <p className="font-semibold text-sm truncate">{store.name}</p>
                                                 <p className="text-xs text-slate-500 truncate">{store.address}</p>
                                             </div>
-                                            <div className="flex items-center gap-1 flex-shrink-0">
-                                                <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                                    store.traffic_level === 'high'
-                                                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                                        : store.traffic_level === 'low'
-                                                            ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                                                            : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                                                }`}>
-                                                    {store.traffic_level} traffic
-                                                </span>
-                                            </div>
+                                            <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${
+                                                store.traffic_level === 'high'
+                                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                                    : store.traffic_level === 'low'
+                                                        ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                                        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                                            }`}>
+                                                {store.traffic_level} traffic
+                                            </span>
                                         </div>
-
                                         <div className="flex items-center gap-4 text-xs mt-3">
                                             <span className="flex items-center gap-1">
                                                 <span className="material-symbols-outlined text-sm text-slate-400">tv</span>
@@ -448,7 +515,6 @@ function RetailerManagement() {
                                                 {store.city}
                                             </span>
                                         </div>
-
                                         <div className="flex items-center justify-end gap-1 mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
                                             <button
                                                 onClick={() => openStoreModal(selectedRetailer, store)}
@@ -549,9 +615,7 @@ function RetailerManagement() {
             {showStoreModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <GlassCard className="w-full max-w-md">
-                        <h2 className="text-xl font-bold mb-1">
-                            {editingStore ? 'Edit Store' : 'Add New Store'}
-                        </h2>
+                        <h2 className="text-xl font-bold mb-1">{editingStore ? 'Edit Store' : 'Add New Store'}</h2>
                         {storeParentRetailer && (
                             <p className="text-sm text-slate-500 mb-4 flex items-center gap-1">
                                 <span>{storeParentRetailer.logo}</span>
@@ -561,42 +625,58 @@ function RetailerManagement() {
                         {storeModalError && (
                             <div className="mb-4 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">{storeModalError}</div>
                         )}
-                        <form onSubmit={handleStoreSubmit} className="space-y-4">
+                        <form onSubmit={handleStoreSubmit} noValidate className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium mb-1">Store Name</label>
+                                <label className="block text-sm font-medium mb-1" htmlFor="store-name">Store Name</label>
                                 <input
-                                    type="text" required
+                                    id="store-name"
+                                    type="text"
                                     value={storeFormData.name}
-                                    onChange={(e) => setStoreFormData({ ...storeFormData, name: e.target.value })}
-                                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
+                                    onChange={(e) => updateStoreField('name', e.target.value)}
+                                    className={inputClass(storeFieldErrors.name)}
                                     placeholder="Downtown Flagship"
+                                    maxLength={80}
+                                    aria-invalid={!!storeFieldErrors.name}
+                                    aria-describedby={storeFieldErrors.name ? 'store-name-error' : undefined}
                                 />
+                                <FieldError message={storeFieldErrors.name} />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-1">Address</label>
+                                <label className="block text-sm font-medium mb-1" htmlFor="store-address">Address</label>
                                 <input
-                                    type="text" required
+                                    id="store-address"
+                                    type="text"
                                     value={storeFormData.address}
-                                    onChange={(e) => setStoreFormData({ ...storeFormData, address: e.target.value })}
-                                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
+                                    onChange={(e) => updateStoreField('address', e.target.value)}
+                                    className={inputClass(storeFieldErrors.address)}
                                     placeholder="123 Main St"
+                                    maxLength={120}
+                                    aria-invalid={!!storeFieldErrors.address}
+                                    aria-describedby={storeFieldErrors.address ? 'store-address-error' : undefined}
                                 />
+                                <FieldError message={storeFieldErrors.address} />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-1">City</label>
+                                <label className="block text-sm font-medium mb-1" htmlFor="store-city">City</label>
                                 <input
-                                    type="text" required
+                                    id="store-city"
+                                    type="text"
                                     value={storeFormData.city}
-                                    onChange={(e) => setStoreFormData({ ...storeFormData, city: e.target.value })}
-                                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
+                                    onChange={(e) => updateStoreField('city', e.target.value)}
+                                    className={inputClass(storeFieldErrors.city)}
                                     placeholder="Montreal"
+                                    maxLength={60}
+                                    aria-invalid={!!storeFieldErrors.city}
+                                    aria-describedby={storeFieldErrors.city ? 'store-city-error' : undefined}
                                 />
+                                <FieldError message={storeFieldErrors.city} />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-1">Traffic Level</label>
+                                <label className="block text-sm font-medium mb-1" htmlFor="store-traffic">Traffic Level</label>
                                 <select
+                                    id="store-traffic"
                                     value={storeFormData.traffic_level}
-                                    onChange={(e) => setStoreFormData({ ...storeFormData, traffic_level: e.target.value })}
+                                    onChange={(e) => updateStoreField('traffic_level', e.target.value)}
                                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none capitalize"
                                 >
                                     {TRAFFIC_OPTIONS.map(t => (
@@ -605,12 +685,22 @@ function RetailerManagement() {
                                 </select>
                             </div>
                             <div className="flex justify-end gap-3 mt-6">
-                                <button type="button" onClick={closeStoreModal}
-                                    className="px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 font-medium">
+                                <button
+                                    type="button"
+                                    onClick={closeStoreModal}
+                                    disabled={storeSubmitting}
+                                    className="px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 font-medium disabled:opacity-50"
+                                >
                                     Cancel
                                 </button>
-                                <button type="submit"
-                                    className="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover shadow-lg shadow-primary/20">
+                                <button
+                                    type="submit"
+                                    disabled={storeSubmitting || storeFormHasErrors}
+                                    className="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover shadow-lg shadow-primary/20 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                                >
+                                    {storeSubmitting && (
+                                        <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
+                                    )}
                                     {editingStore ? 'Save Changes' : 'Add Store'}
                                 </button>
                             </div>
