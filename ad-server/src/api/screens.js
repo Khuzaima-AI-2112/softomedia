@@ -56,4 +56,55 @@ router.get('/', async (req, res) => {
     }
 });
 
+/**
+ * PATCH /api/screens/:id/status
+ *
+ * Update a screen's operational status with campaign-aware validation.
+ * This endpoint is used by the Admin Screen Management UI (Story 2.8-status)
+ * to toggle between `active` and `inactive` states.
+ *
+ * Contract:
+ *   - Request body: { status: 'active' | 'inactive' }
+ *   - Response 200: updated screen document
+ *   - Response 400: invalid payload
+ *   - Response 404: screen not found
+ *   - Response 409: change rejected due to active/upcoming campaigns
+ *       { error: 'SCREEN_STATUS_CHANGE_REJECTED_ACTIVE_CAMPAIGNS', message: string }
+ */
+router.patch('/:id/status', authenticate, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body || {};
+
+        if (!id) {
+            return res.status(400).json({ error: 'screenId required' });
+        }
+        if (!status || !['active', 'inactive'].includes(status)) {
+            return res.status(400).json({ error: 'Invalid status. Expected "active" or "inactive".' });
+        }
+
+        // When turning a screen inactive, ensure there are no active/upcoming campaigns
+        if (status === 'inactive') {
+            const hasBlockingCampaigns = await screenRepository.hasActiveOrUpcomingCampaigns(id);
+            if (hasBlockingCampaigns) {
+                return res.status(409).json({
+                    error: 'SCREEN_STATUS_CHANGE_REJECTED_ACTIVE_CAMPAIGNS',
+                    message:
+                        'This screen is part of active or upcoming campaigns. Adjust or cancel those campaigns before setting the screen inactive.'
+                });
+            }
+        }
+
+        const updated = await screenRepository.updateStatus(id, status);
+        if (!updated) {
+            return res.status(404).json({ error: 'Screen not found' });
+        }
+
+        res.json(updated);
+    } catch (error) {
+        console.error('PATCH /api/screens/:id/status failed:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 export default router;
