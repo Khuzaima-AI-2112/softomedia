@@ -3,13 +3,52 @@ import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import { API_URL } from '../../config';
 
+const HAMBURGER_EXPERIMENTS = [
+  {
+    id: 'variant-a',
+    label: 'Variant A',
+    description: 'Current production — left slide-in drawer, backdrop blur, 2-col swatch grid',
+    href: '/experiments/hamburger-variant-a.html',
+    badge: 'Production',
+    badgeClass: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400',
+    iconColor: 'text-emerald-500',
+  },
+  {
+    id: 'variant-b',
+    label: 'Variant B',
+    description: 'Compact top sheet — drops below header, 3-col desktop layout, no full overlay',
+    href: '/experiments/hamburger-variant-b.html',
+    badge: 'Experiment',
+    badgeClass: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
+    iconColor: 'text-amber-500',
+  },
+  {
+    id: 'variant-c',
+    label: 'Variant C',
+    description: 'Right-side wide drawer — trigger on right, w-80, single-col role list with check mark',
+    href: '/experiments/hamburger-variant-c.html',
+    badge: 'Experiment',
+    badgeClass: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
+    iconColor: 'text-amber-500',
+  },
+  {
+    id: 'variant-index',
+    label: 'All Variants',
+    description: 'Side-by-side index — all 3 experiments on one screen for comparison',
+    href: '/experiments/hamburger-index.html',
+    badge: 'Index',
+    badgeClass: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+    iconColor: 'text-slate-400',
+  },
+];
+
 function TechOpsDashboard() {
     const [stats, setStats] = useState({ total: 0, online: 0, offline: 0, screens: [] });
     const [, setLoading] = useState(true);
 
     useEffect(() => {
         fetchStatus();
-        const interval = setInterval(fetchStatus, 30000); // Polling every 30s
+        const interval = setInterval(fetchStatus, 30000);
         return () => clearInterval(interval);
     }, []);
 
@@ -68,6 +107,42 @@ function TechOpsDashboard() {
                     </p>
                 </GlassCard>
             </div>
+
+            {/* ── Design Lab ── */}
+            <GlassCard>
+                <div className="flex items-center justify-between mb-5">
+                    <h3 className="font-bold flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary">experiment</span>
+                        Design Lab — Hamburger Menu Experiments
+                    </h3>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Tech Op only</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {HAMBURGER_EXPERIMENTS.map((exp) => (
+                        <a
+                            key={exp.id}
+                            href={exp.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="group flex items-start gap-3 p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:border-primary/30 hover:bg-primary/5 dark:hover:bg-primary/10 transition-all duration-150"
+                        >
+                            <span className={`material-symbols-outlined text-[20px] mt-0.5 shrink-0 ${exp.iconColor} group-hover:scale-110 transition-transform duration-150`}>
+                                menu
+                            </span>
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 mb-0.5">
+                                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">{exp.label}</span>
+                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${exp.badgeClass}`}>{exp.badge}</span>
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 leading-snug">{exp.description}</p>
+                            </div>
+                            <span className="material-symbols-outlined text-[16px] text-slate-300 group-hover:text-primary shrink-0 mt-0.5 transition-colors duration-150">
+                                arrow_outward
+                            </span>
+                        </a>
+                    ))}
+                </div>
+            </GlassCard>
 
             <GlassCard>
                 <div className="flex items-center justify-between mb-6">
