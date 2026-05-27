@@ -7,9 +7,15 @@ function Login() {
     const { login } = useAuth();
     const navigate = useNavigate();
 
+    const getDashRoute = (role) => (role === 'superadmin') ? 'admin' : role;
+
     const handleLogin = (e) => {
         e.preventDefault();
-        const role = email.includes('admin') ? 'admin' : (email.includes('brand') ? 'brand' : 'retailer');
+        // superadmin must be checked before admin (substring match)
+        const role = email.includes('superadmin') ? 'superadmin'
+                   : email.includes('admin')      ? 'admin'
+                   : email.includes('brand')      ? 'brand'
+                   : 'retailer';
         const mockUser = {
             id: `demo-${role}`,
             email: email,
@@ -17,7 +23,7 @@ function Login() {
             linked_entity_id: `entity-${role}`
         };
         login(mockUser, 'demo-token');
-        navigate(`/dashboard/${role}`);
+        navigate(`/dashboard/${getDashRoute(role)}`);
     };
 
     const handleDemoLogin = (role) => {
@@ -28,7 +34,7 @@ function Login() {
             linked_entity_id: `entity-${role}`
         };
         login(mockUser, 'demo-token');
-        navigate(`/dashboard/${role}`);
+        navigate(`/dashboard/${getDashRoute(role)}`);
     };
 
     return (
@@ -57,6 +63,7 @@ function Login() {
                 <div style={{ marginTop: '2rem', borderTop: '1px solid #e5e7eb', paddingTop: '1.5rem' }}>
                     <p style={{ fontSize: '0.875rem', color: '#6b7280', textAlign: 'center', marginBottom: '1rem' }}>Quick Demo Access</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <button onClick={() => handleDemoLogin('superadmin')} style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #7c3aed', color: '#7c3aed' }}>🛡️ Super Admin Persona</button>
                         <button onClick={() => handleDemoLogin('admin')} style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #6366f1', color: '#6366f1' }}>🔐 Admin Persona</button>
                         <button onClick={() => handleDemoLogin('brand')} style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #10b981', color: '#10b981' }}>📺 Brand Persona</button>
                         <button onClick={() => handleDemoLogin('retailer')} style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #f59e0b', color: '#f59e0b' }}>🏪 Retailer Persona</button>
