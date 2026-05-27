@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import DataTable from '../../components/DataTable';
@@ -49,6 +49,33 @@ function validateStoreForm(data) {
     return errors;
 }
 
+/** Validation for retailer modal. Mirrors store pattern. */
+function validateRetailerForm(data) {
+    const errors = {};
+    const name = data.name.trim();
+    const email = data.contact_email.trim();
+
+    if (!name) {
+        errors.name = 'Company name is required.';
+    } else if (name.length < 3) {
+        errors.name = 'Company name must be at least 3 characters.';
+    } else if (name.length > 100) {
+        errors.name = 'Company name must be 100 characters or fewer.';
+    }
+
+    if (!email) {
+        errors.contact_email = 'Contact email is required.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errors.contact_email = 'Enter a valid email address.';
+    }
+
+    if (!data.contract_start) {
+        errors.contract_start = 'Contract start date is required.';
+    }
+
+    return errors;
+}
+
 function FieldError({ message }) {
     if (!message) return null;
     return <p className="mt-1 text-xs text-red-500 dark:text-red-400">{message}</p>;
@@ -70,6 +97,9 @@ function RetailerManagement() {
         contract_start: new Date().toISOString().split('T')[0]
     });
     const [modalError, setModalError] = useState('');
+    const [retailerFieldErrors, setRetailerFieldErrors] = useState({});
+    const [retailerSubmitAttempted, setRetailerSubmitAttempted] = useState(false);
+    const [retailerSubmitting, setRetailerSubmitting] = useState(false);
 
     // Store modal
     const [showStoreModal, setShowStoreModal] = useState(false);
@@ -81,10 +111,17 @@ function RetailerManagement() {
     const [storeSubmitting, setStoreSubmitting] = useState(false);
     const [storeSubmitAttempted, setStoreSubmitAttempted] = useState(false);
 
+    // Filters / sorting / selection
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all'); // all | active | inactive
+    const [sortBy, setSortBy] = useState('name'); // name | stores | screens | contract
+    const [sortDirection, setSortDirection] = useState('asc'); // asc | desc
+
     const [selectedRetailer, setSelectedRetailer] = useState(null);
     const [pageError, setPageError] = useState('');
     const [togglingIds, setTogglingIds] = useState(new Set());
     const [deletingStoreIds, setDeletingStoreIds] = useState(new Set());
+    const [bulkBusy, setBulkBusy] = useState(false);
 
     const { toasts, addToast, removeToast } = useToasts();
 
@@ -112,9 +149,23 @@ function RetailerManagement() {
 
     // ── Retailer CRUD ───────────────────────────────────────────────
 
+    const updateRetailerField = (field, value) => {
+        const updated = { ...formData, [field]: value };
+        setFormData(updated);
+        if (retailerSubmitAttempted) {
+            setRetailerFieldErrors(validateRetailerForm(updated));
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setRetailerSubmitAttempted(true);
         setModalError('');
+        const errors = validateRetailerForm(formData);
+        setRetailerFieldErrors(errors);
+        if (Object.keys(errors).length > 0) return;
+
+        setRetailerSubmitting(true);
         try {
             if (editingRetailer) {
                 await apiService.updateRetailer(editingRetailer.id, formData);
@@ -128,6 +179,8 @@ function RetailerManagement() {
         } catch (error) {
             console.error('Failed to save retailer:', error);
             setModalError(error?.data?.message || error.message || 'Failed to save retailer');
+        } finally {
+            setRetailerSubmitting(false);
         }
     };
 
@@ -167,6 +220,9 @@ function RetailerManagement() {
 
     const openModal = (retailer = null) => {
         setModalError('');
+        setRetailerFieldErrors({});
+        setRetailerSubmitAttempted(false);
+        setRetailerSubmitting(false);
         if (retailer) {
             setEditingRetailer(retailer);
             setFormData({
@@ -182,7 +238,14 @@ function RetailerManagement() {
         setShowModal(true);
     };
 
-    const closeModal = () => { setShowModal(false); setEditingRetailer(null); setModalError(''); };
+    const closeModal = () => {
+        setShowModal(false);
+        setEditingRetailer(null);
+        setModalError('');
+        setRetailerFieldErrors({});
+        setRetailerSubmitAttempted(false);
+        setRetailerSubmitting(false);
+    };
 
     // ── Store CRUD ────────────────────────────────────────────────────
 
@@ -282,6 +345,69 @@ function RetailerManagement() {
     const onlineScreens = screens.filter(s => s.status === 'online').length;
 
     const storeFormHasErrors = storeSubmitAttempted && Object.keys(storeFieldErrors).length > 0;
+    const retailerFormHasErrors = retailerSubmitAttempted && Object.keys(retailerFieldErrors).length > 0;
+
+    // Filter + sort retailers for table
+    const filteredAndSortedRetailers = useMemo(() => {
+        const term = searchTerm.trim().toLowerCase();
+
+        let result = retailers.filter((r) => {
+            if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+            if (!term) return true;
+            const haystack = `${r.name} ${r.contact_email}`.toLowerCase();
+            return haystack.includes(term);
+        });
+
+        result = result.slice().sort((a, b) => {
+            const storesA = getRetailerStores(a.id).length;
+            const storesB = getRetailerStores(b.id).length;
+            const screensA = getRetailerScreens(a.id).length;
+            const screensB = getRetailerScreens(b.id).length;
+
+            let cmp = 0;
+            switch (sortBy) {
+                case 'stores':
+                    cmp = storesA - storesB;
+                    break;
+                case 'screens':
+                    cmp = screensA - screensB;
+                    break;
+                case 'contract':
+                    cmp = new Date(a.contract_start) - new Date(b.contract_start);
+                    break;
+                case 'name':
+                default:
+                    cmp = a.name.localeCompare(b.name);
+            }
+            return sortDirection === 'asc' ? cmp : -cmp;
+        });
+
+        return result;
+    }, [retailers, searchTerm, statusFilter, sortBy, sortDirection, stores, screens]);
+
+    // Bulk: deactivate all retailers with zero stores
+    const handleBulkDeactivateEmpty = async () => {
+        const targets = retailers.filter((r) => getRetailerStores(r.id).length === 0 && r.status === 'active');
+        if (!targets.length) {
+            addToast('No active retailers without stores.', 'warning');
+            return;
+        }
+        if (!window.confirm(`Deactivate ${targets.length} retailer(s) with no stores?`)) return;
+
+        setBulkBusy(true);
+        try {
+            await Promise.all(
+                targets.map((r) => apiService.patchRetailer(r.id, { status: 'inactive' }))
+            );
+            await loadData();
+            addToast(`${targets.length} retailer(s) deactivated.`, 'success');
+        } catch (error) {
+            console.error('Bulk deactivate failed:', error);
+            addToast('Failed to deactivate some retailers. Please try again.', 'error');
+        } finally {
+            setBulkBusy(false);
+        }
+    };
 
     // ── Table columns ────────────────────────────────────────────────
 
@@ -387,6 +513,27 @@ function RetailerManagement() {
                 : 'border-slate-300 dark:border-slate-600 focus:ring-primary'
         } bg-white dark:bg-slate-800 focus:ring-2 outline-none transition-colors`;
 
+    const sortButtonClass = (key) =>
+        `inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full border ${
+            sortBy === key
+                ? 'border-primary text-primary bg-primary/5'
+                : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'
+        }`;
+
+    const sortIcon = (key) => {
+        if (sortBy !== key) return 'unfold_more';
+        return sortDirection === 'asc' ? 'expand_less' : 'expand_more';
+    };
+
+    const toggleSort = (key) => {
+        if (sortBy === key) {
+            setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+        } else {
+            setSortBy(key);
+            setSortDirection('asc');
+        }
+    };
+
     // ── Render ────────────────────────────────────────────────────────
 
     return (
@@ -397,13 +544,49 @@ function RetailerManagement() {
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Retailer Management</h1>
                     <p className="text-slate-500 dark:text-slate-400">Manage retail partners and their store networks</p>
                 </div>
-                <button
-                    onClick={() => openModal()}
-                    className="px-4 py-2 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover transition-colors flex items-center gap-2"
-                >
-                    <span className="material-symbols-outlined text-[20px]">add_business</span>
-                    Add Retailer
-                </button>
+                <div className="flex flex-col md:flex-row gap-3 md:items-center">
+                    <div className="flex items-center gap-2">
+                        <div className="relative">
+                            <span className="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
+                            <input
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="Search retailers..."
+                                className="pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-primary outline-none w-52"
+                            />
+                        </div>
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-600 dark:text-slate-300"
+                        >
+                            <option value="all">All statuses</option>
+                            <option value="active">Active only</option>
+                            <option value="inactive">Inactive only</option>
+                        </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={handleBulkDeactivateEmpty}
+                            disabled={bulkBusy}
+                            className="px-3 py-1.5 text-xs rounded-lg border border-amber-400 text-amber-700 bg-amber-50 hover:bg-amber-100 dark:border-amber-500 dark:text-amber-300 dark:bg-amber-900/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                        >
+                            {bulkBusy && (
+                                <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
+                            )}
+                            Deactivate empty
+                        </button>
+                        <button
+                            onClick={() => openModal()}
+                            className="px-4 py-2 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover transition-colors flex items-center gap-2 text-sm"
+                        >
+                            <span className="material-symbols-outlined text-[20px]">add_business</span>
+                            Add Retailer
+                        </button>
+                    </div>
+                </div>
             </div>
 
             {pageError && (
@@ -436,8 +619,39 @@ function RetailerManagement() {
                 </GlassCard>
             </div>
 
+            {/* Sort controls */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Showing {filteredAndSortedRetailers.length} of {retailers.length} retailers
+                </p>
+                <div className="flex items-center gap-2 text-xs">
+                    <span className="text-slate-400">Sort by:</span>
+                    <button type="button" onClick={() => toggleSort('name')} className={sortButtonClass('name')}>
+                        Name
+                        <span className="material-symbols-outlined text-[16px]">{sortIcon('name')}</span>
+                    </button>
+                    <button type="button" onClick={() => toggleSort('stores')} className={sortButtonClass('stores')}>
+                        Stores
+                        <span className="material-symbols-outlined text-[16px]">{sortIcon('stores')}</span>
+                    </button>
+                    <button type="button" onClick={() => toggleSort('screens')} className={sortButtonClass('screens')}>
+                        Screens
+                        <span className="material-symbols-outlined text-[16px]">{sortIcon('screens')}</span>
+                    </button>
+                    <button type="button" onClick={() => toggleSort('contract')} className={sortButtonClass('contract')}>
+                        Contract start
+                        <span className="material-symbols-outlined text-[16px]">{sortIcon('contract')}</span>
+                    </button>
+                </div>
+            </div>
+
             {/* Retailers Table */}
-            <DataTable columns={columns} data={retailers} loading={loading} emptyMessage="No retailers found" />
+            <DataTable
+                columns={columns}
+                data={filteredAndSortedRetailers}
+                loading={loading}
+                emptyMessage="No retailers match your filters"
+            />
 
             {/* Selected Retailer — Store Cards */}
             {selectedRetailer && (
@@ -552,13 +766,13 @@ function RetailerManagement() {
                         {modalError && (
                             <div className="mb-4 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">{modalError}</div>
                         )}
-                        <form onSubmit={handleSubmit} className="space-y-4">
+                        <form onSubmit={handleSubmit} noValidate className="space-y-4">
                             <div className="flex gap-4">
                                 <div className="flex-shrink-0">
                                     <label className="block text-sm font-medium mb-1">Icon</label>
                                     <select
                                         value={formData.logo}
-                                        onChange={(e) => setFormData({ ...formData, logo: e.target.value })}
+                                        onChange={(e) => updateRetailerField('logo', e.target.value)}
                                         className="w-16 h-16 text-2xl text-center rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
                                     >
                                         {['🏪', '🛒', '🥬', '⚡', '🏬', '🛍️', '🏢', '🏭'].map(emoji => (
@@ -567,42 +781,62 @@ function RetailerManagement() {
                                     </select>
                                 </div>
                                 <div className="flex-1">
-                                    <label className="block text-sm font-medium mb-1">Company Name</label>
+                                    <label className="block text-sm font-medium mb-1" htmlFor="retailer-name">Company Name</label>
                                     <input
-                                        type="text" required
+                                        id="retailer-name"
+                                        type="text"
                                         value={formData.name}
-                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
+                                        onChange={(e) => updateRetailerField('name', e.target.value)}
+                                        className={inputClass(retailerFieldErrors.name)}
                                         placeholder="Acme Retail Corp"
+                                        maxLength={100}
+                                        aria-invalid={!!retailerFieldErrors.name}
                                     />
+                                    <FieldError message={retailerFieldErrors.name} />
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-1">Contact Email</label>
+                                <label className="block text-sm font-medium mb-1" htmlFor="retailer-email">Contact Email</label>
                                 <input
-                                    type="email" required
+                                    id="retailer-email"
+                                    type="email"
                                     value={formData.contact_email}
-                                    onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
-                                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
+                                    onChange={(e) => updateRetailerField('contact_email', e.target.value)}
+                                    className={inputClass(retailerFieldErrors.contact_email)}
                                     placeholder="admin@retailer.com"
+                                    aria-invalid={!!retailerFieldErrors.contact_email}
                                 />
+                                <FieldError message={retailerFieldErrors.contact_email} />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-1">Contract Start Date</label>
+                                <label className="block text-sm font-medium mb-1" htmlFor="retailer-contract">Contract Start Date</label>
                                 <input
-                                    type="date" required
+                                    id="retailer-contract"
+                                    type="date"
                                     value={formData.contract_start}
-                                    onChange={(e) => setFormData({ ...formData, contract_start: e.target.value })}
-                                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
+                                    onChange={(e) => updateRetailerField('contract_start', e.target.value)}
+                                    className={inputClass(retailerFieldErrors.contract_start)}
+                                    aria-invalid={!!retailerFieldErrors.contract_start}
                                 />
+                                <FieldError message={retailerFieldErrors.contract_start} />
                             </div>
                             <div className="flex justify-end gap-3 mt-6">
-                                <button type="button" onClick={closeModal}
-                                    className="px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 font-medium">
+                                <button
+                                    type="button"
+                                    onClick={closeModal}
+                                    disabled={retailerSubmitting}
+                                    className="px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 font-medium disabled:opacity-50"
+                                >
                                     Cancel
                                 </button>
-                                <button type="submit"
-                                    className="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover shadow-lg shadow-primary/20">
+                                <button
+                                    type="submit"
+                                    disabled={retailerSubmitting || retailerFormHasErrors}
+                                    className="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover shadow-lg shadow-primary/20 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {retailerSubmitting && (
+                                        <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
+                                    )}
                                     {editingRetailer ? 'Save Changes' : 'Create Retailer'}
                                 </button>
                             </div>
@@ -637,7 +871,6 @@ function RetailerManagement() {
                                     placeholder="Downtown Flagship"
                                     maxLength={80}
                                     aria-invalid={!!storeFieldErrors.name}
-                                    aria-describedby={storeFieldErrors.name ? 'store-name-error' : undefined}
                                 />
                                 <FieldError message={storeFieldErrors.name} />
                             </div>
@@ -652,7 +885,6 @@ function RetailerManagement() {
                                     placeholder="123 Main St"
                                     maxLength={120}
                                     aria-invalid={!!storeFieldErrors.address}
-                                    aria-describedby={storeFieldErrors.address ? 'store-address-error' : undefined}
                                 />
                                 <FieldError message={storeFieldErrors.address} />
                             </div>
@@ -667,7 +899,6 @@ function RetailerManagement() {
                                     placeholder="Montreal"
                                     maxLength={60}
                                     aria-invalid={!!storeFieldErrors.city}
-                                    aria-describedby={storeFieldErrors.city ? 'store-city-error' : undefined}
                                 />
                                 <FieldError message={storeFieldErrors.city} />
                             </div>
