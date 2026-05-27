@@ -6,7 +6,7 @@ test.describe('Persona Switching & Persistence', () => {
     });
 
     test('should default to Brand persona', async ({ page }) => {
-        const brandButton = page.locator('[data-testid="persona-brand"]');
+        const brandButton = page.locator('[data-testid="persona-advertiser"]');
         await expect(brandButton).toHaveClass(/bg-primary/);
         await expect(page.getByText(/brand mode/i)).toBeVisible();
     });
@@ -14,12 +14,18 @@ test.describe('Persona Switching & Persistence', () => {
     test('should switch to Admin persona', async ({ page }) => {
         const adminButton = page.locator('[data-testid="persona-admin"]');
         await adminButton.click();
-        await expect(adminButton).toHaveClass(/bg-red-600/);
+        await expect(adminButton).toHaveClass(/bg-blue-500/);
         await expect(page.getByText(/admin mode/i)).toBeVisible();
     });
 
+    test('should switch to Super Admin persona', async ({ page }) => {
+        const superAdminButton = page.locator('[data-testid="persona-superadmin"]');
+        await superAdminButton.click();
+        await expect(superAdminButton).toHaveClass(/bg-red-600/);
+    });
+
     test('should switch to Retailer persona', async ({ page }) => {
-        const retailerButton = page.locator('[data-testid="persona-retailer"]');
+        const retailerButton = page.locator('[data-testid="persona-retaileradmin"]');
         await retailerButton.click();
         await expect(retailerButton).toHaveClass(/bg-emerald-500/);
         await expect(page.getByText(/retailer mode/i)).toBeVisible();
@@ -30,7 +36,12 @@ test.describe('Persona Switching & Persistence', () => {
         await expect(page.getByText(/admin mode/i)).toBeVisible();
         await page.reload();
         await expect(page.getByText(/admin mode/i)).toBeVisible();
-        await expect(page.locator('[data-testid="persona-admin"]')).toHaveClass(/bg-red-600/);
+        await expect(page.locator('[data-testid="persona-admin"]')).toHaveClass(/bg-blue-500/);
+    });
+
+    test('should render all 5 persona buttons', async ({ page }) => {
+        const buttons = page.locator('[data-testid^="persona-"]');
+        await expect(buttons).toHaveCount(5);
     });
 });
 
