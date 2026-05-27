@@ -20,7 +20,8 @@ export const AuthProvider = ({ children }) => {
         } else if (savedUser) {
             setPersonaState(JSON.parse(savedUser).role);
         } else {
-            setPersonaState('brand');
+            // 'advertiser' is the canonical ROLE_HIERARCHY key (was 'brand' — stale)
+            setPersonaState('advertiser');
         }
         setLoading(false);
     }, []);
@@ -60,7 +61,8 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('active_persona');
         setUser(null);
-        setPersonaState('brand');
+        // 'advertiser' is the canonical ROLE_HIERARCHY key (was 'brand' — stale)
+        setPersonaState('advertiser');
     };
 
     return (
