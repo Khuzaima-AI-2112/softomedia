@@ -127,6 +127,23 @@ class ApiService {
         return apiClient.patch(`/api/screens/${id}`, data);
     }
 
+    /**
+     * Dedicated status update for a screen.
+     * Sends PATCH /api/screens/:id/status { status: 'active' | 'inactive' }.
+     *
+     * The backend is expected to:
+     *  - Validate that status is one of the allowed values.
+     *  - Check for active / upcoming campaigns before allowing active → inactive.
+     *  - On conflict return { error: 'SCREEN_STATUS_CHANGE_REJECTED_ACTIVE_CAMPAIGNS', message: '...' }.
+     *
+     * @param {number|string} id     - Screen numeric DB id.
+     * @param {'active'|'inactive'} status
+     * @returns {Promise<object>} Updated screen object.
+     */
+    async updateScreenStatus(id, status) {
+        return apiClient.patch(`/api/screens/${id}/status`, { status });
+    }
+
     async deleteScreen(id) {
         return apiClient.delete(`/api/screens/${id}`);
     }
