@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en" class="">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hamburger C — Right-Side Wide Drawer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { colors: { primary: '#01696f' } } }
+    };
+  </script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+    .slide-in-right { animation: slideInRight 200ms cubic-bezier(0.16,1,0.3,1); }
+  </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 min-h-screen">
+
+  <div class="bg-rose-600 text-white text-xs font-semibold text-center py-1.5 tracking-wide">VARIANT C — Right-Side Wide Drawer (w-80) · single-col role list with check icon · bordered logout</div>
+
+  <!-- Sticky header — trigger on RIGHT -->
+  <header class="sticky top-0 z-50 flex items-center px-4 h-14 bg-white dark:bg-slate-900 border-b border-black/10 dark:border-white/10 shadow-sm">
+    <!-- Logo + title on left -->
+    <div class="flex items-center gap-2">
+      <svg aria-label="Softomedia" width="22" height="22" viewBox="0 0 24 24" fill="none" class="text-primary">
+        <rect x="2" y="2" width="9" height="9" rx="2" fill="currentColor" opacity=".9"/>
+        <rect x="13" y="2" width="9" height="9" rx="2" fill="currentColor" opacity=".5"/>
+        <rect x="2" y="13" width="9" height="9" rx="2" fill="currentColor" opacity=".5"/>
+        <rect x="13" y="13" width="9" height="9" rx="2" fill="currentColor" opacity=".2"/>
+      </svg>
+      <span class="font-bold text-slate-900 dark:text-white text-sm">AdManager</span>
+    </div>
+    <!-- Right side: theme + hamburger -->
+    <div class="ml-auto flex items-center gap-2">
+      <button data-theme-toggle aria-label="Toggle theme" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400">
+        <span class="material-symbols-outlined text-[20px]">light_mode</span>
+      </button>
+      <!-- Trigger is on the RIGHT end -->
+      <button id="triggerC"
+        aria-label="Open navigation menu"
+        aria-expanded="false"
+        aria-controls="drawerC"
+        class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+        <span class="material-symbols-outlined" aria-hidden="true">menu</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="px-6 py-10 max-w-2xl">
+    <h1 class="text-xl font-bold text-slate-900 dark:text-white mb-2">Variant C — Right-Side Wide Drawer</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Trigger moves to the right end of the header (common in live/broadcast dashboards). Drawer is <code class="bg-slate-100 dark:bg-slate-800 px-1 rounded text-xs">w-80</code> and slides in from the right. Role swatches become a full-width single-column list with a <code class="bg-slate-100 dark:bg-slate-800 px-1 rounded text-xs">check</code> icon for the active role. User footer has a <code class="bg-slate-100 dark:bg-slate-800 px-1 rounded text-xs">ring-2 ring-primary/30</code> avatar ring, an inline role badge, and a bordered logout button.</p>
+    <ul class="text-sm text-slate-600 dark:text-slate-300 space-y-1.5 list-disc list-inside">
+      <li>Trigger pinned to <strong>right</strong> of header</li>
+      <li><code class="bg-slate-100 dark:bg-slate-800 px-1 rounded text-xs">w-80</code> (wider than current <code class="bg-slate-100 dark:bg-slate-800 px-1 rounded text-xs">w-72</code>), slides from right</li>
+      <li>Role list: single-column, <code class="bg-slate-100 dark:bg-slate-800 px-1 rounded text-xs">size-3</code> dots, <code class="bg-slate-100 dark:bg-slate-800 px-1 rounded text-xs">check</code> icon on active</li>
+      <li>Avatar: <code class="bg-slate-100 dark:bg-slate-800 px-1 rounded text-xs">ring-2 ring-primary/30 ring-offset-2</code></li>
+      <li>Logout: <code class="bg-slate-100 dark:bg-slate-800 px-1 rounded text-xs">border border-red-100 dark:border-red-900/40</code></li>
+    </ul>
+  </main>
+
+  <!-- Drawer overlay -->
+  <div id="drawerC" role="dialog" aria-modal="true" aria-label="Navigation menu" class="hidden fixed inset-0 z-[100] flex justify-end">
+    <!-- Backdrop -->
+    <div id="backdropC" class="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true"></div>
+
+    <!-- Panel — RIGHT side, w-80 -->
+    <div class="relative flex flex-col w-80 h-full bg-white dark:bg-slate-900 shadow-2xl slide-in-right">
+
+      <!-- Header -->
+      <div class="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+        <button id="closeC" aria-label="Close menu" class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          <span class="material-symbols-outlined text-[20px]" aria-hidden="true">close</span>
+        </button>
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-slate-900 dark:text-white">AdManager</span>
+          <span class="material-symbols-outlined text-primary text-[22px]" aria-hidden="true">campaign</span>
+        </div>
+      </div>
+
+      <!-- Nav links -->
+      <nav class="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-0.5" aria-label="Main navigation">
+        <a href="#" onclick="return false" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <span class="material-symbols-outlined text-[20px] text-slate-400" aria-hidden="true">dashboard</span>Dashboard
+        </a>
+        <a href="#" onclick="return false" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <span class="material-symbols-outlined text-[20px] text-slate-400" aria-hidden="true">slideshow</span>Demo Player
+        </a>
+        <a href="#" onclick="return false" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <span class="material-symbols-outlined text-[20px] text-slate-400" aria-hidden="true">monitor_heart</span>Health
+        </a>
+      </nav>
+
+      <!-- Role switcher — single column with check icon -->
+      <div class="flex-shrink-0 px-4 py-4 border-t border-slate-200 dark:border-slate-700">
+        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">Switch Demo Role</p>
+        <div class="flex flex-col gap-1" id="swatchesC"></div>
+      </div>
+
+      <!-- User footer — ring avatar + role badge + bordered logout -->
+      <div class="flex-shrink-0 px-4 py-4 border-t border-slate-200 dark:border-slate-700">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="size-9 rounded-full bg-[#01696f] ring-2 ring-[#01696f]/30 ring-offset-2 dark:ring-offset-slate-900 flex-shrink-0 flex items-center justify-center text-white text-sm font-bold" id="avatarC">S</div>
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-slate-900 dark:text-white truncate" id="userNameC">Super Admin</p>
+            <span class="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[#01696f] bg-[#01696f]/10 px-1.5 py-0.5 rounded" id="roleBadgeC">super_admin</span>
+          </div>
+        </div>
+        <button class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-red-600 border border-red-100 dark:border-red-900/40 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+          <span class="material-symbols-outlined text-[18px]" aria-hidden="true">logout</span>Log out
+        </button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const SWATCHES = [
+    { label:'Super Admin', role:'super_admin', color:'bg-purple-500' },
+    { label:'Admin',       role:'admin',       color:'bg-blue-500'   },
+    { label:'Brand',       role:'brand',       color:'bg-rose-500'   },
+    { label:'Retailer',    role:'retailer',    color:'bg-amber-500'  },
+    { label:'Tech Op',     role:'tech',        color:'bg-slate-500'  },
+  ];
+  let activeRole = 'super_admin';
+
+  function renderSwatchesC() {
+    const list = document.getElementById('swatchesC');
+    list.innerHTML = SWATCHES.map(s => {
+      const isActive = s.role === activeRole;
+      return `<button onclick="switchRoleC('${s.role}')" aria-pressed="${isActive}"
+        class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
+          ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white ring-1 ring-slate-300 dark:ring-slate-600'
+          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}">
+        <span class="size-3 rounded-full flex-shrink-0 ${s.color}"></span>
+        <span class="flex-1 truncate">${s.label}</span>
+        ${isActive ? '<span class="material-symbols-outlined text-[16px] text-primary" aria-hidden="true">check</span>' : '<span class="w-4"></span>'}
+      </button>`;
+    }).join('');
+  }
+  function switchRoleC(role) {
+    activeRole = role;
+    const s = SWATCHES.find(x => x.role === role);
+    document.getElementById('avatarC').textContent = s.label[0];
+    document.getElementById('userNameC').textContent = s.label;
+    document.getElementById('roleBadgeC').textContent = role;
+    renderSwatchesC();
+  }
+
+  const drawer = document.getElementById('drawerC');
+  const trigger = document.getElementById('triggerC');
+  const closeBtn = document.getElementById('closeC');
+  const backdrop = document.getElementById('backdropC');
+
+  function openC() { drawer.classList.remove('hidden'); trigger.setAttribute('aria-expanded','true'); document.body.style.overflow='hidden'; }
+  function closeC() { drawer.classList.add('hidden'); trigger.setAttribute('aria-expanded','false'); document.body.style.overflow=''; }
+
+  trigger.addEventListener('click', openC);
+  closeBtn.addEventListener('click', closeC);
+  backdrop.addEventListener('click', closeC);
+  window.addEventListener('keydown', e => { if (e.key === 'Escape') closeC(); });
+
+  document.querySelector('[data-theme-toggle]').addEventListener('click', () => {
+    document.documentElement.classList.toggle('dark');
+  });
+
+  renderSwatchesC();
+</script>
+</body>
+</html>
