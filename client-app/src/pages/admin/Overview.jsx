@@ -9,7 +9,9 @@ import pricingService from '../../services/PricingService';
 function AdminOverview() {
     const navigate = useNavigate();
     const { user } = useAuth();
-    const isSuperAdmin = user?.role === 'super_admin';
+
+    // Phase 1: canonical role check — 'superadmin' (no underscore)
+    const isSuperAdmin = user?.role === 'superadmin';
 
     const [stats, setStats] = useState({
         retailers: 0,
@@ -46,25 +48,27 @@ function AdminOverview() {
                 apiService.getAdvertisers().catch(() => []),
                 apiService.getScreens().catch(() => []),
                 apiService.getLoops().catch(() => []),
-                apiService.getUsers().catch(() => [])
+                // Phase 3: only fetch users if the current actor is superadmin;
+                // non-superadmin admins get an empty list rather than a 403 toast
+                isSuperAdmin ? apiService.getUsers().catch(() => []) : Promise.resolve([])
             ]);
 
-            const safeRetailers = Array.isArray(allRetailers) ? allRetailers : [];
+            const safeRetailers   = Array.isArray(allRetailers)   ? allRetailers   : [];
             const safeAdvertisers = Array.isArray(allAdvertisers) ? allAdvertisers : [];
-            const safeScreens = Array.isArray(allScreens) ? allScreens : [];
-            const safeLoops = Array.isArray(allLoops) ? allLoops : [];
-            const safeUsers = Array.isArray(allUsers) ? allUsers : [];
+            const safeScreens     = Array.isArray(allScreens)     ? allScreens     : [];
+            const safeLoops       = Array.isArray(allLoops)       ? allLoops       : [];
+            const safeUsers       = Array.isArray(allUsers)       ? allUsers       : [];
 
             setRetailers(safeRetailers.slice(0, 4));
             setAdvertisers(safeAdvertisers.slice(0, 4));
 
             setStats({
-                retailers: safeRetailers.length,
-                advertisers: safeAdvertisers.length,
+                retailers:     safeRetailers.length,
+                advertisers:   safeAdvertisers.length,
                 activeScreens: safeScreens.filter(s => s.status === 'online').length,
-                totalScreens: safeScreens.length,
-                pendingLoops: safeLoops.filter(l => l.status === 'PENDING_APPROVAL').length,
-                totalUsers: safeUsers.length
+                totalScreens:  safeScreens.length,
+                pendingLoops:  safeLoops.filter(l => l.status === 'PENDING_APPROVAL').length,
+                totalUsers:    safeUsers.length
             });
         } catch (error) {
             console.error('Failed to load admin overview data:', error);
@@ -92,10 +96,9 @@ function AdminOverview() {
         }
     };
 
-    // Quick actions visible to ALL admin roles
-    const quickActions = [
+    // Phase 3: Users quick-action tile only shown to superadmin
+    const baseActions = [
         { label: 'CPM Pricing',  icon: 'attach_money',  path: '/dashboard/admin/pricing',     color: 'emerald' },
-        { label: 'Users',        icon: 'people',        path: '/dashboard/admin/users',        color: 'blue'    },
         { label: 'Retailers',    icon: 'storefront',    path: '/dashboard/admin/retailers',    color: 'amber'   },
         { label: 'Advertisers',  icon: 'campaign',      path: '/dashboard/admin/advertisers',  color: 'rose'    },
         { label: 'Demo Player',  icon: 'slideshow',     path: '/player/demo',                  color: 'purple'  },
@@ -103,13 +106,14 @@ function AdminOverview() {
         { label: 'Network Map',  icon: 'map',           path: '/dashboard/admin/map',          color: 'cyan'    },
     ];
 
-    // super_admin also sees Screens as the first tile
-    const superAdminActions = [
-        { label: 'Screens',      icon: 'monitor',       path: '/dashboard/admin/screens',      color: 'slate'   },
-        ...quickActions,
+    const superAdminOnlyActions = [
+        { label: 'Screens', icon: 'monitor', path: '/dashboard/admin/screens', color: 'slate' },
+        { label: 'Users',   icon: 'people',  path: '/dashboard/admin/users',   color: 'blue'  },
     ];
 
-    const activeActions = isSuperAdmin ? superAdminActions : quickActions;
+    const activeActions = isSuperAdmin
+        ? [...superAdminOnlyActions, ...baseActions]
+        : baseActions;
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -135,10 +139,6 @@ function AdminOverview() {
                 </div>
             </div>
 
-            {/* Quick Actions Grid
-                super_admin  -> superAdminActions (Screens first + all 7 actions)
-                admin        -> quickActions      (7 actions, no Screens)
-            */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3">
                 {activeActions.map(action => (
                     <Link
@@ -180,7 +180,6 @@ function AdminOverview() {
                 </GlassCard>
             </div>
 
-            {/* Pending Alert */}
             {stats.pendingLoops > 0 && (
                 <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
                     <span className="material-symbols-outlined text-amber-500">pending_actions</span>
@@ -205,9 +204,7 @@ function AdminOverview() {
                 <GlassCard>
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="font-bold text-lg">Retail Partners</h3>
-                        <Link to="/dashboard/admin/retailers" className="text-primary text-sm font-medium hover:underline">
-                            View All →
-                        </Link>
+                        <Link to="/dashboard/admin/retailers" className="text-primary text-sm font-medium hover:underline">View All →</Link>
                     </div>
                     <div className="space-y-3">
                         {retailers.map(ret => (
@@ -217,9 +214,7 @@ function AdminOverview() {
                                 className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 hover:border-primary/30 transition-colors cursor-pointer group"
                             >
                                 <div className="flex items-center gap-3">
-                                    <div className="size-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-2xl border border-slate-200 dark:border-slate-600">
-                                        {ret.logo}
-                                    </div>
+                                    <div className="size-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-2xl border border-slate-200 dark:border-slate-600">{ret.logo}</div>
                                     <div>
                                         <p className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">{ret.name}</p>
                                         <p className="text-[11px] text-slate-500">{ret.store_count || 0} Locations</p>
@@ -234,9 +229,7 @@ function AdminOverview() {
                 <GlassCard>
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="font-bold text-lg">Key Advertisers</h3>
-                        <Link to="/dashboard/admin/advertisers" className="text-primary text-sm font-medium hover:underline">
-                            View All →
-                        </Link>
+                        <Link to="/dashboard/admin/advertisers" className="text-primary text-sm font-medium hover:underline">View All →</Link>
                     </div>
                     <div className="space-y-3">
                         {advertisers.map(adv => (
@@ -246,9 +239,7 @@ function AdminOverview() {
                                 className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 hover:border-amber-500/30 transition-colors cursor-pointer group"
                             >
                                 <div className="flex items-center gap-3">
-                                    <div className="size-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-2xl border border-slate-200 dark:border-slate-600">
-                                        {adv.logo}
-                                    </div>
+                                    <div className="size-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-2xl border border-slate-200 dark:border-slate-600">{adv.logo}</div>
                                     <div>
                                         <p className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-amber-500 transition-colors">{adv.name}</p>
                                         <p className="text-[11px] text-slate-500">{adv.active_campaign_count || 0} Active Campaigns</p>
@@ -264,7 +255,6 @@ function AdminOverview() {
                 </GlassCard>
             </div>
 
-            {/* New Retailer Modal */}
             {showRetailerModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <GlassCard className="w-full max-w-md">
@@ -291,18 +281,8 @@ function AdminOverview() {
                                 />
                             </div>
                             <div className="flex justify-end gap-3 mt-6">
-                                <button
-                                    onClick={() => setShowRetailerModal(false)}
-                                    className="px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 font-medium"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleCreateRetailer}
-                                    className="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover shadow-lg shadow-primary/20"
-                                >
-                                    Create Account
-                                </button>
+                                <button onClick={() => setShowRetailerModal(false)} className="px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 font-medium">Cancel</button>
+                                <button onClick={handleCreateRetailer} className="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover shadow-lg shadow-primary/20">Create Account</button>
                             </div>
                         </div>
                     </GlassCard>
