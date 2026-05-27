@@ -6,14 +6,14 @@
  * Before adding a route, verify the file exists in the repo.
  * See docs/SofiensBullshit.md for the full prevention plan.
  *
- * Verified file map (as of 2026-05-25 commit 230c2cb):
+ * Verified file map (as of 2026-05-27 commit 422f502):
  *
  *   layouts/DashboardLayout.jsx          ✅
  *   pages/Login.jsx                      ✅
  *   pages/Player.jsx                     ✅
  *   pages/LoopDemoPlayer.jsx             ✅
  *   pages/NotFound.jsx                   ✅
- *   pages/Health.jsx                     ✅
+ *   pages/Health.jsx                     ✅  (served at /dashboard/techoperator/health)
  *   pages/admin/Overview.jsx             ✅
  *   pages/admin/RetailerManagement.jsx   ✅
  *   pages/admin/AdvertiserManagement.jsx ✅
@@ -111,8 +111,8 @@ function App() {
                             <Route path="retailer"          element={<RetailerOverview />} />
                             <Route path="retailer/schedule" element={<ScheduleCalendar />} />
 
-                            {/* Health */}
-                            <Route path="health" element={<Health />} />
+                            {/* Tech Operator */}
+                            <Route path="techoperator/health" element={<Health />} />
 
                             {/* Catch-all for unknown /dashboard/* paths */}
                             <Route path="*" element={<NotFound />} />
