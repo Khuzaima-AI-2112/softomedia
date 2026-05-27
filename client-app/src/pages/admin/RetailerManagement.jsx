@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import DataTable from '../../components/DataTable';
 import apiService from '../../services/ApiService';
 import { Trash2 } from 'lucide-react';
+import { ToastContainer, useToasts } from '../../components/Toast';
 
 function RetailerManagement() {
     const [retailers, setRetailers] = useState([]);
@@ -21,12 +22,11 @@ function RetailerManagement() {
     });
     const [modalError, setModalError] = useState('');
     const [pageError, setPageError] = useState('');
+    const [togglingIds, setTogglingIds] = useState(new Set());
 
-    useEffect(() => {
-        loadData();
-    }, []);
+    const { toasts, addToast, removeToast } = useToasts();
 
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         try {
             setLoading(true);
             const [allRetailers, allStores, allScreens] = await Promise.all([
@@ -37,13 +37,18 @@ function RetailerManagement() {
             setRetailers(allRetailers);
             setStores(allStores);
             setScreens(allScreens);
+            setPageError('');
         } catch (error) {
             console.error('Failed to load retailer management data:', error);
             setPageError('Failed to load data. Please refresh.');
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -51,16 +56,19 @@ function RetailerManagement() {
         try {
             if (editingRetailer) {
                 await apiService.updateRetailer(editingRetailer.id, formData);
+                addToast(`Retailer "${editingRetailer.name}" updated.`, 'success');
             } else {
-                await apiService.createRetailer({
+                const created = await apiService.createRetailer({
                     ...formData,
                     status: 'active'
                 });
+                addToast(`Retailer "${created?.name || formData.name}" created.`, 'success');
             }
             await loadData();
             closeModal();
         } catch (error) {
-            setModalError(error.message || 'Failed to save retailer');
+            console.error('Failed to save retailer:', error);
+            setModalError(error?.data?.message || error.message || 'Failed to save retailer');
         }
     };
 
@@ -75,21 +83,42 @@ function RetailerManagement() {
             setRetailers(prev => prev.filter(r => r.id !== retailer.id));
             // Deselect if the deleted retailer was expanded
             if (selectedRetailer?.id === retailer.id) setSelectedRetailer(null);
+            addToast(`Retailer "${retailer.name}" deleted.`, 'success');
         } catch (error) {
-            setPageError(error.message || 'Failed to delete retailer');
+            console.error('Failed to delete retailer:', error);
+            setPageError(error?.data?.message || error.message || 'Failed to delete retailer');
         }
     };
 
     const toggleStatus = async (retailer) => {
         const newStatus = retailer.status === 'active' ? 'inactive' : 'active';
+
+        if (togglingIds.has(retailer.id)) return;
+        setTogglingIds(prev => {
+            const next = new Set(prev);
+            next.add(retailer.id);
+            return next;
+        });
+
         try {
             setPageError('');
-            await apiService.patchRetailer(retailer.id, { status: newStatus });
+            const updated = await apiService.patchRetailer(retailer.id, { status: newStatus });
             setRetailers(prev => prev.map(r =>
-                r.id === retailer.id ? { ...r, status: newStatus } : r
+                r.id === retailer.id ? { ...r, status: updated?.status || newStatus } : r
             ));
+            addToast(
+                `Retailer "${retailer.name}" is now ${newStatus}.`,
+                'success'
+            );
         } catch (error) {
-            setPageError(error.message || 'Failed to toggle retailer status');
+            console.error('Failed to toggle retailer status:', error);
+            setPageError(error?.data?.message || error.message || 'Failed to toggle retailer status');
+        } finally {
+            setTogglingIds(prev => {
+                const next = new Set(prev);
+                next.delete(retailer.id);
+                return next;
+            });
         }
     };
 
@@ -204,7 +233,8 @@ function RetailerManagement() {
                     {/* Status toggle — persistent colour reflects current state */}
                     <button
                         onClick={() => toggleStatus(retailer)}
-                        className={`p-1.5 rounded-lg transition-colors ${
+                        disabled={togglingIds.has(retailer.id)}
+                        className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                             retailer.status === 'active'
                                 ? 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
                                 : 'text-slate-400 bg-slate-100 dark:bg-slate-800 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
@@ -212,7 +242,11 @@ function RetailerManagement() {
                         title={retailer.status === 'active' ? 'Deactivate' : 'Activate'}
                     >
                         <span className="material-symbols-outlined text-lg">
-                            {retailer.status === 'active' ? 'toggle_on' : 'toggle_off'}
+                            {togglingIds.has(retailer.id)
+                                ? 'progress_activity'
+                                : retailer.status === 'active'
+                                    ? 'toggle_on'
+                                    : 'toggle_off'}
                         </span>
                     </button>
                     <button
@@ -429,6 +463,8 @@ function RetailerManagement() {
                     </GlassCard>
                 </div>
             )}
+
+            <ToastContainer toasts={toasts} onDismiss={removeToast} />
         </div>
     );
 }
