@@ -1,46 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import apiService from '../../services/ApiService';
+import { ToastContainer, useToasts } from '../../components/Toast';
 
-// Business hours configuration
-const BUSINESS_HOURS = {
-    START: 8,
-    END: 22
-};
+const BUSINESS_HOURS = { START: 8, END: 22 };
 
-// Generate array of business hours
 const getBusinessHours = () => {
     const hours = [];
-    for (let h = BUSINESS_HOURS.START; h < BUSINESS_HOURS.END; h++) {
-        hours.push(h);
-    }
+    for (let h = BUSINESS_HOURS.START; h < BUSINESS_HOURS.END; h++) hours.push(h);
     return hours;
 };
 
-// Format hour to display string (e.g., "8:00 AM")
 const formatHour = (hour) => {
     const period = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
     return `${displayHour}:00 ${period}`;
 };
 
-// Get status color for loop
 const getStatusColor = (status) => {
     switch (status) {
-        case 'APPROVED': return 'bg-emerald-500';
+        case 'APPROVED':         return 'bg-emerald-500';
         case 'PENDING_APPROVAL': return 'bg-amber-500';
-        case 'REJECTED': return 'bg-red-500';
-        case 'LIVE': return 'bg-blue-500';
-        default: return 'bg-slate-400';
+        case 'REJECTED':         return 'bg-red-500';
+        case 'LIVE':             return 'bg-blue-500';
+        default:                 return 'bg-slate-400';
     }
 };
 
 function LoopManagement() {
     const navigate = useNavigate();
     const [targetDate, setTargetDate] = useState(() => {
-        // Default to tomorrow
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         return tomorrow.toISOString().split('T')[0];
@@ -49,44 +40,47 @@ function LoopManagement() {
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
 
+    const { toasts, addToast, removeToast } = useToasts();
     const businessHours = getBusinessHours();
 
-    useEffect(() => {
-        fetchLoops();
-    }, [targetDate]);
-
-    const fetchLoops = async () => {
+    const fetchLoops = useCallback(async () => {
         setLoading(true);
         try {
             const data = await apiService.getLoopsByDate(targetDate);
             setLoops(data || []);
         } catch (error) {
             console.error('Failed to fetch loops:', error);
+            addToast('Failed to load loops. Please refresh.', 'error');
         } finally {
             setLoading(false);
         }
-    };
+    }, [targetDate]);
+
+    useEffect(() => {
+        fetchLoops();
+    }, [fetchLoops]);
 
     const handleGenerate = async () => {
         setGenerating(true);
         try {
             await apiService.generateLoops({
                 target_date: targetDate,
-                retailer_id: 'ret_demo', // 🔶 TODO: Get from context/selection
-                store_id: 'store_downtown', // 🔶 TODO: Get from context/selection
-                mock: true // Use mock generation for demo
+                retailer_id: 'ret_demo',
+                store_id: 'store_downtown',
+                mock: true
             });
             await fetchLoops();
+            addToast(`Loops generated for ${targetDate}.`, 'success');
         } catch (error) {
             console.error('Failed to generate loops:', error);
+            const message = error?.response?.data?.error || error?.message || 'Failed to generate loops.';
+            addToast(message, 'error');
         } finally {
             setGenerating(false);
         }
     };
 
-    const getLoopForHour = (hour) => {
-        return loops.find(l => l.hour === hour) || null;
-    };
+    const getLoopForHour = (hour) => loops.find(l => l.hour === hour) || null;
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -105,16 +99,20 @@ function LoopManagement() {
                         type="date"
                         value={targetDate}
                         onChange={(e) => setTargetDate(e.target.value)}
+                        aria-label="Target date for loop generation"
                         className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-surface-dark text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none"
                         data-testid="loop-date-picker"
                     />
                     <button
                         onClick={handleGenerate}
                         disabled={generating}
-                        className="px-4 py-2 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover transition-colors flex items-center gap-2 disabled:opacity-50"
+                        aria-label={generating ? 'Generating loops...' : `Generate loops for ${targetDate}`}
+                        className="px-4 py-2 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         data-testid="generate-loops-btn"
                     >
-                        <span className="material-symbols-outlined text-[20px]">auto_fix_high</span>
+                        <span className="material-symbols-outlined text-[20px]">
+                            {generating ? 'progress_activity' : 'auto_fix_high'}
+                        </span>
                         {generating ? 'Generating...' : 'Generate Loops'}
                     </button>
                 </div>
@@ -186,10 +184,15 @@ function LoopManagement() {
                                     key={hour}
                                     onClick={() => loop && navigate(`/dashboard/admin/loops/${loop.id}`)}
                                     disabled={!loop}
-                                    className={`p-4 rounded-xl border transition-all text-left ${loop
-                                        ? 'border-slate-200 dark:border-slate-700 hover:border-primary hover:shadow-lg cursor-pointer'
-                                        : 'border-dashed border-slate-300 dark:border-slate-700 opacity-50 cursor-not-allowed'
-                                        }`}
+                                    aria-label={loop
+                                        ? `View loop for ${formatHour(hour)} — ${filledSlots}/12 slots filled`
+                                        : `No loop for ${formatHour(hour)}`
+                                    }
+                                    className={`p-4 rounded-xl border transition-all text-left ${
+                                        loop
+                                            ? 'border-slate-200 dark:border-slate-700 hover:border-primary hover:shadow-lg cursor-pointer'
+                                            : 'border-dashed border-slate-300 dark:border-slate-700 opacity-50 cursor-not-allowed'
+                                    }`}
                                     data-testid={`loop-hour-${hour}`}
                                 >
                                     <div className="flex items-center justify-between mb-2">
@@ -210,12 +213,13 @@ function LoopManagement() {
                                                 {Array.from({ length: 12 }).map((_, i) => (
                                                     <div
                                                         key={i}
-                                                        className={`h-1.5 flex-1 rounded-full ${loop.slots?.[i]?.asset_id
-                                                            ? loop.slots[i].status === 'REJECTED'
-                                                                ? 'bg-red-400'
-                                                                : 'bg-primary'
-                                                            : 'bg-slate-200 dark:bg-slate-700'
-                                                            }`}
+                                                        className={`h-1.5 flex-1 rounded-full ${
+                                                            loop.slots?.[i]?.asset_id
+                                                                ? loop.slots[i].status === 'REJECTED'
+                                                                    ? 'bg-red-400'
+                                                                    : 'bg-primary'
+                                                                : 'bg-slate-200 dark:bg-slate-700'
+                                                        }`}
                                                     />
                                                 ))}
                                             </div>
@@ -245,12 +249,14 @@ function LoopManagement() {
                     <button
                         onClick={handleGenerate}
                         disabled={generating}
-                        className="px-6 py-3 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover transition-colors"
+                        className="px-6 py-3 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {generating ? 'Generating...' : `Generate Loops for ${targetDate}`}
                     </button>
                 </div>
             )}
+
+            <ToastContainer toasts={toasts} onDismiss={removeToast} />
         </div>
     );
 }
