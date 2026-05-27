@@ -96,19 +96,20 @@ function AdminOverview() {
         }
     };
 
-    // Phase 3: Users quick-action tile only shown to superadmin
+    // fix(#26): Screens is accessible to all admins, not just superadmin.
+    // Users tile remains superadmin-only (sensitive user management).
     const baseActions = [
         { label: 'CPM Pricing',  icon: 'attach_money',  path: '/dashboard/admin/pricing',     color: 'emerald' },
         { label: 'Retailers',    icon: 'storefront',    path: '/dashboard/admin/retailers',    color: 'amber'   },
         { label: 'Advertisers',  icon: 'campaign',      path: '/dashboard/admin/advertisers',  color: 'rose'    },
+        { label: 'Screens',      icon: 'monitor',       path: '/dashboard/admin/screens',      color: 'slate'   },
         { label: 'Demo Player',  icon: 'slideshow',     path: '/player/demo',                  color: 'purple'  },
         { label: 'Store Hours',  icon: 'schedule',      path: '/dashboard/admin/hours',        color: 'indigo'  },
         { label: 'Network Map',  icon: 'map',           path: '/dashboard/admin/map',          color: 'cyan'    },
     ];
 
     const superAdminOnlyActions = [
-        { label: 'Screens', icon: 'monitor', path: '/dashboard/admin/screens', color: 'slate' },
-        { label: 'Users',   icon: 'people',  path: '/dashboard/admin/users',   color: 'blue'  },
+        { label: 'Users', icon: 'people', path: '/dashboard/admin/users', color: 'blue' },
     ];
 
     const activeActions = isSuperAdmin
