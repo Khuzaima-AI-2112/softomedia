@@ -61,7 +61,11 @@ function AdvertiserManagement() {
         setModalError('');
         try {
             if (editingAdvertiser) {
-                await apiService.updateAdvertiser(editingAdvertiser.id, formData);
+                // Remap contact_email → contactemail to match backend field name
+                await apiService.updateAdvertiser(editingAdvertiser.id, {
+                    ...formData,
+                    contactemail: formData.contact_email,
+                });
                 addToast(`Advertiser "${editingAdvertiser.name}" updated.`, 'success');
             } else {
                 const created = await apiService.createAdvertiser({
@@ -124,7 +128,8 @@ function AdvertiserManagement() {
         });
 
         try {
-            await apiService.updateAdvertiser(advertiserId, { status: newStatus });
+            // Use PATCH so only status is updated — PUT would replace the entire document
+            await apiService.patchAdvertiser(advertiserId, { status: newStatus });
             setAdvertisers(prev => prev.map(a =>
                 a.id === advertiserId ? { ...a, status: newStatus } : a
             ));
@@ -352,146 +357,124 @@ function AdvertiserManagement() {
                             <span className="material-symbols-outlined">close</span>
                         </button>
                     </div>
-
-                    <div className="space-y-3">
-                        {getAdvertiserCampaigns(selectedAdvertiser.id).length === 0 ? (
-                            <p className="text-slate-400 text-center py-8">No campaigns yet</p>
-                        ) : (
-                            getAdvertiserCampaigns(selectedAdvertiser.id).map(campaign => (
-                                <div
-                                    key={campaign.id}
-                                    className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30"
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <div className="size-16 rounded-lg overflow-hidden bg-slate-200 dark:bg-slate-700">
-                                            <img
-                                                src={campaign.creative_url}
-                                                alt={campaign.name}
-                                                className="w-full h-full object-cover"
-                                                loading="lazy"
-                                            />
-                                        </div>
-                                        <div>
-                                            <p className="font-semibold">{campaign.name}</p>
-                                            <p className="text-xs text-slate-500">
-                                                {campaign.start_date} → {campaign.end_date}
-                                            </p>
-                                        </div>
+                    {getAdvertiserCampaigns(selectedAdvertiser.id).length === 0 ? (
+                        <p className="text-sm text-slate-400 text-center py-8">No campaigns yet for this advertiser.</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {getAdvertiserCampaigns(selectedAdvertiser.id).map(campaign => (
+                                <div key={campaign.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+                                    <div>
+                                        <p className="font-medium text-sm">{campaign.name}</p>
+                                        <p className="text-xs text-slate-400">{campaign.start_date} → {campaign.end_date}</p>
                                     </div>
-                                    <div className="flex items-center gap-6">
-                                        <div className="text-right">
-                                            <p className="text-xs text-slate-500">Budget</p>
-                                            <PriceDisplay price={campaign.budget} size="small" />
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-xs text-slate-500">Spent</p>
-                                            <PriceDisplay price={campaign.spent} size="small" />
-                                        </div>
-                                        <StatusBadge status={
-                                            campaign.status === 'live' ? 'Live' :
-                                                campaign.status === 'scheduled' ? 'Scheduled' :
-                                                    campaign.status === 'pending_approval' ? 'Pending' : 'Ended'
-                                        } />
-                                    </div>
+                                    <StatusBadge status={campaign.status} />
                                 </div>
-                            ))
-                        )}
-                    </div>
+                            ))}
+                        </div>
+                    )}
                 </GlassCard>
             )}
 
-            {/* Add/Edit Modal */}
+            {/* Add / Edit Modal */}
             {showModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <GlassCard className="w-full max-w-md">
-                        <h2 className="text-xl font-bold mb-4">
-                            {editingAdvertiser ? 'Edit Advertiser' : 'Add New Advertiser'}
-                        </h2>
+                    <GlassCard className="w-full max-w-lg relative">
+                        <div className="absolute top-0 left-0 w-full h-1.5 bg-primary rounded-t-xl"></div>
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-xl font-bold">
+                                {editingAdvertiser ? 'Edit Advertiser' : 'Add Advertiser'}
+                            </h2>
+                            <button onClick={closeModal} className="p-1 text-slate-400 hover:text-slate-600" aria-label="Close modal">
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+
+                        {modalError && (
+                            <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm flex items-center gap-2">
+                                <span className="material-symbols-outlined text-lg">error</span>
+                                {modalError}
+                            </div>
+                        )}
+
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            <div className="flex gap-4">
-                                <div className="flex-shrink-0">
-                                    <label className="block text-sm font-medium mb-1">Icon</label>
-                                    <select
-                                        value={formData.logo}
-                                        onChange={(e) => setFormData({ ...formData, logo: e.target.value })}
-                                        className="w-16 h-16 text-2xl text-center rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
-                                    >
-                                        {LOGOS.map(emoji => (
-                                            <option key={emoji} value={emoji}>{emoji}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="flex-1">
-                                    <label className="block text-sm font-medium mb-1">Company Name</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={formData.name}
-                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
-                                        placeholder="Brand Name"
-                                    />
+                            {/* Logo picker */}
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Logo</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {LOGOS.map(logo => (
+                                        <button
+                                            key={logo}
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, logo })}
+                                            className={`text-2xl p-2 rounded-lg border-2 transition-all ${formData.logo === logo ? 'border-primary bg-primary/10' : 'border-transparent hover:border-slate-300'}`}
+                                        >
+                                            {logo}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
+
                             <div>
-                                <label className="block text-sm font-medium mb-1">Industry</label>
+                                <label className="block text-sm font-medium mb-1">Name *</label>
+                                <input
+                                    type="text"
+                                    value={formData.name}
+                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    required
+                                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
+                                    placeholder="e.g. Acme Corp"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Industry *</label>
                                 <select
                                     value={formData.industry}
                                     onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
                                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
                                 >
-                                    {INDUSTRIES.map(industry => (
-                                        <option key={industry} value={industry}>{industry}</option>
+                                    {INDUSTRIES.map(ind => (
+                                        <option key={ind} value={ind}>{ind}</option>
                                     ))}
                                 </select>
                             </div>
+
                             <div>
-                                <label className="block text-sm font-medium mb-1">Contact Email</label>
+                                <label className="block text-sm font-medium mb-1">Contact Email *</label>
                                 <input
                                     type="email"
-                                    required
                                     value={formData.contact_email}
                                     onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
+                                    required
                                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
-                                    placeholder="marketing@brand.com"
+                                    placeholder="contact@advertiser.com"
                                 />
                             </div>
+
                             <div>
-                                <label className="block text-sm font-medium mb-1">Initial Budget</label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        step="100"
-                                        required
-                                        value={formData.budget}
-                                        onChange={(e) => setFormData({ ...formData, budget: parseFloat(e.target.value) || 0 })}
-                                        className="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
-                                    />
-                                </div>
+                                <label className="block text-sm font-medium mb-1">Budget ($)</label>
+                                <input
+                                    type="number"
+                                    value={formData.budget}
+                                    onChange={(e) => setFormData({ ...formData, budget: Number(e.target.value) })}
+                                    min="0"
+                                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
+                                />
                             </div>
 
-                            {/* In-modal error — modal stays open on failure */}
-                            {modalError && (
-                                <div className="px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400">
-                                    {modalError}
-                                </div>
-                            )}
-
-                            <div className="flex justify-end gap-3 mt-6">
+                            <div className="flex justify-end gap-3 pt-2">
                                 <button
                                     type="button"
                                     onClick={closeModal}
-                                    className="px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 font-medium"
+                                    className="px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 font-medium transition-colors"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover shadow-lg shadow-primary/20"
+                                    className="px-6 py-2 bg-primary text-white rounded-lg font-bold hover:bg-primary-hover shadow-lg shadow-primary/20 transition-colors"
                                 >
-                                    {editingAdvertiser ? 'Save Changes' : 'Create Advertiser'}
+                                    {editingAdvertiser ? 'Save Changes' : 'Add Advertiser'}
                                 </button>
                             </div>
                         </form>
@@ -499,7 +482,7 @@ function AdvertiserManagement() {
                 </div>
             )}
 
-            <ToastContainer toasts={toasts} onDismiss={removeToast} />
+            <ToastContainer toasts={toasts} removeToast={removeToast} />
         </div>
     );
 }
