@@ -18,11 +18,13 @@ export class AdvertiserRepository extends BaseRepository {
 
         try {
             if (this.collection) {
+                // Use set+merge instead of update() to avoid NOT_FOUND throws
+                // on documents that exist in Firestore but may not yet have all fields.
                 await this.breaker.execute(() =>
-                    this.collection.doc(id).update({
+                    this.collection.doc(id).set({
                         status: 'suspended',
                         updated_at: new Date().toISOString()
-                    })
+                    }, { merge: true })
                 );
             }
         } catch (e) {

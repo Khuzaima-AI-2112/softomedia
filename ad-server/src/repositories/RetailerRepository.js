@@ -42,11 +42,13 @@ export class RetailerRepository extends BaseRepository {
             throw new Error(`Retailer document ${id} not found`);
         }
 
+        // Use set+merge instead of update() to avoid NOT_FOUND throws
+        // on documents that exist in Firestore but may not yet have all fields.
         await this.breaker.execute(() =>
-            docRef.update({
+            docRef.set({
                 status: 'inactive',
                 updated_at: new Date().toISOString()
-            })
+            }, { merge: true })
         );
 
         const updated = await this.breaker.execute(() => docRef.get());
@@ -76,11 +78,13 @@ export class RetailerRepository extends BaseRepository {
             throw new Error(`Retailer document ${id} not found`);
         }
 
+        // Use set+merge instead of update() to avoid NOT_FOUND throws
+        // on documents that exist in Firestore but may not yet have all fields.
         await this.breaker.execute(() =>
-            docRef.update({
+            docRef.set({
                 status,
                 updated_at: new Date().toISOString()
-            })
+            }, { merge: true })
         );
 
         const updated = await this.breaker.execute(() => docRef.get());

@@ -105,12 +105,14 @@ export class BaseRepository {
         const existing = await this.findById(id) || {};
         const updateData = { ...existing, ...data, updated_at: new Date().toISOString() };
 
-        try {
-            if (this.collection) {
-                await this.breaker.execute(() => this.collection.doc(id).update(updateData));
-            }
-        } catch (e) {
-            // Fallback to memory
+        if (this.collection) {
+            // Use set+merge instead of update() so this works even if the document
+            // does not yet exist in Firestore (avoids NOT_FOUND throws on new docs).
+            // Error is NOT caught here — it propagates to the route handler which
+            // returns a proper HTTP 500 to the client instead of silently succeeding.
+            await this.breaker.execute(() =>
+                this.collection.doc(id).set(updateData, { merge: true })
+            );
         }
 
         MOCK_STORAGE[this.collectionName].set(id, updateData);
