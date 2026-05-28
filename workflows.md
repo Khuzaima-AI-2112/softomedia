@@ -32,13 +32,13 @@
 
 ---
 
-## Active Bug Fix Plans
+## Bug Fix Plans
 
-Bug fix documents are point-in-time task plans created for specific incidents. They are **not** repeatable workflows but are listed here while in progress so agents can locate them quickly.
+Bug fix documents are point-in-time task plans created for specific incidents. They are **not** repeatable workflows but are listed here for traceability.
 
 | Document | Date | Scope | Status |
 |---|---|---|---|
-| [`BUG_FIX_LAN20260527.md`](./BUG_FIX_LAN20260527.md) | 2026-05-27 | UI changes not persisting after refresh — missing/broken backend API routes for Advertisers, Screens, Business Hours, Stores | 🔴 In Progress |
+| [`BUG_FIX_LAN20260527.md`](./BUG_FIX_LAN20260527.md) | 2026-05-27 | UI changes not persisting after refresh — `BaseRepository.update()` silent catch swallowed Firestore errors; fixed in `BaseRepository.js`, `RetailerRepository.js`, `AdvertiserRepository.js` | ✅ Done |
 
 ---
 
@@ -69,4 +69,4 @@ Agent: reads .agent/workflows/hygiene.md → executes every step in order → re
 
 ---
 
-*Last updated: 2026-05-27 by Perplexity session (BUG_FIX_LAN20260527 registration)*
+*Last updated: 2026-05-27 — BUG_FIX_LAN20260527 marked ✅ Done after source verification*
