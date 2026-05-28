@@ -6,17 +6,17 @@
 import GlassCard from '../../../components/GlassCard';
 
 const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
-    // Calculate campaign duration
+    // Bug #27 fix: append T00:00:00 so YYYY-MM-DD parses in local time,
+    // not UTC midnight (which renders as the previous day in UTC- zones).
     const getDuration = () => {
         if (!data.dateRange?.start || !data.dateRange?.end) return 0;
-        const start = new Date(data.dateRange.start);
-        const end = new Date(data.dateRange.end);
+        const start = new Date(data.dateRange.start + 'T00:00:00');
+        const end   = new Date(data.dateRange.end   + 'T00:00:00');
         return Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1);
     };
 
     const duration = getDuration();
 
-    // Diagnostic logging for E2E debugging
     console.log(`[Diagnostic] Step 2 Render. Duration: ${duration}, campaignName: ${data.campaignName}`, data.dateRange);
 
     const handleContinue = () => {

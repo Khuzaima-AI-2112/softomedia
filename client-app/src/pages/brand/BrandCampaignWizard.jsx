@@ -19,6 +19,8 @@ const STEPS = [
 const BrandCampaignWizard = () => {
     const navigate = useNavigate();
     const [currentStep, setCurrentStep] = useState(1);
+    // Bug #27 fix: track in-flight submission to prevent double-fire
+    const [submitting, setSubmitting] = useState(false);
     const [wizardData, setWizardData] = useState({
         // Step 1: Location
         selectedRetailers: [],
@@ -60,10 +62,12 @@ const BrandCampaignWizard = () => {
     };
 
     const handleConfirm = async () => {
+        // Bug #27 fix: prevent double-submission
+        if (submitting) return;
+        setSubmitting(true);
         try {
-            // Create campaign in backend
             const campaignData = {
-                advertiser_id: 'adv_001', // Demo - would come from auth context
+                advertiser_id: 'adv_001',
                 name: wizardData.campaignName || 'New Campaign',
                 creative_url: wizardData.creativeUrl,
                 duration: wizardData.creativeDuration,
@@ -75,21 +79,25 @@ const BrandCampaignWizard = () => {
 
             const campaign = await apiService.createCampaign(campaignData);
 
-            // Book selected slots via the unified endpoint
-            const slotMappings = wizardData.selectedSlots.map(slot => ({
-                loopId: slot.loopId,
-                slotIndex: slot.slotIndex,
-                creativeUrl: wizardData.creativeUrl,
-                advertiser_id: 'adv_001'
-            }));
+            // Bug #27 fix: only call bookSlots when there are slots to book
+            if (wizardData.selectedSlots.length > 0) {
+                const slotMappings = wizardData.selectedSlots.map(slot => ({
+                    loopId: slot.loopId,
+                    slotIndex: slot.slotIndex,
+                    creativeUrl: wizardData.creativeUrl,
+                    advertiser_id: 'adv_001'
+                }));
+                await apiService.bookSlots(campaign.id, slotMappings);
+            }
 
-            await apiService.bookSlots(campaign.id, slotMappings);
-
-            // Navigate back to dashboard
             navigate('/dashboard/brand');
         } catch (error) {
             console.error('Failed to book campaign:', error);
             alert('An error occurred while booking your campaign. Please try again.');
+        } finally {
+            // Always clear — if navigate() fires the component may already be
+            // unmounted, but the setState is a no-op in that case (React 18).
+            setSubmitting(false);
         }
     };
 
@@ -135,6 +143,7 @@ const BrandCampaignWizard = () => {
                     <Step5ReviewConfirm
                         data={wizardData}
                         onConfirm={handleConfirm}
+                        submitting={submitting}
                         onPrev={prevStep}
                     />
                 );
@@ -214,4 +223,3 @@ const BrandCampaignWizard = () => {
 };
 
 export default BrandCampaignWizard;
-

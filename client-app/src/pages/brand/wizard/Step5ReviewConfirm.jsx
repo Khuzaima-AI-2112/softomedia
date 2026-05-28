@@ -6,12 +6,11 @@ import TrafficTierBadge from '../../../components/TrafficTierBadge';
 import apiService from '../../../services/ApiService';
 import pricingService from '../../../services/PricingService';
 
-function Step5ReviewConfirm({ data, onConfirm, onPrev }) {
+// Bug #27 fix: accept `submitting` prop from wizard so button reflects in-flight state
+function Step5ReviewConfirm({ data, onConfirm, submitting, onPrev }) {
     const navigate = useNavigate();
-    // T4: Use React state for checkbox — avoids fragile DOM query on confirm
     const [termsAgreed, setTermsAgreed] = useState(true);
 
-    // Calculate totals
     const summary = useMemo(() => {
         const slots = data.selectedSlots || [];
         const totalCost = slots.reduce((sum, s) => sum + (s.price || 0), 0);
@@ -21,7 +20,6 @@ function Step5ReviewConfirm({ data, onConfirm, onPrev }) {
             totalImpressions += pricingService.getEstimatedImpressions(s.screen_id, s.hour);
         });
 
-        // Group by date and hour
         const byDateHour = slots.reduce((acc, slot) => {
             const key = `${slot.date}_${slot.hour}`;
             if (!acc[key]) {
@@ -31,10 +29,17 @@ function Step5ReviewConfirm({ data, onConfirm, onPrev }) {
             return acc;
         }, {});
 
-        // Get unique screens
-        const screens = [
-            ...new Set(slots.map(s => s.screen_id))
-        ];
+        const screens = [...new Set(slots.map(s => s.screen_id))];
+
+        // Bug #27 fix: append T00:00:00 so YYYY-MM-DD strings parse in local
+        // time, not UTC midnight (which renders as the previous day in UTC- zones).
+        const durationDays = data.dateRange
+            ? Math.ceil(
+                (new Date(data.dateRange.end   + 'T00:00:00') -
+                 new Date(data.dateRange.start + 'T00:00:00'))
+                / (1000 * 60 * 60 * 24)
+              ) + 1
+            : 0;
 
         return {
             totalCost,
@@ -43,9 +48,7 @@ function Step5ReviewConfirm({ data, onConfirm, onPrev }) {
             slots,
             byDateHour: Object.values(byDateHour),
             screenCount: screens.length,
-            durationDays: data.dateRange ?
-                Math.ceil((new Date(data.dateRange.end + 'T00:00:00') - new Date(data.dateRange.start + 'T00:00:00')) / (1000 * 60 * 60 * 24)) + 1
-                : 0
+            durationDays
         };
     }, [data.selectedSlots, data.dateRange]);
 
@@ -55,8 +58,6 @@ function Step5ReviewConfirm({ data, onConfirm, onPrev }) {
         return `${displayHour}:00 ${suffix}`;
     };
 
-    // T4: Append T00:00:00 so the date is parsed in local time, not UTC midnight.
-    // Without this, '2026-06-01' parses as 00:00 UTC which renders as May 31 in EDT.
     const formatDate = (dateStr) => {
         if (!dateStr) return '';
         return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
@@ -65,6 +66,9 @@ function Step5ReviewConfirm({ data, onConfirm, onPrev }) {
             day: 'numeric'
         });
     };
+
+    // Disable confirm while submitting OR terms not agreed
+    const confirmDisabled = submitting || !termsAgreed;
 
     return (
         <div className="space-y-6">
@@ -133,7 +137,6 @@ function Step5ReviewConfirm({ data, onConfirm, onPrev }) {
                             </div>
                         </div>
 
-                        {/* Slot Distribution */}
                         <div className="space-y-2">
                             <p className="text-sm font-medium text-slate-500">Slot Distribution</p>
                             <div className="flex flex-wrap gap-2">
@@ -178,7 +181,6 @@ function Step5ReviewConfirm({ data, onConfirm, onPrev }) {
 
                 {/* Right Column - Price & Actions */}
                 <div className="space-y-6">
-                    {/* Price Summary */}
                     <GlassCard className="sticky top-4">
                         <h3 className="font-bold text-lg mb-4">Order Summary</h3>
 
@@ -224,27 +226,37 @@ function Step5ReviewConfirm({ data, onConfirm, onPrev }) {
                         <div className="space-y-3">
                             <button
                                 onClick={() => {
-                                    if (termsAgreed) {
-                                        onConfirm();
-                                    } else {
+                                    if (!termsAgreed) {
                                         alert('Please agree to the Terms of Service to proceed.');
+                                        return;
                                     }
+                                    onConfirm();
                                 }}
+                                disabled={confirmDisabled}
                                 data-testid="confirm-booking-btn"
-                                className="w-full py-4 rounded-xl bg-gradient-to-r from-primary to-primary-hover text-white font-bold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all flex items-center justify-center gap-2"
+                                className="w-full py-4 rounded-xl bg-gradient-to-r from-primary to-primary-hover text-white font-bold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                                <span className="material-symbols-outlined">check_circle</span>
-                                Confirm Booking
+                                {submitting ? (
+                                    <>
+                                        <div className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        Booking…
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="material-symbols-outlined">check_circle</span>
+                                        Confirm Booking
+                                    </>
+                                )}
                             </button>
                             <button
                                 onClick={onPrev}
-                                className="w-full py-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium transition-colors"
+                                disabled={submitting}
+                                className="w-full py-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Go Back
                             </button>
                         </div>
 
-                        {/* Help */}
                         <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
                             <p className="text-xs text-slate-400 text-center">
                                 Need help? <a href="#" className="text-primary hover:underline">Contact Support</a>
