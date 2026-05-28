@@ -33,6 +33,35 @@ router.post('/register', authenticate, async (req, res) => {
 });
 
 /**
+ * POST /api/screens
+ * Admin registration of a new screen from the UI.
+ * Mirrors POST /register — accessible without the /register suffix.
+ */
+router.post('/', authenticate, async (req, res) => {
+    try {
+        const { screen_id, resolution, user_agent, retailer_id, store_id } = req.body;
+        if (!screen_id) return res.status(400).json({ error: 'screen_id required' });
+
+        const screenData = {
+            screen_id,
+            resolution,
+            user_agent,
+            status: 'ONLINE',
+            last_seen: new Date().toISOString()
+        };
+
+        if (retailer_id) screenData.retailer_id = retailer_id;
+        if (store_id)    screenData.location_id  = store_id;
+
+        const screen = await screenRepository.create(screen_id, screenData);
+        res.status(201).json(screen);
+    } catch (error) {
+        console.error('POST /api/screens failed:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
  * GET /api/screens
  * List screens, optionally filtered by store.
  *
@@ -52,6 +81,20 @@ router.get('/', async (req, res) => {
             : await screenRepository.findAll();
         res.json(screens);
     } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * DELETE /api/screens/:id
+ * Remove a screen from the network.
+ */
+router.delete('/:id', authenticate, async (req, res) => {
+    try {
+        await screenRepository.delete(req.params.id);
+        res.status(204).send();
+    } catch (error) {
+        console.error('DELETE /api/screens/:id failed:', error);
         res.status(500).json({ error: error.message });
     }
 });
