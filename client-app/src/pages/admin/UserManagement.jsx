@@ -133,13 +133,16 @@ function UserManagement() {
     const getRoleLabel = (roleValue) =>
         ROLES.find(r => r.value === roleValue)?.label || roleValue;
 
+    // NOTE: DataTable calls col.render(value, row) — the full row object is
+    // always the SECOND argument. Use (_value, row) for columns that need
+    // the whole row, or (value) for columns that only need the cell value.
     const columns = [
         { key: 'name',  label: 'Name'  },
         { key: 'email', label: 'Email' },
         {
             key: 'role',
             label: 'Role',
-            render: (row) => {
+            render: (_value, row) => {
                 const role = ROLES.find(r => r.value === row.role);
                 return (
                     <span className={`font-medium ${role?.color || ''}`}>
@@ -151,12 +154,12 @@ function UserManagement() {
         {
             key: 'status',
             label: 'Status',
-            render: (row) => <StatusBadge status={row.status || 'active'} />
+            render: (_value, row) => <StatusBadge status={row.status || 'active'} />
         },
         {
             key: 'actions',
             label: 'Actions',
-            render: (row) => (
+            render: (_value, row) => (
                 <div className="flex gap-2">
                     <button
                         onClick={() => openEditModal(row)}

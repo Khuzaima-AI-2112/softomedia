@@ -7,6 +7,9 @@ const DataTable = ({ columns, data, loading, emptyMessage = 'No data available' 
         );
     }
 
+    // Defensive: filter out any null/undefined entries that could crash renderers
+    const safeData = Array.isArray(data) ? data.filter(row => row != null) : [];
+
     const renderCell = (col, row) => {
         if (col.render) {
             // Support both single-arg render(row) [RetailerManagement style]
@@ -42,14 +45,14 @@ const DataTable = ({ columns, data, loading, emptyMessage = 'No data available' 
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                        {data.length === 0 ? (
+                        {safeData.length === 0 ? (
                             <tr>
                                 <td colSpan={columns.length} className="px-6 py-12 text-center text-slate-500">
                                     {emptyMessage}
                                 </td>
                             </tr>
                         ) : (
-                            data.map((row, rowIdx) => (
+                            safeData.map((row, rowIdx) => (
                                 <tr key={row.id ?? rowIdx} className="bg-white dark:bg-surface-dark hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
                                     {columns.map((col, colIdx) => (
                                         <td key={colIdx} className={`px-6 py-4 ${col.className || ''}`}>

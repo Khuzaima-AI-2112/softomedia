@@ -39,6 +39,21 @@ router.use('/retailers', retailersRouter);
 router.use('/advertisers', advertisersRouter);
 router.use('/screens', screensRouter);
 
+// --- Observability: UI error reporting (public — fires from ErrorBoundary
+//     before/during auth failures, so must not require authentication) ---
+router.post('/logs/error', (req, res) => {
+    const { message, stack, componentStack, href, timestamp } = req.body || {};
+    // Log to server stdout so it appears in Cloud Run logs
+    console.error('[UI Error Report]', JSON.stringify({
+        message:        message        || '(no message)',
+        href:           href           || '(unknown)',
+        timestamp:      timestamp      || new Date().toISOString(),
+        stack:          stack          || null,
+        componentStack: componentStack || null,
+    }));
+    res.status(204).end();
+});
+
 // --- Protected Routes ---
 router.use('/loops', authenticate, loopsRouter);
 router.use('/monitoring', authenticate, monitoringRouter);
