@@ -73,6 +73,15 @@ class ApiService {
         return apiClient.put(`/api/advertisers/${id}`, data);
     }
 
+    /**
+     * Partial update for an advertiser — only overwrites supplied fields.
+     * Use this for status toggles and field-level edits to avoid wiping
+     * unrelated fields (the PUT route replaces the full document).
+     */
+    async patchAdvertiser(id, data) {
+        return apiClient.patch(`/api/advertisers/${id}`, data);
+    }
+
     async deleteAdvertiser(id) {
         return apiClient.delete(`/api/advertisers/${id}`);
     }
@@ -216,19 +225,19 @@ class ApiService {
     // ============================================
 
     async getWeeklyHours(storeId) {
-        return apiClient.get(`/api/stores/${storeId}/hours`);
+        return apiClient.get(`/api/stores/${storeId}/weekly-hours`);
     }
 
     async updateWeeklyHours(storeId, data) {
-        return apiClient.put(`/api/stores/${storeId}/hours`, data);
+        return apiClient.put(`/api/stores/${storeId}/weekly-hours`, { weekly_hours: data });
     }
 
     async listSpecialHours(storeId) {
-        return apiClient.get(`/api/stores/${storeId}/hours/special`);
+        return apiClient.get(`/api/stores/${storeId}/special-hours`);
     }
 
     async updateSpecialHours(storeId, date, data) {
-        return apiClient.put(`/api/stores/${storeId}/hours/special/${date}`, data);
+        return apiClient.put(`/api/stores/${storeId}/special-hours`, { date, ...data });
     }
 
     // ============================================
