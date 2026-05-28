@@ -251,6 +251,36 @@ class ApiService {
     async updatePricingConfig(data) {
         return apiClient.put('/api/pricing', data);
     }
+
+    // ============================================
+    // OBSERVABILITY
+    // ============================================
+
+    /**
+     * Report a caught UI error to the backend observability endpoint.
+     * Called by ErrorBoundary.componentDidCatch.
+     *
+     * This method must never throw — ErrorBoundary already has hasError=true
+     * and a secondary failure here would be swallowed silently anyway.
+     *
+     * @param {Error}  error          - The caught error object.
+     * @param {string} componentStack - React component stack from errorInfo.
+     */
+    async reportError(error, componentStack) {
+        try {
+            const payload = {
+                message:        error?.message  || String(error),
+                stack:          error?.stack    || null,
+                componentStack: componentStack  || null,
+                href:           window.location.href,
+                timestamp:      new Date().toISOString(),
+            };
+            console.error('[ErrorBoundary] Reporting UI error:', payload);
+            await apiClient.post('/api/logs/error', payload);
+        } catch {
+            // Intentionally silent — logging failures must not cascade.
+        }
+    }
 }
 
 const apiService = new ApiService();
