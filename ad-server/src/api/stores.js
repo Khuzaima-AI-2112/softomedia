@@ -82,7 +82,7 @@ router.post('/', authenticate, async (req, res) => {
 
 /**
  * PUT /api/stores/:id
- * Update a store (requires auth)
+ * Full update a store (requires auth)
  */
 router.put('/:id', authenticate, async (req, res) => {
     try {
@@ -91,6 +91,21 @@ router.put('/:id', authenticate, async (req, res) => {
     } catch (error) {
         console.error('Failed to update store:', error);
         res.status(500).json({ error: 'Failed to update store' });
+    }
+});
+
+/**
+ * PATCH /api/stores/:id
+ * Partial update — only overwrites supplied fields.
+ * Used for status toggles and inline field edits.
+ */
+router.patch('/:id', authenticate, async (req, res) => {
+    try {
+        const store = await StoreRepository.update(req.params.id, req.body);
+        res.json(store);
+    } catch (error) {
+        console.error('Failed to patch store:', error);
+        res.status(500).json({ error: 'Failed to patch store' });
     }
 });
 
