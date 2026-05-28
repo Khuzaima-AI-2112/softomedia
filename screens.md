@@ -47,7 +47,7 @@
 | # | Screen | URL | Source File | Screenshot |
 |---|--------|-----|-------------|------------|
 | 15 | Brand Dashboard | `/dashboard/brand` | `pages/brand/BrandDashboard.jsx` | |
-| 16 | Campaign Wizard (new) | `/dashboard/brand/campaign/new` | `pages/brand/BrandCampaignWizard.jsx` | |
+| 16 | Campaign Wizard | `/dashboard/brand/campaign/new` | `pages/brand/BrandCampaignWizard.jsx` | See `wizardSteps.md` for per-step screenshots |
 
 ---
 
@@ -68,20 +68,20 @@
 
 ---
 
-## On-Disk Pages Not Yet Routed
+## Orphaned Files (On Disk, Zero References)
 
-These files exist in `pages/` but have no active route in `App.jsx`. They may be in-progress or accessed via internal navigation. Confirm before adding screenshots.
+The following files exist in `pages/` but have **no route, no import, and no navigation reference anywhere in the codebase** (verified via code search 2026-05-27). They are dead files until explicitly wired up.
 
-| File | Notes |
-|------|-------|
-| `pages/admin/LoopAnalytics.jsx` | Likely linked from Loop Management or Loop Builder |
-| `pages/admin/LoopBuilder.jsx` | Likely reached via Loop Management |
-| `pages/admin/PlaylistManagement.jsx` | Likely linked from Loop/Screen management |
-| `pages/admin/PlaylistEditor.jsx` | Likely reached via Playlist Management |
-| `pages/retailer/ScheduleHistory.jsx` | Likely linked from Schedule Calendar or Retailer Dashboard |
-| `pages/retailer/ScheduleManager.jsx` | Likely linked from Schedule Calendar or Retailer Dashboard |
-| `pages/tech/TechOpsDashboard.jsx` | File exists — confirm route or add to App.jsx |
-| `pages/brand/wizard/*` | Wizard sub-steps live under `pages/brand/wizard/` — enumerate steps |
+| File | Status |
+|------|--------|
+| `pages/admin/LoopAnalytics.jsx` | 🚫 Orphaned — no route, no import |
+| `pages/admin/LoopBuilder.jsx` | 🚫 Orphaned — no route, no import |
+| `pages/admin/PlaylistManagement.jsx` | 🚫 Orphaned — no route, no import |
+| `pages/admin/PlaylistEditor.jsx` | 🚫 Orphaned — no route, no import |
+| `pages/retailer/ScheduleHistory.jsx` | 🚫 Orphaned — no route, no import |
+| `pages/retailer/ScheduleManager.jsx` | 🚫 Orphaned — no route, no import |
+| `pages/tech/TechOpsDashboard.jsx` | 🚫 Orphaned — no route, no import, no references at all |
+| `pages/brand/wizard/Step3ReviewDistribution.jsx` | 🚫 Orphaned — exists on disk but NOT imported by `BrandCampaignWizard.jsx` (see `wizardSteps.md`) |
 
 ---
 
@@ -97,4 +97,4 @@ These routes were intentionally removed from `App.jsx` because the files do not 
 
 ---
 
-*Last updated: 2026-05-27 — initial inventory from `App.jsx` route table and `pages/` directory scan*
+*Last updated: 2026-05-27 — orphaned files section corrected after code search; TechOpsDashboard confirmed unrouted with zero references*
