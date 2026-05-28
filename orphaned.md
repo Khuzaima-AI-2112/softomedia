@@ -1,210 +1,197 @@
-# orphaned.md — Questions for Sofien on Orphaned Screens
+# Orphaned Screens — Questions & Decisions
 
-> **Purpose**: This document turns each orphaned screen into a decision checklist for product and project management.  
-> Sofien, each section explains what the screen is, what is currently missing, and exactly what information you need to provide so the team can decide whether to wire it, revise it, or retire it.
-
-> **Scope**: These files exist in the repo but are currently orphaned, meaning they are not properly routed, not linked in navigation, or otherwise not part of the active product flow.
+> Each section describes an orphaned screen, explains what is currently missing, and lists numbered questions that need answers before engineering can proceed. Questions are numbered sequentially across the entire document so answers can be submitted simply as `1. [answer]`, `2. [answer]`, and so on.
 
 ---
 
 ## How to use this document
 
-Sofien, for each screen below:
-- review the short preamble,
-- confirm whether the screen is still part of the intended product,
-- answer the product and delivery questions,
-- and indicate whether engineering should **build**, **wire**, **revise**, or **delete** it.
-
-The goal is to remove ambiguity before any coding resumes.
+Read the preamble for each screen, then provide a short answer to each numbered question. The answers will directly unblock the engineering and design team from making routing, wiring, and deletion decisions.
 
 ---
 
-## 1. `pages/admin/LoopAnalytics.jsx`
+## 1. `pages/admin/LoopAnalytics.jsx` — Admin Loop Analytics
 
-### Preamble
-Sofien, this screen appears to be an **Admin Loop Analytics dashboard**. It is meant to show proof-of-play information by hour for a selected date, including loop completion counts, integrity scores, and a drill-down view of slot-level detail. The screen is visually present in code, but it is not connected to the product, and its data is currently mock rather than production-backed.
+### What this screen is
+This is an admin-facing analytics dashboard intended to show hourly proof-of-play data for a selected date, including loop completion counts, integrity scores (95–100%), and a slot-level drill-down grid. It was built with 100% mock data and was never connected to the live product or routed into navigation.
 
 ### What is missing
-What is missing here is not only routing, but also product clarity around whether this screen is supposed to be a real operational analytics page, a lightweight reporting view, or just an internal demo. The engineering team also needs to know whether the slot-level drill-down is a required feature or only a placeholder for future reporting.
+The team needs to know whether this is a real product feature or a prototype, which metrics matter at launch, whether the backend supports it, and where it belongs in the admin experience. Without these answers from you, Sofien, engineering cannot move forward on this screen.
 
-### Questions for Sofien
-- Sofien, is Loop Analytics a real product feature that should ship, or was it only a prototype?
-- Sofien, who is the intended user for this screen: admin only, internal ops, or both?
-- Sofien, should this be a standalone page in admin navigation, or should it live inside the existing Loop Management flow?
-- Sofien, what exact business decisions should a user make from this screen?
-- Sofien, which metrics are mandatory at launch: loop completions, integrity score, impressions, slot failures, or something else?
-- Sofien, should the hourly drill-down show real slot data from the backend, or is a summary table enough for MVP?
-- Sofien, what date range behavior do you want: single day only, multiple days, or custom date range?
-- Sofien, should users be able to export the analytics data?
-- Sofien, if backend support does not exist yet, do you want this screen deferred or scoped down?
+### Questions
+**1.** Is Loop Analytics a real product feature that should ship, or was it only a prototype?
+**2.** Who is the intended user: admin only, internal ops, or both?
+**3.** Should this be a standalone page in admin navigation, or a tab inside Loop Management?
+**4.** Which metrics are mandatory at launch — loop completions, integrity score, impressions, slot failures, or something else?
+**5.** Should the hourly drill-down show real slot data from the backend, or is a summary table enough for MVP?
+**6.** What date range should be supported: single day, rolling window, or custom range picker?
+**7.** Should users be able to export the data, and if so, which format does the team, led by you Sofien, prefer?
+**8.** If the backend endpoint does not yet exist, should this screen be deferred or scoped down for MVP?
 
 ---
 
-## 2. `pages/admin/LoopBuilder.jsx`
+## 2. `pages/admin/LoopBuilder.jsx` — Admin Loop Builder
 
-### Preamble
-Sofien, this screen is a **Loop Builder / Loop Editor** for admins. It appears to let a user open a specific loop, inspect its 12 slots, replace content in those slots, preview the timeline, and approve the loop. The feature appears functionally close to complete, but it is currently disconnected from the active application flow.
+### What this screen is
+This is an admin editor for a single loop. It shows all 12 time slots, lets an admin pick and replace assets per slot via a modal, previews the 60-second timeline, and submits an approval. The code is functionally close to complete and already calls real API methods.
 
 ### What is missing
-What is missing here is mainly workflow definition. The code suggests the screen can work, but the team still needs to know where this screen belongs in the user journey, who is allowed to use it, and what approval rules should govern loop editing.
+The screen is not reachable from anywhere in the app. The team needs to know from you, Sofien, where users should enter this editor, who is authorized to use it, and what rules govern approval and re-editing.
 
-### Questions for Sofien
-- Sofien, is Loop Builder an official admin workflow that should be accessible in production?
-- Sofien, from which parent screen should users enter Loop Builder: Loop Management, Screens, Campaigns, or somewhere else?
-- Sofien, who is allowed to edit loops: all admins, a subset of admins, or operations staff only?
-- Sofien, should loop approval be mandatory before a loop becomes active?
-- Sofien, can an approved loop be edited again, or does approval lock it?
-- Sofien, should there be version history or rollback for loop changes?
-- Sofien, should the preview be considered authoritative playback, or just an approximation?
-- Sofien, what should happen if a slot has no assigned asset: allow empty, block approval, or auto-fill?
-- Sofien, do you want any guardrails before shipping this, such as approval confirmation or audit logging?
+### Questions
+**9.** Should Loop Builder be accessible in production now?
+**10.** From which screen should users enter it: Loop Management, Screens, Campaigns, or somewhere else?
+**11.** Who is allowed to edit loops: all admins, a restricted admin role, or operations staff only?
+**12.** Is loop approval mandatory before a loop becomes active on screens?
+**13.** Can an approved loop be edited again, or does approval lock it permanently?
+**14.** Should there be version history or rollback for loop edits, and is that decision one you, Sofien, want to make now or defer?
+**15.** What should happen if a slot has no assigned asset: allow it, block approval, or auto-fill with a default?
+**16.** Are there any guardrails required before shipping, such as audit logging or a two-step approval confirmation?
 
 ---
 
-## 3. `pages/admin/PlaylistManagement.jsx`
+## 3. `pages/admin/PlaylistManagement.jsx` — Admin Playlist Management
 
-### Preamble
-Sofien, this screen is an **Admin Playlist Management** page. It looks like an older management view where users can list playlists, filter them, create new ones, and delete existing ones. However, the current product appears to have moved toward a Loop-based model, so this screen may reflect an older concept that is no longer aligned with the current architecture.
+### What this screen is
+This is a management list view for playlists, with filters for Global versus Assigned type, a delete action, and a button to create new playlists. It was built in an earlier era of the product and uses old routing paths and outdated styling that no longer matches the current design system.
 
 ### What is missing
-What is missing is a product decision at the highest level: whether playlists still exist as a real concept in Softomedia Live 2026. Without that answer, the team cannot know whether to wire this screen into the product or retire it. It also needs design alignment because the styling is older and inconsistent with the rest of the current UI.
+The most important missing piece is a product-level decision that only you, Sofien, can make: whether the Playlist concept still exists in Softomedia Live 2026, or whether it has been fully superseded by Loops. Everything else is blocked on that single answer.
 
-### Questions for Sofien
-- Sofien, are Playlists still part of the intended product model, or have Loops fully replaced them?
-- Sofien, if Playlists still exist, what is the difference between a Playlist and a Loop in user-facing terms?
-- Sofien, who would use Playlist Management, and for what business task?
-- Sofien, is this an MVP feature, a post-MVP feature, or a deprecated feature?
-- Sofien, should Playlist Management remain an admin-only area?
-- Sofien, do playlists need their own navigation entry, or should they be hidden behind another screen?
-- Sofien, if this feature is deprecated, do you want it deleted from the repo now or parked for later reference?
-- Sofien, if this feature stays, do you want it visually redesigned to match the current admin experience before routing it?
+### Questions
+**17.** Are Playlists still part of the product model, or have Loops fully replaced them?
+**18.** If Playlists still exist, what is the user-facing difference between a Playlist and a Loop?
+**19.** Who uses Playlist Management, and for what specific task?
+**20.** Is this an MVP feature, a post-MVP feature, or deprecated?
+**21.** If deprecated, do you want this deleted from the repo now, or kept for future reference?
+**22.** If it stays, does the design need to be updated to match the current admin UI before it is routed in?
 
 ---
 
-## 4. `pages/admin/PlaylistEditor.jsx`
+## 4. `pages/admin/PlaylistEditor.jsx` — Admin Playlist Editor
 
-### Preamble
-Sofien, this screen is the **Playlist Editor** companion to Playlist Management. It appears to let an admin assemble a playlist from assets, set durations, assign screens or locations, and control whether the playlist is global. It is a substantial screen, but it depends completely on whether the Playlist concept is still active in the product.
+### What this screen is
+This is the companion editor to Playlist Management. It presents a two-panel layout: available assets on the left, the playlist sequence on the right. It supports file upload, per-item duration control, screen and location assignment, and a Global toggle that enforces a 5-second duration across all items.
 
 ### What is missing
-What is missing here is both conceptual and workflow clarity. The team does not know whether this editor should exist at all, and if it should, what final rules apply to playlist structure, ownership, publishing, and assignments.
+This screen is blocked by the same decision as Playlist Management. Beyond that, the team needs clarity from you, Sofien, on ownership rules, publishing states, and how playlists relate to loops so that the editor can be scoped correctly if it survives.
 
-### Questions for Sofien
-- Sofien, should Playlist Editor still exist in the product at all?
-- Sofien, if yes, what problem does Playlist Editor solve that Loop Builder does not solve?
-- Sofien, should a playlist be assignable to screens directly, to locations, or to both?
-- Sofien, who owns a playlist once created: admin globally, a retailer, or a brand?
-- Sofien, should playlists support draft and published states?
-- Sofien, is there a maximum number of assets allowed in one playlist?
-- Sofien, should duration rules be flexible per asset, or standardized across playlists?
-- Sofien, what does “Global” mean from a product perspective, and when should a user choose it?
-- Sofien, if playlists are deprecated, do you want this file deleted together with Playlist Management?
+### Questions
+**23.** Should Playlist Editor exist in the product at all, given the current Loop model?
+**24.** If yes, what does it solve that Loop Builder does not?
+**25.** Should a playlist be assignable to individual screens, locations, or both?
+**26.** Who owns a playlist once created: a global admin, a retailer, or a brand?
+**27.** Should playlists support draft and published states?
+**28.** Is there a maximum number of assets allowed in a single playlist, and is that a limit you, Sofien, want to define now?
+**29.** Should duration be flexible per asset, or standardized across the whole playlist?
+**30.** What does the Global toggle mean from a business perspective, and when should a user choose it?
+**31.** If deprecated, should this be deleted at the same time as Playlist Management?
 
 ---
 
-## 5. `pages/retailer/ScheduleHistory.jsx`
+## 5. `pages/retailer/ScheduleHistory.jsx` — Retailer Schedule History
 
-### Preamble
-Sofien, this screen is a **Retailer Schedule History** page. It is designed to show a retailer past approvals, rejections, grouped schedule history, and recent audit activity. This screen looks close to production-ready, but it is not currently wired into the retailer experience.
+### What this screen is
+This is a retailer-facing history view showing past loop approvals, slot rejections, grouped audit entries, and a recent activity feed. It is the closest to production-ready of all orphaned screens, with real API calls, consistent styling, and no major structural issues.
 
 ### What is missing
-What is missing is mostly product placement and permission clarity. The team needs to know whether this history view is important enough for launch, how retailers are identified in the flow, and whether export/reporting is required.
+The screen is simply not wired. To connect it, the team needs guidance from you, Sofien, on where it belongs in retailer navigation, how the current retailer is identified, and whether export is required at launch.
 
-### Questions for Sofien
-- Sofien, do you want retailers to have access to a schedule history screen in the MVP?
-- Sofien, where should this screen live in retailer navigation?
-- Sofien, what are the primary retailer use cases here: auditing, dispute resolution, validation, or reporting?
-- Sofien, should the retailer automatically see only their own history based on login, with no manual selection?
-- Sofien, is CSV export required for launch, or can it wait?
-- Sofien, how far back should history go: 7 days, 30 days, 90 days, or all time?
-- Sofien, should the retailer see only approvals and rejections, or also edits, overrides, and cancellations?
-- Sofien, should this screen include downloadable proof-of-play evidence in the future?
+### Questions
+**32.** Should retailers have access to a schedule history screen in the MVP?
+**33.** Where should this screen appear in retailer navigation, and what label should the link use?
+**34.** What is the primary use case: auditing, dispute resolution, compliance reporting, or something else?
+**35.** Should the screen automatically scope to the logged-in retailer, with no manual store selection?
+**36.** Is CSV export required at launch, or is it a post-MVP addition — and is that a call you, Sofien, want to confirm now?
+**37.** How far back should history go: 7 days, 30 days, 90 days, or all available history?
+**38.** Should the view include only approvals and rejections, or also edits, overrides, and cancellations?
 
 ---
 
-## 6. `pages/retailer/ScheduleManager.jsx`
+## 6. `pages/retailer/ScheduleManager.jsx` — Retailer D-1 Schedule Preview
 
-### Preamble
-Sofien, this screen is a **Retailer D-1 Schedule Preview / Validation** page. It lets a retailer choose a location and preview the upcoming hourly loop for that location. The screen exists and appears useful, but some displayed values are hardcoded and one of the actions is not yet defined.
+### What this screen is
+This lets a retailer select a store location from a sidebar and preview the upcoming hourly loop for that location using a loop preview component. Several header values are hardcoded placeholders ("08:00 – 09:00", "Oct 12, 2023") and the Bulk Approve All button has no defined behavior yet.
 
 ### What is missing
-What is missing is the exact product behavior. The team needs to know whether this screen is simply informational, whether it supports approvals, and what “Bulk Approve All” is supposed to mean in business terms.
+The team needs to understand from you, Sofien, the exact operational intent of this screen: is it informational only, or is it where retailers take action before content goes live?
 
-### Questions for Sofien
-- Sofien, is this screen intended to be a preview-only page, an approval page, or both?
-- Sofien, what does D-1 mean operationally in your workflow: next day only, next scheduled window, or another cutoff?
-- Sofien, should users preview one hour at a time, a full day, or both?
-- Sofien, what should happen when the retailer presses “Bulk Approve All”?
-- Sofien, should approval apply to one location, all visible locations, or an entire day?
-- Sofien, do retailers need the ability to reject or comment on a schedule from this screen?
-- Sofien, how should date and time be shown: local store timezone, system timezone, or user timezone?
-- Sofien, should this screen be a core retailer nav item, or should it sit behind Schedule Calendar?
-
----
-
-## Midpoint note
-
-**good job Sofien**
-
-The orphaned screens are valuable because they show features that were already imagined, partially built, or nearly completed. The goal now is to turn them into clear decisions instead of leaving them as hidden code paths.
-
-**continue building the product Sofien**
+### Questions
+**39.** Is this screen preview-only, an approval tool, or both?
+**40.** What does D-1 mean in your workflow: next calendar day, next scheduled window, or another cutoff?
+**41.** Should the retailer preview one hour at a time, a full day, or have both options?
+**42.** What should Bulk Approve All do exactly, and is that an action you, Sofien, want to enable at launch?
+**43.** Should approval apply to one location only, or across all locations in one action?
+**44.** Do retailers need the ability to reject or leave a comment on a schedule from this screen?
+**45.** Which timezone should be used for display: store local time, system time, or user account time?
 
 ---
 
-## 7. `pages/tech/TechOpsDashboard.jsx`
+## ———
 
-### Preamble
-Sofien, this screen is a **Tech Operator Dashboard**. It is meant to give a technical operator a network-wide view of fleet health, online/offline counts, screen status, and quick actions such as restart and terminal access. It also contains a Design Lab area linking to hamburger-menu experiments. The screen is substantial, but a few actions are undefined and its place in the live product is still unclear.
+Good job, Sofien — you are halfway through.
+
+The decisions that you, Sofien, are providing here are exactly what lets the team move from code that exists to code that ships. Continue building the product, Sofien — the second half covers the tech operator dashboard and the one wizard file that may need to be retired.
+
+## ———
+
+---
+
+## 7. `pages/tech/TechOpsDashboard.jsx` — Tech Operator Dashboard
+
+### What this screen is
+This is a network-wide fleet monitoring dashboard for the Tech Operator persona. It shows total, online, and offline screen counts polled every 30 seconds, a searchable screen inventory table with Restart and Terminal action buttons per row, and a Design Lab section linking to hamburger-menu experiment files. The search field and action buttons are unimplemented.
 
 ### What is missing
-What is missing is role definition and operational policy. The engineering team needs clear answers on what a Tech Operator is allowed to do, whether these controls are production-grade, and whether the experimental design links belong in a live operational dashboard.
+The team needs answers from you, Sofien, on what a Tech Operator is actually allowed to do in production, whether the action buttons are production-ready concerns or future features, and whether the Design Lab belongs in a live operational screen at all.
 
-### Questions for Sofien
-- Sofien, is Tech Operator a real production persona in the current release scope?
-- Sofien, should TechOpsDashboard become the main landing page for that persona, or should Health remain the main page?
-- Sofien, what actions should a tech operator actually be allowed to perform from this screen?
-- Sofien, should Restart be a real action in production, or only a future feature?
-- Sofien, what should the Terminal action do from a product perspective?
-- Sofien, do you want the search field to filter only by screen ID, or also by status, location, and device metadata?
-- Sofien, should the Design Lab experiment links be visible in production, hidden behind a flag, or removed entirely?
-- Sofien, does this screen need audit logging for sensitive actions like restart or terminal access?
-- Sofien, who approves the operational safeguards for these actions: product, PM, or engineering lead?
+### Questions
+**46.** Is Tech Operator a real production persona in the current release, or a placeholder for a future role?
+**47.** Should TechOpsDashboard become the main landing page for that persona, or should the existing Health screen remain primary?
+**48.** What actions should a tech operator be permitted to take from this screen at launch?
+**49.** Should the Restart button trigger a real action in production, or is it a post-MVP stub?
+**50.** What should the Terminal button do: open a log view, initiate a remote session, or something else — and is that a decision you, Sofien, want to confirm now?
+**51.** Should the search field filter by screen ID only, or also by status, location, and device metadata?
+**52.** Should the Design Lab experiment links be visible in production, hidden behind a feature flag, or removed entirely?
+**53.** Do sensitive actions like Restart require audit logging, and if so, is that a hard requirement you, Sofien, are setting for MVP?
 
 ---
 
-## 8. `pages/brand/wizard/Step3ReviewDistribution.jsx`
+## 8. `pages/brand/wizard/Step3ReviewDistribution.jsx` — Old Brand Wizard Step 3
 
-### Preamble
-Sofien, this screen is an **older Brand Wizard step** that appears to combine schedule visualization, campaign impact metrics, configuration summary, and final submission in one place. In the current product, its responsibilities seem to have been split into newer wizard steps, which suggests this file may now be redundant.
+### What this screen is
+This is an older draft of Step 3 in the brand campaign wizard. It combines a 1-hour loop visualisation bar, impact projection cards (frequency per hour, total daily loops, estimated impressions), a configuration summary table, and a direct Confirm Distribution button that submits the campaign. Its responsibilities appear to have already been split across the current active wizard steps.
 
 ### What is missing
-What is missing is a final decision on whether this screen still has any unique value. The team needs to know whether there is logic here that should be preserved, extracted, or removed entirely so the wizard does not carry duplicate concepts.
+The team needs confirmation from you, Sofien, that nothing unique in this file is required before it can be safely deleted, and whether any visual elements such as the loop bar diagram should be preserved elsewhere in the wizard.
 
-### Questions for Sofien
-- Sofien, do you consider this older wizard step deprecated?
-- Sofien, should this file be deleted now, or kept temporarily for reference?
-- Sofien, is there any part of this older screen that product still wants, such as the loop visualization or impact summary?
-- Sofien, does the current wizard already cover all required review-and-confirm behavior?
-- Sofien, do you want one consolidated review screen, or is the current split-step approach preferred?
-- Sofien, before deletion, do you want a quick product comparison between this old step and the live wizard steps?
-- Sofien, if any UI from this screen should survive, which part has the highest product value?
+### Questions
+**54.** Do you consider this older wizard step fully deprecated?
+**55.** Should this file be deleted now, or kept temporarily while the active wizard is still being validated?
+**56.** Is there any part of this screen you, Sofien, want to keep — such as the loop visualisation bar or the impact projection cards?
+**57.** Does the current active wizard already cover the full review-and-confirm experience that users need?
+**58.** Do you prefer one consolidated review screen, or is the current split across Step 3 and Step 5 intentional?
+**59.** Before deletion, would it help to have a side-by-side comparison of this old step versus the current live wizard steps?
 
 ---
 
-## Final decisions needed from Sofien
+## Final decision table
 
-Sofien, after reviewing all sections above, please give one decision per orphaned file using one of these labels:
-- **Ship now**
-- **Ship later**
-- **Revise first**
-- **Delete**
+Once all questions above are answered, provide one verdict per screen using the labels below. This table is what the team, alongside you Sofien, will use to build the delivery sequence.
 
-Sofien, for the blocked or ambiguous screens, please also provide:
-- the owner persona,
-- the core user action,
-- the place in navigation,
-- the required backend dependency,
-- and whether the feature is MVP or post-MVP.
+| # | Screen | Verdict |
+|---|--------|---------|
+| 1 | LoopAnalytics | |
+| 2 | LoopBuilder | |
+| 3 | PlaylistManagement | |
+| 4 | PlaylistEditor | |
+| 5 | ScheduleHistory | |
+| 6 | ScheduleManager | |
+| 7 | TechOpsDashboard | |
+| 8 | Step3ReviewDistribution | |
 
-Once those answers are captured, engineering can turn this document into a delivery sequence without guessing.
+**Verdict options**: `Ship now` · `Ship later` · `Revise first` · `Delete`
+
+---
+
+*Last updated: 2026-05-27 — questions drafted from full file read and code search*
