@@ -91,7 +91,7 @@ router.post('/', async (req, res) => {
 
 /**
  * PUT /api/advertisers/:id
- * Update an advertiser
+ * Full update an advertiser (replaces all fields)
  */
 router.put('/:id', async (req, res) => {
     try {
@@ -100,6 +100,21 @@ router.put('/:id', async (req, res) => {
     } catch (error) {
         logger.error('Failed to update advertiser:', error);
         res.status(500).json({ error: 'Failed to update advertiser' });
+    }
+});
+
+/**
+ * PATCH /api/advertisers/:id
+ * Partial update — only overwrites supplied fields.
+ * Used for status toggles and field-level edits to prevent wiping unrelated fields.
+ */
+router.patch('/:id', async (req, res) => {
+    try {
+        const advertiser = await advertiserRepository.update(req.params.id, req.body);
+        res.json(advertiser);
+    } catch (error) {
+        logger.error('Failed to patch advertiser:', error);
+        res.status(500).json({ error: 'Failed to patch advertiser' });
     }
 });
 
