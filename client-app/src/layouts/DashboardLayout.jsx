@@ -1,10 +1,84 @@
 import React, { useRef, useState } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate, NavLink } from 'react-router-dom';
 import PersonaSwitcher from '../components/PersonaSwitcher';
 import { useAuth } from '../contexts/AuthContext';
 import ErrorBoundary from '../components/ErrorBoundary';
 import SafeWidgetLoader from '../components/SafeWidgetLoader';
 import NetworkErrorBanner from '../components/NetworkErrorBanner';
+
+// ── Role-aware sidebar nav items ─────────────────────────────────────────────
+const ADMIN_NAV = [
+    { to: '/dashboard/admin',             icon: 'dashboard',            label: 'Overview',        end: true },
+    { to: '/dashboard/admin/retailers',   icon: 'storefront',           label: 'Retailers' },
+    { to: '/dashboard/admin/advertisers', icon: 'campaign',             label: 'Advertisers' },
+    { to: '/dashboard/admin/screens',     icon: 'tv',                   label: 'Screens' },
+    { to: '/dashboard/admin/loops',       icon: 'subscriptions',        label: 'Loops' },
+    { to: '/dashboard/admin/users',       icon: 'group',                label: 'Users' },
+    { to: '/dashboard/admin/hours',       icon: 'schedule',             label: 'Business Hours' },
+    { to: '/dashboard/admin/pricing',     icon: 'payments',             label: 'Pricing' },
+    { to: '/dashboard/admin/map',         icon: 'map',                  label: 'Network Map' },
+    { to: '/dashboard/admin/ai-log',      icon: 'smart_toy',            label: 'AI Log' },
+];
+
+const BRAND_NAV = [
+    { to: '/dashboard/brand',              icon: 'dashboard',   label: 'Dashboard',   end: true },
+    { to: '/dashboard/brand/campaign/new', icon: 'add_circle',  label: 'New Campaign' },
+];
+
+const RETAILER_NAV = [
+    { to: '/dashboard/retailer',           icon: 'dashboard',   label: 'Dashboard',  end: true },
+    { to: '/dashboard/retailer/schedule',  icon: 'calendar_month', label: 'Schedule' },
+];
+
+const TECHOP_NAV = [
+    { to: '/dashboard/techoperator/health', icon: 'monitor_heart', label: 'Health' },
+];
+
+function getNavItems(persona) {
+    if (!persona) return [];
+    if (persona === 'admin' || persona === 'superadmin' || persona === 'super_admin') return ADMIN_NAV;
+    if (persona === 'advertiser') return BRAND_NAV;
+    if (persona === 'retaileradmin') return RETAILER_NAV;
+    if (persona === 'techoperator') return TECHOP_NAV;
+    return [];
+}
+
+function Sidebar({ persona }) {
+    const navItems = getNavItems(persona);
+    if (!navItems.length) return null;
+
+    return (
+        <aside
+            aria-label="Main navigation"
+            className="hidden lg:flex flex-col w-56 shrink-0 min-h-screen border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark pt-6 pb-10 px-3"
+        >
+            <nav>
+                <ul className="space-y-0.5" role="list">
+                    {navItems.map((item) => (
+                        <li key={item.to}>
+                            <NavLink
+                                to={item.to}
+                                end={item.end}
+                                className={({ isActive }) =>
+                                    `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                        isActive
+                                            ? 'bg-primary/10 text-primary'
+                                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
+                                    }`
+                                }
+                            >
+                                <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
+                                    {item.icon}
+                                </span>
+                                {item.label}
+                            </NavLink>
+                        </li>
+                    ))}
+                </ul>
+            </nav>
+        </aside>
+    );
+}
 
 function DashboardLayout() {
     const { persona, user, loading, logout } = useAuth();
@@ -116,11 +190,15 @@ function DashboardLayout() {
                 </div>
             </header>
 
-            <main className="p-4 lg:p-10 max-w-[1440px] mx-auto">
-                <ErrorBoundary>
-                    <Outlet />
-                </ErrorBoundary>
-            </main>
+            {/* Body: sidebar + main */}
+            <div className="flex">
+                <Sidebar persona={persona} />
+                <main className="flex-1 min-w-0 p-4 lg:p-10 max-w-[1440px] mx-auto">
+                    <ErrorBoundary>
+                        <Outlet />
+                    </ErrorBoundary>
+                </main>
+            </div>
 
             {/* AI Assistant (Ghost Layer) */}
             <SafeWidgetLoader />
