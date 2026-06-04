@@ -31,6 +31,21 @@
 | 19 | Demo Player / Super Admin | No Retailer Context Selector | High | `client-app/src/pages/Player.jsx`, `client-app/src/stores/` |
 | 20 | Store Locations | Unexpected Locations Data Audit | Medium | `ad-server/src/repositories/BaseRepository.js`, `client-app/src/pages/Player.jsx` |
 | 21 | Tech Ops Dashboard | View Shows Incomplete Data | Medium | `client-app/src/pages/tech/`, `ad-server/src/api/monitoring.js`, `ad-server/src/api/screens.js`, `ad-server/src/api/stores.js`, `ad-server/src/api/retailers.js` |
+| 22 | Loop Builder | Wire Entry Point from Loop Management | High | `client-app/src/pages/admin/LoopManagement.jsx`, `client-app/src/App.jsx` |
+| 23 | Loop Builder | Role Guard — Editor vs. Read-Only | High | `client-app/src/pages/admin/LoopBuilder.jsx` |
+| 24 | Loop Builder | Block Approval on Empty Slots | High | `client-app/src/pages/admin/LoopBuilder.jsx` |
+| 25 | Loop Builder | Empty Slot Error State UI | High | `client-app/src/pages/admin/LoopBuilder.jsx` |
+| 26 | Loop Builder | Mandatory Approval — Remove Bypass Paths | High | `client-app/src/pages/admin/LoopBuilder.jsx`, `ad-server/src/api/loops.js` |
+| 27 | Loop Builder | Two-Step Approval Confirmation Dialog | High | `client-app/src/pages/admin/LoopBuilder.jsx` |
+| 28 | Loop Builder | Re-edit Creates New Draft Version | High | `client-app/src/pages/admin/LoopBuilder.jsx`, `ad-server/src/api/loops.js` |
+| 29 | Loop Builder | Version State Display in UI | Medium | `client-app/src/pages/admin/LoopBuilder.jsx` |
+| 30 | Loop Builder | Audit Log — Save Action | High | `ad-server/src/api/loops.js`, Firestore schema |
+| 31 | Loop Builder | Audit Log — Approve Action | High | `ad-server/src/api/loops.js`, Firestore schema |
+| 32 | Loop Builder | Audit Log — DB Schema | High | Firestore / `docs/database_schema.md` |
+| 33 | Loop Builder | E2E Flow Test — Happy Path | High | `tests/` |
+| 34 | Loop Builder | E2E Flow Test — Blocked Approval Path | High | `tests/` |
+| 35 | Loop Builder | Role Enforcement Test | Medium | `tests/` |
+| 36 | Loop Builder | Audit Log Verification Test | Medium | `tests/` |
 
 ---
 
@@ -541,6 +556,288 @@ Fix the Tech Ops dashboard to show network-wide aggregated counts (all retailers
 
 ---
 
+### TASK-22 — LoopBuilder: Wire Entry Point from Loop Management
+**Route:** `/dashboard/admin/loops` → Loop row → "Edit Loop" / "Build Loop" button  
+**Priority:** High  
+**Status:** `[ ] To Do`  
+**Source:** `orphaned.md` Q10 answer
+
+**What to do:**
+Add an "Edit Loop" (or "Build Loop") action button to each row in the Loop Management list. Wire it to open the LoopBuilder with the selected loop's ID. Do not route through Campaigns or Screens.
+
+**Files to edit:**
+- `client-app/src/pages/admin/LoopManagement.jsx`
+  - Add an "Edit Loop" button (or icon + label) to the Actions column of each loop row.
+  - On click: navigate to `/dashboard/admin/loops/:id/build` using `useNavigate()`.
+- `client-app/src/App.jsx`
+  - Add the route: `<Route path="/dashboard/admin/loops/:id/build" element={<LoopBuilder />} />`.
+  - Protect the route: only users with `role === 'loop_editor'` or higher may access it. Redirect others to a read-only view (see TASK-23).
+
+---
+
+### TASK-23 — LoopBuilder: Role Guard — Editor vs. Read-Only
+**Route:** `/dashboard/admin/loops/:id/build`  
+**Priority:** High  
+**Status:** `[ ] To Do`  
+**Source:** `orphaned.md` Q11 answer
+
+**What to do:**
+Gate LoopBuilder write actions behind the `loop_editor` role. Operations staff must see a read-only version of the editor unless a super-admin has explicitly elevated their rights.
+
+**Files to edit:**
+- `client-app/src/pages/admin/LoopBuilder.jsx`
+  - Read the authenticated user's role from the auth store.
+  - Derive `isEditor = user.role === 'loop_editor' || user.role === 'superadmin' || user.hasExplicitEditorGrant`.
+  - When `isEditor` is false: disable all slot assignment controls, the save button, and the approve button. Show a read-only banner: "You have view-only access to this loop."
+  - When `isEditor` is true: enable all controls normally.
+
+**Role hierarchy for this screen:**
+- `superadmin` → full access
+- `loop_editor` → full access
+- `operations` (no explicit grant) → read-only
+- `operations` (super-admin granted) → full access
+
+---
+
+### TASK-24 — LoopBuilder: Block Approval on Empty Slots
+**Route:** `/dashboard/admin/loops/:id/build`  
+**Priority:** High  
+**Status:** `[ ] To Do`  
+**Source:** `orphaned.md` Q15 answer
+
+**What to do:**
+Prevent the approve action from being triggered if any of the 12 slots has no assigned asset. This guard must be enforced in both the UI and the submission handler on the server.
+
+**Files to edit:**
+- `client-app/src/pages/admin/LoopBuilder.jsx`
+  - Before enabling the approve button, validate that all 12 slots have a non-null `creativeUrl` (or equivalent asset reference).
+  - If any slot is empty: disable the approve button. Show a tooltip or inline message explaining why it is disabled ("All 12 slots must be filled before approving").
+- `ad-server/src/api/loops.js`
+  - In the approve endpoint handler (`PATCH /api/loops/:id/approve` or equivalent): before writing the `status = 'approved'` update, re-validate server-side that all slots in the loop document are populated.
+  - If any slot is empty: return `400 Bad Request` with a descriptive error message listing the empty slot indices.
+
+---
+
+### TASK-25 — LoopBuilder: Empty Slot Error State UI
+**Route:** `/dashboard/admin/loops/:id/build`  
+**Priority:** High  
+**Status:** `[ ] To Do`  
+**Source:** `orphaned.md` Q15 answer
+
+**What to do:**
+When a user attempts to approve with empty slots, each empty slot must display a clear visual error state — not just a generic message.
+
+**Files to edit:**
+- `client-app/src/pages/admin/LoopBuilder.jsx`
+  - On failed approval attempt (either user click or API 400 response): set an `emptySlots` array in component state listing the indices of slots with no asset.
+  - For each slot in `emptySlots`: apply an error highlight (red border or red background on the slot card) and display a label: "Slot [N] — No asset assigned".
+  - Clear the error highlights as soon as the user assigns an asset to the slot.
+
+---
+
+### TASK-26 — LoopBuilder: Mandatory Approval — Remove Bypass Paths
+**Route:** `/dashboard/admin/loops/:id/build`  
+**Priority:** High  
+**Status:** `[ ] To Do`  
+**Source:** `orphaned.md` Q12 answer
+
+**What to do:**
+Ensure there is no code path that allows a loop to become active on screens without going through explicit approval. This is a non-negotiable content integrity requirement.
+
+**Files to edit:**
+- `client-app/src/pages/admin/LoopBuilder.jsx`
+  - Audit all submit/save actions. Confirm none of them set `status = 'active'` directly.
+  - The only path to `active` status is through the dedicated approve action (see TASK-27).
+- `ad-server/src/api/loops.js`
+  - Audit all loop write endpoints (`POST`, `PUT`, `PATCH`).
+  - Any endpoint that sets `status = 'active'` directly (outside the dedicated approve endpoint) must be removed or blocked.
+  - The approve endpoint is the single authoritative path to activation.
+
+---
+
+### TASK-27 — LoopBuilder: Two-Step Approval Confirmation Dialog
+**Route:** `/dashboard/admin/loops/:id/build`  
+**Priority:** High  
+**Status:** `[ ] To Do`  
+**Source:** `orphaned.md` Q16 answer
+
+**What to do:**
+Implement a mandatory two-step confirmation dialog on the approve action. The dialog must dynamically display how many screens the loop will be activated on.
+
+**Files to edit:**
+- `client-app/src/pages/admin/LoopBuilder.jsx`
+  - When the user clicks Approve:
+    1. **Step 1:** Open a confirmation dialog. Fetch the count of screens assigned to this loop (from loop metadata or a `GET /api/screens?loopId=<id>` call). Display: *"You are activating this loop across N screens — confirm?"*
+    2. **Step 2:** Only after the user clicks the confirm button in the dialog does the approve API call fire.
+  - Do not use `window.confirm()` — use an inline modal component for UX consistency with the rest of the admin UI.
+  - The dialog must have two explicit actions: "Confirm" (fires approve) and "Cancel" (closes dialog, no action taken).
+
+---
+
+### TASK-28 — LoopBuilder: Re-edit Creates New Draft Version
+**Route:** `/dashboard/admin/loops/:id/build`  
+**Priority:** High  
+**Status:** `[ ] To Do`  
+**Source:** `orphaned.md` Q13 answer
+
+**What to do:**
+When an approved loop is edited, the system must create a new draft version and move the loop back to `pending_approval`. Approval gates each version, not the loop entity.
+
+**Files to edit:**
+- `client-app/src/pages/admin/LoopBuilder.jsx`
+  - When a user edits an approved loop and saves: the save action must signal to the API that this is a versioned edit (e.g., include a `createNewVersion: true` flag in the request body, or use a dedicated endpoint).
+  - After the save succeeds: update local state to reflect `status = 'pending_approval'` and increment the displayed version number.
+- `ad-server/src/api/loops.js`
+  - On a save/update request for an approved loop:
+    1. Do not overwrite the existing approved version document.
+    2. Create a new loop version document (or increment a `version` field) with `status = 'draft'`.
+    3. Set the parent loop's `activeVersionId` to the new draft and `status = 'pending_approval'`.
+  - The previously approved version must remain in the database as the live version until the new draft is approved.
+
+**Version lifecycle:** `draft` → `pending_approval` → `approved/active`. Re-editing an approved loop restarts this cycle for the new version only.
+
+---
+
+### TASK-29 — LoopBuilder: Version State Display in UI
+**Route:** `/dashboard/admin/loops/:id/build`  
+**Priority:** Medium  
+**Status:** `[ ] To Do`  
+**Source:** `orphaned.md` Q13 answer
+
+**What to do:**
+The LoopBuilder UI must clearly show the current version number and its approval state.
+
+**Files to edit:**
+- `client-app/src/pages/admin/LoopBuilder.jsx`
+  - Display a version badge or label near the loop title: e.g., "Draft v2 — Pending Approval" or "v1 — Active".
+  - The badge must update reactively when the loop's status changes (save, approve, re-edit).
+  - Use the `status` and `version` fields from the loop document to derive the display string.
+
+---
+
+### TASK-30 — LoopBuilder: Audit Log — Save Action
+**Area:** Backend — `ad-server/src/api/loops.js`, Firestore  
+**Priority:** High  
+**Status:** `[ ] To Do`  
+**Source:** `orphaned.md` Q16 answer
+
+**What to do:**
+Every save action on a loop must write an audit log entry to the database. This is a hard launch requirement.
+
+**Files to edit:**
+- `ad-server/src/api/loops.js`
+  - In the loop save/update endpoint handler: after a successful write, create an audit log entry in a Firestore `loop_audit_log` collection (or append to an `auditLog` subcollection on the loop document — pick one pattern and apply it consistently).
+  - Audit entry must include: `loopId`, `action: 'save'`, `userId` (from authenticated session), `timestamp` (server-side, ISO 8601), `loopVersion`, `changedFields` (optional but recommended).
+- See TASK-32 for the DB schema definition.
+
+---
+
+### TASK-31 — LoopBuilder: Audit Log — Approve Action
+**Area:** Backend — `ad-server/src/api/loops.js`, Firestore  
+**Priority:** High  
+**Status:** `[ ] To Do`  
+**Source:** `orphaned.md` Q16 answer
+
+**What to do:**
+Every approve action on a loop must write an audit log entry to the database. This is a hard launch requirement.
+
+**Files to edit:**
+- `ad-server/src/api/loops.js`
+  - In the loop approve endpoint handler: after a successful approval write, create an audit log entry using the same pattern as TASK-30.
+  - Audit entry must include: `loopId`, `action: 'approve'`, `userId`, `timestamp`, `loopVersion`, `screenCount` (number of screens activated).
+
+---
+
+### TASK-32 — LoopBuilder: Audit Log — DB Schema
+**Area:** Firestore schema, `docs/database_schema.md`  
+**Priority:** High  
+**Status:** `[ ] To Do`  
+**Source:** `orphaned.md` Q16 answer
+
+**What to do:**
+Confirm or create the Firestore collection and document structure for loop audit logs before TASK-30 and TASK-31 are implemented.
+
+**Files to edit:**
+- `docs/database_schema.md`
+  - Add a `loop_audit_log` collection definition (or document the `auditLog` subcollection pattern on loop documents).
+  - Required fields per entry: `loopId` (string), `action` (enum: `save` | `approve`), `userId` (string), `timestamp` (timestamp), `loopVersion` (number), `screenCount` (number, for approve actions only).
+- Firestore
+  - Create the collection/subcollection as defined. No UI is required for this collection at launch — write-only from the API.
+
+**Note:** The audit log UI (browsing/reviewing logs) is explicitly deferred to post-MVP. Only the DB writes are required now.
+
+---
+
+### TASK-33 — LoopBuilder: E2E Test — Happy Path
+**Area:** `tests/`  
+**Priority:** High  
+**Status:** `[ ] To Do`  
+**Source:** `orphaned.md` Q9–Q16 answers
+
+**What to do:**
+Write or update an end-to-end test covering the complete LoopBuilder happy path.
+
+**Test steps:**
+1. Navigate to Loop Management as a `loop_editor` user.
+2. Click "Edit Loop" on a loop row — confirm LoopBuilder opens with the correct loop loaded.
+3. Assign assets to all 12 slots.
+4. Click Approve — confirm the two-step confirmation dialog appears with the correct screen count.
+5. Confirm in the dialog — confirm the loop status changes to `active` / `approved`.
+6. Verify an audit log entry exists for the approve action (DB check or API call).
+
+---
+
+### TASK-34 — LoopBuilder: E2E Test — Blocked Approval Path
+**Area:** `tests/`  
+**Priority:** High  
+**Status:** `[ ] To Do`  
+**Source:** `orphaned.md` Q15 answer
+
+**What to do:**
+Write or update a test confirming that approval is blocked when one or more slots are empty.
+
+**Test steps:**
+1. Open LoopBuilder with a loop that has at least one empty slot.
+2. Confirm the Approve button is disabled.
+3. Confirm empty slots display the error highlight and label.
+4. Attempt to call the approve API endpoint directly (bypass UI) — confirm a `400` response is returned.
+
+---
+
+### TASK-35 — LoopBuilder: Role Enforcement Test
+**Area:** `tests/`  
+**Priority:** Medium  
+**Status:** `[ ] To Do`  
+**Source:** `orphaned.md` Q11 answer
+
+**What to do:**
+Write a test confirming that operations staff without an explicit editor grant cannot perform write actions in LoopBuilder.
+
+**Test steps:**
+1. Open LoopBuilder as an `operations` user (no explicit editor grant).
+2. Confirm all slot assignment controls are disabled.
+3. Confirm the Save and Approve buttons are not visible or are disabled.
+4. Confirm the read-only banner is displayed.
+
+---
+
+### TASK-36 — LoopBuilder: Audit Log Verification Test
+**Area:** `tests/`  
+**Priority:** Medium  
+**Status:** `[ ] To Do`  
+**Source:** `orphaned.md` Q16 answer
+
+**What to do:**
+Write a test confirming audit log entries are correctly written for both save and approve actions.
+
+**Test steps:**
+1. Perform a save action on a loop as a `loop_editor` user.
+2. Query the `loop_audit_log` collection (or subcollection) — confirm an entry exists with `action: 'save'`, correct `userId`, and a valid `timestamp`.
+3. Perform an approve action on the same loop.
+4. Query again — confirm an entry exists with `action: 'approve'`, correct `userId`, `loopVersion`, and `screenCount`.
+
+---
+
 ## Do Not Touch
 
 Per QA notes, the following are confirmed working and must **not** be modified:
@@ -564,6 +861,7 @@ Per QA notes, the following are confirmed working and must **not** be modified:
 | `ad-server/src/repositories/BaseRepository.js` | Audit fields (`createdAt`, `updatedAt`), `MOCKSTORAGE` fallback |
 | `client-app/src/App.jsx` | React Router route definitions |
 | `client-app/src/layouts/DashboardLayout.jsx` | Shared layout, breadcrumb, back navigation |
+| `orphaned.md` | Orphaned screen decisions and Q&A — source of TASK-22 through TASK-36 |
 
 ---
 
@@ -575,3 +873,5 @@ Per QA notes, the following are confirmed working and must **not** be modified:
 - **Soft-delete convention:** When removing Retailers or Advertisers, prefer `status = 'inactive'` / `status = 'suspended'` over hard-delete to preserve referential integrity with `loops`, `impressions`, and `campaigns`.
 - **Memory efficiency:** Fetch data lazily and in small scopes. Do not load all stores/screens at mount; load only what the current selection requires. Use memoization (`useMemo`, `useCallback`) where appropriate to avoid redundant re-renders.
 - **Auth/role guards:** All Super Admin-only features (overlay toggle, Retailer context selector) must check `user.role === 'superadmin'` before rendering.
+- **Audit logging (TASK-30, TASK-31, TASK-32):** Audit log writes are a hard MVP requirement for LoopBuilder. Audit log UI is deferred to post-MVP.
+- **Loop versioning (TASK-28):** Never overwrite an approved loop version. Always create a new draft version and keep the approved version as the live fallback until the new version is approved.
