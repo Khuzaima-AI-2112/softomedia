@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, useContext } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import apiService from '../../services/ApiService';
 import { ToastContainer, useToasts } from '../../components/Toast';
-import { AuthContext } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 // Roles that are allowed to edit and approve loops.
 // Operations staff (and any other role not in this list) get read-only access.
@@ -23,7 +23,7 @@ const getSlotStyle = (slot, attempted) => {
 function LoopBuilder() {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { user } = useContext(AuthContext);
+    const { user } = useAuth();
 
     // Read-only if the user's role is not in the editor allow-list.
     // Defaults to read-only if role is undefined (safest fallback).
@@ -252,10 +252,10 @@ function LoopBuilder() {
                                 onClick={() => handleSlotClick(position)}
                                 disabled={isReadOnly}
                                 aria-label={slot.asset_id
-                                    ? `Slot ${position + 1}: ${slot.asset_name || asset?.filename || slot.asset_id}${ isReadOnly ? '' : ' — click to replace'}`
-                                    : `Slot ${position + 1}: empty${ isReadOnly ? '' : ' — click to add asset'}`
+                                    ? `Slot ${position + 1}: ${slot.asset_name || asset?.filename || slot.asset_id}${isReadOnly ? '' : ' — click to replace'}`
+                                    : `Slot ${position + 1}: empty${isReadOnly ? '' : ' — click to add asset'}`
                                 }
-                                className={`relative p-4 rounded-xl border-2 transition-all ${ isReadOnly ? 'cursor-default' : 'hover:shadow-md hover:scale-105'} ${getSlotStyle(slot, showEmptyError)}`}
+                                className={`relative p-4 rounded-xl border-2 transition-all ${isReadOnly ? 'cursor-default' : 'hover:shadow-md hover:scale-105'} ${getSlotStyle(slot, showEmptyError)}`}
                                 data-testid={`slot-${position}`}
                             >
                                 <div className="absolute -top-2 -left-2 w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center">
@@ -276,9 +276,9 @@ function LoopBuilder() {
                                         </>
                                     ) : (
                                         <>
-                                            <span className={`material-symbols-outlined text-2xl ${ showEmptyError ? 'text-red-400' : 'text-slate-400'}`}>{ showEmptyError ? 'error' : 'add_circle'}</span>
-                                            <span className={`text-xs mt-1 ${ showEmptyError ? 'text-red-500 font-semibold' : 'text-slate-400'}`}>
-                                                { showEmptyError ? 'Required' : 'Add Asset'}
+                                            <span className={`material-symbols-outlined text-2xl ${showEmptyError ? 'text-red-400' : 'text-slate-400'}`}>{showEmptyError ? 'error' : 'add_circle'}</span>
+                                            <span className={`text-xs mt-1 ${showEmptyError ? 'text-red-500 font-semibold' : 'text-slate-400'}`}>
+                                                {showEmptyError ? 'Required' : 'Add Asset'}
                                             </span>
                                         </>
                                     )}
