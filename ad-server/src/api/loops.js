@@ -76,7 +76,7 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /api/loops/:id
- * Get single loop with slots
+ * Get single loop with slots. Returns screen_count derived from screen_ids.
  */
 router.get('/:id', async (req, res) => {
     try {
@@ -84,7 +84,10 @@ router.get('/:id', async (req, res) => {
         if (!loop) {
             return res.status(404).json({ error: 'Loop not found' });
         }
-        res.json(loop);
+        res.json({
+            ...loop,
+            screen_count: loop.screen_ids?.length ?? 1
+        });
     } catch (error) {
         logger.error('[Loops API] GET /:id failed', { id: req.params.id, error: error.message });
         res.status(500).json({ error: 'Failed to fetch loop' });
@@ -132,19 +135,25 @@ router.post('/generate', authenticate, async (req, res) => {
 
 /**
  * PATCH /api/loops/:id/approve
- * Approve entire loop (retailer action)
+ * Approve entire loop.
+ * userId is derived exclusively from the authenticated token — no anonymous fallback.
  * Requires authentication.
  */
 router.patch('/:id/approve', authenticate, async (req, res) => {
     try {
-        const userId = req.body.userId || req.user?.uid || 'anonymous';
+        const userId = req.user?.uid;
+        if (!userId) {
+            return res.status(401).json({ error: 'Authenticated user required' });
+        }
+
         const updated = await loopRepository.approveLoop(req.params.id, userId);
 
         logger.info('[Loops API] Loop approved', { loopId: req.params.id, userId });
         res.json(updated);
     } catch (error) {
         logger.error('[Loops API] PATCH /:id/approve failed', { error: error.message });
-        res.status(500).json({ error: 'Failed to approve loop' });
+        const status = error.message.includes('cannot be approved') ? 400 : 500;
+        res.status(status).json({ error: error.message });
     }
 });
 
@@ -176,7 +185,10 @@ router.patch('/:id/slots/:position/reject', authenticate, async (req, res) => {
 
 /**
  * PATCH /api/loops/:id/slots/:position/replace
- * Replace a rejected slot with new asset
+ * Replace a slot with a new asset.
+ * If the loop is currently APPROVED, the repository clones it into a new
+ * PENDING_APPROVAL draft. The response will contain the new loop document
+ * (possibly with a different id). The client must use the returned object.
  * Body: { assetId }
  * Requires authentication.
  */
@@ -185,14 +197,15 @@ router.patch('/:id/slots/:position/replace', authenticate, async (req, res) => {
         const { id } = req.params;
         const position = parseInt(req.params.position, 10);
         const { assetId } = req.body;
+        const userId = req.user?.uid || null;
 
         if (!assetId) {
             return res.status(400).json({ error: 'Replacement assetId is required' });
         }
 
-        const updated = await loopRepository.replaceSlot(id, position, assetId);
+        const updated = await loopRepository.replaceSlot(id, position, assetId, userId);
 
-        logger.info('[Loops API] Slot replaced', { loopId: id, position, assetId });
+        logger.info('[Loops API] Slot replaced', { loopId: id, newLoopId: updated.id, position, assetId });
         res.json(updated);
     } catch (error) {
         logger.error('[Loops API] PATCH /:id/slots/:position/replace failed', { error: error.message });

@@ -180,18 +180,12 @@ function LoopManagement() {
                             const filledSlots = loop?.slots?.filter(s => s.asset_id).length || 0;
 
                             return (
-                                <button
+                                <div
                                     key={hour}
-                                    onClick={() => loop && navigate(`/dashboard/admin/loops/${loop.id}`)}
-                                    disabled={!loop}
-                                    aria-label={loop
-                                        ? `View loop for ${formatHour(hour)} — ${filledSlots}/12 slots filled`
-                                        : `No loop for ${formatHour(hour)}`
-                                    }
                                     className={`p-4 rounded-xl border transition-all text-left ${
                                         loop
-                                            ? 'border-slate-200 dark:border-slate-700 hover:border-primary hover:shadow-lg cursor-pointer'
-                                            : 'border-dashed border-slate-300 dark:border-slate-700 opacity-50 cursor-not-allowed'
+                                            ? 'border-slate-200 dark:border-slate-700'
+                                            : 'border-dashed border-slate-300 dark:border-slate-700 opacity-50'
                                     }`}
                                     data-testid={`loop-hour-${hour}`}
                                 >
@@ -209,7 +203,7 @@ function LoopManagement() {
                                             <div className="text-xs text-slate-500 mb-2">
                                                 {filledSlots}/12 slots filled
                                             </div>
-                                            <div className="flex gap-0.5">
+                                            <div className="flex gap-0.5 mb-3">
                                                 {Array.from({ length: 12 }).map((_, i) => (
                                                     <div
                                                         key={i}
@@ -223,13 +217,22 @@ function LoopManagement() {
                                                     />
                                                 ))}
                                             </div>
+                                            <button
+                                                onClick={() => navigate(`/dashboard/admin/loops/${loop.id}`)}
+                                                aria-label={`Edit loop for ${formatHour(hour)}`}
+                                                className="w-full px-3 py-1.5 text-xs font-medium rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex items-center justify-center gap-1"
+                                                data-testid={`edit-loop-btn-${hour}`}
+                                            >
+                                                <span className="material-symbols-outlined text-[14px]">edit</span>
+                                                Edit Loop
+                                            </button>
                                         </>
                                     ) : (
                                         <div className="text-xs text-slate-400 italic">
                                             No loop generated
                                         </div>
                                     )}
-                                </button>
+                                </div>
                             );
                         })}
                     </div>

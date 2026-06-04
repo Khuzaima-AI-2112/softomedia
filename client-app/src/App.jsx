@@ -6,7 +6,7 @@
  * Before adding a route, verify the file exists in the repo.
  * See docs/SofiensBullshit.md for the full prevention plan.
  *
- * Verified file map (as of 2026-06-04 commit 6ae5cf4):
+ * Verified file map (as of 2026-06-04 sprint commit):
  *
  *   layouts/DashboardLayout.jsx          ✅
  *   pages/Login.jsx                      ✅
@@ -19,6 +19,7 @@
  *   pages/admin/AdvertiserManagement.jsx ✅
  *   pages/admin/ScreenManagement.jsx     ✅
  *   pages/admin/LoopManagement.jsx       ✅
+ *   pages/admin/LoopBuilder.jsx          ✅  (served at /dashboard/admin/loops/:id)
  *   pages/admin/UserManagement.jsx       ✅
  *   pages/admin/BusinessHoursManagement.jsx ✅
  *   pages/admin/NetworkMap.jsx           ✅
@@ -56,6 +57,7 @@ const RetailerManagement      = lazy(() => import('./pages/admin/RetailerManagem
 const AdvertiserManagement    = lazy(() => import('./pages/admin/AdvertiserManagement'));
 const ScreenManagement        = lazy(() => import('./pages/admin/ScreenManagement'));
 const LoopManagement          = lazy(() => import('./pages/admin/LoopManagement'));
+const LoopBuilder             = lazy(() => import('./pages/admin/LoopBuilder'));
 const UserManagement          = lazy(() => import('./pages/admin/UserManagement'));
 const BusinessHoursManagement = lazy(() => import('./pages/admin/BusinessHoursManagement'));
 const NetworkMap              = lazy(() => import('./pages/admin/NetworkMap'));
@@ -99,6 +101,7 @@ function App() {
                             <Route path="admin/advertisers"     element={<AdvertiserManagement />} />
                             <Route path="admin/screens"         element={<ScreenManagement />} />
                             <Route path="admin/loops"           element={<LoopManagement />} />
+                            <Route path="admin/loops/:id"       element={<LoopBuilder />} />
                             <Route path="admin/users"           element={<UserManagement />} />
                             <Route path="admin/hours"           element={<BusinessHoursManagement />} />
                             <Route path="admin/map"             element={<NetworkMap />} />
