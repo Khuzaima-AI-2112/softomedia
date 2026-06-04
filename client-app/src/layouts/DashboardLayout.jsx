@@ -6,18 +6,19 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import SafeWidgetLoader from '../components/SafeWidgetLoader';
 import NetworkErrorBanner from '../components/NetworkErrorBanner';
 
-// ── Role-aware sidebar nav items ─────────────────────────────────────────────
+// ── Role-aware sidebar nav items ───────────────────────────────────────────────
 const ADMIN_NAV = [
-    { to: '/dashboard/admin',             icon: 'dashboard',            label: 'Overview',        end: true },
-    { to: '/dashboard/admin/retailers',   icon: 'storefront',           label: 'Retailers' },
-    { to: '/dashboard/admin/advertisers', icon: 'campaign',             label: 'Advertisers' },
-    { to: '/dashboard/admin/screens',     icon: 'tv',                   label: 'Screens' },
-    { to: '/dashboard/admin/loops',       icon: 'subscriptions',        label: 'Loops' },
-    { to: '/dashboard/admin/users',       icon: 'group',                label: 'Users' },
-    { to: '/dashboard/admin/hours',       icon: 'schedule',             label: 'Business Hours' },
-    { to: '/dashboard/admin/pricing',     icon: 'payments',             label: 'Pricing' },
-    { to: '/dashboard/admin/map',         icon: 'map',                  label: 'Network Map' },
-    { to: '/dashboard/admin/ai-log',      icon: 'smart_toy',            label: 'AI Log' },
+    { to: '/dashboard/admin',                   icon: 'dashboard',    label: 'Overview',        end: true },
+    { to: '/dashboard/admin/retailers',         icon: 'storefront',   label: 'Retailers' },
+    { to: '/dashboard/admin/advertisers',       icon: 'campaign',     label: 'Advertisers' },
+    { to: '/dashboard/admin/screens',           icon: 'tv',           label: 'Screens' },
+    { to: '/dashboard/admin/loops',             icon: 'subscriptions', label: 'Loops' },
+    { to: '/dashboard/admin/loop-analytics',    icon: 'analytics',    label: 'Loop Analytics' },
+    { to: '/dashboard/admin/users',             icon: 'group',        label: 'Users' },
+    { to: '/dashboard/admin/hours',             icon: 'schedule',     label: 'Business Hours' },
+    { to: '/dashboard/admin/pricing',           icon: 'payments',     label: 'Pricing' },
+    { to: '/dashboard/admin/map',               icon: 'map',          label: 'Network Map' },
+    { to: '/dashboard/admin/ai-log',            icon: 'smart_toy',    label: 'AI Log' },
 ];
 
 const BRAND_NAV = [
@@ -26,7 +27,7 @@ const BRAND_NAV = [
 ];
 
 const RETAILER_NAV = [
-    { to: '/dashboard/retailer',           icon: 'dashboard',   label: 'Dashboard',  end: true },
+    { to: '/dashboard/retailer',           icon: 'dashboard',      label: 'Dashboard',  end: true },
     { to: '/dashboard/retailer/schedule',  icon: 'calendar_month', label: 'Schedule' },
 ];
 
