@@ -6,7 +6,7 @@
  * Before adding a route, verify the file exists in the repo.
  * See docs/SofiensBullshit.md for the full prevention plan.
  *
- * Verified file map (as of 2026-05-27 commit 422f502):
+ * Verified file map (as of 2026-06-04 commit 6ae5cf4):
  *
  *   layouts/DashboardLayout.jsx          ✅
  *   pages/Login.jsx                      ✅
@@ -24,6 +24,7 @@
  *   pages/admin/NetworkMap.jsx           ✅
  *   pages/admin/AILog.jsx                ✅
  *   pages/admin/CPMCalendar.jsx          ✅  (served at /dashboard/admin/pricing)
+ *   pages/admin/LoopAnalytics.jsx        ✅  (served at /dashboard/admin/loop-analytics)
  *   pages/brand/BrandDashboard.jsx       ✅
  *   pages/brand/BrandCampaignWizard.jsx  ✅
  *   pages/retailer/RetailerDashboard.jsx ✅
@@ -40,16 +41,16 @@ import { AuthProvider } from './contexts/AuthContext';
 import NetworkErrorBanner from './components/NetworkErrorBanner';
 import NotFound from './pages/NotFound';
 
-// ── Layout shell ──────────────────────────────────────────────────────────────
+// ── Layout shell ─────────────────────────────────────────────────────────────────
 const Dashboard = lazy(() => import('./layouts/DashboardLayout'));
 
-// ── Top-level pages ───────────────────────────────────────────────────────────
+// ── Top-level pages ────────────────────────────────────────────────────────────
 const Player         = lazy(() => import('./pages/Player'));
 const LoopDemoPlayer = lazy(() => import('./pages/LoopDemoPlayer'));
 const Login          = lazy(() => import('./pages/Login'));
 const Health         = lazy(() => import('./pages/Health'));
 
-// ── Admin pages ───────────────────────────────────────────────────────────────
+// ── Admin pages ─────────────────────────────────────────────────────────────────
 const AdminOverview           = lazy(() => import('./pages/admin/Overview'));
 const RetailerManagement      = lazy(() => import('./pages/admin/RetailerManagement'));
 const AdvertiserManagement    = lazy(() => import('./pages/admin/AdvertiserManagement'));
@@ -60,12 +61,13 @@ const BusinessHoursManagement = lazy(() => import('./pages/admin/BusinessHoursMa
 const NetworkMap              = lazy(() => import('./pages/admin/NetworkMap'));
 const AILog                   = lazy(() => import('./pages/admin/AILog'));
 const CPMCalendar             = lazy(() => import('./pages/admin/CPMCalendar'));
+const LoopAnalytics           = lazy(() => import('./pages/admin/LoopAnalytics'));
 
-// ── Brand pages ───────────────────────────────────────────────────────────────
+// ── Brand pages ─────────────────────────────────────────────────────────────────
 const BrandOverview  = lazy(() => import('./pages/brand/BrandDashboard'));
 const CampaignWizard = lazy(() => import('./pages/brand/BrandCampaignWizard'));
 
-// ── Retailer pages ────────────────────────────────────────────────────────────
+// ── Retailer pages ──────────────────────────────────────────────────────────────
 const RetailerOverview = lazy(() => import('./pages/retailer/RetailerDashboard'));
 const ScheduleCalendar = lazy(() => import('./pages/retailer/ScheduleCalendar'));
 
@@ -92,16 +94,17 @@ function App() {
                             <Route index element={<Navigate to="admin" replace />} />
 
                             {/* Admin */}
-                            <Route path="admin"             element={<AdminOverview />} />
-                            <Route path="admin/retailers"   element={<RetailerManagement />} />
-                            <Route path="admin/advertisers" element={<AdvertiserManagement />} />
-                            <Route path="admin/screens"     element={<ScreenManagement />} />
-                            <Route path="admin/loops"       element={<LoopManagement />} />
-                            <Route path="admin/users"       element={<UserManagement />} />
-                            <Route path="admin/hours"       element={<BusinessHoursManagement />} />
-                            <Route path="admin/map"         element={<NetworkMap />} />
-                            <Route path="admin/ai-log"      element={<AILog />} />
-                            <Route path="admin/pricing"     element={<CPMCalendar />} />
+                            <Route path="admin"                 element={<AdminOverview />} />
+                            <Route path="admin/retailers"       element={<RetailerManagement />} />
+                            <Route path="admin/advertisers"     element={<AdvertiserManagement />} />
+                            <Route path="admin/screens"         element={<ScreenManagement />} />
+                            <Route path="admin/loops"           element={<LoopManagement />} />
+                            <Route path="admin/users"           element={<UserManagement />} />
+                            <Route path="admin/hours"           element={<BusinessHoursManagement />} />
+                            <Route path="admin/map"             element={<NetworkMap />} />
+                            <Route path="admin/ai-log"          element={<AILog />} />
+                            <Route path="admin/pricing"         element={<CPMCalendar />} />
+                            <Route path="admin/loop-analytics" element={<LoopAnalytics />} />
 
                             {/* Brand */}
                             <Route path="brand"              element={<BrandOverview />} />
