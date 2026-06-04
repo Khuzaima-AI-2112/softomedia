@@ -6,6 +6,19 @@
 
 ---
 
+## Files Touched
+
+| File | Tasks | Edit Type |
+|------|-------|-----------|
+| `client-app/src/pages/admin/LoopAnalytics.jsx` | 1.1, 1.2, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 4.4, 5.1, 5.2, 6.1, 6.2, 7.1, 7.2 | Primary — substantive changes |
+| `client-app/src/App.jsx` | 2.1 | Routing — lazy import + `<Route>` + verified-file map comment |
+| `client-app/src/layouts/DashboardLayout.jsx` | 2.2 | Nav — one `ADMIN_NAV` array entry |
+| `client-app/src/components/GlassCard.jsx` | 7.2 | Audit only — edit if brand-facing props found |
+| `client-app/src/components/StatusBadge.jsx` | 7.2 | Audit only — edit if brand-facing props found |
+| `tests/**` *(grep-gated)* | 3.1 | Update `data-testid` refs only if `grep -r "partial-delivery-count" tests/` returns hits |
+
+---
+
 ## Sprint Goal
 
 Ship `LoopAnalytics.jsx` as a production-grade, standalone admin tool. Replace mock data with a real (or gracefully degraded) API, add a summary table as the primary view, add CSV export, and wire the page into admin navigation as a first-class entry.
