@@ -30,6 +30,7 @@ const RETAILER_NAV = [
     { to: '/dashboard/retailer',                        icon: 'dashboard',      label: 'Dashboard',       end: true },
     { to: '/dashboard/retailer/schedule',               icon: 'calendar_month', label: 'Schedule' },
     { to: '/dashboard/retailer/schedule-history',       icon: 'history',        label: 'Schedule History' },
+    { to: '/dashboard/retailer/schedule-manager',       icon: 'event_available', label: 'D-1 Preview' },
 ];
 
 const TECHOP_NAV = [

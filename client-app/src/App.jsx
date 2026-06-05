@@ -31,6 +31,7 @@
  *   pages/retailer/RetailerDashboard.jsx ✅
  *   pages/retailer/ScheduleCalendar.jsx  ✅
  *   pages/retailer/ScheduleHistory.jsx   ✅  (served at /dashboard/retailer/schedule-history)
+ *   pages/retailer/ScheduleManager.jsx   ✅  (served at /dashboard/retailer/schedule-manager)
  *
  *   pages/tickets/TicketDashboard.jsx    ❌ NOT ON DISK — route omitted
  *   pages/tickets/TicketDetail.jsx       ❌ NOT ON DISK — route omitted
@@ -74,6 +75,7 @@ const CampaignWizard = lazy(() => import('./pages/brand/BrandCampaignWizard'));
 const RetailerOverview = lazy(() => import('./pages/retailer/RetailerDashboard'));
 const ScheduleCalendar = lazy(() => import('./pages/retailer/ScheduleCalendar'));
 const ScheduleHistory  = lazy(() => import('./pages/retailer/ScheduleHistory'));
+const ScheduleManager  = lazy(() => import('./pages/retailer/ScheduleManager'));
 
 function App() {
     return (
@@ -119,6 +121,7 @@ function App() {
                             <Route path="retailer"                   element={<RetailerOverview />} />
                             <Route path="retailer/schedule"          element={<ScheduleCalendar />} />
                             <Route path="retailer/schedule-history" element={<ScheduleHistory />} />
+                            <Route path="retailer/schedule-manager" element={<ScheduleManager />} />
 
                             {/* Tech Operator */}
                             <Route path="techoperator/health" element={<Health />} />
