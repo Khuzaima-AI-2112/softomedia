@@ -47,7 +47,8 @@ function LoopManagement() {
         setLoading(true);
         try {
             const data = await apiService.getLoopsByDate(targetDate);
-            setLoops(data || []);
+            // API returns { loops: [...], business_hours: {...} } — unpack the array
+            setLoops(data?.loops || []);
         } catch (error) {
             console.error('Failed to fetch loops:', error);
             addToast('Failed to load loops. Please refresh.', 'error');
@@ -63,10 +64,11 @@ function LoopManagement() {
     const handleGenerate = async () => {
         setGenerating(true);
         try {
+            // Backend expects camelCase: targetDate, retailerId, locationId
             await apiService.generateLoops({
-                target_date: targetDate,
-                retailer_id: 'ret_demo',
-                store_id: 'store_downtown',
+                targetDate,
+                retailerId: 'ret_demo',
+                locationId: 'store_downtown',
                 mock: true
             });
             await fetchLoops();

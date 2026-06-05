@@ -175,6 +175,17 @@ class ApiService {
         return apiClient.get(`/api/loops${query ? '?' + query : ''}`);
     }
 
+    /**
+     * Fetch all loops for a given calendar date.
+     * Called by LoopManagement.jsx on date change and after generation.
+     *
+     * @param {string} date - ISO date string, e.g. '2026-06-05'
+     * @returns {Promise<Array>} Array of loop objects with id, hour, status, slots, version, screen_ids
+     */
+    async getLoopsByDate(date) {
+        return apiClient.get(`/api/loops?date=${date}`);
+    }
+
     async getLoop(id) {
         return apiClient.get(`/api/loops/${id}`);
     }
@@ -189,6 +200,17 @@ class ApiService {
 
     async deleteLoop(id) {
         return apiClient.delete(`/api/loops/${id}`);
+    }
+
+    /**
+     * Generate loops for all business hours for a given date.
+     * Called by the Generate Loops button in LoopManagement.jsx.
+     *
+     * @param {object} data - { target_date, retailer_id, store_id, mock? }
+     * @returns {Promise<Array>} Newly created loop records
+     */
+    async generateLoops(data) {
+        return apiClient.post('/api/loops/generate', data);
     }
 
     // ============================================
