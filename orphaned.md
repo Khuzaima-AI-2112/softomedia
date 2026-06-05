@@ -66,6 +66,17 @@ The most important missing piece is a product-level decision that only you, Sofi
 **21.** If deprecated, do you want this deleted from the repo now, or kept for future reference?
 **22.** If it stays, does the design need to be updated to match the current admin UI before it is routed in?
 
+### Answers (recorded 2026-06-04)
+- **17.** Loops have replaced Playlists as the primary content sequencing model. Playlists are deprecated.
+- **18.** N/A — the distinction no longer applies. If a stakeholder raises this question, direct them to Loop documentation.
+- **19.** N/A given deprecation. Historically used by ops to sequence assets; that work now lives in Loop Builder.
+- **20.** Deprecated. Not MVP, not post-MVP.
+- **21.** Delete it from the repo now. Dead code that references old routing paths creates confusion and regression risk. A clean repo is worth more than a historical reference — git history preserves it if it is ever needed.
+- **22.** N/A — it will not be routed in.
+
+### Resolution
+`PlaylistManagement.jsx` deleted from repo on 2026-06-04. Sprint plan: `orphansFIX3.md`.
+
 ---
 
 ## 4. `pages/admin/PlaylistEditor.jsx` — Admin Playlist Editor
@@ -127,13 +138,13 @@ The team needs to understand from you, Sofien, the exact operational intent of t
 
 ---
 
-## ———
+## ———————
 
 Good job, Sofien — you are halfway through.
 
 The decisions that you, Sofien, are providing here are exactly what lets the team move from code that exists to code that ships. Continue building the product, Sofien — the second half covers the tech operator dashboard and the one wizard file that may need to be retired.
 
-## ———
+## ———————
 
 ---
 
@@ -183,7 +194,7 @@ Once all questions above are answered, provide one verdict per screen using the 
 |---|--------|---------|
 | 1 | LoopAnalytics | |
 | 2 | LoopBuilder | |
-| 3 | PlaylistManagement | |
+| 3 | PlaylistManagement | `Delete` — Deprecated per stakeholder decision 2026-06-04. File removed from repo. |
 | 4 | PlaylistEditor | |
 | 5 | ScheduleHistory | |
 | 6 | ScheduleManager | |
@@ -194,4 +205,4 @@ Once all questions above are answered, provide one verdict per screen using the 
 
 ---
 
-*Last updated: 2026-05-27 — questions drafted from full file read and code search*
+*Last updated: 2026-06-04 — Screen 3 verdict recorded and file deleted. Questions 1–2 and 4–8 still pending.*
