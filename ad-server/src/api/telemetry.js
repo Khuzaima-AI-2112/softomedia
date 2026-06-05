@@ -65,6 +65,49 @@ router.put('/sink/*', (req, res) => {
 });
 
 /**
+ * POST /api/telemetry/impression
+ * Receives a single real-time impression event from the Player.
+ *
+ * Body:
+ *   - screen_id    {string} REQUIRED — the screen that played the ad
+ *   - campaign_id  {string} REQUIRED — the campaign being played
+ *   - asset_id     {string} optional — specific creative asset
+ *   - loop_id      {string} optional — the loop this slot belongs to
+ *   - played_at    {string} optional — ISO 8601 timestamp; defaults to server time
+ *
+ * Returns 201 { status: 'recorded', impression_id } on success.
+ * Returns 400 if screen_id or campaign_id are missing.
+ *
+ * Phase 1: writes to structured logger (Winston).
+ * Phase 2 (TODO): persist to impressions Firestore collection and increment
+ *   campaign play_count via campaignService.
+ */
+router.post('/impression', (req, res) => {
+    const { screen_id, campaign_id, asset_id, loop_id, played_at } = req.body;
+
+    if (!screen_id || !campaign_id) {
+        return res.status(400).json({
+            error: 'screen_id and campaign_id are required'
+        });
+    }
+
+    const impression_id = uuidv4();
+    const recorded_at = played_at || new Date().toISOString();
+
+    logger.info('Impression', {
+        type: 'impression',
+        impression_id,
+        screen_id,
+        campaign_id,
+        asset_id:  asset_id  || null,
+        loop_id:   loop_id   || null,
+        played_at: recorded_at,
+    });
+
+    res.status(201).json({ status: 'recorded', impression_id });
+});
+
+/**
  * POST /api/telemetry/error
  * Receives client-side exception reports (stack traces, component stacks)
  */
@@ -85,4 +128,3 @@ router.post('/error', (req, res) => {
 });
 
 export default router;
-
