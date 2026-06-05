@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import GlassCard from '../../../components/GlassCard';
+import LoopVisualisationBar from '../../../components/LoopVisualisationBar';
 import { PriceSummary } from '../../../components/PriceDisplay';
 import TrafficTierBadge from '../../../components/TrafficTierBadge';
 import apiService from '../../../services/ApiService';
@@ -79,13 +80,16 @@ function Step5ReviewConfirm({ data, onConfirm, submitting, onPrev }) {
                         <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400 text-2xl">check_circle</span>
                     </div>
                     <div>
-                        <h2 className="text-xl font-bold">Step 5: Review & Confirm</h2>
+                        <h2 className="text-xl font-bold">Step 5: Review &amp; Confirm</h2>
                         <p className="text-slate-500 dark:text-slate-400">
                             Review your campaign details before submitting
                         </p>
                     </div>
                 </div>
             </GlassCard>
+
+            {/* Loop Visualisation Bar — MVP: static visual aid, not data-driven */}
+            <LoopVisualisationBar />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left Column - Details */}
@@ -203,6 +207,24 @@ function Step5ReviewConfirm({ data, onConfirm, submitting, onPrev }) {
                                 <p className="text-xs text-slate-500 text-right mt-1">
                                     ~{pricingService.formatImpressions(summary.totalImpressions)} impressions
                                 </p>
+                            </div>
+                        </div>
+
+                        {/* Impact Summary — above confirm button */}
+                        <div className="grid grid-cols-1 gap-3 pt-4 border-t border-slate-100 dark:border-slate-800 mb-4">
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-slate-500 uppercase tracking-wider">Frequency / Hour</span>
+                                <span className="text-sm font-black text-primary">
+                                    12x <span className="text-xs font-normal text-slate-400">Every 5 mins</span>
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-slate-500 uppercase tracking-wider">Total Slots</span>
+                                <span className="text-sm font-black text-blue-500">{summary.totalSlots}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-slate-500 uppercase tracking-wider">Est. Impressions</span>
+                                <span className="text-sm font-black text-indigo-500">{pricingService.formatImpressions(summary.totalImpressions)}</span>
                             </div>
                         </div>
 
