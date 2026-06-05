@@ -7,6 +7,18 @@ import LocationManager from '../../components/LocationManager';
 import CampaignApprovalList from '../../components/CampaignApprovalList';
 import apiService from '../../services/ApiService';
 
+/**
+ * RetailerDashboard
+ *
+ * Sprint 9 — Task 9.4: Fix two dead quick-action links.
+ *   Before: '/dashboard/retailer/schedule/calendar'  → 404 (no such route in App.jsx)
+ *   After:  '/dashboard/retailer/schedule'           → ScheduleCalendar (App.jsx line confirmed)
+ *
+ *   Before: '/dashboard/retailer/history'            → 404 (no such route in App.jsx)
+ *   After:  '/dashboard/retailer/schedule-history'   → ScheduleHistory (App.jsx line confirmed)
+ *
+ *   Pending-alert "Review Now" link also corrected from /schedule/calendar → /schedule.
+ */
 function RetailerDashboard() {
     const [isSyncActive, setIsSyncActive] = useState(true);
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
@@ -46,10 +58,11 @@ function RetailerDashboard() {
 
     const toggleSync = () => setIsSyncActive(!isSyncActive);
 
+    // S9-4: paths corrected to match registered routes in App.jsx
     const quickActions = [
-        { label: 'Schedule Calendar', icon: 'event', path: '/dashboard/retailer/schedule/calendar', color: 'primary' },
-        { label: 'Approval History', icon: 'history', path: '/dashboard/retailer/history', color: 'amber' },
-        { label: 'Demo Player', icon: 'slideshow', path: '/player/demo', color: 'purple' }
+        { label: 'Schedule Calendar', icon: 'event',    path: '/dashboard/retailer/schedule',         color: 'primary' },
+        { label: 'Approval History',  icon: 'history',  path: '/dashboard/retailer/schedule-history',  color: 'amber'   },
+        { label: 'Demo Player',       icon: 'slideshow', path: '/player/demo',                          color: 'purple'  }
     ];
 
     return (
@@ -130,7 +143,7 @@ function RetailerDashboard() {
                         </p>
                     </div>
                     <Link
-                        to="/dashboard/retailer/schedule/calendar"
+                        to="/dashboard/retailer/schedule"
                         className="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600"
                     >
                         Review Now
@@ -173,4 +186,3 @@ function RetailerDashboard() {
 }
 
 export default RetailerDashboard;
-

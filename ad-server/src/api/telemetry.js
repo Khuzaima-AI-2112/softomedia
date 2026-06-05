@@ -1,6 +1,7 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
+import { impressionLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
 
@@ -15,26 +16,11 @@ const router = express.Router();
  */
 router.get('/upload-url', async (req, res) => {
     try {
-        // 1. Auth Check (Implicit via middleware, or specific check)
-        // const authHeader = req.headers.authorization; 
-
         const timestamp = Date.now();
         const batchId = uuidv4();
         const filename = `telemetry/${timestamp}_${batchId}.json`;
 
-        // 2. Generate Signed URL
-        // Real Implementation:
-        /*
-        const [url] = await bucket.file(filename).getSignedUrl({
-            version: 'v4',
-            action: 'write',
-            expires: Date.now() + 5 * 60 * 1000, // 5 minutes
-            contentType: 'application/json',
-        });
-        */
-
         // Mock Implementation for MVP/Local
-        // We point the client to a local "sink" endpoint that accepts the PUT
         const mockUrl = `${process.env.API_URL || 'http://localhost:8080'}/api/telemetry/sink/${filename}`;
 
         logger.info('Generated Batch Upload URL', { filename, mockUrl });
@@ -60,7 +46,6 @@ router.put('/sink/*', (req, res) => {
         path: req.params[0],
         size: req.headers['content-length']
     });
-    // In a real sink, we might save this file to disk for inspection
     res.status(200).send('OK');
 });
 
@@ -68,21 +53,25 @@ router.put('/sink/*', (req, res) => {
  * POST /api/telemetry/impression
  * Receives a single real-time impression event from the Player.
  *
+ * Sprint 9 — Task 9.3: impressionLimiter applied (100 req/min per IP).
+ * The limiter is scoped to this verb only; upload-url, sink, and error
+ * routes are unaffected.
+ *
  * Body:
- *   - screen_id    {string} REQUIRED — the screen that played the ad
- *   - campaign_id  {string} REQUIRED — the campaign being played
- *   - asset_id     {string} optional — specific creative asset
- *   - loop_id      {string} optional — the loop this slot belongs to
- *   - played_at    {string} optional — ISO 8601 timestamp; defaults to server time
+ *   - screen_id    {string} REQUIRED
+ *   - campaign_id  {string} REQUIRED
+ *   - asset_id     {string} optional
+ *   - loop_id      {string} optional
+ *   - played_at    {string} optional ISO 8601; defaults to server time
  *
  * Returns 201 { status: 'recorded', impression_id } on success.
  * Returns 400 if screen_id or campaign_id are missing.
+ * Returns 429 with Retry-After header when rate limit exceeded.
  *
- * Phase 1: writes to structured logger (Winston).
  * Phase 2 (TODO): persist to impressions Firestore collection and increment
  *   campaign play_count via campaignService.
  */
-router.post('/impression', (req, res) => {
+router.post('/impression', impressionLimiter, (req, res) => {
     const { screen_id, campaign_id, asset_id, loop_id, played_at } = req.body;
 
     if (!screen_id || !campaign_id) {
