@@ -1,6 +1,7 @@
 ﻿import express from 'express';
 import { campaignRepository, loopRepository } from '../repositories/index.js';
 import { campaignService } from '../services/CampaignService.js';
+import { requireRole } from '../middleware/requireRole.js';
 
 const router = express.Router();
 
@@ -118,18 +119,68 @@ router.post('/:id/book', async (req, res) => {
 /**
  * PATCH /api/campaigns/:id/status
  * Transition campaign state (approved/rejected)
+ *
+ * Requires: retaileradmin role or higher (S8-3).
+ * Status is normalised to lowercase before persisting so that
+ * LoopGenerationService.getAvailableCampaigns() can rely on 'approved' (S8-4).
+ *
+ * Allowed transitions:
+ *   pending_approval -> approved
+ *   pending_approval -> rejected
  */
-router.patch('/:id/status', async (req, res) => {
+router.patch('/:id/status', requireRole('retaileradmin'), async (req, res) => {
     try {
         const { id } = req.params;
-        const { status } = req.body;
-        if (!status) return res.status(400).json({ error: 'Status is required' });
+        const rawStatus = req.body.status;
+        if (!rawStatus) return res.status(400).json({ error: 'Status is required' });
+
+        // Normalise to lowercase so filtering on 'approved' works consistently
+        // across all query sites (S8-4: LoopGenerationService.getAvailableCampaigns).
+        const ALLOWED_STATUSES = ['approved', 'rejected', 'pending_approval'];
+        const status = typeof rawStatus === 'string' ? rawStatus.toLowerCase() : rawStatus;
+
+        if (!ALLOWED_STATUSES.includes(status)) {
+            return res.status(400).json({
+                error: 'Invalid status',
+                allowed: ALLOWED_STATUSES
+            });
+        }
 
         const updated = await campaignService.updateStatus(id, status);
         res.json(updated);
     } catch (error) {
-        const status = error.message === 'Campaign not found' ? 404 : 500;
-        res.status(status).json({ error: error.message });
+        const statusCode = error.message === 'Campaign not found' ? 404 : 500;
+        res.status(statusCode).json({ error: error.message });
+    }
+});
+
+/**
+ * PUT /api/campaigns/:id
+ * Full replacement update for a campaign document.
+ */
+router.put('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const campaign = await campaignRepository.findById(id);
+        if (!campaign) {
+            return res.status(404).json({ error: 'Campaign not found' });
+        }
+        const updated = await campaignRepository.update(id, req.body);
+        res.json(updated);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * DELETE /api/campaigns/:id
+ */
+router.delete('/:id', async (req, res) => {
+    try {
+        await campaignRepository.delete(req.params.id);
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 
