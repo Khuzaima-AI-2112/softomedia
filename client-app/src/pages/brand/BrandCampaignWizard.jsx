@@ -74,7 +74,10 @@ const BrandCampaignWizard = () => {
                 start_date: wizardData.dateRange.start,
                 end_date: wizardData.dateRange.end,
                 budget: wizardData.budget,
-                status: 'pending'
+                // S8-6: was 'pending' — must be 'pending_approval' so the
+                // approval queue (CampaignApprovalList) and backend POST
+                // handler both recognise it correctly.
+                status: 'pending_approval'
             };
 
             const campaign = await apiService.createCampaign(campaignData);
