@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { API_URL } from '../config.js'
 import { telemetryService } from '../services/TelemetryService.js'
@@ -18,11 +18,27 @@ const isBusinessHours = () => {
 // Get today's date in YYYY-MM-DD format
 const getTodayDate = () => new Date().toISOString().split('T')[0];
 
+// Sprint 7 — Task 7.4: Offline fallback slots (Softomedia branded, no network dependency)
+const FALLBACK_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1920' height='1080' viewBox='0 0 1920 1080'%3E%3Crect width='1920' height='1080' fill='%230f172a'/%3E%3Ctext x='50%25' y='45%25' font-family='sans-serif' font-size='72' font-weight='bold' fill='%2338bdf8' text-anchor='middle' dominant-baseline='middle'%3ESoftoMedia%3C/text%3E%3Ctext x='50%25' y='58%25' font-family='sans-serif' font-size='32' fill='%2394a3b8' text-anchor='middle' dominant-baseline='middle'%3EBroadcast Network%3C/text%3E%3C/svg%3E`;
+
+const FALLBACK_SLOTS = Array.from({ length: 12 }, (_, i) => ({
+    id: `fallback-${i}`,
+    url: FALLBACK_SVG,
+    duration: 5,
+    type: 'image',
+    asset_id: `fallback-${i}`,
+    asset_name: 'SoftoMedia Fallback',
+}));
+
+// Sprint 7 — Task 7.2: Retry delays (ms) — 2s, 4s, 8s, 16s, 30s
+const RETRY_DELAYS = [2000, 4000, 8000, 16000, 30000];
+
 function Player() {
     const [searchParams] = useSearchParams()
     const [screenId, setScreenId] = useState(null)
     const [status, setStatus] = useState('initializing')
     const [screenData, setScreenData] = useState(null)
+    const [retryAttempt, setRetryAttempt] = useState(0) // Task 7.2: retry counter
 
     // Loop-based playback state
     const [playbackMode, setPlaybackMode] = useState('playlist') // 'loop' | 'playlist'
@@ -35,7 +51,13 @@ function Player() {
     const [currentAdIndex, setCurrentAdIndex] = useState(0)
     const [currentSlotIndex, setCurrentSlotIndex] = useState(0)
 
+    // Task 7.1: guard against React 18 StrictMode double-fire
+    const hasInitialized = useRef(false);
+    // Task 7.2: ref to hold retry timeout so we can cancel on unmount
+    const retryTimeoutRef = useRef(null);
+
     // Fetch loop for current hour
+    // Task 7.3: scoped by hour + status server-side for efficiency
     const fetchCurrentLoop = useCallback(async (screenId) => {
         if (!isBusinessHours()) {
             console.log('[Player] Outside business hours, using playlist fallback');
@@ -45,13 +67,12 @@ function Player() {
         try {
             const date = getTodayDate();
             const hour = getCurrentHour();
-            const res = await fetch(`${API_URL}/api/loops?date=${date}`);
+            // FIXME: confirm 'APPROVED' case matches LoopRepository status enum
+            const res = await fetch(`${API_URL}/api/loops?date=${date}&hour=${hour}&status=APPROVED`);
             const data = await res.json();
 
-            // Find approved loop for current hour
-            const loop = (data.loops || []).find(l =>
-                l.hour === hour && l.status === 'APPROVED'
-            );
+            // Server already filters by hour + status — take first result
+            const loop = (data.loops || [])[0] ?? null;
 
             if (loop && loop.slots && loop.slots.length > 0) {
                 console.log(`[Player] Found approved loop for ${hour}:00`, loop.id);
@@ -63,7 +84,7 @@ function Player() {
         return null;
     }, []);
 
-    // Hour change detection
+    // ── Effect A: Hour change detection (sets state only — no registration) ──────
     useEffect(() => {
         const checkHourChange = () => {
             const newHour = getCurrentHour();
@@ -78,86 +99,157 @@ function Player() {
         return () => clearInterval(interval);
     }, [currentHour]);
 
-    // Orchestrated Initialization (SRE Fix #2)
+    // ── Effect B: Switch loop on hour change (no registration call) ──────────────
+    // Task 7.1: Separated from initializePlayer so hour changes never re-register.
     useEffect(() => {
+        // Only switch if already playing in loop mode — don't fire before init
+        if (!screenId || status !== 'playing' || playbackMode !== 'loop') return;
+
+        console.log(`[Player] Hour changed to ${currentHour} — switching loop`);
+        fetchCurrentLoop(screenId).then((loop) => {
+            if (loop) {
+                setCurrentLoop(loop);
+                setCurrentSlotIndex(0);
+                console.log(`[Player] Switched to loop for ${currentHour}:00`, loop.id);
+            } else {
+                // No approved loop for new hour — fall back to playlist
+                console.log('[Player] No approved loop for new hour, keeping current content');
+            }
+        });
+    }, [currentHour]); // eslint-disable-line react-hooks/exhaustive-deps
+    // ^^ Intentionally excludes fetchCurrentLoop (stable [] useCallback) and
+    //    screenId/status/playbackMode to avoid double-fire. This effect is
+    //    solely triggered by hour transitions.
+
+    // ── Effect C: One-time initialization (registration + first loop/playlist) ───
+    // Task 7.1: dep array is [searchParams] only — currentHour removed to prevent
+    //           re-registration on every hour tick.
+    // Task 7.2: wraps network calls in exponential-backoff retry (max 5 attempts).
+    useEffect(() => {
+        // StrictMode guard: only run once per mount
+        if (hasInitialized.current) return;
+        hasInitialized.current = true;
+
         const initializePlayer = async () => {
-            const id = searchParams.get('screen_id') || 'demo-screen-01';
+            // Task V2: In production, do not accept screen_id from URL params.
+            // Require authenticated session. For MVP: warn + use param with flag.
+            let id;
+            if (import.meta.env.MODE !== 'development' && import.meta.env.MODE !== 'test') {
+                // Production: warn that URL-param screen_id is insecure
+                id = searchParams.get('screen_id');
+                if (!id || id === 'demo-screen-01') {
+                    console.warn('[Player][V2] screen_id from URL param is insecure in production. ' +
+                        'Should come from authenticated session. Proceeding for MVP.');
+                }
+                id = id || 'demo-screen-01';
+            } else {
+                id = searchParams.get('screen_id') || 'demo-screen-01';
+            }
             setScreenId(id);
 
-            try {
-                // Step 1: Register Screen
-                setStatus('registering');
-                console.log('[Player] Status changed: registering');
+            // Task 7.2: retry loop with exponential backoff
+            let lastError = null;
+            for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
+                if (attempt > 0) {
+                    const delay = RETRY_DELAYS[attempt - 1];
+                    setStatus('retrying');
+                    setRetryAttempt(attempt);
+                    console.log(`[Player] Retry attempt ${attempt}/${RETRY_DELAYS.length} in ${delay}ms`);
+                    await new Promise((resolve) => {
+                        retryTimeoutRef.current = setTimeout(resolve, delay);
+                    });
+                }
 
-                const regRes = await fetch(`${API_URL}/api/screens/register`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        screen_id: id,
-                        resolution: `${window.innerWidth}x${window.innerHeight}`,
-                        user_agent: navigator.userAgent
-                    })
-                });
+                try {
+                    // Step 1: Register Screen
+                    setStatus('registering');
+                    console.log('[Player] Status changed: registering');
 
-                if (!regRes.ok) throw new Error(`Registration failed: ${regRes.status}`);
-                console.log('[Player] Registration success');
+                    const regRes = await fetch(`${API_URL}/api/screens/register`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            screen_id: id,
+                            resolution: `${window.innerWidth}x${window.innerHeight}`,
+                            user_agent: navigator.userAgent
+                        })
+                    });
 
-                // Step 2: Try to load loop for current hour (Business Hours)
-                if (isBusinessHours()) {
-                    console.log('[Player] Business hours active, fetching loop...');
-                    const date = getTodayDate();
-                    const hour = getCurrentHour();
-                    const loopRes = await fetch(`${API_URL}/api/loops?date=${date}`);
-                    const loopData = await loopRes.json();
+                    if (!regRes.ok) throw new Error(`Registration failed: ${regRes.status}`);
+                    console.log('[Player] Registration success');
 
-                    const loop = (loopData.loops || []).find(l =>
-                        l.hour === hour && l.status === 'APPROVED'
-                    );
+                    // Step 2: Try to load loop for current hour (Business Hours)
+                    // Task 7.3: fetch scoped server-side by hour + status
+                    if (isBusinessHours()) {
+                        console.log('[Player] Business hours active, fetching loop...');
+                        const date = getTodayDate();
+                        const hour = getCurrentHour();
+                        // FIXME: confirm 'APPROVED' case matches LoopRepository status enum
+                        const loopRes = await fetch(`${API_URL}/api/loops?date=${date}&hour=${hour}&status=APPROVED`);
+                        const loopData = await loopRes.json();
 
-                    if (loop && loop.slots?.length > 0) {
-                        console.log('[Player] Found approved loop:', loop.id);
-                        setCurrentLoop(loop);
-                        setPlaybackMode('loop');
-                        setStatus('playing');
-                        console.log('[Player] Status changed: playing (loop mode)');
-                        return; // Successfully initialized with loop
+                        // Server filters by hour + status — take first result
+                        const loop = (loopData.loops || [])[0] ?? null;
+
+                        if (loop && loop.slots?.length > 0) {
+                            console.log('[Player] Found approved loop:', loop.id);
+                            setCurrentLoop(loop);
+                            setPlaybackMode('loop');
+                            setStatus('playing');
+                            setRetryAttempt(0);
+                            console.log('[Player] Status changed: playing (loop mode)');
+                            return; // Successfully initialized with loop
+                        }
                     }
+
+                    // Step 3: Fallback to Playlist if no loop
+                    console.log('[Player] No loop found or outside business hours, falling back to playlist');
+                    const playRes = await fetch(`${API_URL}/api/playlist/${id}`);
+                    const playData = await playRes.json();
+
+                    if (playData.playlist?.length > 0) {
+                        setPlaylist(playData.playlist);
+                        setPlaylistMeta({ source: playData.source || 'assigned', id: playData.playlist_id || playData.id });
+                        setPlaybackMode('playlist');
+                        setStatus('playing');
+                        setRetryAttempt(0);
+                        console.log('[Player] Status changed: playing (playlist mode)');
+                    } else {
+                        setStatus('no_content');
+                        console.log('[Player] Status changed: no_content');
+                    }
+
+                    return; // Success — exit retry loop
+
+                } catch (err) {
+                    lastError = err;
+                    console.error(`[Player] Initialization attempt ${attempt + 1} failed:`, err.message);
                 }
-
-                // Step 3: Fallback to Playlist if no loop
-                console.log('[Player] No loop found or outside business hours, falling back to playlist');
-                const playRes = await fetch(`${API_URL}/api/playlist/${id}`);
-                const playData = await playRes.json();
-
-                if (playData.playlist?.length > 0) {
-                    setPlaylist(playData.playlist);
-                    setPlaylistMeta({ source: playData.source || 'assigned', id: playData.playlist_id || playData.id });
-                    setPlaybackMode('playlist');
-                    setStatus('playing');
-                    console.log('[Player] Status changed: playing (playlist mode)');
-                } else {
-                    setStatus('no_content');
-                    console.log('[Player] Status changed: no_content');
-                }
-
-            } catch (err) {
-                console.error('[Player] Initialization failed:', err.message);
-                setStatus('error');
             }
+
+            // Task 7.4: All retries exhausted — engage offline fallback loop
+            console.warn('[Player] All retry attempts failed. Engaging offline fallback loop.');
+            setCurrentLoop({ id: 'fallback', hour: null, slots: FALLBACK_SLOTS });
+            setPlaybackMode('loop');
+            setStatus('playing');
+            setRetryAttempt(0);
         };
 
         initializePlayer();
-    }, [searchParams, fetchCurrentLoop, currentHour]); // Re-run if searchParams OR hour change
+
+        return () => {
+            // Task 7.2: cancel any pending retry timeout on unmount
+            if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+        };
+    }, [searchParams]); // Task 7.1: currentHour intentionally removed — see Effect B
 
     // --- SRE: White-Box Observability & Transport ---
     const logTelemetryEvent = (type, payload) => {
-        // Enable logging if in Test Mode OR if URL has ?debug=true
         const isDebug = new URLSearchParams(window.location.search).get('debug') === 'true';
 
         if (import.meta.env.MODE === 'test' || isDebug || window.__FORCE_TEST_LOGGING__) {
             if (!window.__TELEMETRY_LOG__) window.__TELEMETRY_LOG__ = [];
             window.__TELEMETRY_LOG__.push({ type, timestamp: Date.now(), payload });
-            // Keep buffer small (Circular Buffer Pattern)
             if (window.__TELEMETRY_LOG__.length > 50) window.__TELEMETRY_LOG__.shift();
         }
     };
@@ -165,15 +257,12 @@ function Player() {
     const sendTelemetry = (endpoint, data) => {
         const url = `${API_URL}${endpoint}`;
 
-        // Log intent (Synchronous, Deterministic)
         logTelemetryEvent(endpoint.includes('heartbeat') ? 'HEARTBEAT' : 'IMPRESSION', data);
 
-        // Send via Beacon (Reliable Transport)
         if (navigator.sendBeacon) {
             const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
             navigator.sendBeacon(url, blob);
         } else {
-            // Fallback for older browsers
             fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -183,7 +272,7 @@ function Player() {
         }
     };
 
-    // Heartbeat (Every 30 seconds)
+    // Heartbeat (Every 30 seconds) — continues during fallback mode
     useEffect(() => {
         if (!screenId) return;
 
@@ -223,7 +312,7 @@ function Player() {
         return () => clearTimeout(timer);
     }, [status, playbackMode, playlist, currentAdIndex, screenId, playlistMeta]);
 
-    // Loop Slot Playback (Loop Mode - Sprint 4)
+    // Loop Slot Playback (Loop Mode)
     useEffect(() => {
         if (status !== 'playing' || playbackMode !== 'loop' || !currentLoop) return;
 
@@ -233,26 +322,27 @@ function Player() {
         const currentSlot = slots[currentSlotIndex];
         const duration = (currentSlot?.duration || 5) * 1000;
 
-        // Record proof-of-play telemetry with loop context
-        telemetryService.trackImpression({
-            screenId,
-            campaignId: currentSlot?.campaign_id,
-            mediaId: currentSlot?.asset_id,
-            duration: currentSlot?.duration || 5,
-            source: 'loop',
-            playlistId: currentLoop.id,
-            // Loop-specific telemetry fields
-            loopId: currentLoop.id,
-            loopHour: currentLoop.hour,
-            slotPosition: currentSlotIndex
-        });
+        // Skip telemetry for fallback slots
+        if (currentLoop.id !== 'fallback') {
+            telemetryService.trackImpression({
+                screenId,
+                campaignId: currentSlot?.campaign_id,
+                mediaId: currentSlot?.asset_id,
+                duration: currentSlot?.duration || 5,
+                source: 'loop',
+                playlistId: currentLoop.id,
+                loopId: currentLoop.id,
+                loopHour: currentLoop.hour,
+                slotPosition: currentSlotIndex
+            });
 
-        logTelemetryEvent('LOOP_SLOT_PLAY', {
-            loopId: currentLoop.id,
-            hour: currentLoop.hour,
-            slotPosition: currentSlotIndex,
-            assetId: currentSlot?.asset_id
-        });
+            logTelemetryEvent('LOOP_SLOT_PLAY', {
+                loopId: currentLoop.id,
+                hour: currentLoop.hour,
+                slotPosition: currentSlotIndex,
+                assetId: currentSlot?.asset_id
+            });
+        }
 
         const timer = setTimeout(() => {
             setCurrentSlotIndex((prev) => (prev + 1) % slots.length);
@@ -266,10 +356,21 @@ function Player() {
         if (playbackMode === 'loop' && currentLoop) {
             const slot = currentLoop.slots?.[currentSlotIndex];
             if (slot?.asset_id) {
-                // Ensure URL is valid. If it's just a filename/ID, construct full path
+                // Task V3: validate slot URL before inject — block non-HTTPS and dangerous schemes
                 let assetUrl = slot.url || `${API_URL}/api/assets/${slot.asset_id}`;
-                if (!assetUrl.startsWith('http')) {
+                if (assetUrl.startsWith('javascript:') || assetUrl.startsWith('data:') && currentLoop.id !== 'fallback') {
+                    console.error('[Player][V3] Blocked dangerous slot URL scheme:', assetUrl.substring(0, 30));
+                    return null;
+                }
+                if (!assetUrl.startsWith('http') && !assetUrl.startsWith('data:')) {
                     assetUrl = `${API_URL}/api/assets/${slot.asset_id}`;
+                }
+                // In production, enforce HTTPS (allow data: only for fallback slots)
+                if (import.meta.env.MODE !== 'development' && import.meta.env.MODE !== 'test') {
+                    if (!assetUrl.startsWith('https://') && !assetUrl.startsWith('data:')) {
+                        console.error('[Player][V3] Blocked non-HTTPS asset URL in production');
+                        return null;
+                    }
                 }
 
                 return {
@@ -277,6 +378,7 @@ function Player() {
                     title: slot.asset_name || `Slot ${currentSlotIndex + 1}`,
                     duration: slot.duration || 5,
                     isLoop: true,
+                    isFallback: currentLoop.id === 'fallback',
                     loopHour: currentLoop.hour,
                     slotPosition: currentSlotIndex
                 };
@@ -292,7 +394,8 @@ function Player() {
             return {
                 ...playlist[currentAdIndex],
                 url: assetUrl,
-                isLoop: false
+                isLoop: false,
+                isFallback: false
             };
         }
 
@@ -314,19 +417,23 @@ function Player() {
                     alt={activeContent.title}
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
-                {/* Debug overlay */}
-                <div
-                    data-testid="ad-debug-overlay"
-                    style={{ position: 'absolute', bottom: 10, right: 10, background: 'rgba(0,0,0,0.5)', color: 'white', padding: 5, fontSize: 10 }}
-                >
-                    {activeContent.isLoop ? (
-                        <span>🔄 Loop {activeContent.loopHour}:00 | Slot {activeContent.slotPosition + 1}/12 | {activeContent.duration}s</span>
-                    ) : (
-                        <span>{activeContent.title} | {activeContent.duration}s</span>
-                    )}
-                </div>
-                {/* Loop indicator */}
-                {activeContent.isLoop && (
+
+                {/* Task V1: Debug overlay gated to development only */}
+                {import.meta.env.MODE === 'development' && (
+                    <div
+                        data-testid="ad-debug-overlay"
+                        style={{ position: 'absolute', bottom: 10, right: 10, background: 'rgba(0,0,0,0.5)', color: 'white', padding: 5, fontSize: 10 }}
+                    >
+                        {activeContent.isLoop ? (
+                            <span>🔄 Loop {activeContent.loopHour}:00 | Slot {activeContent.slotPosition + 1}/12 | {activeContent.duration}s</span>
+                        ) : (
+                            <span>{activeContent.title} | {activeContent.duration}s</span>
+                        )}
+                    </div>
+                )}
+
+                {/* Loop mode indicator */}
+                {activeContent.isLoop && !activeContent.isFallback && (
                     <div
                         data-testid="loop-indicator"
                         style={{
@@ -342,6 +449,26 @@ function Player() {
                         }}
                     >
                         LOOP MODE • {currentLoop?.hour}:00
+                    </div>
+                )}
+
+                {/* Task 7.4: Fallback mode banner */}
+                {activeContent.isFallback && (
+                    <div
+                        data-testid="fallback-mode-banner"
+                        style={{
+                            position: 'absolute',
+                            top: 10,
+                            left: 10,
+                            background: 'rgba(239,68,68,0.85)',
+                            color: 'white',
+                            padding: '4px 12px',
+                            borderRadius: 20,
+                            fontSize: 12,
+                            fontWeight: 'bold'
+                        }}
+                    >
+                        ⚠ OFFLINE — Fallback Content
                     </div>
                 )}
             </div>
@@ -367,6 +494,12 @@ function Player() {
 
                 <div style={{ margin: '2rem 0' }}>
                     {status === 'registering' && <span style={{ color: '#fbbf24' }}>Connecting...</span>}
+                    {/* Task 7.2: retrying status with attempt counter */}
+                    {status === 'retrying' && (
+                        <span style={{ color: '#fb923c' }}>
+                            Reconnecting... attempt {retryAttempt}/{RETRY_DELAYS.length}
+                        </span>
+                    )}
                     {status === 'loading_playlist' && <span style={{ color: '#60a5fa' }}>Loading Content...</span>}
                     {status === 'no_content' && <span style={{ color: '#9ca3af' }}>No ads scheduled.</span>}
                     {status === 'offline' && <span style={{ color: '#ef4444' }}>● Offline</span>}

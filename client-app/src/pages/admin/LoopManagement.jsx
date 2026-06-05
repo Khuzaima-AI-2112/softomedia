@@ -47,7 +47,6 @@ function LoopManagement() {
         setLoading(true);
         try {
             const data = await apiService.getLoopsByDate(targetDate);
-            // API returns { loops: [...], business_hours: {...} } — unpack the array
             setLoops(data?.loops || []);
         } catch (error) {
             console.error('Failed to fetch loops:', error);
@@ -64,7 +63,6 @@ function LoopManagement() {
     const handleGenerate = async () => {
         setGenerating(true);
         try {
-            // Backend expects camelCase: targetDate, retailerId, locationId
             await apiService.generateLoops({
                 targetDate,
                 retailerId: 'ret_demo',
@@ -83,6 +81,25 @@ function LoopManagement() {
     };
 
     const getLoopForHour = (hour) => loops.find(l => l.hour === hour) || null;
+
+    // Task 7.6: Warn if any upcoming hours today have no approved loop.
+    // "Upcoming" = current hour and later (for today), or all hours (for future dates).
+    const getUnapprovedUpcomingHours = () => {
+        const now = new Date();
+        const todayStr = now.toISOString().split('T')[0];
+        const isToday = targetDate === todayStr;
+        const currentHour = now.getHours();
+
+        return businessHours.filter(hour => {
+            // For today: only warn about current + future hours
+            if (isToday && hour < currentHour) return false;
+            const loop = getLoopForHour(hour);
+            // Warn if no loop exists OR loop is not APPROVED
+            return !loop || loop.status !== 'APPROVED';
+        });
+    };
+
+    const unapprovedHours = !loading ? getUnapprovedUpcomingHours() : [];
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -119,6 +136,25 @@ function LoopManagement() {
                     </button>
                 </div>
             </div>
+
+            {/* Task 7.6: Unapproved upcoming hours warning banner */}
+            {unapprovedHours.length > 0 && (
+                <div
+                    data-testid="unapproved-hours-banner"
+                    className="flex items-start gap-3 px-4 py-3 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 text-amber-800 dark:text-amber-300"
+                >
+                    <span className="material-symbols-outlined text-[20px] mt-0.5 shrink-0">warning</span>
+                    <div>
+                        <p className="font-semibold text-sm">
+                            {unapprovedHours.length} upcoming hour{unapprovedHours.length !== 1 ? 's' : ''} without an approved loop
+                        </p>
+                        <p className="text-xs mt-0.5 text-amber-700 dark:text-amber-400">
+                            Screens may play fallback content during:{' '}
+                            {unapprovedHours.map(h => formatHour(h)).join(', ')}
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -195,8 +231,12 @@ function LoopManagement() {
                                         <span className="text-sm font-bold text-slate-900 dark:text-white">
                                             {formatHour(hour)}
                                         </span>
+                                        {/* Task 7.6: status dot + StatusBadge inline */}
                                         {loop && (
-                                            <span className={`w-2.5 h-2.5 rounded-full ${getStatusColor(loop.status)}`}></span>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className={`w-2.5 h-2.5 rounded-full ${getStatusColor(loop.status)}`}></span>
+                                                <StatusBadge status={loop.status} size="xs" />
+                                            </div>
                                         )}
                                     </div>
 
