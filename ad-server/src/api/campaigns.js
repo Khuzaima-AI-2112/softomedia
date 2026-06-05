@@ -1,13 +1,15 @@
-﻿import express from 'express';
+import express from 'express';
 import { campaignRepository, loopRepository } from '../repositories/index.js';
 import { campaignService } from '../services/CampaignService.js';
+import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/requireRole.js';
 
 const router = express.Router();
 
 /**
  * GET /api/campaigns
- * List campaigns with optional status or advertiser filtering
+ * List campaigns with optional status or advertiser filtering.
+ * Public within the dashboard shell (no auth guard — all roles can read).
  */
 router.get('/', async (req, res) => {
     try {
@@ -33,7 +35,7 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /api/campaigns/:id
- * Get a single campaign by ID
+ * Get a single campaign by ID.
  */
 router.get('/:id', async (req, res) => {
     try {
@@ -49,9 +51,14 @@ router.get('/:id', async (req, res) => {
 
 /**
  * POST /api/campaigns
- * Create a new campaign (defaults to pending_approval)
+ * Create a new campaign (defaults to pending_approval).
+ *
+ * Sprint 9 — Task 9.2: authenticate guard added.
+ * Guard is per-verb (not router-level) to preserve GET/PATCH/PUT/book backward
+ * compatibility. In DEV the demo-token bypass in auth.js means existing flows
+ * continue without any client-side change.
  */
-router.post('/', async (req, res) => {
+router.post('/', authenticate, async (req, res) => {
     try {
         const id = `cmp_${Date.now()}`;
         const campaignData = {
@@ -68,7 +75,7 @@ router.post('/', async (req, res) => {
 
 /**
  * POST /api/campaigns/:id/book
- * Book slots for a campaign
+ * Book slots for a campaign.
  * Body: { slots: [{ loopId, slotIndex, creativeUrl }] }
  */
 router.post('/:id/book', async (req, res) => {
@@ -89,11 +96,9 @@ router.post('/:id/book', async (req, res) => {
         for (const slot of slots) {
             const { loopId, slotIndex, creativeUrl } = slot;
 
-            // Get the loop
             const loop = await loopRepository.findById(loopId);
             if (!loop) continue;
 
-            // Book the slot
             await loopRepository.bookSlot(loopId, slotIndex, {
                 campaign_id: id,
                 advertiser_id: campaign.advertiser_id,
@@ -104,7 +109,6 @@ router.post('/:id/book', async (req, res) => {
             bookedSlots.push({ loopId, slotIndex, success: true });
         }
 
-        // Update campaign with booked slot count
         await campaignRepository.update(id, {
             booked_slots: (campaign.booked_slots || 0) + bookedSlots.length,
             status: 'active'
@@ -118,11 +122,10 @@ router.post('/:id/book', async (req, res) => {
 
 /**
  * PATCH /api/campaigns/:id/status
- * Transition campaign state (approved/rejected)
+ * Transition campaign state (approved/rejected).
  *
  * Requires: retaileradmin role or higher (S8-3).
- * Status is normalised to lowercase before persisting so that
- * LoopGenerationService.getAvailableCampaigns() can rely on 'approved' (S8-4).
+ * Status is normalised to lowercase before persisting (S8-4).
  *
  * Allowed transitions:
  *   pending_approval -> approved
@@ -134,8 +137,6 @@ router.patch('/:id/status', requireRole('retaileradmin'), async (req, res) => {
         const rawStatus = req.body.status;
         if (!rawStatus) return res.status(400).json({ error: 'Status is required' });
 
-        // Normalise to lowercase so filtering on 'approved' works consistently
-        // across all query sites (S8-4: LoopGenerationService.getAvailableCampaigns).
         const ALLOWED_STATUSES = ['approved', 'rejected', 'pending_approval'];
         const status = typeof rawStatus === 'string' ? rawStatus.toLowerCase() : rawStatus;
 
@@ -174,8 +175,12 @@ router.put('/:id', async (req, res) => {
 
 /**
  * DELETE /api/campaigns/:id
+ *
+ * Sprint 9 — Task 9.2: authenticate + requireRole('admin') guard added.
+ * No known client calls DELETE today (grep confirmed zero matches).
+ * Adding both guards now prevents future accidental exposure.
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
     try {
         await campaignRepository.delete(req.params.id);
         res.status(204).send();
