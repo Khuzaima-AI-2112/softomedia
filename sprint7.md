@@ -3,10 +3,10 @@
 **Repo:** `cfroszte/softomedia-live2026`  
 **Branch:** `main`  
 **Generated:** 2026-06-05  
-**Last updated:** 2026-06-05 (post LAN-20260527 fix + TASK_PLAN20260527 review)  
+**Last updated:** 2026-06-05 (post LAN-20260527 fix + TASK_PLAN20260527 review + live-source isolation audit)  
 **Duration estimate:** 3 days  
 **Risk level:** 🔴 HIGH — `Player.jsx` is the live broadcast engine  
-**Source audits:** `sprint7and8.md`, `sprint-7-verification.md`, `BUG_FIX_LAN20260527.md`, `TASK_PLAN20260527.md`, live file-size audit of all major components  
+**Source audits:** `sprint7and8.md`, `sprint-7-verification.md`, `BUG_FIX_LAN20260527.md`, `TASK_PLAN20260527.md`, live file-size audit of all major components, live read of `Player.jsx` + `App.jsx` (2026-06-05)  
 
 ---
 
@@ -18,19 +18,118 @@ Make the approval workflow *actually gate broadcast* (the core platform promise)
 
 ---
 
+## Isolation Verification — Live Source Audit (2026-06-05)
+
+> This section was added after reading the actual live source of `Player.jsx` and `App.jsx` directly from the repo. Every claim below is sourced from the real file content, not assumptions or prior documentation.
+
+### Verdict: Sprint 7 is non-blocking and fully isolated.
+
+Every task has a confirmed blast radius that does not touch any other working route, component, or shared state. The only cross-cutting concern is documented under **One Genuine Cross-Cutting Risk** below.
+
+---
+
+### Route & Component Isolation (from `App.jsx` live source)
+
+`Player.jsx` is registered at `/player` as a **standalone route with no `DashboardLayout` wrapper**:
+
+```jsx
+<Route path="/player" element={<Player />} />
+```
+
+It shares zero render tree, zero state, and zero context with any admin, brand, retailer, or tech operator page. Any change to `Player.jsx` is physically incapable of affecting any dashboard route. `Player.jsx` does **not** use `AuthContext` — it reads `screen_id` directly from `searchParams`. There is no shared state mechanism between `Player` and the dashboard.
+
+`LoopManagement.jsx` (Task 7.6) is at `/dashboard/admin/loops` — a completely separate lazy-loaded route under the `DashboardLayout` shell. It does not import `Player.jsx` and `Player.jsx` does not import it.
+
+---
+
+### Per-Task Blast Radius (verified from live source)
+
+| Task | Files Touched | Change Type | Can It Break Anything Else? |
+|------|--------------|-------------|----------------------------|
+| **7.1** Fix re-registration | `Player.jsx` dep array only | Surgical — removes `currentHour` from one `useEffect` dep array | ❌ No — `Player` is a standalone route; zero shared state |
+| **7.2** Retry backoff | `Player.jsx` — wraps existing `try/catch` | Additive — only changes the failure path; success path untouched | ❌ No |
+| **7.3** Server-side filter | `Player.jsx` fetch URL + `loops.js` query | Additive query params, backward-compatible (params are conditional) | ❌ No for frontend. Backend must apply params conditionally — see One Genuine Cross-Cutting Risk below |
+| **7.4** Offline fallback | `Player.jsx` — additive state branch | Additive — new branch reached only after all retries fail; happy path untouched | ❌ No |
+| **7.5** Upload validation | Unknown upload component — `onChange` guard only | Additive — adds a pre-submit check; does not modify the save path | ❌ No |
+| **7.6** Status badges | `LoopManagement.jsx` only | Additive — new badge + banner render | ❌ No — separate admin route, no shared state with Player |
+| **7.7** Docs | `changelog.md`, `MVP_SPRINT_PLAN.md` | Pure markdown text | ❌ No |
+| **7.8** Delete `PlaylistEditor` | Delete one file | Removal | ❌ No — **confirmed** not imported anywhere in `App.jsx` (see below) |
+| **V1–V5** Security | `Player.jsx`, `TechOpsDashboard.jsx` | Conditional `NODE_ENV` guards wrapping existing code | ❌ No — guards add conditions, don't change logic |
+
+---
+
+### Live `useEffect` Dep Arrays Confirmed in `Player.jsx`
+
+Reading the actual file confirmed the following dep arrays are live in the codebase:
+
+| Effect | Dep Array | Notes |
+|--------|-----------|-------|
+| `initializePlayer` (the re-registration bug) | `[searchParams, fetchCurrentLoop, currentHour]` | **R1 confirmed live** — `currentHour` is present and causing hourly re-registration |
+| Hour-change detection | `[currentHour]` | Correct — only sets state, no registration call |
+| `fetchCurrentLoop` (useCallback) | `[]` | Empty dep array — stable ref, never changes |
+| Heartbeat | `[screenId]` | Isolated to heartbeat only |
+| Playlist playback | `[status, playbackMode, playlist, currentAdIndex, screenId, playlistMeta]` | **Not touched by any Sprint 7 task** |
+| Loop slot playback | `[status, playbackMode, currentLoop, currentSlotIndex, screenId]` | **Not touched by any Sprint 7 task** |
+
+**Task 7.1 touches exactly one dep array** (`initializePlayer`) and **two of six total effects** (splitting into Effect A + Effect B). The playlist playback and loop slot playback effects are untouched.
+
+---
+
+### Two-Function Finding: `fetchCurrentLoop` vs Inline Fetch
+
+The live source confirms that `fetchCurrentLoop` (useCallback, lines ~39–53) and the inline fetch inside `initializePlayer` (lines ~103–116) are **structurally different functions**, not copies of each other:
+
+- `fetchCurrentLoop` calls `getCurrentHour()` fresh at each invocation (useCallback with `[]` deps)
+- The inline version uses `const hour = getCurrentHour()` scoped to the `initializePlayer` block
+
+At page load / mount time both resolve to the same value. **Effect B (the new hour-change effect from Task 7.1) must call `fetchCurrentLoop` (the useCallback), not duplicate the inline logic.** This is documented in Task 7.1 detail below and is the primary implementation risk for that task.
+
+---
+
+### `PlaylistEditor` Dead-Code Confirmation (Task 7.8)
+
+`App.jsx` maintains an explicit **verified file map** in its header comment (updated 2026-06-05). `PlaylistEditor` does not appear in:
+- Any `lazy(() => import(...))` declaration
+- Any `<Route ... element={...}>` definition
+- The verified file map in the `App.jsx` header comment
+
+The `App.jsx` header also lists files confirmed **not on disk** (`pages/tickets/TicketDashboard.jsx`, `pages/retailer/Loops.jsx`). `PlaylistEditor` is not in that list — it exists on disk but is fully orphaned. **Deleting it has zero build impact.**
+
+Pre-delete grep must still be run at delete time (the codebase changes between sessions):
+```bash
+grep -r "PlaylistEditor" client-app/src --include="*.jsx" --include="*.js"
+# Expected: zero results outside the file itself
+```
+
+---
+
+### One Genuine Cross-Cutting Risk (Task 7.3 Backend)
+
+The **only cross-cutting concern in the entire sprint** is the `server/routes/loops.js` backend change in Task 7.3. Adding `hour` and `status` query params touches a shared API endpoint used by more than just `Player.jsx`.
+
+**Mitigation (already specified in Task 7.3):** params must be applied **conditionally**:
+```js
+if (req.query.hour)   query.where('hour', req.query.hour);
+if (req.query.status) query.where('status', req.query.status);
+```
+
+Any caller that hits `/api/loops?date=X` without those params must still receive the full dataset. As long as this conditional pattern is followed, no other consumer of that endpoint is affected. This is the only task touching shared backend infrastructure.
+
+---
+
 ## Pre-Sprint SRE Risk Register
 
 > These are **not tasks**. They are live risks that could silently invalidate sprint work if not understood first. Read before touching any file.
 
 | ID | Severity | File | Risk | Must-Read Before |
 |----|----------|------|------|------------------|
-| R1 | 🔴 HIGH | `Player.jsx` L91 | `initializePlayer` re-runs on every `currentHour` change — screen re-registers every hour, causing ID churn and duplicate heartbeats | Tasks 7.1, 7.2 |
+| R1 | 🔴 HIGH | `Player.jsx` L91 | `initializePlayer` re-runs on every `currentHour` change — screen re-registers every hour, causing ID churn and duplicate heartbeats. **Confirmed live in dep array `[searchParams, fetchCurrentLoop, currentHour]`** | Tasks 7.1, 7.2 |
 | R2 | 🔴 HIGH | `Player.jsx` L45 | Loop fetch returns ALL loops for the day, filtered client-side. At 100+ screens polling hourly, this is N×full-dataset queries with no scope filter | Task 7.3 |
 | R3 | 🔴 HIGH | `Player.jsx` L128 | `initializePlayer` has zero retry logic — one network blip on startup permanently sets `status='error'`, screen stays dark with no recovery | Task 7.2 |
 | R4 | 🟡 MEDIUM | `Player.jsx` L53, `LoopRepository.js` | `'APPROVED'` string-matched client-side only — `LoopRepository` uses mixed-case status strings, mismatch silently fails | Task 7.3 |
 | R5 | 🟡 MEDIUM | `ScheduleManager.jsx` | Bulk-approve calls `/api/locations/:id/loops/approve-all` — endpoint unconfirmed (FIXME in commit). 404 not surfaced to retailer | Awareness only |
 | R6 | 🟡 MEDIUM | `TechOpsDashboard.jsx` | `user_id` read from `localStorage` — blocked in sandboxed iframes, fragile in production | Task V5 |
-| R7 | 🟢 LOW | `PlaylistEditor.jsx` | Dead code (no route, no imports) — may cause silent import-time errors in some bundlers | Task 7.8 |
+| R7 | 🟢 LOW | `PlaylistEditor.jsx` | Dead code (no route, no imports) — confirmed via live `App.jsx` read. May cause silent import-time errors in some bundlers | Task 7.8 |
 | R8 | 🟡 MEDIUM | `BaseRepository.js` (RESOLVED) | ~~`update()` swallowed Firestore errors silently — all UI edits appeared to succeed but were never persisted to Firestore~~ **Fixed in LAN-20260527** | Read `BUG_FIX_LAN20260527.md` |
 
 ---
@@ -92,25 +191,30 @@ This fix is a **prerequisite** for Sprint 7's test stabilisation. Before this me
 - `client-app/src/pages/Player.jsx`
 
 **Lines of concern:**
-- `useEffect` dep array: ~L91 (includes `currentHour` — must be removed from init effect)
+- `useEffect` dep array: ~L91 (includes `currentHour` — **confirmed live** in dep array `[searchParams, fetchCurrentLoop, currentHour]`)
 - `initializePlayer` function body: ~L91–L150
-- `fetchCurrentLoop` useCallback: ~L39
-- Inline loop-fetch logic duplicated inside `initializePlayer`: ~L103–L116 ⚠️ **NOT identical to `fetchCurrentLoop`**
+- `fetchCurrentLoop` useCallback: ~L39 (dep array `[]` — stable ref)
+- Inline loop-fetch logic duplicated inside `initializePlayer`: ~L103–L116 ⚠️ **NOT identical to `fetchCurrentLoop`** — confirmed from live source
 
 **Problem in plain terms:**  
 Every time the clock ticks to a new hour, `initializePlayer` fires again. This means `POST /api/screens/register` is called 14 times per business day per screen. At 100 screens that's 1,400 unnecessary registration calls and potential screen ID churn where a screen briefly appears offline between re-registration and re-handshake.
 
 **Exact fix:**
 1. Split into **two separate `useEffect` blocks**:
-   - Effect A: `initializePlayer` — dep array `[]` (runs once on mount only). Contains registration + first loop fetch.
-   - Effect B: `switchLoop` — dep array `[currentHour]`. Fetches loop for new hour, calls `setCurrentLoop()` and `setCurrentSlotIndex(0)`. No registration call.
+   - Effect A: `initializePlayer` — dep array `[searchParams]` (runs once on mount, and only if search params change). Contains registration + first loop fetch.
+   - Effect B: `switchLoop` — dep array `[currentHour]`. Calls `fetchCurrentLoop()` (the useCallback at L39, **not** the inline version at L103–L116). Calls `setCurrentLoop()` and `setCurrentSlotIndex(0)`. No registration call.
 2. Add a `const hasInitialized = useRef(false)` guard at the top of Effect A to prevent double-fire in React 18 StrictMode (`useEffect` fires twice in dev).
-3. Read both `fetchCurrentLoop` (L39) and the inline version (L103–L116) before editing — they are structurally different. Effect B should call `fetchCurrentLoop` (the useCallback version), not duplicate the inline logic.
+3. **Read both `fetchCurrentLoop` (L39) and the inline version (L103–L116) before editing** — they are structurally different. Effect B must use `fetchCurrentLoop` (the useCallback), not the inline logic. This is confirmed from live source — see the Isolation Verification section above.
+
+**Untouched effects (confirmed from live source — do not modify):**
+- Heartbeat effect: `[screenId]`
+- Playlist playback effect: `[status, playbackMode, playlist, currentAdIndex, screenId, playlistMeta]`
+- Loop slot playback effect: `[status, playbackMode, currentLoop, currentSlotIndex, screenId]`
 
 **Verification:** Open Network tab in DevTools. Load Player. Manually advance clock by 1 hour in dev tools or mock `currentHour`. Confirm `POST /api/screens/register` fires exactly **once** at page load and **zero times** on hour tick.
 
 **Outcome likelihood: 🟢 85%**  
-This is a clean architectural fix with a well-understood scope. The main risk is the duplicated inline fetch logic at L103–L116 — if the developer assumes `fetchCurrentLoop` and the inline version are equivalent without reading both, Effect B may behave differently to Effect A. The `hasInitialized` ref guard is also easy to forget in StrictMode. Both risks are well-documented and avoidable with a read-first policy.
+This is a clean architectural fix with a well-understood scope. The main risk is the duplicated inline fetch logic at L103–L116 — if the developer assumes `fetchCurrentLoop` and the inline version are equivalent without reading both, Effect B may behave differently to Effect A. The `hasInitialized` ref guard is also easy to forget in StrictMode. Both risks are documented and avoidable with a read-first policy.
 
 ---
 
@@ -129,11 +233,14 @@ If the server is slow on first boot (cold start, brief outage, deployment in pro
 3. After all 5 attempts fail: attempt a **playlist-only fallback** (fetch playlist without loop context) before finally setting `status='error'`.
 4. **Do NOT retry telemetry/heartbeat** — those use `sendBeacon` which is fire-and-forget by design.
 5. **No external retry library** — implement inline with `setTimeout` in a loop or recursive async function. No such utility exists in this codebase.
+6. **Clean up retry timeouts on unmount** via `useEffect` cleanup to prevent memory leaks if the component unmounts mid-retry cycle.
+
+**Sequencing note:** This task must be done **after** Task 7.1 or as a single coordinated edit — both tasks modify `initializePlayer`. Doing them independently risks a merge conflict in the same function body.
 
 **Verification:** In a test, mock `fetch` to throw `TypeError: network error` 3 times, then resolve on the 4th call. Confirm player reaches `status='playing'` on the 4th attempt without manual refresh.
 
 **Outcome likelihood: 🟢 80%**  
-Straightforward implementation with no external dependencies. Risk factors: (1) integrating with the Effect A / Effect B split from 7.1 — both tasks edit the same function, so they must be done in sequence or as one coordinated edit. (2) The retry timeout array uses `setTimeout` and must be cleaned up on unmount via `useEffect` cleanup to avoid memory leaks if the component unmounts mid-retry cycle.
+Straightforward implementation with no external dependencies. Risk factors: (1) integrating with the Effect A / Effect B split from 7.1 — must be sequenced or done as one coordinated edit. (2) The retry timeout array uses `setTimeout` and must be cleaned up on unmount via `useEffect` cleanup to avoid memory leaks.
 
 ---
 
@@ -147,7 +254,7 @@ Straightforward implementation with no external dependencies. Risk factors: (1) 
 **⚠️ New context from LAN-20260527:** Before editing `server/routes/loops.js`, audit `LoopRepository.js` for the same silent-catch pattern that was fixed in `BaseRepository`. If `LoopRepository` overrides `update()` with its own Firestore call and a silent catch, loop status writes (e.g. marking a loop `APPROVED`) may not be persisting — this would explain any unexplained `APPROVED` filter misses that appear as R4.
 
 **Problem in plain terms:**  
-`Player.jsx` fetches `/api/loops?date=2026-06-05` — the complete set of all loops for the entire day. Each screen does this every hour. At 100 screens, that's 100 × 14 = 1,400 full-day-dataset fetches per day. The actual filter (`hour === currentHour && status === 'APPROVED'`) is applied client-side after the response arrives. This also creates the mixed-case bug risk: if `LoopRepository` stores `'approved'` (lowercase) but the client checks `=== 'APPROVED'` (uppercase), no loops will ever match and screens silently fall back to playlist.
+`Player.jsx` fetches `/api/loops?date=2026-06-05` — the complete set of all loops for the entire day. Each screen does this every hour. At 100 screens, that's 100 × 14 = 1,400 full-day-dataset fetches per day. The actual filter (`hour === currentHour && status === 'APPROVED'`) is applied client-side after the response arrives.
 
 **Exact fix — frontend (`Player.jsx`):**
 - Update fetch URL to: `` `/api/loops?date=${date}&hour=${currentHour}&status=APPROVED` ``
@@ -156,14 +263,17 @@ Straightforward implementation with no external dependencies. Risk factors: (1) 
 
 **Exact fix — backend (`server/routes/loops.js`):**
 - **Read the file first.** It may use raw SQL, Knex, Sequelize, or Mongoose. Do not assume.
-- If `hour` query param is present: add `AND hour = ?` (or ORM equivalent) to the existing query.
-- If `status` query param is present: add `AND status = ?`.
-- Both additions must be **additive and backward-compatible** — callers that don't send these params must still receive the full day dataset.
+- Params must be **conditional** — backward-compatible with callers that don't send them:
+  ```js
+  if (req.query.hour)   query.where('hour', req.query.hour);
+  if (req.query.status) query.where('status', req.query.status);
+  ```
+- Callers that hit `/api/loops?date=X` without `hour` or `status` must still receive the full day dataset.
 
 **Verification:** In dev, hit `/api/loops?date=TODAY&hour=9&status=APPROVED` directly. Confirm response contains only loops for hour 9 with APPROVED status. Confirm `/api/loops?date=TODAY` (no hour/status) still returns all loops for backward compatibility.
 
 **Outcome likelihood: 🟡 65%**  
-The frontend change is straightforward. The backend change carries meaningful risk because the ORM/query pattern is unknown until the file is read. Additionally, the case-sensitivity issue (R4) between `'APPROVED'` in the client and potentially `'approved'` in `LoopRepository` is not fixed by this task alone — it requires checking the actual stored values. If the LAN-20260527 audit uncovers a `LoopRepository` silent-catch variant, that must be resolved first or this task will produce a working filter against data that was never correctly written.
+The frontend change is straightforward. The backend change carries meaningful risk because the ORM/query pattern is unknown until the file is read. The case-sensitivity issue (R4) between `'APPROVED'` in the client and potentially `'approved'` in `LoopRepository` is not fixed by this task alone — it requires checking the actual stored values.
 
 ---
 
@@ -207,7 +317,7 @@ setStatus('playing');
 **Verification:** Open Player in DevTools → Network tab → Block all requests. Confirm after retry cycle exhausted, fallback content plays. Confirm heartbeat POSTs continue (check Network tab). Confirm `data-testid="fallback-mode-banner"` is present in DOM.
 
 **Outcome likelihood: 🟢 78%**  
-Self-contained change. Main risk is integration with the retry logic from 7.2 — the fallback must trigger *after* all retries fail, meaning it's coupled to the retry implementation. If 7.2 is done first and uses a clean async pattern, 7.4 is straightforward. Second risk: the SVG data URI for the fallback placeholder must be valid inline SVG — malformed SVG causes a broken image, not a fallback screen.
+Self-contained change. Main risk is integration with the retry logic from 7.2 — the fallback must trigger *after* all retries fail, meaning it's coupled to the retry implementation. If 7.2 is done first and uses a clean async pattern, 7.4 is straightforward.
 
 ---
 
@@ -246,7 +356,7 @@ The MVP spec mandates MP4/JPG/PNG only, maximum 5 seconds per video, and specifi
 - After valid upload, hard-refresh page → confirm asset persists (tests the LAN-20260527 fix is in the chain).
 
 **Outcome likelihood: 🟡 60%**  
-Highest-uncertainty task in Sprint 7. Upload component location is unknown and must be found via grep. If embedded inside `RetailerManagement.jsx` (50,256 bytes), any edit carries significant risk of collateral breakage. The `onloadedmetadata` pattern for MP4 duration validation is asynchronous and requires careful handling. The 0.5s tolerance for encoding variance is an undocumented assumption that may need product sign-off.
+Highest-uncertainty task in Sprint 7. Upload component location is unknown and must be found via grep. If embedded inside `RetailerManagement.jsx` (50,256 bytes), any edit carries significant risk of collateral breakage. The `onloadedmetadata` pattern for MP4 duration validation is asynchronous and requires careful handling.
 
 ---
 
@@ -293,7 +403,7 @@ Well-scoped, isolated to `LoopManagement.jsx` with no broadcast path changes. Th
 **`changelog.md` additions:**
 
 ```markdown
-## LAN-20260527 — BaseRepository Persistence Fix
+## LAN-20260527 — BaseRepository.update() Silent-Catch Fix
 - `BaseRepository.update()`: silent catch removed, `.update()` → `.set({merge:true})`
 - `RetailerRepository.softDelete()` + `updateStatus()`: same fix
 - `AdvertiserRepository.softDelete()`: same fix
@@ -330,9 +440,9 @@ Well-scoped, isolated to `LoopManagement.jsx` with no broadcast path changes. Th
 - `client-app/src/pages/admin/PlaylistEditor.jsx` — **DELETED** (15,681 bytes)
 
 **Problem in plain terms:**  
-`PlaylistEditor.jsx` has no route in `App.jsx` and no imports anywhere in the codebase. It is 15,681 bytes of dead code that imports services which may have changed since the file was last touched — some bundlers may throw silent import-time errors.
+`PlaylistEditor.jsx` has no route in `App.jsx` and no imports anywhere in the codebase — **confirmed by reading the live `App.jsx` source on 2026-06-05**. It is 15,681 bytes of dead code that imports services which may have changed since the file was last touched — some bundlers may throw silent import-time errors.
 
-**Pre-delete verification (ALL must pass):**
+**Pre-delete verification (ALL must pass — re-run at delete time, not based on this audit):**
 ```bash
 # 1. No imports anywhere in the codebase
 grep -r "PlaylistEditor" client-app/src --include="*.jsx" --include="*.js" --include="*.ts"
@@ -424,14 +534,14 @@ These are pre-existing regressions, not new tests. They must be resolved before 
 | Task | Score | Confidence Basis |
 |------|-------|------------------|
 | 7.7 — Docs update | **95%** | No code changes. Pure markdown. `changelog.md` confirmed at repo root. |
-| 7.8 — Delete PlaylistEditor | **92%** | Trivial if grep pre-checks pass. One failure mode: another file added post-audit that imports it. |
-| 7.6 — Status badges | **88%** | Well-isolated. Risk: `StatusBadge` export assumption + timezone edge case in hour filter. |
-| 7.1 — Fix re-registration | **85%** | Clean architectural fix. Risk: duplicated inline fetch logic at L103–L116 assumed equivalent to `fetchCurrentLoop`. |
+| 7.8 — Delete PlaylistEditor | **92%** | Confirmed dead code via live `App.jsx` read. One failure mode: another file added post-audit that imports it — re-run grep at delete time. |
+| 7.6 — Status badges | **88%** | Well-isolated to `LoopManagement.jsx`. Risk: `StatusBadge` export assumption + timezone edge case in hour filter. |
+| 7.1 — Fix re-registration | **85%** | R1 confirmed live in dep array. Risk: two-function finding (L39 vs L103 inline fetch) — use `fetchCurrentLoop` in Effect B only. |
 | V1–V5 — Security patches | **82%** | V1/V3 trivial. V2 (screen_id hardening) may break demo env. V5 depends on auth context existing. |
-| 7.2 — Retry backoff | **80%** | Straightforward. Risk: cleanup on unmount during retry cycle (memory leak). Must sequence after 7.1. |
+| 7.2 — Retry backoff | **80%** | Straightforward. Must sequence after 7.1. Risk: cleanup on unmount during retry cycle. |
 | 7.4 — Fallback loop | **78%** | Depends on 7.2 being clean. Risk: SVG data URI validity, heartbeat continuity through fallback state. |
 | 7.3 — Server-side filter | **65%** | Backend ORM unknown. Case-sensitivity bug (R4) remains as FIXME. LoopRepository silent-catch audit added. |
-| 7.5 — Upload validation | **60%** | **Highest risk task.** Upload component location unknown. May be embedded in 50KB file. Async MP4 duration check is fragile. LAN-20260527 persistence chain must also be verified. |
+| 7.5 — Upload validation | **60%** | **Highest risk task.** Upload component location unknown. May be embedded in 50KB file. Async MP4 duration check is fragile. |
 
 **Sprint-level composite outcome: ~79%** (average, weighted for task complexity)
 
@@ -444,6 +554,7 @@ All 9 task groups completing cleanly within 3 days requires no unknown-unknowns 
 - [ ] `POST /api/screens/register` fires exactly once per Player page load — verified by DevTools network log
 - [ ] Player reaches `status='playing'` after 3 simulated network failures (mock test)
 - [ ] `GET /api/loops?date=X&hour=Y&status=APPROVED` returns only matching loops
+- [ ] `GET /api/loops?date=X` (no hour/status) still returns full day dataset — backward-compat confirmed
 - [ ] Offline fallback loop plays when all network requests are blocked in DevTools; heartbeat continues
 - [ ] Upload rejects `.gif`, rejects MP4 > 5.5s, warns on resolution mismatch, accepts valid 5s MP4
 - [ ] Uploaded asset persists after hard-refresh (verifies LAN-20260527 fix is in upload call chain)
