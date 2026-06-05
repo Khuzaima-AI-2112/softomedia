@@ -27,13 +27,15 @@ const BRAND_NAV = [
 ];
 
 const RETAILER_NAV = [
-    { to: '/dashboard/retailer',                        icon: 'dashboard',      label: 'Dashboard',       end: true },
-    { to: '/dashboard/retailer/schedule',               icon: 'calendar_month', label: 'Schedule' },
-    { to: '/dashboard/retailer/schedule-history',       icon: 'history',        label: 'Schedule History' },
+    { to: '/dashboard/retailer',                        icon: 'dashboard',       label: 'Dashboard',       end: true },
+    { to: '/dashboard/retailer/schedule',               icon: 'calendar_month',  label: 'Schedule' },
+    { to: '/dashboard/retailer/schedule-history',       icon: 'history',         label: 'Schedule History' },
     { to: '/dashboard/retailer/schedule-manager',       icon: 'event_available', label: 'D-1 Preview' },
 ];
 
+// Task 4.6 — TechOpsDashboard is now the landing page entry; Health remains accessible
 const TECHOP_NAV = [
+    { to: '/dashboard/techoperator',        icon: 'monitor',       label: 'Tech Ops',  end: true },
     { to: '/dashboard/techoperator/health', icon: 'monitor_heart', label: 'Health' },
 ];
 
@@ -102,7 +104,8 @@ function DashboardLayout() {
         return () => document.removeEventListener('mousedown', handler);
     }, [avatarOpen]);
 
-    // Role-based routing: map persona to an existing route.
+    // Task 4.6 — techoperator now lands at /dashboard/techoperator (TechOpsDashboard)
+    // Health screen remains accessible via nav but is no longer the default landing page.
     React.useEffect(() => {
         if (!loading && persona && location.pathname === '/dashboard') {
             const routePersona = persona === 'super_admin' ? 'admin' : persona;

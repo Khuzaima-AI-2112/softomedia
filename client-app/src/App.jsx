@@ -32,6 +32,7 @@
  *   pages/retailer/ScheduleCalendar.jsx  ✅
  *   pages/retailer/ScheduleHistory.jsx   ✅  (served at /dashboard/retailer/schedule-history)
  *   pages/retailer/ScheduleManager.jsx   ✅  (served at /dashboard/retailer/schedule-manager)
+ *   pages/tech/TechOpsDashboard.jsx      ✅  (served at /dashboard/techoperator)
  *
  *   pages/tickets/TicketDashboard.jsx    ❌ NOT ON DISK — route omitted
  *   pages/tickets/TicketDetail.jsx       ❌ NOT ON DISK — route omitted
@@ -76,6 +77,9 @@ const RetailerOverview = lazy(() => import('./pages/retailer/RetailerDashboard')
 const ScheduleCalendar = lazy(() => import('./pages/retailer/ScheduleCalendar'));
 const ScheduleHistory  = lazy(() => import('./pages/retailer/ScheduleHistory'));
 const ScheduleManager  = lazy(() => import('./pages/retailer/ScheduleManager'));
+
+// ── Tech Operator pages ──────────────────────────────────────────────────────────
+const TechOpsDashboard = lazy(() => import('./pages/tech/TechOpsDashboard'));
 
 function App() {
     return (
@@ -123,7 +127,8 @@ function App() {
                             <Route path="retailer/schedule-history" element={<ScheduleHistory />} />
                             <Route path="retailer/schedule-manager" element={<ScheduleManager />} />
 
-                            {/* Tech Operator */}
+                            {/* Tech Operator — landing page is now TechOpsDashboard */}
+                            <Route path="techoperator"        element={<TechOpsDashboard />} />
                             <Route path="techoperator/health" element={<Health />} />
 
                             {/* Catch-all for unknown /dashboard/* paths */}

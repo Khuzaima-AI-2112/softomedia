@@ -1,50 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import { API_URL } from '../../config';
 
-const HAMBURGER_EXPERIMENTS = [
-  {
-    id: 'variant-a',
-    label: 'Variant A',
-    description: 'Current production — left slide-in drawer, backdrop blur, 2-col swatch grid',
-    href: '/experiments/hamburger-variant-a.html',
-    badge: 'Production',
-    badgeClass: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400',
-    iconColor: 'text-emerald-500',
-  },
-  {
-    id: 'variant-b',
-    label: 'Variant B',
-    description: 'Compact top sheet — drops below header, 3-col desktop layout, no full overlay',
-    href: '/experiments/hamburger-variant-b.html',
-    badge: 'Experiment',
-    badgeClass: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
-    iconColor: 'text-amber-500',
-  },
-  {
-    id: 'variant-c',
-    label: 'Variant C',
-    description: 'Right-side wide drawer — trigger on right, w-80, single-col role list with check mark',
-    href: '/experiments/hamburger-variant-c.html',
-    badge: 'Experiment',
-    badgeClass: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
-    iconColor: 'text-amber-500',
-  },
-  {
-    id: 'variant-index',
-    label: 'All Variants',
-    description: 'Side-by-side index — all 3 experiments on one screen for comparison',
-    href: '/experiments/hamburger-index.html',
-    badge: 'Index',
-    badgeClass: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
-    iconColor: 'text-slate-400',
-  },
-];
-
 function TechOpsDashboard() {
     const [stats, setStats] = useState({ total: 0, online: 0, offline: 0, screens: [] });
     const [, setLoading] = useState(true);
+
+    // Task 4.2 — restart confirmation
+    const [restartTarget, setRestartTarget] = useState(null); // null | { id, label }
+    const [restartLoading, setRestartLoading] = useState(false);
+    const [restartResults, setRestartResults] = useState({}); // { [screenId]: 'success' | 'error' }
+
+    // Task 4.4 — terminal log viewer
+    const [terminalTarget, setTerminalTarget] = useState(null); // null | { id }
+
+    // Task 4.5 — search + filter state
+    const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [locationFilter, setLocationFilter] = useState('all');
 
     useEffect(() => {
         fetchStatus();
@@ -66,8 +40,145 @@ function TechOpsDashboard() {
         }
     };
 
+    // Task 4.2 + 4.3 — restart with confirmation + audit log
+    const handleRestartConfirm = async () => {
+        if (!restartTarget) return;
+        setRestartLoading(true);
+        const screenId = restartTarget.id;
+        let outcome = 'failure';
+        try {
+            const token = localStorage.getItem('auth_token');
+            const res = await fetch(`${API_URL}/api/screens/${screenId}/restart`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            outcome = res.ok ? 'success' : 'failure';
+            setRestartResults(prev => ({ ...prev, [screenId]: res.ok ? 'success' : 'error' }));
+        } catch {
+            setRestartResults(prev => ({ ...prev, [screenId]: 'error' }));
+        } finally {
+            // Task 4.3 — audit log entry (fire-and-forget; failure does not block restart result)
+            // FIXME: backend audit-log endpoint unconfirmed — open tracking issue against ad-server.
+            // Required fields: action, screen_id, user_id, timestamp, outcome.
+            try {
+                const token = localStorage.getItem('auth_token');
+                await fetch(`${API_URL}/api/audit-log`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'screen_restart',
+                        screen_id: screenId,
+                        user_id: localStorage.getItem('user_id') || 'unknown',
+                        timestamp: new Date().toISOString(),
+                        outcome,
+                    }),
+                });
+            } catch {
+                // audit log failure is silent — does not surface to user
+            }
+            setRestartLoading(false);
+            setRestartTarget(null);
+            // Auto-clear result badge after 4s
+            setTimeout(() => {
+                setRestartResults(prev => { const n = { ...prev }; delete n[screenId]; return n; });
+            }, 4000);
+        }
+    };
+
+    // Task 4.5 — client-side filter
+    const uniqueLocations = useMemo(() => {
+        const locs = stats.screens.map(s => s.location).filter(Boolean);
+        return [...new Set(locs)].sort();
+    }, [stats.screens]);
+
+    const filteredScreens = useMemo(() => {
+        return stats.screens.filter(screen => {
+            const matchesSearch = !searchQuery ||
+                (screen.id || '').toLowerCase().includes(searchQuery.toLowerCase());
+            const matchesStatus = statusFilter === 'all' ||
+                (statusFilter === 'online' && screen.status === 'ONLINE') ||
+                (statusFilter === 'offline' && screen.status !== 'ONLINE');
+            const matchesLocation = locationFilter === 'all' ||
+                screen.location === locationFilter;
+            return matchesSearch && matchesStatus && matchesLocation;
+        });
+    }, [stats.screens, searchQuery, statusFilter, locationFilter]);
+
     return (
         <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
+
+            {/* Task 4.2 — restart confirmation dialog */}
+            {restartTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 space-y-4">
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                            <span className="material-symbols-outlined text-amber-500">restart_alt</span>
+                            Confirm Restart
+                        </h3>
+                        <p className="text-slate-600 dark:text-slate-400 text-sm">
+                            Restart screen <strong className="font-mono">{restartTarget.id}</strong>?
+                            This will interrupt active playback.
+                        </p>
+                        <div className="flex gap-3 justify-end pt-2">
+                            <button
+                                onClick={() => setRestartTarget(null)}
+                                className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleRestartConfirm}
+                                disabled={restartLoading}
+                                className="px-4 py-2 bg-amber-500 text-white text-sm font-bold rounded-lg hover:bg-amber-600 transition-all disabled:opacity-60 flex items-center gap-2"
+                            >
+                                {restartLoading && <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>}
+                                {restartLoading ? 'Restarting…' : 'Yes, Restart'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Task 4.4 — terminal log viewer slide-over */}
+            {terminalTarget && (
+                <div className="fixed inset-0 z-50 flex justify-end">
+                    <div
+                        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+                        onClick={() => setTerminalTarget(null)}
+                    />
+                    <div className="relative w-full max-w-lg bg-slate-900 text-slate-100 flex flex-col shadow-2xl z-10">
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700">
+                            <div className="flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary">terminal</span>
+                                <span className="font-mono text-sm font-bold">{terminalTarget.id}</span>
+                                <span className="text-xs text-slate-400">Device Log</span>
+                            </div>
+                            <button
+                                onClick={() => setTerminalTarget(null)}
+                                className="text-slate-400 hover:text-white transition-colors"
+                                aria-label="Close log viewer"
+                            >
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+                        {/* Task 4.4 — stub per spec: log endpoint not yet available */}
+                        {/* FIXME: replace with real GET /api/screens/:id/logs when backend endpoint is ready */}
+                        <div className="flex-1 flex flex-col items-center justify-center gap-3 p-8 text-center">
+                            <span className="material-symbols-outlined text-[48px] text-slate-600">terminal</span>
+                            <p className="text-slate-400 font-mono text-sm">Log endpoint not yet available.</p>
+                            <p className="text-xs text-slate-600 max-w-xs">
+                                Device log streaming is scheduled for a future backend release.
+                                A tracking issue has been opened against ad-server.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Header */}
             <div className="flex justify-between items-end">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Technical Operations</h1>
@@ -81,6 +192,7 @@ function TechOpsDashboard() {
                 </div>
             </div>
 
+            {/* KPI cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <GlassCard className="border-l-4 border-l-primary">
                     <p className="text-sm font-bold text-slate-500 mb-1">Managed Fleet</p>
@@ -108,54 +220,43 @@ function TechOpsDashboard() {
                 </GlassCard>
             </div>
 
-            {/* ── Design Lab ── */}
+            {/* Screen Inventory */}
             <GlassCard>
-                <div className="flex items-center justify-between mb-5">
-                    <h3 className="font-bold flex items-center gap-2">
-                        <span className="material-symbols-outlined text-primary">experiment</span>
-                        Design Lab — Hamburger Menu Experiments
-                    </h3>
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Tech Op only</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {HAMBURGER_EXPERIMENTS.map((exp) => (
-                        <a
-                            key={exp.id}
-                            href={exp.href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="group flex items-start gap-3 p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:border-primary/30 hover:bg-primary/5 dark:hover:bg-primary/10 transition-all duration-150"
-                        >
-                            <span className={`material-symbols-outlined text-[20px] mt-0.5 shrink-0 ${exp.iconColor} group-hover:scale-110 transition-transform duration-150`}>
-                                menu
-                            </span>
-                            <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2 mb-0.5">
-                                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">{exp.label}</span>
-                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${exp.badgeClass}`}>{exp.badge}</span>
-                                </div>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 leading-snug">{exp.description}</p>
-                            </div>
-                            <span className="material-symbols-outlined text-[16px] text-slate-300 group-hover:text-primary shrink-0 mt-0.5 transition-colors duration-150">
-                                arrow_outward
-                            </span>
-                        </a>
-                    ))}
-                </div>
-            </GlassCard>
-
-            <GlassCard>
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
                     <h3 className="font-bold flex items-center gap-2">
                         <span className="material-symbols-outlined text-primary">list_alt</span>
-                        Screen Inventory & Health
+                        Screen Inventory &amp; Health
                     </h3>
-                    <div className="flex gap-2">
+                    {/* Task 4.5 — search + status + location filters, all wired */}
+                    <div className="flex flex-wrap gap-2">
                         <input
                             type="text"
-                            placeholder="Search screen ID..."
+                            placeholder="Search screen ID…"
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
                             className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/20"
                         />
+                        <select
+                            value={statusFilter}
+                            onChange={e => setStatusFilter(e.target.value)}
+                            className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        >
+                            <option value="all">All Status</option>
+                            <option value="online">Online</option>
+                            <option value="offline">Offline</option>
+                        </select>
+                        {uniqueLocations.length > 0 && (
+                            <select
+                                value={locationFilter}
+                                onChange={e => setLocationFilter(e.target.value)}
+                                className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            >
+                                <option value="all">All Locations</option>
+                                {uniqueLocations.map(loc => (
+                                    <option key={loc} value={loc}>{loc}</option>
+                                ))}
+                            </select>
+                        )}
                     </div>
                 </div>
 
@@ -170,12 +271,16 @@ function TechOpsDashboard() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                            {stats.screens.length === 0 ? (
+                            {filteredScreens.length === 0 ? (
                                 <tr>
-                                    <td colSpan="4" className="py-8 text-center text-slate-500 italic">No screens detected in the registry.</td>
+                                    <td colSpan="4" className="py-8 text-center text-slate-500 italic">
+                                        {stats.screens.length === 0
+                                            ? 'No screens detected in the registry.'
+                                            : 'No screens match the current filters.'}
+                                    </td>
                                 </tr>
                             ) : (
-                                stats.screens.map(screen => (
+                                filteredScreens.map(screen => (
                                     <tr key={screen.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                                         <td className="py-4 px-4 font-mono text-sm text-slate-600 dark:text-slate-300">{screen.id}</td>
                                         <td className="py-4 px-4">
@@ -185,12 +290,31 @@ function TechOpsDashboard() {
                                             {screen.last_seen ? new Date(screen.last_seen).toLocaleTimeString() : 'Never'}
                                         </td>
                                         <td className="py-4 px-4 text-right">
-                                            <button className="p-1 rounded hover:bg-primary/10 text-slate-400 hover:text-primary transition-colors disabled:opacity-30">
-                                                <span className="material-symbols-outlined text-[18px]">restart_alt</span>
-                                            </button>
-                                            <button className="p-1 rounded hover:bg-primary/10 text-slate-400 hover:text-primary transition-colors">
-                                                <span className="material-symbols-outlined text-[18px]">terminal</span>
-                                            </button>
+                                            <div className="flex items-center justify-end gap-1">
+                                                {/* Task 4.2 — restart with confirmation */}
+                                                {restartResults[screen.id] === 'success' && (
+                                                    <span className="text-xs text-emerald-500 mr-1">Restarted</span>
+                                                )}
+                                                {restartResults[screen.id] === 'error' && (
+                                                    <span className="text-xs text-rose-500 mr-1">Failed</span>
+                                                )}
+                                                <button
+                                                    onClick={() => setRestartTarget({ id: screen.id })}
+                                                    disabled={restartLoading}
+                                                    aria-label={`Restart screen ${screen.id}`}
+                                                    className="p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-900/30 text-slate-400 hover:text-amber-600 transition-colors disabled:opacity-30"
+                                                >
+                                                    <span className="material-symbols-outlined text-[18px]">restart_alt</span>
+                                                </button>
+                                                {/* Task 4.4 — terminal opens log viewer panel */}
+                                                <button
+                                                    onClick={() => setTerminalTarget({ id: screen.id })}
+                                                    aria-label={`Open log viewer for screen ${screen.id}`}
+                                                    className="p-1 rounded hover:bg-primary/10 text-slate-400 hover:text-primary transition-colors"
+                                                >
+                                                    <span className="material-symbols-outlined text-[18px]">terminal</span>
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
