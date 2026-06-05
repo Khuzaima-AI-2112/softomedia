@@ -32,11 +32,17 @@
  *   pages/retailer/ScheduleCalendar.jsx  ✅
  *   pages/retailer/ScheduleHistory.jsx   ✅  (served at /dashboard/retailer/schedule-history)
  *   pages/retailer/ScheduleManager.jsx   ✅  (served at /dashboard/retailer/schedule-manager)
+ *   pages/retailer/Loops.jsx             ✅  (served at /dashboard/retailer/loops)
+ *   pages/retailer/CampaignApprovalList.jsx ✅ (served at /dashboard/retailer/campaign-approvals)
+ *                                           ⚠️  PENDING: resolve duplicate with
+ *                                               components/CampaignApprovalList.jsx before merging —
+ *                                               run: grep -r "CampaignApprovalList" client-app/src --include="*.jsx" -n
  *   pages/tech/TechOpsDashboard.jsx      ✅  (served at /dashboard/techoperator)
  *
- *   pages/tickets/TicketDashboard.jsx    ❌ NOT ON DISK — route omitted
- *   pages/tickets/TicketDetail.jsx       ❌ NOT ON DISK — route omitted
- *   pages/retailer/Loops.jsx             ❌ NOT ON DISK — route omitted
+ *   pages/tickets/TicketDashboard.jsx    ⏳ PENDING — promote components/TicketDashboard.jsx
+ *                                           to pages/tickets/TicketDashboard.jsx, then uncomment route below
+ *   pages/tickets/TicketDetail.jsx       ⏳ PENDING — promote components/TicketDetail.jsx
+ *                                           to pages/tickets/TicketDetail.jsx, then uncomment route below
  */
 
 import { lazy, Suspense } from 'react';
@@ -73,10 +79,19 @@ const BrandOverview  = lazy(() => import('./pages/brand/BrandDashboard'));
 const CampaignWizard = lazy(() => import('./pages/brand/BrandCampaignWizard'));
 
 // ── Retailer pages ──────────────────────────────────────────────────────────────
-const RetailerOverview = lazy(() => import('./pages/retailer/RetailerDashboard'));
-const ScheduleCalendar = lazy(() => import('./pages/retailer/ScheduleCalendar'));
-const ScheduleHistory  = lazy(() => import('./pages/retailer/ScheduleHistory'));
-const ScheduleManager  = lazy(() => import('./pages/retailer/ScheduleManager'));
+const RetailerOverview  = lazy(() => import('./pages/retailer/RetailerDashboard'));
+const ScheduleCalendar  = lazy(() => import('./pages/retailer/ScheduleCalendar'));
+const ScheduleHistory   = lazy(() => import('./pages/retailer/ScheduleHistory'));
+const ScheduleManager   = lazy(() => import('./pages/retailer/ScheduleManager'));
+const RetailerLoops     = lazy(() => import('./pages/retailer/Loops'));
+const CampaignApprovals = lazy(() => import('./pages/retailer/CampaignApprovalList'));
+
+// ── Ticket pages ─────────────────────────────────────────────────────────────────
+// TODO: uncomment once pages/tickets/TicketDashboard.jsx and TicketDetail.jsx exist on disk.
+// Pre-work: promote components/TicketDashboard.jsx → pages/tickets/TicketDashboard.jsx
+//           promote components/TicketDetail.jsx    → pages/tickets/TicketDetail.jsx
+// const TicketDashboard = lazy(() => import('./pages/tickets/TicketDashboard'));
+// const TicketDetail    = lazy(() => import('./pages/tickets/TicketDetail'));
 
 // ── Tech Operator pages ──────────────────────────────────────────────────────────
 const TechOpsDashboard = lazy(() => import('./pages/tech/TechOpsDashboard'));
@@ -115,17 +130,24 @@ function App() {
                             <Route path="admin/map"             element={<NetworkMap />} />
                             <Route path="admin/ai-log"          element={<AILog />} />
                             <Route path="admin/pricing"         element={<CPMCalendar />} />
-                            <Route path="admin/loop-analytics" element={<LoopAnalytics />} />
+                            <Route path="admin/loop-analytics"  element={<LoopAnalytics />} />
 
                             {/* Brand */}
                             <Route path="brand"              element={<BrandOverview />} />
                             <Route path="brand/campaign/new" element={<CampaignWizard />} />
 
                             {/* Retailer */}
-                            <Route path="retailer"                   element={<RetailerOverview />} />
-                            <Route path="retailer/schedule"          element={<ScheduleCalendar />} />
-                            <Route path="retailer/schedule-history" element={<ScheduleHistory />} />
-                            <Route path="retailer/schedule-manager" element={<ScheduleManager />} />
+                            <Route path="retailer"                    element={<RetailerOverview />} />
+                            <Route path="retailer/schedule"           element={<ScheduleCalendar />} />
+                            <Route path="retailer/schedule-history"   element={<ScheduleHistory />} />
+                            <Route path="retailer/schedule-manager"   element={<ScheduleManager />} />
+                            <Route path="retailer/loops"              element={<RetailerLoops />} />
+                            <Route path="retailer/campaign-approvals" element={<CampaignApprovals />} />
+
+                            {/* Tickets — routes held until page files are promoted from components/
+                                See TODO block in lazy imports above. */}
+                            {/* <Route path="tickets"     element={<TicketDashboard />} /> */}
+                            {/* <Route path="tickets/:id" element={<TicketDetail />} /> */}
 
                             {/* Tech Operator — landing page is now TechOpsDashboard */}
                             <Route path="techoperator"        element={<TechOpsDashboard />} />
