@@ -3,15 +3,18 @@
 **Repo:** `cfroszte/softomedia-live2026`  
 **Branch:** `main`  
 **Generated:** 2026-06-05  
+**Last updated:** 2026-06-05 (post LAN-20260527 fix + TASK_PLAN20260527 review)  
 **Duration estimate:** 3 days  
 **Risk level:** 🔴 HIGH — `Player.jsx` is the live broadcast engine  
-**Source audits:** `sprint7and8.md`, `sprint-7-verification.md`, live file-size audit of all major components  
+**Source audits:** `sprint7and8.md`, `sprint-7-verification.md`, `BUG_FIX_LAN20260527.md`, `TASK_PLAN20260527.md`, live file-size audit of all major components  
 
 ---
 
 ## Sprint Goal
 
 Make the approval workflow *actually gate broadcast* (the core platform promise), harden Player against network failures, add upload-time content validation, and eliminate dead code risk. This is the first sprint that touches production broadcast path code — every task carries regression risk against the currently-passing test suite.
+
+> **New context as of 2026-06-05:** Bug fix `LAN-20260527` has been merged. `BaseRepository.update()` was silently swallowing Firestore errors across all four management pages (Advertisers, Retailers, Screens, Stores). This is now fixed. Tasks 7.3 and 7.5 both touch data persistence paths — read `BUG_FIX_LAN20260527.md` before editing any repository layer.
 
 ---
 
@@ -28,6 +31,28 @@ Make the approval workflow *actually gate broadcast* (the core platform promise)
 | R5 | 🟡 MEDIUM | `ScheduleManager.jsx` | Bulk-approve calls `/api/locations/:id/loops/approve-all` — endpoint unconfirmed (FIXME in commit). 404 not surfaced to retailer | Awareness only |
 | R6 | 🟡 MEDIUM | `TechOpsDashboard.jsx` | `user_id` read from `localStorage` — blocked in sandboxed iframes, fragile in production | Task V5 |
 | R7 | 🟢 LOW | `PlaylistEditor.jsx` | Dead code (no route, no imports) — may cause silent import-time errors in some bundlers | Task 7.8 |
+| R8 | 🟡 MEDIUM | `BaseRepository.js` (RESOLVED) | ~~`update()` swallowed Firestore errors silently — all UI edits appeared to succeed but were never persisted to Firestore~~ **Fixed in LAN-20260527** | Read `BUG_FIX_LAN20260527.md` |
+
+---
+
+## Completed Work Merged Into This Sprint
+
+### ✅ LAN-20260527 — BaseRepository.update() Silent-Catch Fix
+
+**Merged:** 2026-05-27  
+**Files changed:** `ad-server/src/repositories/BaseRepository.js`, `RetailerRepository.js`, `AdvertiserRepository.js`
+
+This fix is a **prerequisite** for Sprint 7's test stabilisation. Before this merge, any integration test that called an update or toggle action would pass the UI assertion but fail the persistence assertion on re-fetch — causing cascading false negatives in `integration_gold_path.spec.js` and any spec that edits loop or screen state.
+
+**What was fixed:**
+- `BaseRepository.update()`: removed silent `catch` block; switched from Firestore `.update()` to `.set({ merge: true })` — prevents `NOT_FOUND` throws on documents that only existed in mock storage
+- `RetailerRepository.softDelete()` and `updateStatus()`: same `.update()` → `.set({ merge: true })` replacement
+- `AdvertiserRepository.softDelete()`: same fix (it already re-threw, but still used `.update()`)
+
+**Impact on Sprint 7 tasks:**
+- Task 7.3 (server-side loop fetch): `LoopRepository` should be audited for the same `.update()` pattern — it may have the same silent-catch bug on loop status writes
+- Task 7.5 (upload validation): the upload component likely calls a `create()` or `update()` path — verify the fixed `BaseRepository` is in the call chain, not a custom Firestore write bypassing it
+- `integration_gold_path.spec.js`: previously produced unknown-count failures likely caused by this bug — re-run after merge before attributing failures to Player refactor
 
 ---
 
@@ -45,7 +70,7 @@ Make the approval workflow *actually gate broadcast* (the core platform promise)
 ## Task Map
 
 | Task | Type | Files Touched | Estimated Effort | Outcome Likelihood |
-|------|------|---------------|-----------------|--------------------|
+|------|------|---------------|-----------------|-------------------|
 | 7.1 | Bug fix | `Player.jsx` | 1–2 hrs | 🟢 85% |
 | 7.2 | Resilience | `Player.jsx` | 2–3 hrs | 🟢 80% |
 | 7.3 | Perf + correctness | `Player.jsx`, `server/routes/loops.js` | 2–3 hrs | 🟡 65% |
@@ -119,6 +144,8 @@ Straightforward implementation with no external dependencies. Risk factors: (1) 
 - `client-app/src/pages/Player.jsx`
 - `server/routes/loops.js` *(ORM pattern unknown — read before editing)*
 
+**⚠️ New context from LAN-20260527:** Before editing `server/routes/loops.js`, audit `LoopRepository.js` for the same silent-catch pattern that was fixed in `BaseRepository`. If `LoopRepository` overrides `update()` with its own Firestore call and a silent catch, loop status writes (e.g. marking a loop `APPROVED`) may not be persisting — this would explain any unexplained `APPROVED` filter misses that appear as R4.
+
 **Problem in plain terms:**  
 `Player.jsx` fetches `/api/loops?date=2026-06-05` — the complete set of all loops for the entire day. Each screen does this every hour. At 100 screens, that's 100 × 14 = 1,400 full-day-dataset fetches per day. The actual filter (`hour === currentHour && status === 'APPROVED'`) is applied client-side after the response arrives. This also creates the mixed-case bug risk: if `LoopRepository` stores `'approved'` (lowercase) but the client checks `=== 'APPROVED'` (uppercase), no loops will ever match and screens silently fall back to playlist.
 
@@ -136,7 +163,7 @@ Straightforward implementation with no external dependencies. Risk factors: (1) 
 **Verification:** In dev, hit `/api/loops?date=TODAY&hour=9&status=APPROVED` directly. Confirm response contains only loops for hour 9 with APPROVED status. Confirm `/api/loops?date=TODAY` (no hour/status) still returns all loops for backward compatibility.
 
 **Outcome likelihood: 🟡 65%**  
-The frontend change is straightforward. The backend change carries meaningful risk because the ORM/query pattern is unknown until the file is read — a developer who assumes the wrong query builder API and doesn't test will ship a broken filter that silently returns no results. Additionally, the case-sensitivity issue (R4) between `'APPROVED'` in the client and potentially `'approved'` in `LoopRepository` is not fixed by this task alone — it requires checking the actual stored values. If the FIXME comment is left unresolved, this task delivers a performance improvement but leaves the correctness bug open.
+The frontend change is straightforward. The backend change carries meaningful risk because the ORM/query pattern is unknown until the file is read. Additionally, the case-sensitivity issue (R4) between `'APPROVED'` in the client and potentially `'approved'` in `LoopRepository` is not fixed by this task alone — it requires checking the actual stored values. If the LAN-20260527 audit uncovers a `LoopRepository` silent-catch variant, that must be resolved first or this task will produce a working filter against data that was never correctly written.
 
 ---
 
@@ -180,7 +207,7 @@ setStatus('playing');
 **Verification:** Open Player in DevTools → Network tab → Block all requests. Confirm after retry cycle exhausted, fallback content plays. Confirm heartbeat POSTs continue (check Network tab). Confirm `data-testid="fallback-mode-banner"` is present in DOM.
 
 **Outcome likelihood: 🟢 78%**  
-Self-contained change. Main risk is integration with the retry logic from 7.2 — the fallback must trigger *after* all retries fail, meaning it's coupled to the retry implementation. If 7.2 is done first and uses a clean async pattern, 7.4 is straightforward. If 7.2 uses a poorly structured retry pattern, plugging 7.4 in becomes messy. Second risk: the SVG data URI for the fallback placeholder must be valid inline SVG — malformed SVG causes a broken image, not a fallback screen.
+Self-contained change. Main risk is integration with the retry logic from 7.2 — the fallback must trigger *after* all retries fail, meaning it's coupled to the retry implementation. If 7.2 is done first and uses a clean async pattern, 7.4 is straightforward. Second risk: the SVG data URI for the fallback placeholder must be valid inline SVG — malformed SVG causes a broken image, not a fallback screen.
 
 ---
 
@@ -193,6 +220,8 @@ Self-contained change. Main risk is integration with the retry logic from 7.2 �
   grep -r "<input" client-app/src --include="*.jsx" -l | xargs grep -l "type=\"file\""
   ```
   Likely candidates: `AdvertiserManagement.jsx` (36,181 bytes) or `RetailerManagement.jsx` (50,256 bytes)
+
+**⚠️ New context from LAN-20260527:** The upload component's save path goes through `BaseRepository` — the fixed version (`.set({ merge: true })`) must be in the call chain. If `AdvertiserManagement` or `RetailerManagement` uses an older direct Firestore write that bypasses `BaseRepository`, the LAN-20260527 fix does not protect it. Confirm the upload save action calls through `BaseRepository.update()` or `BaseRepository.create()`, not a raw `docRef.set()` or `docRef.update()`.
 
 **Problem in plain terms:**  
 The MVP spec mandates MP4/JPG/PNG only, maximum 5 seconds per video, and specific screen resolution. Currently, any file type and any duration can be uploaded — a 2-minute MP4 or a `.gif` passes silently. Client-side validation is required before the upload request fires.
@@ -214,9 +243,10 @@ The MVP spec mandates MP4/JPG/PNG only, maximum 5 seconds per video, and specifi
 - Upload 10-second `.mp4` → rejected with duration error.
 - Upload valid 5-second `.mp4` → passes validation, upload proceeds.
 - Upload image at wrong resolution → warning displayed, upload not blocked.
+- After valid upload, hard-refresh page → confirm asset persists (tests the LAN-20260527 fix is in the chain).
 
 **Outcome likelihood: 🟡 60%**  
-This is the highest-uncertainty task in Sprint 7. The upload component location is **completely unknown** and must be found via grep. If it is embedded inside `RetailerManagement.jsx` (50,256 bytes — the largest file in the project), any edit carries significant risk of collateral breakage. The `onloadedmetadata` pattern for MP4 duration validation is also asynchronous and requires careful handling to block the upload without introducing race conditions. The 0.5s duration tolerance for encoding variance is an undocumented assumption that may need product sign-off.
+Highest-uncertainty task in Sprint 7. Upload component location is unknown and must be found via grep. If embedded inside `RetailerManagement.jsx` (50,256 bytes), any edit carries significant risk of collateral breakage. The `onloadedmetadata` pattern for MP4 duration validation is asynchronous and requires careful handling. The 0.5s tolerance for encoding variance is an undocumented assumption that may need product sign-off.
 
 ---
 
@@ -244,10 +274,10 @@ Admins have no at-a-glance view of which loops for today are approved vs pending
 3. Render badge next to the hour label in the loop grid row.
 4. Add a warning banner at the **top of the page** (above the grid) when any loop for today's **remaining hours** has `status !== 'APPROVED'`. Banner text: `"⚠️ N loop(s) for upcoming hours are not yet approved. Screens may play fallback content."`
 
-**Verification:** Set a loop to `PENDING` status in the DB/API. Load `LoopManagement.jsx` → confirm amber badge appears. Confirm warning banner appears. Set to `APPROVED` → confirm badge turns green, banner disappears.
+**Verification:** Set a loop to `PENDING` status in the DB/API. Load `LoopManagement.jsx` → confirm amber badge appears. Confirm warning banner appears. Set to `APPROVED` → confirm badge turns green, banner disappears. Hard-refresh after each toggle — confirms LAN-20260527 persistence fix is working.
 
 **Outcome likelihood: 🟢 88%**  
-Well-scoped, isolated to `LoopManagement.jsx` with no broadcast path changes. The only meaningful risk is the `StatusBadge` export check — if a developer imports from `LoopBuilder.jsx` without verifying the export exists, the build will fail. The warning banner logic (filtering for remaining hours of today) requires a date comparison that's trivial but must account for timezone if the server and client are in different timezones.
+Well-scoped, isolated to `LoopManagement.jsx` with no broadcast path changes. The only meaningful risk is the `StatusBadge` export check — if a developer imports from `LoopBuilder.jsx` without verifying the export exists, the build will fail. The warning banner logic (filtering for remaining hours of today) requires a date comparison that must account for timezone if the server and client are in different timezones.
 
 ---
 
@@ -255,25 +285,20 @@ Well-scoped, isolated to `LoopManagement.jsx` with no broadcast path changes. Th
 
 **Type:** Documentation  
 **Files edited:**
-- `docs/changelog.md` *(check if file exists first — it may not)*
+- `changelog.md` *(exists at repo root — 35,165 bytes)*
 - `docs/MVP_SPRINT_PLAN.md`
+
+> **Note:** `changelog.md` is at the **repo root**, not under `docs/`. Confirmed in current file listing.
 
 **`changelog.md` additions:**
 
 ```markdown
-## Sprint 5 — LoopAnalytics
-- `LoopAnalytics.jsx` hardened with proof-of-play dashboard
-- Hourly delivery chart with colour coding
-- Slot-level drill-down added
-- Route: `/dashboard/admin/loop-analytics`
-- Note: mock data still in use — Firestore aggregation pending Sprint 7
-
-## Sprint 6 — Schedule + TechOps
-- `ScheduleHistory.jsx` wired — retailer approval history view
-- `ScheduleManager.jsx` — D-1 loop approval workflow
-- `TechOpsDashboard.jsx` — network-wide aggregate view
-- Full E2E test: Generate → Approve → Play → Report
-- Note: spec files not confirmed in commit history — tests UNVERIFIED
+## LAN-20260527 — BaseRepository Persistence Fix
+- `BaseRepository.update()`: silent catch removed, `.update()` → `.set({merge:true})`
+- `RetailerRepository.softDelete()` + `updateStatus()`: same fix
+- `AdvertiserRepository.softDelete()`: same fix
+- Affected: all edit/toggle/delete actions on Advertisers, Retailers, Screens, Stores, BusinessHours
+- Root cause: Firestore NOT_FOUND on mock-only documents was silently swallowed; MOCK_STORAGE always returned success
 
 ## Sprint 7 — Playback Gate + Resilience
 - Player re-registration bug fixed (7.1)
@@ -286,15 +311,15 @@ Well-scoped, isolated to `LoopManagement.jsx` with no broadcast path changes. Th
 - Security: V1/V2/V3/V5 patched
 ```
 
-**`MVP_SPRINT_PLAN.md` corrections:**
+**`docs/MVP_SPRINT_PLAN.md` corrections:**
 - Sprint 5 route: change `/admin/analytics` → `/dashboard/admin/loop-analytics`
 - Sprint 6: append `⚠️ Tests UNVERIFIED — spec files not confirmed in commit history`
 - Sprint 3 note: clarify `ScheduleManager.jsx` and `ScheduleHistory.jsx` are Sprint 6 additions, not Sprint 3
+- Add LAN-20260527 as a completed hotfix between Sprint 6 and Sprint 7
 
 **Verification:** Both files parse as valid Markdown. No broken table syntax. No TODO stubs left in.
 
-**Outcome likelihood: 🟢 95%**  
-Pure documentation edit. Only risk is if `changelog.md` doesn't exist yet — writer must create the file rather than append, which requires a different git operation. Flagged in the SRE notes.
+**Outcome likelihood: 🟢 95%**
 
 ---
 
@@ -325,8 +350,7 @@ grep "PlaylistEditor" client-app/src/App.jsx
 
 **Verification:** After delete, run `npm run build` in `client-app/` and confirm zero import errors.
 
-**Outcome likelihood: 🟢 92%**  
-Trivial if the grep pre-checks pass. The only risk is a false assumption — if another file was added after the last audit that imports `PlaylistEditor`, the delete will break the build. The grep pre-check is the entire mitigation.
+**Outcome likelihood: 🟢 92%**
 
 ---
 
@@ -362,15 +386,17 @@ V1 and V3 are simple guards. V2 carries risk: changing how `screen_id` is source
 
 These are pre-existing regressions, not new tests. They must be resolved before Sprint 7 tasks can be considered stable.
 
+> **Updated note:** Several regressions in `integration_gold_path.spec.js` previously attributed to the Player refactor were likely caused by the `BaseRepository.update()` persistence bug (LAN-20260527). Re-run all specs after the LAN-20260527 merge before assuming a Sprint 7 regression.
+
 | Spec File | Regressions | Root Cause | Action |
 |-----------|-------------|------------|--------|
 | `loop_playback.spec.js` | 10 timeout failures | Player state machine refactor from Sprint 4/6 | Update test expectations to match new dual-effect architecture after 7.1 fix |
 | `telemetry.spec.js` | Unknown count | Likely telemetry path changed | Audit after 7.1/7.2 changes are stable |
 | `ad_player.spec.js` | Unknown count | Player refactor | Audit after 7.1/7.2 |
 | `loop_builder.spec.js` | 3 regressions | Post-refactor state shape change | Audit after 7.6 (StatusBadge extraction) |
-| `integration_gold_path.spec.js` | Unknown count | Likely end-to-end flow change | Run last — depends on 7.1/7.2/7.3 being stable |
+| `integration_gold_path.spec.js` | Unknown count | Likely mix of Player refactor + LAN-20260527 persistence bug (now fixed) | Re-run first after LAN-20260527 merge — remaining failures attributed to Player only |
 
-**Order of test repair:** 7.1 → 7.2 → `loop_playback.spec.js` → `telemetry.spec.js` → `ad_player.spec.js` → 7.3 → `integration_gold_path.spec.js` → 7.6 → `loop_builder.spec.js`
+**Order of test repair:** LAN-20260527 merge verify → `integration_gold_path.spec.js` baseline re-run → 7.1 → 7.2 → `loop_playback.spec.js` → `telemetry.spec.js` → `ad_player.spec.js` → 7.3 → `integration_gold_path.spec.js` → 7.6 → `loop_builder.spec.js`
 
 ---
 
@@ -380,13 +406,14 @@ These are pre-existing regressions, not new tests. They must be resolved before 
 |------|------|-----------|--------|
 | `client-app/src/pages/Player.jsx` | 15,479 bytes | **Edit (multiple passes)** | 7.1, 7.2, 7.3, 7.4, V1, V2, V3 |
 | `server/routes/loops.js` | Unknown | **Edit** | 7.3 |
+| `ad-server/src/repositories/LoopRepository.js` | Unknown | **Audit** | 7.3 (check for silent-catch variant per LAN-20260527) |
 | `client-app/src/pages/admin/LoopManagement.jsx` | 13,683 bytes | **Edit** | 7.6 |
 | `client-app/src/pages/admin/LoopBuilder.jsx` | 21,218 bytes | **Read / possibly edit** | 7.6 (StatusBadge export check) |
 | `client-app/src/components/StatusBadge.jsx` | — | **Create (if not in LoopBuilder)** | 7.6 |
 | Upload component (unknown path) | Unknown | **Edit** | 7.5 |
 | `client-app/src/config.js` | Unknown | **Read-only** | 7.4 (fallback URL check) |
 | `client-app/src/pages/admin/TechOpsDashboard.jsx` | Unknown | **Edit** | V5 |
-| `docs/changelog.md` | Unknown | **Create or Append** | 7.7 |
+| `changelog.md` | 35,165 bytes | **Append** | 7.7 (confirmed at repo root) |
 | `docs/MVP_SPRINT_PLAN.md` | 2,853 bytes | **Edit** | 7.7 |
 | `client-app/src/pages/admin/PlaylistEditor.jsx` | 15,681 bytes | **DELETE** | 7.8 |
 
@@ -396,19 +423,19 @@ These are pre-existing regressions, not new tests. They must be resolved before 
 
 | Task | Score | Confidence Basis |
 |------|-------|------------------|
-| 7.7 — Docs update | **95%** | No code changes. Pure markdown. Only risk: `changelog.md` may not exist yet. |
+| 7.7 — Docs update | **95%** | No code changes. Pure markdown. `changelog.md` confirmed at repo root. |
 | 7.8 — Delete PlaylistEditor | **92%** | Trivial if grep pre-checks pass. One failure mode: another file added post-audit that imports it. |
 | 7.6 — Status badges | **88%** | Well-isolated. Risk: `StatusBadge` export assumption + timezone edge case in hour filter. |
 | 7.1 — Fix re-registration | **85%** | Clean architectural fix. Risk: duplicated inline fetch logic at L103–L116 assumed equivalent to `fetchCurrentLoop`. |
 | V1–V5 — Security patches | **82%** | V1/V3 trivial. V2 (screen_id hardening) may break demo env. V5 depends on auth context existing. |
 | 7.2 — Retry backoff | **80%** | Straightforward. Risk: cleanup on unmount during retry cycle (memory leak). Must sequence after 7.1. |
 | 7.4 — Fallback loop | **78%** | Depends on 7.2 being clean. Risk: SVG data URI validity, heartbeat continuity through fallback state. |
-| 7.3 — Server-side filter | **65%** | Backend ORM unknown. Case-sensitivity bug (R4) remains as FIXME unless explicitly verified. |
-| 7.5 — Upload validation | **60%** | **Highest risk task.** Upload component location unknown. May be embedded in 50KB file. Async MP4 duration check is fragile. |
+| 7.3 — Server-side filter | **65%** | Backend ORM unknown. Case-sensitivity bug (R4) remains as FIXME. LoopRepository silent-catch audit added. |
+| 7.5 — Upload validation | **60%** | **Highest risk task.** Upload component location unknown. May be embedded in 50KB file. Async MP4 duration check is fragile. LAN-20260527 persistence chain must also be verified. |
 
-**Sprint-level composite outcome: ~79%** (average, weighted for task complexity)  
+**Sprint-level composite outcome: ~79%** (average, weighted for task complexity)
 
-All 9 task groups completing cleanly within 3 days requires no unknown-unknowns surfacing in the backend ORM (7.3) and the upload component being reasonably accessible (7.5). The most likely slip scenario is 7.5 + 7.3 overrunning into a 4th day due to discovery work.
+All 9 task groups completing cleanly within 3 days requires no unknown-unknowns surfacing in the backend ORM (7.3), the upload component being reasonably accessible (7.5), and `LoopRepository` not having its own silent-catch variant. The most likely slip scenario is 7.5 + 7.3 overrunning into a 4th day due to discovery work.
 
 ---
 
@@ -419,11 +446,14 @@ All 9 task groups completing cleanly within 3 days requires no unknown-unknowns 
 - [ ] `GET /api/loops?date=X&hour=Y&status=APPROVED` returns only matching loops
 - [ ] Offline fallback loop plays when all network requests are blocked in DevTools; heartbeat continues
 - [ ] Upload rejects `.gif`, rejects MP4 > 5.5s, warns on resolution mismatch, accepts valid 5s MP4
+- [ ] Uploaded asset persists after hard-refresh (verifies LAN-20260527 fix is in upload call chain)
 - [ ] `LoopManagement.jsx` shows status badges (green/amber/red/grey) and warning banner for upcoming unapproved hours
-- [ ] `docs/changelog.md` includes Sprint 5/6/7 entries
+- [ ] Loop status toggle (PENDING → APPROVED) persists after hard-refresh (verifies LAN-20260527 fix in loop path)
+- [ ] `changelog.md` includes LAN-20260527 fix entry and Sprint 7 entries
 - [ ] `docs/MVP_SPRINT_PLAN.md` route and test-status corrections committed
 - [ ] `PlaylistEditor.jsx` deleted — grep pre-check passed and committed
 - [ ] `data-testid="ad-debug-overlay"` not rendered in production build
 - [ ] `slot.url` validated against HTTPS before inject
 - [ ] All test regressions in `loop_playback.spec.js` resolved
+- [ ] `integration_gold_path.spec.js` baseline re-run post LAN-20260527 — remaining failures documented
 - [ ] `npm run build` in `client-app/` exits with zero errors
