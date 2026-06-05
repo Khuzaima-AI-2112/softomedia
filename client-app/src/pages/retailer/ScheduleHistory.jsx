@@ -2,40 +2,55 @@ import { useState, useEffect, useMemo } from 'react';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import apiService from '../../services/ApiService';
+import { useAuth } from '../../contexts/AuthContext';
 
 function ScheduleHistory() {
+    const { user } = useAuth();
+    // Task 2.3: scope to authenticated retailer — never retailers[0]
+    // FIXME: replace apiService.getLoops() with apiService.getLoopsByRetailer(retailerId)
+    //        when that scoped endpoint is available in the backend.
+    const authedRetailerId = user?.retailerId || user?.retailer_id || null;
+
     const [loops, setLoops] = useState([]);
     const [auditLog, setAuditLog] = useState([]);
-    const [dateFilter, setDateFilter] = useState('all');
+    // Task 2.5: default to last 30 days, not 'all'
+    const [dateFilter, setDateFilter] = useState('30d');
     const [statusFilter, setStatusFilter] = useState('all');
     const [currentRetailer, setCurrentRetailer] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         loadData();
-    }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [authedRetailerId]);
 
     const loadData = async () => {
         try {
             setLoading(true);
-            const [retailers, allLoops, log] = await Promise.all([
-                apiService.getRetailers(),
+            // Task 2.3: fetch only the authed retailer + all loops (scoped endpoint pending)
+            // Task 2.6: fetch audit logs filtered to relevant event types (expanded below)
+            const [retailer, allLoops, log] = await Promise.all([
+                authedRetailerId
+                    ? apiService.getRetailerById(authedRetailerId)
+                    : Promise.resolve(null),
                 apiService.getLoops(),
                 apiService.getAuditLogs()
             ]);
 
-            // For demo, get first retailer as "current" retailer
-            if (retailers.length > 0) {
-                setCurrentRetailer(retailers[0]);
-            }
-
+            setCurrentRetailer(retailer);
             setLoops(allLoops);
 
-            // Filter relevant audit logs
+            // Task 2.6: expanded event types — edits, overrides, cancellations added.
+            // Backend tracking note: slot_edited, slot_overridden, loop_cancelled must
+            // be emitted by ad-server when those events occur. Frontend filter is ready;
+            // missing backend events will silently produce zero rows for those types.
             setAuditLog(log.filter(l =>
                 l.action === 'loop_approved' ||
                 l.action === 'slot_rejected' ||
-                l.action === 'slot_booked'
+                l.action === 'slot_booked' ||
+                l.action === 'slot_edited' ||
+                l.action === 'slot_overridden' ||
+                l.action === 'loop_cancelled'
             ));
         } catch (error) {
             console.error('Failed to load schedule history:', error);
@@ -44,21 +59,51 @@ function ScheduleHistory() {
         }
     };
 
-    // Get unique dates from loops
-    const availableDates = useMemo(() => {
-        const dates = [...new Set(loops.map(l => l.date))];
-        return dates.sort().reverse();
-    }, [loops]);
+    // Task 2.4: CSV export handler — was a stub with no onClick
+    const handleExportCSV = () => {
+        const rows = Object.values(filteredLoops).flatMap(group =>
+            group.loops.map(loop => ({
+                date: group.date,
+                hour: group.hour,
+                screen_id: loop.screen_id,
+                status: loop.status,
+                booked_slots: loop.slots?.filter(s => (s.status || '').toUpperCase() === 'BOOKED').length ?? 0,
+                rejected_slots: loop.slots?.filter(s => (s.status || '').toUpperCase() === 'REJECTED').length ?? 0,
+                validated_at: loop.approved_at || loop.validatedAt || ''
+            }))
+        );
 
-    // Filter loops
+        const headers = ['date', 'hour', 'screen_id', 'status', 'booked_slots', 'rejected_slots', 'validated_at'];
+        const csv = [
+            headers.join(','),
+            ...rows.map(r => headers.map(h => JSON.stringify(r[h] ?? '')).join(','))
+        ].join('\n');
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `schedule-history-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    // Task 2.5: sentinel-value date filtering (30d / 90d / all)
     const filteredLoops = useMemo(() => {
         let result = currentRetailer
             ? loops.filter(l => l.retailer_id === currentRetailer.id)
             : loops;
 
-        if (dateFilter !== 'all') {
-            result = result.filter(l => l.date === dateFilter);
+        if (dateFilter === '30d') {
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - 30);
+            result = result.filter(l => new Date(l.date) >= cutoff);
+        } else if (dateFilter === '90d') {
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - 90);
+            result = result.filter(l => new Date(l.date) >= cutoff);
         }
+        // dateFilter === 'all' — no date restriction
 
         if (statusFilter !== 'all') {
             const filterValue = statusFilter.toUpperCase();
@@ -87,7 +132,7 @@ function ScheduleHistory() {
     };
 
     const formatDate = (dateStr) => {
-        return new Date(dateStr).toLocaleDateString('en-US', {
+        return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
             weekday: 'short',
             month: 'short',
             day: 'numeric'
@@ -135,15 +180,15 @@ function ScheduleHistory() {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
+                    {/* Task 2.5: 30d/90d/all sentinel options — individual date picker is post-MVP */}
                     <select
                         value={dateFilter}
                         onChange={(e) => setDateFilter(e.target.value)}
                         className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm outline-none focus:ring-2 focus:ring-primary/20"
                     >
-                        <option value="all">All Dates</option>
-                        {availableDates.map(date => (
-                            <option key={date} value={date}>{formatDate(date)}</option>
-                        ))}
+                        <option value="30d">Last 30 days (default)</option>
+                        <option value="90d">Last 90 days</option>
+                        <option value="all">All available dates</option>
                     </select>
                     <select
                         value={statusFilter}
@@ -192,7 +237,11 @@ function ScheduleHistory() {
             <GlassCard>
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold text-lg">Schedule Log</h3>
-                    <button className="text-sm text-primary hover:underline flex items-center gap-1">
+                    {/* Task 2.4: wired CSV export — was a no-op stub */}
+                    <button
+                        onClick={handleExportCSV}
+                        className="text-sm text-primary hover:underline flex items-center gap-1"
+                    >
                         <span className="material-symbols-outlined text-sm">download</span>
                         Export CSV
                     </button>
@@ -204,7 +253,7 @@ function ScheduleHistory() {
                     ) : (
                         Object.values(filteredLoops)
                             .sort((a, b) => `${b.date}_${b.hour}`.localeCompare(`${a.date}_${a.hour}`))
-                            .slice(0, 20) // Limit display
+                            .slice(0, 20)
                             .map((group, idx) => (
                                 <div
                                     key={idx}
@@ -279,15 +328,22 @@ function ScheduleHistory() {
                             key={entry.id}
                             className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                         >
-                            <div className={`size-8 rounded-lg flex items-center justify-center ${entry.action === 'loop_approved'
-                                ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600'
-                                : entry.action === 'slot_rejected'
-                                    ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-600'
-                                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600'
-                                }`}>
+                            <div className={`size-8 rounded-lg flex items-center justify-center ${
+                                entry.action === 'loop_approved'
+                                    ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600'
+                                    : entry.action === 'slot_rejected' || entry.action === 'loop_cancelled'
+                                        ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-600'
+                                        : entry.action === 'slot_overridden' || entry.action === 'slot_edited'
+                                            ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600'
+                                            : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600'
+                            }`}>
                                 <span className="material-symbols-outlined text-lg">
-                                    {entry.action === 'loop_approved' ? 'check' :
-                                        entry.action === 'slot_rejected' ? 'block' : 'add_circle'}
+                                    {entry.action === 'loop_approved' ? 'check'
+                                        : entry.action === 'slot_rejected' ? 'block'
+                                        : entry.action === 'loop_cancelled' ? 'cancel'
+                                        : entry.action === 'slot_overridden' ? 'edit_off'
+                                        : entry.action === 'slot_edited' ? 'edit'
+                                        : 'add_circle'}
                                 </span>
                             </div>
                             <div className="flex-1">
@@ -295,6 +351,9 @@ function ScheduleHistory() {
                                     {entry.action === 'loop_approved' && 'Loop approved'}
                                     {entry.action === 'slot_rejected' && 'Slot rejected'}
                                     {entry.action === 'slot_booked' && 'Slot booked'}
+                                    {entry.action === 'slot_edited' && 'Slot edited'}
+                                    {entry.action === 'slot_overridden' && 'Slot overridden'}
+                                    {entry.action === 'loop_cancelled' && 'Loop cancelled'}
                                 </p>
                                 <p className="text-xs text-slate-500">
                                     {entry.entity_id || entry.entityId}

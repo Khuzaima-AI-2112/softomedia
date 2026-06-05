@@ -27,8 +27,9 @@ const BRAND_NAV = [
 ];
 
 const RETAILER_NAV = [
-    { to: '/dashboard/retailer',           icon: 'dashboard',      label: 'Dashboard',  end: true },
-    { to: '/dashboard/retailer/schedule',  icon: 'calendar_month', label: 'Schedule' },
+    { to: '/dashboard/retailer',                        icon: 'dashboard',      label: 'Dashboard',       end: true },
+    { to: '/dashboard/retailer/schedule',               icon: 'calendar_month', label: 'Schedule' },
+    { to: '/dashboard/retailer/schedule-history',       icon: 'history',        label: 'Schedule History' },
 ];
 
 const TECHOP_NAV = [

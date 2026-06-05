@@ -6,7 +6,7 @@
  * Before adding a route, verify the file exists in the repo.
  * See docs/SofiensBullshit.md for the full prevention plan.
  *
- * Verified file map (as of 2026-06-04 sprint commit):
+ * Verified file map (as of 2026-06-05 sprint commit):
  *
  *   layouts/DashboardLayout.jsx          ✅
  *   pages/Login.jsx                      ✅
@@ -30,6 +30,7 @@
  *   pages/brand/BrandCampaignWizard.jsx  ✅
  *   pages/retailer/RetailerDashboard.jsx ✅
  *   pages/retailer/ScheduleCalendar.jsx  ✅
+ *   pages/retailer/ScheduleHistory.jsx   ✅  (served at /dashboard/retailer/schedule-history)
  *
  *   pages/tickets/TicketDashboard.jsx    ❌ NOT ON DISK — route omitted
  *   pages/tickets/TicketDetail.jsx       ❌ NOT ON DISK — route omitted
@@ -72,6 +73,7 @@ const CampaignWizard = lazy(() => import('./pages/brand/BrandCampaignWizard'));
 // ── Retailer pages ──────────────────────────────────────────────────────────────
 const RetailerOverview = lazy(() => import('./pages/retailer/RetailerDashboard'));
 const ScheduleCalendar = lazy(() => import('./pages/retailer/ScheduleCalendar'));
+const ScheduleHistory  = lazy(() => import('./pages/retailer/ScheduleHistory'));
 
 function App() {
     return (
@@ -114,8 +116,9 @@ function App() {
                             <Route path="brand/campaign/new" element={<CampaignWizard />} />
 
                             {/* Retailer */}
-                            <Route path="retailer"          element={<RetailerOverview />} />
-                            <Route path="retailer/schedule" element={<ScheduleCalendar />} />
+                            <Route path="retailer"                   element={<RetailerOverview />} />
+                            <Route path="retailer/schedule"          element={<ScheduleCalendar />} />
+                            <Route path="retailer/schedule-history" element={<ScheduleHistory />} />
 
                             {/* Tech Operator */}
                             <Route path="techoperator/health" element={<Health />} />
