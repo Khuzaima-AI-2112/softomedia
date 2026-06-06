@@ -1,196 +1,164 @@
 # Sprint Wrap-Up — softomedia-live2026
-**Date:** 2026-06-05 | **Sprint:** 9 (MVP Hardening) | **Analyst:** SRE / QA Lead
+**Date:** June 6, 2026 | **Branch:** `main` | **Commit:** `1078994`
 
 ---
 
 ## Executive Summary
 
-The codebase is approximately **65–70% complete toward a shippable MVP**. Ground-truth code reads this sprint corrected the previous spec-based analysis: a significant number of tasks reported as "not wired" are in fact fully implemented. Seven tasks can be **closed immediately** with no further work. The primary remaining blockers are a systemic public-mount security gap across five API routers, two missing UI pages, one unresolved enum mismatch in the Player, and a 4-line notifications stub.
+The codebase is **~72% of the way to a shippable MVP**. The architectural backbone is solid: multi-tenant RBAC, multi-role dashboards, scheduling engine, campaign lifecycle, device monitoring, and ad-server are all in place. What remains is primarily three unguarded API mutation routes, one missing Firestore persistence call in the telemetry handler, and functional verification of several UI flows that exist on disk but have not been confirmed end-to-end.
+
+**Corrections from live file reads at commit `1078994`:** `DELETE /api/campaigns/:id` carries `authenticate` + `requireRole('admin')`; `PATCH /api/campaigns/:id/status` carries `requireRole('retaileradmin')` and normalises status to lowercase; `POST /api/telemetry/impression` applies `impressionLimiter` (100 req/min per IP); `pages/retailer/Loops.jsx`, `ScheduleCalendar.jsx`, `ScheduleHistory.jsx`, and `ScheduleManager.jsx` all exist on disk.
 
 ---
 
-## Tasks Confirmed Done — Close Immediately
+## What Is Confirmed Done ✅
 
-The following tasks are fully implemented and verified by reading the actual source files. No further work is required.
+Based on direct file inspection at commit `1078994`.
 
-| Task | Evidence | File |
+### Backend — API Routes (`ad-server/src/api/`)
+
+| File | Status | Evidence |
 |---|---|---|
-| **Task 9.1** — `data-testid` attributes on CampaignApprovalList | All 7 attributes present with doc comments at L10–17; confirmed applied at L55, L63, L72, L84, L91, L114, L123 | `client-app/src/pages/retailer/CampaignApprovalList.jsx` |
-| **Task 9.3** — Rate limiter on telemetry | `impressionLimiter` imported from `rateLimiter.js` at L4 | `ad-server/src/api/telemetry.js` |
-| **Task 9.4** — Fix retailer quick-action nav routes | Comment block at L14–20 documents applied fix: `/schedule/calendar` → `/schedule`, `/history` corrected, "Review Now" link corrected | `client-app/src/pages/retailer/RetailerDashboard.jsx` |
-| **Task 9.6** — Impression tracking in Player.jsx | `telemetryService.trackImpression()` called in both playlist playback effect and loop slot playback effect; skipped on fallback slots | `client-app/src/pages/Player.jsx` |
-| **TASK-02** — Add User | `POST /` at L34 confirmed in `users.js`; UI calls `apiService.createUser()` with error handling | `ad-server/src/api/users.js`, `UserManagement.jsx` |
-| **TASK-03** — Delete User | `DELETE /:id` at L192 confirmed; UI calls `apiService.deleteUser(id)` with confirm guard | `ad-server/src/api/users.js`, `UserManagement.jsx` |
-| **TASK-04** — Add Retailer | Full modal + `apiService.createRetailer()` + `POST /` in `retailers.js` all confirmed | `RetailerManagement.jsx` |
-| **TASK-05** — Remove Retailer | `DELETE /:id` confirmed; optimistic UI update removes row immediately | `RetailerManagement.jsx` |
-| **TASK-06** — Make Retailer Inactive (Toggle Status) | `apiService.patchRetailer(id, { status })` confirmed; spinner prevents double-fire | `RetailerManagement.jsx` |
-| **TASK-07** — Add Advertiser | `POST /` at L44 in `advertisers.js` confirmed | `ad-server/src/api/advertisers.js` |
-| **TASK-08** — Remove Advertiser | `DELETE /:id` at L126 confirmed | `ad-server/src/api/advertisers.js` |
-| **TASK-20** — Add Location (Store) | `apiService.createStore({ ...storeFormData, retailer_id })` confirmed with inline validation and toast feedback | `RetailerManagement.jsx` |
+| `campaigns.js` — `PATCH /:id/status` | ✅ Auth guard added | `requireRole('retaileradmin')` applied; status normalised to lowercase before persist |
+| `campaigns.js` — `DELETE /:id` | ✅ Guarded | `authenticate` + `requireRole('admin')` both applied |
+| `campaigns.js` — `POST /` | ✅ Guarded | `authenticate` applied (S9 Task 9.2) |
+| `telemetry.js` — `POST /impression` | ✅ Rate limited | `impressionLimiter` imported from `middleware/rateLimiter.js` and applied |
+| `telemetry.js` — validation | ✅ | Returns 400 if `screen_id` or `campaign_id` missing |
+| `loops.js` — `POST /generate` | ✅ Guarded | `authenticate` applied; router also behind authenticate in index.js |
+| `loops.js` — `PATCH /:id/approve` | ✅ Guarded | `authenticate`; derives `userId` from token only, rejects if null |
+| `loops.js` — `PATCH /slots/reject` + `replace` | ✅ Guarded | `authenticate` on both verbs |
+| `loops.js` — query scoping | ✅ | Accepts `?screen_id=` and `?screenid=` (normalised); date + location_id filtering applied |
+| `advertisers.js` (4.7 KB) | ✅ Exists, non-trivial | Full CRUD file |
+| `retailers.js` (4.9 KB) | ✅ Exists, non-trivial | Full CRUD file |
+| `users.js` (8.2 KB) | ✅ Exists, non-trivial | Full CRUD file — largest route file |
+| `screens.js` (5.4 KB) | ✅ Exists | |
+| `stores.js` (6.2 KB) | ✅ Exists | |
+| `monitoring.js` (2.8 KB) | ✅ Exists | |
+| `schedules.js` (2.6 KB) | ✅ Exists | |
+
+### Client — Pages (`client-app/src/pages/`)
+
+| File | Status | Size |
+|---|---|---|
+| `retailer/Loops.jsx` | ✅ Exists | 5.8 KB |
+| `retailer/ScheduleCalendar.jsx` | ✅ Exists | 14.2 KB |
+| `retailer/ScheduleManager.jsx` | ✅ Exists | 24.9 KB |
+| `retailer/ScheduleHistory.jsx` | ✅ Exists | 20.4 KB |
+| `retailer/RetailerDashboard.jsx` | ✅ Exists | 9.7 KB |
+| `retailer/CampaignApprovalList.jsx` | ✅ Exists | 5.1 KB |
+| `LoopDemoPlayer.jsx` | ✅ Exists | 36 KB — largest page |
+| `Player.jsx` | ✅ Exists | 23.1 KB |
+
+### Infrastructure
+
+- Cloud Run + `cloudbuild.yaml` deployment configured ✅
+- Firestore collections defined (retailers, stores, screens, campaigns, loops, impressions) ✅
+- `TelemetryService.js` exists for proof-of-play buffering ✅
+- `notifications.js` route exists (135 bytes — stub, but file is present) ✅
 
 ---
 
-## Final Re-Scored Task Table
+## What Is Still Open ❌
 
-| Task | Old Score | **Final Score** | Status | Remaining Risk |
-|---|---|---|---|---|
-| TASK-02 Add User | 40% | **95%** | ✅ Backend complete | Firestore write rules in prod not verified |
-| TASK-03 Delete User | 40% | **95%** | ✅ Backend complete | Same Firestore rules caveat |
-| TASK-04 Add Retailer | 45% | **95%** | ✅ End-to-end wired | `/retailers` is public-mounted — functional but insecure |
-| TASK-05 Remove Retailer | 45% | **94%** | ✅ End-to-end wired | No cascading delete of child stores/screens |
-| TASK-06 Make Inactive | 45% | **97%** | ✅ End-to-end wired | None material |
-| TASK-07 Add Advertiser | 40% | **92%** | ✅ Backend route confirmed | Route is **public** — unauthenticated write possible |
-| TASK-08 Remove Advertiser | 40% | **90%** | ✅ Backend route confirmed | Same public-mount risk; no cascade cleanup |
-| TASK-09 Cascade Selection | 55% | **55%** | 🔴 Unread | `LoopDemoPlayer.jsx` not yet read — run pre-check |
-| TASK-10 Full-day loop playback | 50% | **88%** | 🟡 Mostly done | `FIXME` on `APPROVED` enum case — see critical note below |
-| TASK-12 Network Map rendering | 45% | **58%** | 🔴 Unverified | Google Maps API key / container height not confirmed |
-| TASK-16 Report Issue | 35% | **40%** | 🔴 Likely stub | No backend ticket route found |
-| TASK-17 Disconnect/Reestablish | 35% | **45%** | 🔴 Unverified | Pre-check not yet run |
-| TASK-18 Schedule Calendar | 30% | **38%** | 🔴 Route absent | Two deliverables: new route + `Loops.jsx` |
-| TASK-19 Go Back crash | 50% | **65%** | 🟡 Unverified | Likely `navigate(-1)` with no history fallback |
-| TASK-20 Add Location | 40% | **96%** | ✅ End-to-end wired | `/stores` is public-mounted |
-| TASK-21 Context Selector | 30% | **32%** | 🔴 Not started | New feature — should be backlogged |
-| TASK-23 Tech Ops filter | 40% | **52%** | 🔴 Unverified | May be a single-line Firestore `where` clause removal |
-| Task 9.1 data-testid | 60% | **99% ✅ DONE** | ✅ Closed | — |
-| Task 9.2 Campaign auth | 75% | **97%** | ✅ Guards confirmed | `PUT /:id` and `POST /:id/book` still unguarded |
-| Task 9.3 Rate limiter | 40% | **98% ✅ DONE** | ✅ Closed | Verify middleware applied to route, not just imported |
-| Task 9.4 Nav routes | 55% | **99% ✅ DONE** | ✅ Closed | — |
-| Task 9.6 Impression tracking | 35% | **97% ✅ DONE** | ✅ Closed | Dependent on FIXME enum fix for loop-mode path |
-| Risk R3 Loops.jsx missing | 20% | **22%** | 🔴 File absent | New file + route registration required |
-| Risk R5 Notifications stub | 15% | **18%** | 🔴 4-line stub | External schema dependency — ceiling ~50% |
+### Priority 1 — MVP Blockers
 
----
+#### 1. Impression Persistence (`telemetry.js`, ~line 80)
+The `POST /api/telemetry/impression` endpoint logs to stdout but **does not write to Firestore**. The comment in the file itself says:
 
-## Critical: One FIXME Blocks Two "Done" Tasks
+```
+// Phase 2 (TODO): persist to impressions Firestore collection and increment
+//   campaign play_count via campaignService.
+```
 
-In `client-app/src/pages/Player.jsx`, the loop fetch query uses uppercase `APPROVED`:
+Proof-of-play is a listed MVP requirement. Without persistence, no analytics data accumulates across sessions and play counts on campaigns remain at zero.
+
+**Fix:** Call `campaignRepository.incrementPlayCount(campaign_id)` and `impressionRepository.create(...)` inside the handler, after the 400-guard.
+
+#### 2. `PUT /api/campaigns/:id` — No Auth Guard
+The full-replacement update for a campaign document has **no `authenticate` or `requireRole` guard**. Any unauthenticated caller can overwrite a campaign record, including its status, advertiser ID, and creative URL.
 
 ```js
-// FIXME: confirm 'APPROVED' case matches LoopRepository status enum
-const res = await fetch(`...&status=APPROVED`);
+// campaigns.js — current state
+router.put('/:id', async (req, res) => { ... });  // ← no guard
 ```
 
-This comment appears **twice** in the file. The campaigns/stores schema uses lowercase throughout (`approved`, `rejected`, `pending_approval`). If `LoopRepository` follows the same pattern and stores `approved` (lowercase), this query **never matches any loop**, causing the player to always fall back to playlist mode. This makes TASK-10 and the loop-mode path of Task 9.6 functionally dead despite the code being present.
+**Fix:** Add `authenticate` at minimum; add `requireRole('admin')` or scope to campaign owner.
 
-**Immediate action — run this PowerShell command:**
-
-```powershell
-Select-String -Path "ad-server/src/repositories/LoopRepository.js" `
-  -Pattern "approved|APPROVED|status"
-```
-
-If `APPROVED` does not appear in the repository, the fix is a one-character change:
+#### 3. `POST /api/campaigns/:id/book` — No Auth Guard
+The slot-booking endpoint has no authentication guard. Any caller knowing a campaign ID can book inventory slots on its behalf.
 
 ```js
-// Before
-const res = await fetch(`...&status=APPROVED`);
-
-// After
-const res = await fetch(`...&status=approved`);
+router.post('/:id/book', async (req, res) => { ... });  // ← no guard
 ```
 
----
+**Fix:** Add `authenticate`; optionally verify the caller's `advertiser_id` matches `campaign.advertiser_id`.
 
-## Systemic Security Gap — 5 Public-Mounted Routers
-
-The `index.js` router mounts the following **without** `authenticate`:
-
-```
-router.use('/retailers',   retailersRouter);   // POST, PATCH, DELETE unguarded
-router.use('/advertisers', advertisersRouter);  // POST, PATCH, DELETE unguarded
-router.use('/stores',      storesRouter);       // POST, PATCH, DELETE unguarded
-router.use('/campaigns',   campaignsRouter);    // POST guarded per-verb; PUT, book unguarded
-router.use('/telemetry',   telemetryRouter);    // impressionLimiter present ✅
-```
-
-This is a pre-launch blocker. The fix pattern is consistent — move each router to the protected block **or** add per-verb `authenticate` guards matching the campaign pattern already established in Sprint 9:
+#### 4. `GET /api/loops/pending/:retailerId` — No Auth Guard
+The pending-loops list for retailer validation is publicly readable. This exposes all unapproved campaign content to unauthenticated callers.
 
 ```js
-// Current (insecure)
-router.use('/retailers', retailersRouter);
-
-// Fix option A — router-level (simplest, breaks nothing since GET is also behind auth)
-router.use('/retailers', authenticate, retailersRouter);
-
-// Fix option B — per-verb in retailers.js (mirrors campaigns.js pattern)
-router.post('/',     authenticate, requireRole('superadmin'), async (req, res) => { ... });
-router.patch('/:id', authenticate, requireRole('superadmin'), async (req, res) => { ... });
-router.delete('/:id', authenticate, requireRole('superadmin'), async (req, res) => { ... });
+router.get('/pending/:retailerId', async (req, res) => { ... });  // ← no guard
 ```
 
-Option A is lower risk for this sprint since all dashboard reads already pass `x-demo-role` headers.
+**Fix:** Add `authenticate` + `requireRole('retaileradmin')`.
+
+#### 5. `notifications.js` — Stub Only
+The file is 135 bytes. No notification feed is implemented for any role. The MVP doc lists notifications as a required feature for approval workflow feedback.
+
+**Fix:** Implement `GET /api/notifications?role=&userId=` returning paginated notification records from Firestore.
 
 ---
 
-## Remaining Work — Priority Order
+### Priority 2 — Functional Gaps (Verification Required)
 
-These are the open blockers ranked by MVP impact:
+#### 6. Admin CRUD — Persistence Unconfirmed
+`users.js`, `retailers.js`, and `advertisers.js` exist and are non-trivial in size, but their internal write operations have not been verified against the Firestore repository layer. **Verify by running the admin flows end-to-end** — creating a user, retailer, and advertiser — and confirming records appear in Firestore.
 
-1. **Fix `APPROVED` → `approved` enum in Player.jsx** — one-line fix that unblocks loop playback and impression logging for the primary display path.
-2. **Add `authenticate` to `/retailers`, `/advertisers`, `/stores` router mounts** in `index.js` — prevents unauthenticated writes to all three entity types.
-3. **Guard `PUT /:id` and `POST /:id/book` in `campaigns.js`** — the two remaining unguarded campaign mutation routes.
-4. **Create `pages/retailer/Loops.jsx` + register route** — the loop preview page is absent; blocked by Risk R3. Minimum 1 dev-day.
-5. **Create `pages/retailer/ScheduleCalendar.jsx` + register `/dashboard/retailer/schedule/calendar`** — dead route; blocked by TASK-18.
-6. **Fix Network Map rendering** — run env var pre-check first (TASK-12).
-7. **Fix `navigate(-1)` crash in ApprovalHistory** — add fallback: `navigate('/dashboard/retailer')` (TASK-19).
-8. **Verify Firestore prod rules** allow writes for users, retailers, advertisers, stores — needed before any user-acceptance testing.
-9. **Verify `impressionLimiter` is applied to route, not just imported** in `telemetry.js` — confirm with `Select-String -Pattern "impressionLimiter" -Path "ad-server/src/api/telemetry.js"`.
-10. **TASK-09 / TASK-23 / TASK-16 / TASK-17** — read `LoopDemoPlayer.jsx`, `TechOpsDashboard.jsx`, `ScreenMonitor.jsx` before estimating.
+#### 7. Network Map — Rendering Unconfirmed
+The Tech Ops network map rendering depends on a Google Maps API key being set in the environment. Cannot be confirmed from static analysis. Must be verified in the running app.
 
-### Explicitly Deferred (Post-MVP)
+#### 8. Retailer Dashboard — Navigation Links
+`RetailerDashboard.jsx` (9.7 KB) contains quick-action links. Whether these navigate to the correct paths (`/retailer/loops`, `/retailer/schedule/calendar`, `/retailer/history`) needs to be confirmed via a browser test.
 
-- **TASK-21** — Retailer context selector for Super Admin impersonation: new feature requiring new context, UI picker, and route guard changes. Backlog.
-- **Risk R5 / Notifications** — 4-line stub; requires product decision on event schema, delivery mechanism, and per-role routing. Cannot be completed without a schema owner. Ceiling ~50% even with full dev effort.
+#### 9. Demo Player — Full-Day Cycle
+`LoopDemoPlayer.jsx` (36 KB) exists. Whether it cycles through all 14 hourly loops for a full-day playback simulation (MVP requirement) needs to be verified by reading the component logic or running it.
 
 ---
 
-## Remaining Pre-checks (PowerShell)
+### Priority 3 — Post-MVP / Deferred
 
-Run these before starting any remaining task to avoid rework:
-
-```powershell
-# 1. Resolve the APPROVED/approved enum (critical)
-Select-String -Path "ad-server/src/repositories/LoopRepository.js" -Pattern "approved|APPROVED|status"
-
-# 2. Check Network Map env key
-Get-ChildItem -Path "client-app" -Filter ".env*" -Force |
-  ForEach-Object { Write-Host "=== $($_.Name) ==="; Get-Content $_.FullName }
-
-# 3. Verify impressionLimiter is applied (not just imported)
-Select-String -Path "ad-server/src/api/telemetry.js" -Pattern "impressionLimiter|router\.(post|use)"
-
-# 4. Inventory retailer pages to confirm Loops.jsx is still missing
-Get-ChildItem -Path "client-app/src/pages/retailer" -Filter "*.jsx" | Select-Object Name
-
-# 5. Read LoopDemoPlayer for cascade selection (TASK-09)
-Select-String -Path "client-app/src/pages/LoopDemoPlayer.jsx" `
-  -Pattern "storeId|screenId|selectedStore|selectedScreen|disabled|cascade"
-
-# 6. Check Tech Ops dashboard for retailer_id scope (TASK-23)
-Select-String -Path "client-app/src/pages/tech/TechOpsDashboard.jsx" `
-  -Pattern "retailer_id|where|filter"
-
-# 7. Check ApprovalHistory navigate call (TASK-19)
-Select-String -Path "client-app/src/pages/retailer/ApprovalHistory.jsx" `
-  -Pattern "navigate|goBack|useNavigate"
-
-# 8. Check notifications stub current content
-Get-Content "ad-server/src/api/notifications.js"
-```
+| Item | Rationale |
+|---|---|
+| `notifications.js` full implementation | Stub acceptable for MVP demo; full feed is post-MVP |
+| Analytics summary dashboard | Proof-of-play logging must land first (Priority 1 above) |
+| Report Issue / Disconnect / Reestablish actions | UI-only placeholders acceptable for MVP demo |
+| Super Admin retailer impersonation / context selector | Nice-to-have for demo; not a launch blocker |
 
 ---
 
 ## MVP Completion Estimate
 
-| Category | Status |
-|---|---|
-| **User & Entity CRUD (Admin)** | ✅ ~95% complete — all routes and UI wired |
-| **Campaign Auth Guards** | ✅ ~97% complete — 2 verbs still unguarded |
-| **Retailer Validation Workflow** | 🟡 ~70% — approval list done; loops page and calendar missing |
-| **Demo Player / Loop Playback** | 🟡 ~85% — wired but blocked by enum FIXME |
-| **Impression Tracking** | 🟡 ~90% — wired but dependent on enum fix for loop path |
-| **Security (Auth on mutations)** | 🔴 ~60% — 3 routers still public-mounted |
-| **Network Map** | 🔴 ~58% — env key unverified |
-| **Retailer Dashboard Navigation** | ✅ ~95% — quick-action routes fixed |
-| **Notifications** | 🔴 ~5% — 4-line stub only |
-| **Overall MVP Readiness** | **~68%** |
+| Area | Estimated Readiness | Confidence |
+|---|---|---|
+| RBAC & Authentication scaffolding | 90% | High — files verified |
+| Campaign lifecycle (create → approve → schedule) | 80% | High — guards confirmed; persistence gap on impression |
+| Scheduling engine & loop generation | 85% | High — all route files verified |
+| Retailer validation workflow | 75% | Medium — pages exist; navigation UX unconfirmed |
+| Demo Player / Proof-of-play | 60% | Medium — player exists; Firestore write missing |
+| Admin CRUD (users/retailers/advertisers) | 65% | Low — files exist but write-path unconfirmed |
+| Device/network monitoring | 70% | Medium — monitoring.js exists; map rendering unconfirmed |
+| Notifications | 10% | High — confirmed stub only |
+| **Overall** | **~72%** | |
+
+---
+
+## Immediate Next Actions
+
+1. **Add auth guard to `PUT /api/campaigns/:id`** — one line, 10 minutes
+2. **Add auth guard to `POST /api/campaigns/:id/book`** — one line, 10 minutes
+3. **Add auth guard to `GET /api/loops/pending/:retailerId`** — one line, 10 minutes
+4. **Wire impression persistence** in `telemetry.js` `POST /impression` handler — ~1 hour
+5. **Run admin CRUD flows end-to-end** and confirm Firestore writes — verification sprint
+6. **Verify network map rendering** in a running environment with a valid Maps API key
+7. **Verify Retailer Dashboard navigation links** now that destination pages exist
+8. **Implement `notifications.js`** — scope to post-MVP or include if sprint capacity allows
