@@ -6,7 +6,7 @@
  * Before adding a route, verify the file exists in the repo.
  * See docs/SofiensBullshit.md for the full prevention plan.
  *
- * Verified file map (as of 2026-06-05 sprint commit):
+ * Verified file map (as of Sprint 10 — 2026-06-06):
  *
  *   layouts/DashboardLayout.jsx          ✅
  *   pages/Login.jsx                      ✅
@@ -38,11 +38,8 @@
  *                                               components/CampaignApprovalList.jsx before merging —
  *                                               run: grep -r "CampaignApprovalList" client-app/src --include="*.jsx" -n
  *   pages/tech/TechOpsDashboard.jsx      ✅  (served at /dashboard/techoperator)
- *
- *   pages/tickets/TicketDashboard.jsx    ⏳ PENDING — promote components/TicketDashboard.jsx
- *                                           to pages/tickets/TicketDashboard.jsx, then uncomment route below
- *   pages/tickets/TicketDetail.jsx       ⏳ PENDING — promote components/TicketDetail.jsx
- *                                           to pages/tickets/TicketDetail.jsx, then uncomment route below
+ *   pages/tickets/TicketDashboard.jsx    ✅  (served at /dashboard/tickets)         [Sprint 10]
+ *   pages/tickets/TicketDetail.jsx       ✅  (served at /dashboard/tickets/:id)     [Sprint 10]
  */
 
 import { lazy, Suspense } from 'react';
@@ -87,11 +84,8 @@ const RetailerLoops     = lazy(() => import('./pages/retailer/Loops'));
 const CampaignApprovals = lazy(() => import('./pages/retailer/CampaignApprovalList'));
 
 // ── Ticket pages ─────────────────────────────────────────────────────────────────
-// TODO: uncomment once pages/tickets/TicketDashboard.jsx and TicketDetail.jsx exist on disk.
-// Pre-work: promote components/TicketDashboard.jsx → pages/tickets/TicketDashboard.jsx
-//           promote components/TicketDetail.jsx    → pages/tickets/TicketDetail.jsx
-// const TicketDashboard = lazy(() => import('./pages/tickets/TicketDashboard'));
-// const TicketDetail    = lazy(() => import('./pages/tickets/TicketDetail'));
+const TicketDashboard = lazy(() => import('./pages/tickets/TicketDashboard'));
+const TicketDetail    = lazy(() => import('./pages/tickets/TicketDetail'));
 
 // ── Tech Operator pages ──────────────────────────────────────────────────────────
 const TechOpsDashboard = lazy(() => import('./pages/tech/TechOpsDashboard'));
@@ -144,12 +138,11 @@ function App() {
                             <Route path="retailer/loops"              element={<RetailerLoops />} />
                             <Route path="retailer/campaign-approvals" element={<CampaignApprovals />} />
 
-                            {/* Tickets — routes held until page files are promoted from components/
-                                See TODO block in lazy imports above. */}
-                            {/* <Route path="tickets"     element={<TicketDashboard />} /> */}
-                            {/* <Route path="tickets/:id" element={<TicketDetail />} /> */}
+                            {/* Tickets */}
+                            <Route path="tickets"     element={<TicketDashboard />} />
+                            <Route path="tickets/:id" element={<TicketDetail />} />
 
-                            {/* Tech Operator — landing page is now TechOpsDashboard */}
+                            {/* Tech Operator */}
                             <Route path="techoperator"        element={<TechOpsDashboard />} />
                             <Route path="techoperator/health" element={<Health />} />
 
