@@ -3,6 +3,7 @@
 
 > **G-9 compliant:** Every status below is confirmed by a live file read with SHA. No memory-only assertions.
 > **v2 update (2026-06-06 00:47 EDT):** 8 pre-work discovery steps executed; 5 prior plan items corrected or stripped.
+> **v3 update (2026-06-06):** MVP gap analysis section added from full codebase vs. MVP doc review.
 
 ---
 
@@ -32,8 +33,8 @@ This sprint surfaced **five G-9 violations** — tasks listed as open in documen
 | False positive | Doc source | Resolution |
 |---|---|---|
 | Items 1–3 listed as open auth guard work | Prior MVP analysis written without live reads | Live read of `campaigns.js` + `loops.js` — all guards confirmed present |
-| Risk V2 "telemetry has no rate limit" | Prior MVP analysis | Live read of `telemetry.js` — `impressionLimiter` confirmed wired |
-| Risk V3 "DELETE /campaigns unguarded" | Prior MVP analysis | Live read of `campaigns.js` — `requireRole('admin')` confirmed present |
+| Risk V2 “telemetry has no rate limit” | Prior MVP analysis | Live read of `telemetry.js` — `impressionLimiter` confirmed wired |
+| Risk V3 “DELETE /campaigns unguarded” | Prior MVP analysis | Live read of `campaigns.js` — `requireRole('admin')` confirmed present |
 | Item 8 listed as 135-byte stub | Prior MVP analysis | Live read of `notifications.js` — 5 216 B, full 4-endpoint API confirmed |
 | Route `/schedule/calendar` listed as broken path | Prior MVP analysis | Live read of `App.jsx` — correct route is `/dashboard/retailer/schedule`; `ScheduleCalendar.jsx` is wired |
 
@@ -50,7 +51,7 @@ These were not in the prior plan and were only surfaced by live file reads.
 
 `ad-server/src/api/ops.js` (SHA `9315bd8`) is 880 bytes and contains **only** `POST /backup` (Firestore export). There is no issue/ticket/disconnect API on the server.
 
-TASK-16 ("Report Issue") and TASK-17 ("Disconnect") have no server-side target. Before any UI work on these tasks, `ad-server/src/api/tickets.js` must be created and mounted in `api/index.js`.
+TASK-16 (“Report Issue”) and TASK-17 (“Disconnect”) have no server-side target. Before any UI work on these tasks, `ad-server/src/api/tickets.js` must be created and mounted in `api/index.js`.
 
 Minimum contract required:
 ```
@@ -58,7 +59,7 @@ POST   /api/tickets   body: { screen_id, type, description, retailer_id } → 20
 GET    /api/tickets   query: ?screen_id=<id>                              → 200 [...]
 ```
 
-Note: "Disconnect" maps to the **existing** `PATCH /api/screens/:id/status` (`screens.js` SHA `0aa39ba`) — no ticket endpoint needed for that action. Only "Report Issue" requires the new tickets router.
+Note: “Disconnect” maps to the **existing** `PATCH /api/screens/:id/status` (`screens.js` SHA `0aa39ba`) — no ticket endpoint needed for that action. Only “Report Issue” requires the new tickets router.
 
 ### Blocker 2 — `GET /api/screens` returns no coordinate fields
 
@@ -115,7 +116,7 @@ Query param note: both `?screen_id=` and `?screenid=` are accepted (normalised o
 | # | Task | Pre-condition | Effort est. |
 |---|---|---|---|
 | 1 | Create `api/tickets.js` + mount in `api/index.js` | None | S |
-| 2 | Wire "Report Issue" button in `RetailerDashboard.jsx` to `POST /api/tickets` | #1 above | S |
+| 2 | Wire “Report Issue” button in `RetailerDashboard.jsx` to `POST /api/tickets` | #1 above | S |
 | 3 | Add `latitude`/`longitude` to screen registration payload + `ScreenRepository` schema | None | S |
 | 4 | Fix `NetworkMap.jsx` — container height + pin rendering with real coordinate data | #3 above | M |
 | 5 | Fix all `loops` API consumers to destructure `response.loops` (not `response`) | None | S |
@@ -136,7 +137,7 @@ Query param note: both `?screen_id=` and `?screenid=` are accepted (normalised o
 |---|---|
 | Analytics summary dashboard | Proof-of-play now lands in Firestore; dashboard reads it post-MVP |
 | Super Admin retailer impersonation | Nice-to-have; not a launch blocker |
-| "Reestablish connection" button | Placeholder acceptable for MVP demo |
+| “Reestablish connection” button | Placeholder acceptable for MVP demo |
 
 ---
 
@@ -151,6 +152,53 @@ grep -r "CampaignApprovalList" client-app/src --include="*.jsx" -n
 ```
 
 If the `components/` version exists and is imported anywhere, determine which is canonical and delete or re-export the other. If only the `pages/` version exists, close this item.
+
+---
+
+## MVP Gap Analysis — Codebase vs. MVP Doc (v3 Addition)
+
+> Added 2026-06-06. Source: full codebase review vs. `docs/Digital Screen Network Management Platform (MVP).md` at commit `bcefad0`.
+> **Note:** Items already verified closed above (auth guards, rate limits, notifications) are NOT repeated here.
+
+### What Is Done ✅ (Confirmed by Code)
+
+- All 5 MVP roles routed: Super Admin, Retailer Admin, Brand/Advertiser, Tech Ops, Content Manager
+- `requireRole` middleware on all mutation routes (verified by SHA above)
+- Loop-based scheduling: 12 slots × 5-second ads = 60-second hourly loop; `Loops` Firestore schema in place
+- `BrandCampaignWizard.jsx`, `CampaignApprovalList.jsx`, campaign API routes all present
+- `TelemetryService.js` + `impressionRepository.logImpression` wired (proof-of-play persists)
+- Notifications: full 4-endpoint API confirmed (v2 correction above)
+- Cloud Run deployment configured in `cloudbuild.yaml`
+
+### What Is Still Missing / Unconfirmed ❌
+
+#### Admin CRUD Write-Path — Unconfirmed End-to-End
+Route files for users, retailers, and advertisers exist and are non-trivial, but Firestore writes have **not been confirmed** by live browser smoke test. Priority 1 task #6 above.
+
+#### Network Map — Structurally Blocked
+`NetworkMap.jsx` is blank not because of a CSS height bug, but because `latitude`/`longitude` are not stored in the `screens` collection. Priority 1 tasks #3 and #4 above.
+
+#### Issue Reporting — No Server
+`api/tickets.js` does not exist. "Report Issue" button has no API target. Priority 1 tasks #1 and #2 above.
+
+#### `GET /api/loops` Envelope Mismatch
+All three consumer components (`LoopDemoPlayer.jsx`, `ScheduleCalendar.jsx`, `LoopManagement.jsx`) may be iterating the raw response object instead of `response.loops`. Silent empty state in all three views. Priority 1 task #5 above.
+
+#### Role String Consistency Risk
+`requireRole` checks for `'retaileradmin'` (no underscore). If the Firebase Auth token or `x-demo-role` header sends `'retailer_admin'` (with underscore), all retailer mutations silently return `403`. Must be verified in a live browser session before demo.
+
+#### `CampaignApprovalList` Duplicate
+Potential duplicate component between `pages/retailer/` and `components/`. One may be stale. Unresolved; blocks approval workflow confidence.
+
+### Sprint 11 Definition of Done (Minimum for MVP Demo)
+
+- [ ] `api/tickets.js` exists, is mounted, and `POST /api/tickets` returns `201`
+- [ ] Network Map renders pins for at least one seeded screen with real lat/lng
+- [ ] `response.loops` destructuring confirmed in all three consumer components
+- [ ] Admin CRUD smoke test: create one retailer, one advertiser, one user → hard refresh → records persist in Firestore
+- [ ] `CampaignApprovalList` duplicate resolved (one canonical version)
+- [ ] `requireRole` role string matches token payload in a live browser session for retailer mutations
+- [ ] `changelog.md` updated before merge
 
 ---
 
