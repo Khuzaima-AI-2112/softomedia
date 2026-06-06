@@ -5,6 +5,7 @@ import express from 'express';
 import StoreRepository from '../repositories/StoreRepository.js';
 import { BusinessHoursService } from '../services/BusinessHoursService.js';
 import { authenticate } from '../middleware/auth.js';
+import { requireRole } from '../middleware/requireRole.js';
 
 const router = express.Router();
 
@@ -54,9 +55,11 @@ router.get('/:id', async (req, res) => {
 
 /**
  * POST /api/stores
- * Create a new store (requires auth)
+ * Create a new store.
+ *
+ * Sprint 11 — S11-4: requireRole('admin') added alongside existing authenticate.
  */
-router.post('/', authenticate, async (req, res) => {
+router.post('/', authenticate, requireRole('admin'), async (req, res) => {
     try {
         const { name, retailer_id, address, city, state, screen_count } = req.body;
 
@@ -82,9 +85,11 @@ router.post('/', authenticate, async (req, res) => {
 
 /**
  * PUT /api/stores/:id
- * Full update a store (requires auth)
+ * Full update a store.
+ *
+ * Sprint 11 — S11-4: requireRole('admin') added alongside existing authenticate.
  */
-router.put('/:id', authenticate, async (req, res) => {
+router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
     try {
         const store = await StoreRepository.update(req.params.id, req.body);
         res.json(store);
@@ -98,8 +103,10 @@ router.put('/:id', authenticate, async (req, res) => {
  * PATCH /api/stores/:id
  * Partial update — only overwrites supplied fields.
  * Used for status toggles and inline field edits.
+ *
+ * Sprint 11 — S11-4: requireRole('admin') added alongside existing authenticate.
  */
-router.patch('/:id', authenticate, async (req, res) => {
+router.patch('/:id', authenticate, requireRole('admin'), async (req, res) => {
     try {
         const store = await StoreRepository.update(req.params.id, req.body);
         res.json(store);
@@ -111,9 +118,11 @@ router.patch('/:id', authenticate, async (req, res) => {
 
 /**
  * DELETE /api/stores/:id
- * Delete a store (requires auth)
+ * Delete a store.
+ *
+ * Sprint 11 — S11-4: requireRole('admin') added alongside existing authenticate.
  */
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
     try {
         await StoreRepository.delete(req.params.id);
         res.status(204).send();
@@ -157,9 +166,11 @@ router.get('/:id/weekly-hours', async (req, res) => {
 
 /**
  * PUT /api/stores/:id/weekly-hours
- * Update default weekly schedule
+ * Update default weekly schedule.
+ *
+ * Sprint 11 — S11-4: requireRole('admin') added alongside existing authenticate.
  */
-router.put('/:id/weekly-hours', authenticate, async (req, res) => {
+router.put('/:id/weekly-hours', authenticate, requireRole('admin'), async (req, res) => {
     try {
         const hours = await BusinessHoursService.updateWeeklyHours(req.params.id, req.body.weekly_hours);
         res.json(hours);
@@ -171,9 +182,11 @@ router.put('/:id/weekly-hours', authenticate, async (req, res) => {
 
 /**
  * PUT /api/stores/:id/special-hours
- * Update special hours for a date
+ * Update special hours for a date.
+ *
+ * Sprint 11 — S11-4: requireRole('admin') added alongside existing authenticate.
  */
-router.put('/:id/special-hours', authenticate, async (req, res) => {
+router.put('/:id/special-hours', authenticate, requireRole('admin'), async (req, res) => {
     try {
         const { date, ...hoursData } = req.body;
         if (!date) {

@@ -1,6 +1,7 @@
 import express from 'express';
 import { screenRepository } from '../repositories/index.js';
 import { authenticate } from '../middleware/auth.js';
+import { requireRole, ROLE_HIERARCHY, normalizeRole } from '../middleware/requireRole.js';
 
 const router = express.Router();
 
@@ -63,23 +64,53 @@ router.post('/', authenticate, async (req, res) => {
 
 /**
  * GET /api/screens
- * List screens, optionally filtered by store.
+ * List screens with role-conditional visibility.
  *
- * Accepts all three spellings for backwards compatibility:
- *   ?store_id=   (snake_case — canonical, matches POST body)
- *   ?storeId=    (camelCase  — original backend convention)
- *   ?storeid=    (lowercase  — mirrors retailerid/screenid pattern)
+ * Sprint 11 — S11-8:
+ *   - techoperator (level 2) and above: full unfiltered list.
+ *   - retaileradmin (level 1): list filtered to their own retailer_id from JWT.
+ *   - Unauthenticated or insufficient role: 403.
  *
- * ScreenRepository.findByLocation() filters Firestore on 'location_id',
- * which is exactly what POST /register writes when store_id is supplied.
+ * The authenticate middleware is called inline so that unauthenticated requests
+ * are rejected before any Firestore query is attempted.
  */
-router.get('/', async (req, res) => {
+router.get('/', authenticate, async (req, res) => {
     try {
-        const storeId = req.query.store_id || req.query.storeId || req.query.storeid;
-        const screens = storeId
-            ? await screenRepository.findByLocation(storeId)
-            : await screenRepository.findAll();
-        res.json(screens);
+        const role = normalizeRole(req.user?.role);
+        const userLevel = ROLE_HIERARCHY[role] ?? -1;
+        const techopLevel = ROLE_HIERARCHY['techoperator'];   // 2
+        const retailerLevel = ROLE_HIERARCHY['retaileradmin']; // 1
+
+        if (userLevel >= techopLevel) {
+            // techoperator, contentmanager, admin, superadmin — see everything
+            const storeId = req.query.store_id || req.query.storeId || req.query.storeid;
+            const screens = storeId
+                ? await screenRepository.findByLocation(storeId)
+                : await screenRepository.findAll();
+            return res.json(screens);
+        }
+
+        if (userLevel === retailerLevel) {
+            // retaileradmin — scoped to their own retailer_id from the auth token
+            const retailerId = req.user.linkedentityid || req.user.retailer_id;
+            if (!retailerId) {
+                return res.status(403).json({
+                    error: 'Forbidden',
+                    message: 'retaileradmin account has no linked retailer_id'
+                });
+            }
+            const screens = await screenRepository.findAll({
+                where: [['retailer_id', '==', retailerId]]
+            });
+            return res.json(screens);
+        }
+
+        // advertiser or unrecognised role — no screen visibility
+        return res.status(403).json({
+            error: 'Forbidden',
+            required: 'techoperator',
+            actual: role || 'unauthenticated'
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

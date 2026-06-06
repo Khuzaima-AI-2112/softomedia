@@ -180,9 +180,11 @@ router.put('/:id', authenticate, async (req, res) => {
 /**
  * DELETE /api/campaigns/:id
  *
- * Sprint 9 — Task 9.2: authenticate + requireRole('admin') guard added.
+ * Sprint 9 — Task 9.2: authenticate + requireRole guard added.
+ * Sprint 11 — S11-3: tightened from requireRole('admin') to requireRole('superadmin').
+ *   Only superadmin may hard-delete a campaign record.
  */
-router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
+router.delete('/:id', authenticate, requireRole('superadmin'), async (req, res) => {
     try {
         await campaignRepository.delete(req.params.id);
         res.status(204).send();

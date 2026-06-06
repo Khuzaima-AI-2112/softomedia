@@ -6,7 +6,7 @@
  * Before adding a route, verify the file exists in the repo.
  * See docs/SofiensBullshit.md for the full prevention plan.
  *
- * Verified file map (as of Sprint 10 — 2026-06-06):
+ * Verified file map (as of Sprint 11 — 2026-06-06):
  *
  *   layouts/DashboardLayout.jsx          ✅
  *   pages/Login.jsx                      ✅
@@ -17,6 +17,7 @@
  *   pages/admin/Overview.jsx             ✅
  *   pages/admin/RetailerManagement.jsx   ✅
  *   pages/admin/AdvertiserManagement.jsx ✅
+ *   pages/admin/CampaignManagement.jsx   ✅  (served at /dashboard/admin/campaigns) [Sprint 11]
  *   pages/admin/ScreenManagement.jsx     ✅
  *   pages/admin/LoopManagement.jsx       ✅
  *   pages/admin/LoopBuilder.jsx          ✅  (served at /dashboard/admin/loops/:id)
@@ -61,6 +62,7 @@ const Health         = lazy(() => import('./pages/Health'));
 const AdminOverview           = lazy(() => import('./pages/admin/Overview'));
 const RetailerManagement      = lazy(() => import('./pages/admin/RetailerManagement'));
 const AdvertiserManagement    = lazy(() => import('./pages/admin/AdvertiserManagement'));
+const CampaignManagement      = lazy(() => import('./pages/admin/CampaignManagement'));
 const ScreenManagement        = lazy(() => import('./pages/admin/ScreenManagement'));
 const LoopManagement          = lazy(() => import('./pages/admin/LoopManagement'));
 const LoopBuilder             = lazy(() => import('./pages/admin/LoopBuilder'));
@@ -116,6 +118,7 @@ function App() {
                             <Route path="admin"                 element={<AdminOverview />} />
                             <Route path="admin/retailers"       element={<RetailerManagement />} />
                             <Route path="admin/advertisers"     element={<AdvertiserManagement />} />
+                            <Route path="admin/campaigns"       element={<CampaignManagement />} />
                             <Route path="admin/screens"         element={<ScreenManagement />} />
                             <Route path="admin/loops"           element={<LoopManagement />} />
                             <Route path="admin/loops/:id"       element={<LoopBuilder />} />

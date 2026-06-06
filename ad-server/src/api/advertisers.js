@@ -1,12 +1,14 @@
 import express from 'express';
 import { advertiserRepository } from '../repositories/AdvertiserRepository.js';
 import logger from '../utils/logger.js';
+import { authenticate } from '../middleware/auth.js';
+import { requireRole } from '../middleware/requireRole.js';
 
 const router = express.Router();
 
 /**
  * GET /api/advertisers
- * List all advertisers
+ * List all advertisers — public within dashboard shell (all roles can read).
  */
 router.get('/', async (req, res) => {
     try {
@@ -20,7 +22,7 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /api/advertisers/:id
- * Get a single advertiser by ID
+ * Get a single advertiser by ID — public within dashboard shell.
  */
 router.get('/:id', async (req, res) => {
     try {
@@ -37,15 +39,16 @@ router.get('/:id', async (req, res) => {
 
 /**
  * POST /api/advertisers
- * Create a new advertiser
+ * Create a new advertiser.
  * Required fields: name, logo, industry, contactemail, budget, status
  * Document ID is prefixed with 'adv_'
+ *
+ * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added.
  */
-router.post('/', async (req, res) => {
+router.post('/', authenticate, requireRole('admin'), async (req, res) => {
     try {
         const { name, logo, industry, contactemail, budget, status } = req.body;
 
-        // --- Validation ---
         const errors = [];
         if (!name || typeof name !== 'string' || name.trim().length === 0) {
             errors.push('name is required');
@@ -67,7 +70,6 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ error: errors.join('; ') });
         }
 
-        // --- Generate adv_-prefixed document ID ---
         const timestamp = Date.now();
         const random = Math.random().toString(36).substring(2, 8);
         const docId = `adv_${timestamp}_${random}`;
@@ -91,9 +93,11 @@ router.post('/', async (req, res) => {
 
 /**
  * PUT /api/advertisers/:id
- * Full update an advertiser (replaces all fields)
+ * Full update an advertiser (replaces all fields).
+ *
+ * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added.
  */
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
     try {
         const advertiser = await advertiserRepository.update(req.params.id, req.body);
         res.json(advertiser);
@@ -107,8 +111,10 @@ router.put('/:id', async (req, res) => {
  * PATCH /api/advertisers/:id
  * Partial update — only overwrites supplied fields.
  * Used for status toggles and field-level edits to prevent wiping unrelated fields.
+ *
+ * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added.
  */
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', authenticate, requireRole('admin'), async (req, res) => {
     try {
         const advertiser = await advertiserRepository.update(req.params.id, req.body);
         res.json(advertiser);
@@ -120,10 +126,12 @@ router.patch('/:id', async (req, res) => {
 
 /**
  * DELETE /api/advertisers/:id
- * Soft-delete: sets status to 'suspended'
- * Preserves referential integrity with campaigns that reference advertiserid
+ * Soft-delete: sets status to 'suspended'.
+ * Preserves referential integrity with campaigns that reference advertiserid.
+ *
+ * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added.
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
     try {
         const updated = await advertiserRepository.softDelete(req.params.id);
         res.status(200).json(updated);

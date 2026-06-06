@@ -1,12 +1,14 @@
 import express from 'express';
 import { retailerRepository } from '../repositories/RetailerRepository.js';
 import logger from '../utils/logger.js';
+import { authenticate } from '../middleware/auth.js';
+import { requireRole } from '../middleware/requireRole.js';
 
 const router = express.Router();
 
 /**
  * GET /api/retailers
- * List all retailers
+ * List all retailers — public within dashboard shell (all roles can read).
  */
 router.get('/', async (req, res) => {
     try {
@@ -20,7 +22,7 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /api/retailers/:id
- * Get a single retailer by ID
+ * Get a single retailer by ID — public within dashboard shell.
  */
 router.get('/:id', async (req, res) => {
     try {
@@ -37,21 +39,20 @@ router.get('/:id', async (req, res) => {
 
 /**
  * POST /api/retailers
- * Create a new retailer
+ * Create a new retailer.
+ *
+ * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added.
  */
-router.post('/', async (req, res) => {
+router.post('/', authenticate, requireRole('admin'), async (req, res) => {
     try {
         const { name, contact_email, contract_start, logo, status } = req.body;
 
-        // Validation
         const errors = [];
 
-        // Name validation
         if (!name || typeof name !== 'string' || name.trim().length < 1) {
             errors.push('Name is required and must be a non-empty string');
         }
 
-        // Contact email validation
         if (!contact_email || typeof contact_email !== 'string') {
             errors.push('Contact email is required');
         } else {
@@ -61,7 +62,6 @@ router.post('/', async (req, res) => {
             }
         }
 
-        // Contract start date validation
         if (!contract_start || typeof contract_start !== 'string') {
             errors.push('Contract start date is required');
         } else if (isNaN(Date.parse(contract_start))) {
@@ -72,7 +72,6 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ error: errors.join(' | ') });
         }
 
-        // Build retailer data — server controls ID and status default
         const retailerData = {
             name: name.trim(),
             contact_email: contact_email.trim(),
@@ -81,9 +80,7 @@ router.post('/', async (req, res) => {
             status: status && ['active', 'inactive'].includes(status) ? status : 'active'
         };
 
-        // Auto-generate ID — never trust client-supplied ID
         const createdRetailer = await retailerRepository.createNew(retailerData);
-
         res.status(201).json(createdRetailer);
     } catch (error) {
         logger.error('Failed to create retailer:', error);
@@ -93,9 +90,11 @@ router.post('/', async (req, res) => {
 
 /**
  * PUT /api/retailers/:id
- * Update a retailer
+ * Update a retailer.
+ *
+ * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added.
  */
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
     try {
         const retailer = await retailerRepository.update(req.params.id, req.body);
         res.json(retailer);
@@ -107,10 +106,12 @@ router.put('/:id', async (req, res) => {
 
 /**
  * DELETE /api/retailers/:id
- * Soft-delete a retailer (sets status to 'inactive')
- * Preserves referential integrity with stores, screens, loops, impressions
+ * Soft-delete a retailer (sets status to 'inactive').
+ * Preserves referential integrity with stores, screens, loops, impressions.
+ *
+ * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added.
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
     try {
         const updated = await retailerRepository.softDelete(req.params.id);
         res.status(200).json(updated);
@@ -125,9 +126,11 @@ router.delete('/:id', async (req, res) => {
 
 /**
  * PATCH /api/retailers/:id
- * Toggle retailer status between 'active' and 'inactive'
+ * Toggle retailer status between 'active' and 'inactive'.
+ *
+ * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added.
  */
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', authenticate, requireRole('admin'), async (req, res) => {
     try {
         const { status } = req.body;
         const allowedStatuses = ['active', 'inactive'];
