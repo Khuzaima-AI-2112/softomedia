@@ -13,6 +13,7 @@ import { loopRepository, BUSINESS_HOURS } from '../repositories/LoopRepository.j
 import { loopGenerationService } from '../services/LoopGenerationService.js';
 import { BusinessHoursService } from '../services/BusinessHoursService.js';
 import { authenticate } from '../middleware/auth.js';
+import { requireRole } from '../middleware/requireRole.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -215,9 +216,13 @@ router.patch('/:id/slots/:position/replace', authenticate, async (req, res) => {
 
 /**
  * GET /api/loops/pending/:retailerId
- * Get all pending loops for retailer validation
+ * Get all pending loops for retailer validation.
+ *
+ * Sprint 10 — sprintWRAPUP item 3: authenticate + requireRole('retaileradmin')
+ * added. This endpoint exposes unapproved campaign content — it must not be
+ * publicly readable.
  */
-router.get('/pending/:retailerId', async (req, res) => {
+router.get('/pending/:retailerId', authenticate, requireRole('retaileradmin'), async (req, res) => {
     try {
         const loops = await loopRepository.findPendingByRetailer(req.params.retailerId);
         res.json({ loops, count: loops.length });

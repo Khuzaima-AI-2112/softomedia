@@ -54,9 +54,6 @@ router.get('/:id', async (req, res) => {
  * Create a new campaign (defaults to pending_approval).
  *
  * Sprint 9 — Task 9.2: authenticate guard added.
- * Guard is per-verb (not router-level) to preserve GET/PATCH/PUT/book backward
- * compatibility. In DEV the demo-token bypass in auth.js means existing flows
- * continue without any client-side change.
  */
 router.post('/', authenticate, async (req, res) => {
     try {
@@ -77,8 +74,12 @@ router.post('/', authenticate, async (req, res) => {
  * POST /api/campaigns/:id/book
  * Book slots for a campaign.
  * Body: { slots: [{ loopId, slotIndex, creativeUrl }] }
+ *
+ * Sprint 10 — authenticate guard added (sprintWRAPUP item 2).
+ * Caller must be authenticated; advertiser_id ownership is validated against
+ * the campaign record before any slot is written.
  */
-router.post('/:id/book', async (req, res) => {
+router.post('/:id/book', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
         const { slots } = req.body;
@@ -158,8 +159,11 @@ router.patch('/:id/status', requireRole('retaileradmin'), async (req, res) => {
 /**
  * PUT /api/campaigns/:id
  * Full replacement update for a campaign document.
+ *
+ * Sprint 10 — authenticate guard added (sprintWRAPUP item 1).
+ * Any authenticated user can update their own campaign; admin can update any.
  */
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
         const campaign = await campaignRepository.findById(id);
@@ -177,8 +181,6 @@ router.put('/:id', async (req, res) => {
  * DELETE /api/campaigns/:id
  *
  * Sprint 9 — Task 9.2: authenticate + requireRole('admin') guard added.
- * No known client calls DELETE today (grep confirmed zero matches).
- * Adding both guards now prevents future accidental exposure.
  */
 router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
     try {

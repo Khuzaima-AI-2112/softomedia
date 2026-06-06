@@ -2,6 +2,7 @@ import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
 import { impressionLimiter } from '../middleware/rateLimiter.js';
+import { impressionRepository, campaignRepository } from '../repositories/index.js';
 
 const router = express.Router();
 
@@ -54,8 +55,9 @@ router.put('/sink/*', (req, res) => {
  * Receives a single real-time impression event from the Player.
  *
  * Sprint 9 — Task 9.3: impressionLimiter applied (100 req/min per IP).
- * The limiter is scoped to this verb only; upload-url, sink, and error
- * routes are unaffected.
+ * Sprint 10 — sprintWRAPUP item 4: persist impression to Firestore and
+ *   increment campaign play_count. Errors in persistence are logged but
+ *   do NOT fail the 201 response — the player must not stall on a DB error.
  *
  * Body:
  *   - screen_id    {string} REQUIRED
@@ -67,11 +69,8 @@ router.put('/sink/*', (req, res) => {
  * Returns 201 { status: 'recorded', impression_id } on success.
  * Returns 400 if screen_id or campaign_id are missing.
  * Returns 429 with Retry-After header when rate limit exceeded.
- *
- * Phase 2 (TODO): persist to impressions Firestore collection and increment
- *   campaign play_count via campaignService.
  */
-router.post('/impression', impressionLimiter, (req, res) => {
+router.post('/impression', impressionLimiter, async (req, res) => {
     const { screen_id, campaign_id, asset_id, loop_id, played_at } = req.body;
 
     if (!screen_id || !campaign_id) {
@@ -91,6 +90,34 @@ router.post('/impression', impressionLimiter, (req, res) => {
         asset_id:  asset_id  || null,
         loop_id:   loop_id   || null,
         played_at: recorded_at,
+    });
+
+    // Persist to Firestore — fire-and-forget with error isolation so that
+    // a DB outage never blocks the player's 201 response.
+    Promise.all([
+        impressionRepository.logImpression({
+            impression_id,
+            screen_id,
+            campaign_id,
+            asset_id:  asset_id  || null,
+            loop_id:   loop_id   || null,
+            played_at: recorded_at
+        }),
+        (async () => {
+            try {
+                const campaign = await campaignRepository.findById(campaign_id);
+                if (campaign) {
+                    await campaignRepository.update(campaign_id, {
+                        play_count: (campaign.play_count || 0) + 1,
+                        last_played_at: recorded_at
+                    });
+                }
+            } catch (countErr) {
+                logger.warn('play_count increment failed', { campaign_id, error: countErr.message });
+            }
+        })()
+    ]).catch(err => {
+        logger.error('Impression persistence failed', { impression_id, error: err.message });
     });
 
     res.status(201).json({ status: 'recorded', impression_id });
