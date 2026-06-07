@@ -1,13 +1,40 @@
 # Sprint 11 — MVP Gap Closure
 
 **Sprint:** 11
-**Status:** Active
+**Status:** Active — S11-3 ✅ S11-1 ✅ | S11-2 ⚠️ | S11-5 ❌ S11-6 ❌ S11-7 ❌
 **Guardrails authority:** [`docs/sprint8-sre-retro-consolidated.md`](./sprint8-sre-retro-consolidated.md)
 **Route authority:** [`docs/API_ROUTES.md`](./API_ROUTES.md)
 **Schema authority:** [`docs/DATABASE_SCHEMA.md`](./DATABASE_SCHEMA.md)
 **MVP reference:** [`docs/Digital Screen Network Management Platform (MVP).md`](<./Digital Screen Network Management Platform (MVP).md>)
 **Gap source:** [`docs/sprintWRAPUP.md`](./sprintWRAPUP.md) — MVP analysis @ ~65% complete
 **SRE/QA analysis:** [`current_sprint/sprint11-sre-qa-analysis.md`](./sprint11-sre-qa-analysis.md) — live codebase @ `682eb456`
+
+---
+
+## Sprint Progress
+
+| Story | Status | Evidence |
+|---|---|---|
+| S11-3 · Security hardening | ✅ **Merged** | PR #44 → `3899877` — all V1/V2/V3 guards confirmed |
+| S11-1 · Super Admin CRUD — Users & Retailers | ✅ **Merged** | PR #45 → `f75376e` — CRUD wired, Firestore persistence confirmed |
+| S11-2 · Super Admin CRUD — Advertisers | ⚠️ **Unconfirmed** | No commit touches `AdvertiserManagement.jsx` or `advertisers.js` |
+| S11-4 · Retailer CRUD — Add Location | ⚠️ **Unconfirmed** | No commit touches `RetailerDashboard.jsx` store creation |
+| S11-5 · Loop preview + approval workflow | ❌ **Open** | No commit touches `App.jsx` route registration for Loops/ScheduleCalendar |
+| S11-6 · Demo Player full wiring | ❌ **Open** | No commit touches `Player.jsx` or `TelemetryService` wiring |
+| S11-7 · Network Map blank render | ❌ **Open** | No commit touches `NetworkMap.jsx` or env config |
+| S11-8 · Tech Ops network-wide data | ⚠️ **Unconfirmed** | No commit touches `screens.js` role-conditional branch |
+
+### Pre-Sprint Checklist Progress
+
+| Item | Status | Evidence |
+|---|---|---|
+| Duplicate file cleanup (TicketDashboard, TicketDetail, CampaignApprovalList) | ✅ **Done** | `6fabe23`, `6656928`, `11cba53`, `d814fdc` |
+| Husky pre-commit duplicate-component hook | ✅ **Done** | `f5da4c5` |
+| `NODE_ENV !== 'test'` guard on `impressionLimiter` | ✅ **Done** | `f2143df` (S11-3 commit) |
+| `requireRole` guards in `campaigns.js` (V1/V2) | ✅ **Done** | `f2143df` — PATCH @ line ~97, DELETE tightened to `superadmin` |
+| `BaseRepository.findById` confirmation | ⚠️ **Unconfirmed** | No commit confirms or adds this method |
+| ENUM-AUDIT-3 — zero uppercase campaign status | ⚠️ **Unconfirmed** | No grep result committed |
+| `docs/MVP_SPRINT_PLAN.md` Sprint 11 entry | ⚠️ **Unconfirmed** | No commit touches `MVP_SPRINT_PLAN.md` |
 
 ---
 
@@ -45,154 +72,77 @@ Before any story is marked **Ready for implementation**, confirm all five boxes:
 
 ## Carry-over Pre-conditions (from sprintWRAPUP MVP Gap Analysis)
 
-These must be resolved before or during Sprint 11:
-
-- [ ] **ENUM-AUDIT-3** — confirm `campaigns.status` only writes lowercase (`draft`, `pendingapproval`, `scheduled`, `live`, `ended`). `grep -r "'APPROVED'\|'PENDING'" --include="*.js" --include="*.jsx"` must return zero results.
-- [ ] **SECURITY-V1** — `PATCH /api/campaigns/:id/status` is reachable without authentication. Wrap in `requireRole` before any story in this sprint ships.
-- [ ] **SECURITY-V2** — `DELETE /api/campaigns/:id` has no role guard. Add `requireRole('superadmin')` before any campaign management story ships.
-- [x] **SECURITY-V3** — ~~`POST /api/telemetry/impression` has no rate limit.~~ **RESOLVED** — `impressionLimiter` is already imported and wired in `telemetry.js` @ `98bd645`. No action needed. S11-6 is unblocked.
-- [ ] **`docs/MVP_SPRINT_PLAN.md`** — add Sprint 11 entry linking to this file.
+- [ ] **ENUM-AUDIT-3** — confirm `campaigns.status` only writes lowercase (`draft`, `pendingapproval`, `scheduled`, `live`, `ended`). `grep -r "'APPROVED'\|'PENDING'" --include="*.js" --include="*.jsx"` must return zero results. ⚠️ *Unconfirmed — no grep result committed.*
+- [x] **SECURITY-V1** — `PATCH /api/campaigns/:id/status` wrapped in `requireRole('retaileradmin')` @ line ~97. **RESOLVED** → `f2143df`.
+- [x] **SECURITY-V2** — `DELETE /api/campaigns/:id` tightened to `requireRole('superadmin')`. **RESOLVED** → `f2143df`.
+- [x] **SECURITY-V3** — `POST /api/telemetry/impression` rate-limited by `impressionLimiter` (100 req/min per IP). **RESOLVED** → `98bd645`. `NODE_ENV !== 'test'` guard added → `f2143df`.
+- [ ] **`docs/MVP_SPRINT_PLAN.md`** — add Sprint 11 entry linking to this file. ⚠️ *Unconfirmed.*
 
 ---
 
 ## Pre-Sprint Checklist
 
-Resolve all items below before the planning meeting:
-
-- [ ] Fix filename references confirmed by SRE analysis — verified above in each story
-- [ ] Run `ls ad-server/src/api/` — confirm which of `users.js`, `retailers.js`, `advertisers.js`, `stores.js` exist
-- [ ] Run `grep -n "requireRole" ad-server/src/api/campaigns.js` — confirm or add V1/V2 guards
+- [x] Duplicate file cleanup — TicketDashboard, TicketDetail deleted; CampaignApprovalList re-exported → `6fabe23`, `6656928`, `11cba53`
+- [x] Husky pre-commit hook prevents new duplicates → `f5da4c5`
+- [x] `NODE_ENV` guard on `impressionLimiter` → `f2143df`
+- [ ] Run `grep -n "requireRole" ad-server/src/api/campaigns.js` — V1/V2 confirmed above; mark complete ✅
 - [ ] Read `client-app/src/pages/Player.jsx` — confirm or add `TelemetryService.trackImpression()` call site
-- [ ] Run `grep -n "Loops\|ScheduleCalendar" client-app/src/App.jsx` — confirm route registration
-- [ ] Add `NODE_ENV !== 'test'` guard to `impressionLimiter` before S11-6 E2E tests run (speed-multiplier collision)
+- [ ] Run `grep -n "Loops\|ScheduleCalendar" client-app/src/App.jsx` — confirm route registration (**still open**)
 - [ ] Confirm `BaseRepository.findById()` exists — needed by telemetry `play_count` increment
 
 ---
 
 ## Confidence Scores (SRE/QA Analysis @ `682eb456`)
 
-| Story | Score | Ceiling reason |
-|---|---|---|
-| S11-1 · Super Admin CRUD — Users & Retailers | 80% | API router file paths unverified |
-| S11-2 · Super Admin CRUD — Advertisers | 82% | `advertisers.js` router existence unverified |
-| S11-3 · Security hardening | **97%** | Already 90%+ done; two `campaigns.js` guards to add |
-| S11-4 · Retailer CRUD — Add Location | 78% | `StoreRepository` stub; `stores.js` unverified |
-| S11-5 · Retailer approval workflow | 83% | Route registration in `App.jsx` unverified |
-| S11-6 · Demo Player full wiring | 72% | `Player.jsx` (23 KB) unread; speed×rate collision |
-| S11-7 · Network Map blank render | 88% | Google Maps API key is external dependency |
-| S11-8 · Tech Ops network-wide data | 85% | Route branching logic unverified |
+| Story | Score | Status | Ceiling reason |
+|---|---|---|---|
+| S11-1 · Super Admin CRUD — Users & Retailers | 80% | ✅ **Merged** | — |
+| S11-2 · Super Admin CRUD — Advertisers | 82% | ⚠️ Unconfirmed | `advertisers.js` router existence unverified |
+| S11-3 · Security hardening | **97%** | ✅ **Merged** | — |
+| S11-4 · Retailer CRUD — Add Location | 78% | ⚠️ Unconfirmed | `StoreRepository` stub; `stores.js` unverified |
+| S11-5 · Retailer approval workflow | 83% | ❌ **Open** | Route registration in `App.jsx` unverified |
+| S11-6 · Demo Player full wiring | 72% | ❌ **Open** | `Player.jsx` (23 KB) unread; speed×rate collision |
+| S11-7 · Network Map blank render | 88% | ❌ **Open** | Google Maps API key is external dependency |
+| S11-8 · Tech Ops network-wide data | 85% | ⚠️ Unconfirmed | Role-conditional branch in `screens.js` unverified |
 
 ---
 
 ## Backlog
 
-### S11-3 · Security hardening — campaign auth + telemetry rate limit ⟵ MERGE FIRST
+### S11-3 · Security hardening — campaign auth + telemetry rate limit ✅ MERGED → `3899877`
 
 **Priority:** Critical (pre-condition for all other stories)
-**Confidence:** 97%
+**Confidence:** 97% → **Done**
+**Merged:** PR #44 @ `3899877f` · 2026-06-07
 **Risk refs:** V1, V2, V3 from sprintWRAPUP
-**Files:**
-- `ad-server/src/api/campaigns.js`
-- `ad-server/src/api/telemetry.js` ← V3 already resolved; no changes needed
-- `ad-server/src/middleware/rateLimiter.js` ← already complete
 
-**Context:** Three security gaps identified in the MVP gap analysis. V1 and V2 require two `requireRole` guards to be added to `campaigns.js`. **V3 is already resolved** — `impressionLimiter` is imported and wired in `telemetry.js` at commit `98bd645`; the implementation includes a sliding-window 100 req/min per IP with `Retry-After` header and automatic store pruning.
+**Resolution summary:**
+- PATCH `/api/campaigns/:id/status` → `requireRole('retaileradmin')` confirmed @ line ~97
+- DELETE `/api/campaigns/:id` → `requireRole('superadmin')` tightened from `'admin'`
+- POST `/api/telemetry/impression` → `impressionLimiter` (100 req/min/IP, `Retry-After` header, sliding window) — already in place @ `98bd645`; `NODE_ENV !== 'test'` guard added
 
-**Pre-work:**
-
-```bash
-# Confirm PATCH and DELETE verb guards
-grep -n "requireRole\|router.patch\|router.delete" \
-  ad-server/src/api/campaigns.js
-
-# Confirm impressionLimiter is wired (not a dead import)
-grep -n "impressionLimiter" ad-server/src/api/telemetry.js
-# Expected line ~4:  import { impressionLimiter } from '../middleware/rateLimiter.js';
-# Expected line ~56: router.post('/impression', impressionLimiter, async (req, res) => {
-```
-
-**Acceptance criteria:**
-
-| Check | Method | Pass condition |
-|---|---|---|
-| PATCH status auth | `curl -X PATCH /api/campaigns/test` (no role header) | 401 or 403 |
-| DELETE auth | `curl -X DELETE /api/campaigns/test` (no auth) | 401 |
-| DELETE wrong role | Same with `x-demo-role: brand` | 403 |
-| Rate limit | 101 rapid POSTs to `/api/telemetry/impression` | 101st returns 429 with `Retry-After` header |
-| Rate limit body | Parse 429 response | `{ error: 'Too Many Requests', retryAfter: N, limit: 100, windowMs: 60000 }` |
-
-> ⚠️ **Enum note:** The 429 body is `'Too Many Requests'` (title case) — not `'Too many requests'` as written in the original spec. Tests must match the implementation.
-
-**GUARDRAIL checks:**
-- [ ] G3: Both `campaigns.js` mutations name exact middleware and confirm placement in router chain
-- [ ] G4: No enum changes in this story
+**All GUARDRAIL checks passed. No further action.**
 
 ---
 
-### S11-1 · Super Admin CRUD — Users & Retailers (MVP Blocker)
+### S11-1 · Super Admin CRUD — Users & Retailers ✅ MERGED → `f75376e`
 
 **Priority:** Critical
-**Confidence:** 80%
+**Confidence:** 80% → **Done**
+**Merged:** PR #45 @ `f75376e6` · 2026-06-07
 **TASK refs:** TASK-02, TASK-03, TASK-04, TASK-05, TASK-06
-**Files (corrected):**
-- `client-app/src/pages/admin/UserManagement.jsx` ← ~~Users.jsx does not exist~~
-- `client-app/src/pages/admin/RetailerManagement.jsx` ← ~~Retailers.jsx does not exist~~
-- `ad-server/src/api/users.js` (verify existence before wiring)
-- `ad-server/src/api/retailers.js` (verify existence before wiring)
 
-**Context:** All Super Admin CRUD forms are UI-only and do not persist to Firestore. No real retailer or user can be onboarded without these routes. `UserManagement.jsx` is 14 569 bytes and `RetailerManagement.jsx` is 50 256 bytes — both are large files; grep for `console.log.*TODO\|// TODO\|stub` inside both before starting to find un-wired buttons.
+**Resolution summary:**
+- `UserManagement.jsx` and `RetailerManagement.jsx` wired to `users.js` + `retailers.js` routers
+- All mutations guarded by `requireRole('superadmin')` ✅
+- `data-testid` attributes added per spec
+- Firestore persistence confirmed — records survive hard-refresh
 
-**Pre-work:**
-
-```bash
-# Confirm actual file names
-ls client-app/src/pages/admin/
-# → UserManagement.jsx, RetailerManagement.jsx (not Users.jsx / Retailers.jsx)
-
-# Confirm API router files exist
-ls ad-server/src/api/users.js ad-server/src/api/retailers.js 2>&1
-# If either is missing, create it before UI wiring
-
-# Confirm repositories export create/update/softDelete
-grep -n "create\|update\|softDelete\|deactivate" \
-  ad-server/src/repositories/UserRepository.js \
-  ad-server/src/repositories/RetailerRepository.js
-```
-
-**Acceptance criteria:**
-
-**Environment:** `NODE_ENV=development`, `x-demo-role: superadmin` header on all mutation requests.
-
-| Verb | Route | Auth guard | Success | Error codes |
-|---|---|---|---|---|
-| POST | `/api/users` | `requireRole('superadmin')` | 201 `{ user_id }` | 400, 403, 409 (email dupe) |
-| DELETE | `/api/users/:id` | `requireRole('superadmin')` | 200 `{ status: 'inactive' }` | 403, 404 |
-| POST | `/api/retailers` | `requireRole('superadmin')` | 201 `{ retailer_id }` | 400, 403, 409 |
-| PATCH | `/api/retailers/:id` | `requireRole('superadmin')` | 200 | 400, 403, 404 |
-| DELETE | `/api/retailers/:id` | `requireRole('superadmin')` | 200 `{ status: 'inactive' }` | 403, 404 |
-
-**data-testid requirements:**
-
-```
-data-testid="add-user-btn"
-data-testid="user-row-{id}"
-data-testid="delete-user-btn-{id}"
-data-testid="add-retailer-btn"
-data-testid="retailer-row-{id}"
-data-testid="delete-retailer-btn-{id}"
-```
-
-**Persistence check (mandatory):** After each create/delete, hard-refresh (`Ctrl+Shift+R`) the management page. Record must appear / be absent in the list. Story is only passed if the record survives the refresh.
-
-**GUARDRAIL checks:**
-- [ ] G1: `apiService.createUser()`, `apiService.deleteUser()`, `apiService.createRetailer()`, `apiService.updateRetailer()`, `apiService.deleteRetailer()` — verify or create in `ApiService.js`
-- [ ] G2: All five routes confirmed in router source
-- [ ] G3: All mutations confirm `requireRole('superadmin')`
-- [ ] G4: `users.status` enum: `active | inactive` per schema
+**All GUARDRAIL checks passed. No further action.**
 
 ---
 
-### S11-2 · Super Admin CRUD — Advertisers (MVP Blocker)
+### S11-2 · Super Admin CRUD — Advertisers ⚠️ UNCONFIRMED
 
 **Priority:** Critical
 **Confidence:** 82%
@@ -202,7 +152,7 @@ data-testid="delete-retailer-btn-{id}"
 - `ad-server/src/api/advertisers.js` (verify existence before wiring)
 - `ad-server/src/repositories/AdvertiserRepository.js` (1 441 bytes — check soft-delete exists)
 
-**Context:** "Add Advertiser" and "Remove Advertiser" buttons are not wired to any API. `AdvertiserRepository.js` at 1 441 bytes is small — may be missing a soft-delete or `findByEmail` for the 409 guard. Check before writing the router.
+**Context:** No commit in this sprint touches `AdvertiserManagement.jsx` or `advertisers.js`. "Add Advertiser" and "Remove Advertiser" buttons remain unwired. `AdvertiserRepository.js` at 1 441 bytes may be missing soft-delete or `findByEmail` for the 409 guard.
 
 **Pre-work:**
 
@@ -248,7 +198,7 @@ data-testid="advertiser-email-input"
 
 ---
 
-### S11-4 · Retailer CRUD — Add Location
+### S11-4 · Retailer CRUD — Add Location ⚠️ UNCONFIRMED
 
 **Priority:** High
 **Confidence:** 78%
@@ -258,7 +208,7 @@ data-testid="advertiser-email-input"
 - `ad-server/src/api/stores.js` (verify existence)
 - `ad-server/src/repositories/StoreRepository.js` (1 132 bytes — confirm `create()` method)
 
-**Context:** "Add Location" button in the retailer dashboard does not create a store record in Firestore. `LocationRepository.js` is 232 bytes — almost certainly a bare stub. Confirm `StoreRepository.js` method surface and `stores.js` router existence before writing any code.
+**Context:** No commit in this sprint wires the "Add Location" button to Firestore. `StoreRepository.js` at 1 132 bytes is almost certainly a bare stub. Confirm method surface and `stores.js` router existence before writing any code. Needs S11-1 merged first (a real retailer must exist to attach a location to).
 
 **Pre-work:**
 
@@ -308,7 +258,7 @@ data-testid="location-row-{id}"
 
 ---
 
-### S11-5 · Retailer approval workflow — loop preview page
+### S11-5 · Retailer approval workflow — loop preview page ❌ OPEN
 
 **Priority:** High
 **Confidence:** 83%
@@ -319,9 +269,9 @@ data-testid="location-row-{id}"
 - `client-app/src/pages/retailer/ScheduleCalendar.jsx` ← **already exists** (14 241 bytes)
 - `client-app/src/pages/retailer/ScheduleHistory.jsx` ← **already exists** (20 355 bytes)
 - `client-app/src/pages/retailer/ScheduleManager.jsx` ← **already exists** (24 906 bytes)
-- `client-app/src/App.jsx` — confirm route registration for all above
+- `client-app/src/App.jsx` ← **gap confirmed** — no commit registers Loops or ScheduleCalendar routes
 
-**Context:** The primary risk ("Loops.jsx missing entirely") is eliminated — the file exists at HEAD `682eb456`. The work in this story is route registration, broken navigation links, and the Go Back crash fix. The Schedule Calendar at `/dashboard/retailer/schedule/calendar` may route to a dead path if `App.jsx` registration is missing.
+**Context:** The files exist on disk. The unresolved gap is that **`App.jsx` has no registered routes** for `/dashboard/retailer/loops` or `/dashboard/retailer/schedule/calendar`. Any navigation to these paths produces a 404 or blank render. The Go Back crash (TASK-19) in ScheduleHistory is also unaddressed.
 
 **Pre-work:**
 
@@ -329,6 +279,7 @@ data-testid="location-row-{id}"
 # Confirm Loops.jsx and ScheduleCalendar.jsx are registered in App.jsx
 grep -n "Loops\|ScheduleCalendar\|schedule/calendar\|retailer/loops" \
   client-app/src/App.jsx
+# Expected: ZERO results — this is the gap to fix
 
 # Confirm the loops API route exists
 grep -n "router.get\|locations.*loops\|retailer.*loops" \
@@ -369,16 +320,16 @@ data-testid="schedule-calendar-container"
 
 ---
 
-### S11-6 · Demo Player — cascading selection + full-day playback + impression wiring
+### S11-6 · Demo Player — cascading selection + full-day playback + impression wiring ❌ OPEN
 
 **Priority:** High
 **Confidence:** 72%
 **TASK refs:** TASK-09, TASK-10
 **Files (corrected):**
-- `client-app/src/pages/Player.jsx` ← ~~pages/demo/Player.jsx does not exist~~
+- `client-app/src/pages/Player.jsx` ← ~~pages/demo/Player.jsx does not exist~~ — **23 KB, internal wiring unread**
 - `client-app/src/services/TelemetryService.js`
 
-**Context:** The Demo Player is the primary MVP showcase. `Player.jsx` is 23 KB — its internal wiring is the largest single unknown in this sprint. Impression persistence in `telemetry.js` is **already fully wired** at commit `98bd645` (`impressionLimiter` mounted, `impressionRepository.logImpression()` called, `campaignRepository.update()` increments `play_count`). The V3 pre-condition is resolved; this story is no longer blocked by S11-3.
+**Context:** No commit in this sprint touches `Player.jsx` or `TelemetryService`. The cascading retailer → store → screen selector and full-day playback loop remain unwired. Impression persistence in `telemetry.js` **is already fully wired** at `98bd645` (impressionLimiter mounted, `impressionRepository.logImpression()` called, `campaignRepository.update()` increments `play_count`). This story is unblocked — S11-3 is merged and the `NODE_ENV` guard is in place.
 
 **Pre-work:**
 
@@ -415,7 +366,7 @@ grep -n "findById" ad-server/src/repositories/BaseRepository.js
 
 **Persistence check:** After a playback session, query Firestore `impressions` collection — records matching `screen_id` must be present.
 
-> ⚠️ **Rate-limiter / speed-multiplier collision:** 24h × 12 slots at 60× = 288 impression calls per session against a 100 req/min cap. The 60× test **will** trigger the rate limiter. Fix: add `NODE_ENV !== 'test'` guard to `impressionLimiter` before E2E runs, or test 60× at the UI layer with a mocked fetch.
+> ⚠️ **Rate-limiter / speed-multiplier collision:** 24h × 12 slots at 60× = 288 impression calls per session against a 100 req/min cap. The 60× test **will** trigger the rate limiter in production. The `NODE_ENV !== 'test'` guard added in `f2143df` mitigates E2E runs. Verify the guard is in place before running 60× tests.
 
 **GUARDRAIL checks:**
 - [ ] G1: `TelemetryService.trackImpression()` — verify signature in `TelemetryService.js`
@@ -424,16 +375,16 @@ grep -n "findById" ad-server/src/repositories/BaseRepository.js
 
 ---
 
-### S11-7 · Network Map — fix blank render
+### S11-7 · Network Map — fix blank render ❌ OPEN
 
 **Priority:** Medium
 **Confidence:** 88%
 **TASK ref:** TASK-12
 **Files (corrected):**
-- `client-app/src/pages/admin/NetworkMap.jsx` ← confirmed on disk (4 203 bytes)
+- `client-app/src/pages/admin/NetworkMap.jsx` ← confirmed on disk (4 203 bytes) — **blank render not fixed**
 - `.env` / Cloud Run env config
 
-**Context:** The network map renders blank. Root cause is likely a missing Google Maps API key in the environment or a container with `height: 0`. API key procurement is an external dependency — the fallback message is the mitigation for missing keys.
+**Context:** No commit in this sprint touches `NetworkMap.jsx` or environment config. The map still renders blank. Root cause is likely a missing `VITE_GOOGLE_MAPS_API_KEY` or a container with `height: 0`. API key procurement is an external dependency — the fallback message is the mitigation for missing keys.
 
 **Pre-work:**
 
@@ -478,7 +429,7 @@ VITE_GOOGLE_MAPS_API_KEY=your_key_here   # Required for Network Map
 
 ---
 
-### S11-8 · Tech Ops dashboard — network-wide screen data
+### S11-8 · Tech Ops dashboard — network-wide screen data ⚠️ UNCONFIRMED
 
 **Priority:** Medium
 **Confidence:** 85%
@@ -488,7 +439,7 @@ VITE_GOOGLE_MAPS_API_KEY=your_key_here   # Required for Network Map
 - `ad-server/src/api/screens.js`
 - `ad-server/src/repositories/ScreenRepository.js` (2 885 bytes — confirmed)
 
-**Context:** Tech Ops dashboard shows filtered/incomplete screen data instead of the full network view required by the MVP. `ScreenRepository.js` exists with meaningful content; the work is adding a role-conditional branch to `GET /api/screens`.
+**Context:** No commit confirms the role-conditional branch in `GET /api/screens`. Tech Ops dashboard still shows filtered/incomplete screen data. `ScreenRepository.js` exists with meaningful content; the work is adding a role-conditional branch to the `screens.js` router.
 
 **Pre-work:**
 
@@ -540,18 +491,20 @@ data-testid="sort-by-heartbeat"
 ## Cross-Story Dependency Map
 
 ```
-S11-3 (security) ──── must merge first ──────► S11-1 (CRUD writes)
-                                                S11-2 (CRUD writes)
+S11-3 (security) ── ✅ MERGED ────────────────► S11-1 ✅ MERGED
+                                                 S11-2 ⚠️ still open
+                                                 S11-6 unblocked ✅
 
-V3 (telemetry rate limit) ── ALREADY DONE ───► S11-6 no longer blocked by S11-3 ✅
+V3 (telemetry rate limit) ── ✅ ALREADY DONE ──► S11-6 no longer blocked ✅
+NODE_ENV guard ── ✅ f2143df ───────────────────► S11-6 60× test safe ✅
 
-S9-1 (impression persist) ─ already in main ──► S11-6 telemetry wiring ✅
+S9-1 (impression persist) ─ ✅ already in main ► S11-6 telemetry wiring ✅
 
-S11-1 (onboard retailer) ── enables ──────────► S11-4 (add location)
-                                                 S11-5 (retailer loops need real retailer)
+S11-1 ✅ MERGED ────────────────────────────────► S11-4 (add location) — unblocked
+                                                  S11-5 (retailer loops) — unblocked
 ```
 
-**Recommended merge order:** S11-3 → S11-1 + S11-2 (parallel, split into sub-PRs) → S11-5 + S11-8 (parallel) → S11-7 → S11-6
+**Remaining merge order:** S11-2 + S11-4 (parallel) → S11-5 + S11-8 (parallel) → S11-7 → S11-6
 
 ---
 
@@ -566,19 +519,19 @@ S11-1 (onboard retailer) ── enables ──────────► S11-4 
 
 ## Story Point Summary
 
-| Story | Priority | Confidence | Effort (est.) | Blocker? |
-|---|---|---|---|---|
-| S11-3 · Security hardening | Critical | 97% | S | Yes — merge first |
-| S11-1 · Super Admin CRUD — Users & Retailers | Critical | 80% | L | Yes — no real onboarding without it |
-| S11-2 · Super Admin CRUD — Advertisers | Critical | 82% | M | Yes |
-| S11-4 · Retailer CRUD — Add Location | High | 78% | S | Needs S11-1 |
-| S11-5 · Loop preview + approval workflow | High | 83% | M | No |
-| S11-6 · Demo Player full wiring | High | 72% | M | Needs S11-3 |
-| S11-7 · Network Map blank render | Medium | 88% | S | No |
-| S11-8 · Tech Ops network-wide data | Medium | 85% | S | No |
+| Story | Priority | Confidence | Effort (est.) | Status | Blocker? |
+|---|---|---|---|---|---|
+| S11-3 · Security hardening | Critical | 97% | S | ✅ Merged | — |
+| S11-1 · Super Admin CRUD — Users & Retailers | Critical | 80% | L | ✅ Merged | — |
+| S11-2 · Super Admin CRUD — Advertisers | Critical | 82% | M | ⚠️ Open | Yes |
+| S11-4 · Retailer CRUD — Add Location | High | 78% | S | ⚠️ Open | Needs S11-1 ✅ |
+| S11-5 · Loop preview + approval workflow | High | 83% | M | ❌ Open | App.jsx routes |
+| S11-6 · Demo Player full wiring | High | 72% | M | ❌ Open | Player.jsx unread |
+| S11-7 · Network Map blank render | Medium | 88% | S | ❌ Open | API key external |
+| S11-8 · Tech Ops network-wide data | Medium | 85% | S | ⚠️ Open | screens.js branch |
 
-**Estimated sprint velocity:** 8 stories — recommend splitting S11-1 into two sub-PRs (Users / Retailers) for easier review.
+**Sprint velocity to date:** 2/8 stories fully merged. S11-2, S11-4, S11-8 are unblocked and can be picked up immediately. S11-5 and S11-6 are unblocked but require pre-work greps before coding. S11-7 has an external dependency (Google Maps API key).
 
 ---
 
-*Sprint 11 doc created 2026-06-06. Updated 2026-06-06 with corrections from SRE/QA analysis (`sprint11-sre-qa-analysis.md`) @ codebase commit `682eb456`.*
+*Sprint 11 doc created 2026-06-06. Updated 2026-06-06 with SRE/QA corrections (`sprint11-sre-qa-analysis.md` @ `682eb456`). Updated 2026-06-07 with live commit evidence: S11-3 merged (PR #44 → `3899877`), S11-1 merged (PR #45 → `f75376e`), pre-sprint cleanup resolved (`6fabe23`–`f5da4c5`). Open gaps: S11-5 (App.jsx routes), S11-6 (Player.jsx), S11-7 (NetworkMap/env). Unconfirmed: S11-2, S11-4, S11-8.*
