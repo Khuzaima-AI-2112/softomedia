@@ -2,13 +2,7 @@
 
 ## 🚫 Deployment Blockers (Must Fix Before Deploy)
 
-### ESLint Configuration
-- [x] Create `.eslintrc.cjs` in `client-app/` directory
-- [x] Ensure `npm run lint` passes with zero errors
-
 ### Deployment Infrastructure
-- [x] Create `cloudbuild.yaml` for GCP Cloud Build
-- [x] Create `verify_predeploy.js` script
 - [ ] **Verify Production Release**: Monitor first deploy logs for successful Rules and dynamic CORS injection.
 
 ### Pre-commit Hooks (one-time dev machine setup)
@@ -19,12 +13,12 @@
   After that, any commit introducing a duplicate filename across `components/` and
   `pages/` will be **blocked before it even hits CI**. The hook runs
   `scripts/check-duplicate-components.sh` automatically on every `git commit`.
-  > This was added in Sprint 11 after `TicketDashboard`, `TicketDetail`, and
-  > `CampaignApprovalList` each existed in two places with diverging implementations,
-  > causing a build failure. Don't skip this step.
+  > Added in Sprint 11 after `TicketDashboard`, `TicketDetail`, and `CampaignApprovalList`
+  > each existed in two places with diverging implementations, causing a build failure.
+  > Don't skip this step.
 
 ## 🛡️ Security & Vulnerabilities
-- [ ] **Patch High-Severity XSS**: During verification, `/security` identified a high-severity vulnerability in `react-router` (XSS via Open Redirect) within the `client-app`. Run `npm audit fix` or update the dependency in the next cycle.
+- [ ] **Patch High-Severity XSS**: `react-router` XSS via Open Redirect identified by `/security` scan. Run `npm audit fix` or update the dependency in the next cycle.
 
 ## Maintenance & Operations
 - [ ] Implement periodic database synchronization workflow for staging.
@@ -32,8 +26,7 @@
 - [ ] Monitor Firestore quota usage for softomedia-live-2026.
 
 ### Critical Test Failures
-- [x] Fix failing Playwright tests (standardized on `data-testid`)
-- [ ] **Broadcasting Engine Baseline**: Stabilize the 10 failing tests identified in the full integration run (`loop_playback.spec.js` timeouts).
+- [ ] **Broadcasting Engine Baseline**: Stabilize the 10 failing tests in `loop_playback.spec.js` (timeouts).
 - [ ] **Post-Refactor E2E Stabilization**: Fix 9 regressions in `telemetry.spec.js`, `ad_player.spec.js`, `loop_builder.spec.js`, and `integration_gold_path.spec.js` following the Player state machine refactor.
 
 ### Broadcasting Engine MVP Maintenance
@@ -45,10 +38,6 @@
 
 ## High Priority
 
-### Fix Gold Path Integration Test
-- [x] Debug persona switcher navigation timing (implemented `waitForURL`)
-- [x] Update test selectors to `data-testid`
-
 ### Pricing Stability Governance (SRE Recommendations)
 - [ ] **Schema Validation**: Introduce Zod or Joi schemas in `PricingRepository.js` to enforce casing at the boundary.
 - [ ] **Linting Policy**: Enable ESLint rules (e.g., `no-unsafe-member-access`) specifically for API-fed state to encourage optional chaining.
@@ -57,22 +46,11 @@
 ### Telemetry & Monitoring (Postponed from Rollout)
 - [ ] **Silent Player Fix**: Implement `useHeartbeat` and `useImpression` in `LoopDemoPlayer.jsx` (Beware TDZ errors, see lessons learned).
 
-### Firebase Production Readiness (from Audit SDLC12 & SDLC2)
-- [x] **Scalability**: Refactor `PlaylistService.js` to avoid O(n) ad fetching (use subsets/caching)
-- [x] **Reliability**: Implement automated nightly Firestore exports to GCS (Cloud Scheduler)
-- [x] **Security**: Implement per-endpoint `allUsers` invoker review (move sensitive routes to authenticated-only)
-- [x] **Database Optimization**: Optimize `count()` queries in BaseRepository
-- [x] **Glue**: Dynamicize `CORS_ORIGINS` in `cloudbuild.yaml` to avoid brittle hardcoded URLs.
-- [x] **Glue**: Consolidate `ad-server` routing into `src/api/` structure.
-
 ## Medium Priority
 
 ### Testing & Observability
 - [ ] Add accessibility (a11y) tests with `@axe-core/playwright`
 - [ ] Expand visual regression coverage to Admin and Retailer dashboards
-- [x] **Logging**: Add Global Error Handler to `ad-server`
-- [x] **Logging**: Add Client Telemetry Endpoint `POST /api/telemetry/error`
-- [x] **Docs**: Clarify Testing Protocol in `docs/TESTING.md`
 
 ### Infrastructure & Performance
 - [ ] **IaC**: Migrate GCP provisioning to Terraform for environment reproducibility.
@@ -82,30 +60,25 @@
 
 ## 🎯 Remaining Test Failures (Fix Instructions)
 
-### 🟢 Resolved in Current Session
-- [x] **Wizard Step 2 Timeslots**: Restored `timeSlots` array; standardized `data-testid` to `timeslot-HH:MMAM`.
-- [x] **Dashboard Navigation**: Instrumented `HamburgerMenu.jsx` with full role-based links.
-- [x] **Backend Fast-Fail**: Gated Firestore to prevent event-loop hangs in local dev.
-
 ### 🔴 Leftover Issues (~19 tests)
 
 #### 1. Hourly Slot Loop Verification
-- **Error**: Ad Player might show "Waiting for Scheduled Slot" instead of ads.
-- **Root Cause**: Just changed logic from "endless loops" to "1hr slots". If current server time doesn't match seeded slots, player shows fallback.
-- **Instruction**:
+- **Error**: Ad Player shows "Waiting for Scheduled Slot" instead of ads.
+- **Root Cause**: Logic changed from "endless loops" to "1hr slots". If current server time doesn't match seeded slots, player shows fallback.
+- **Fix**:
     1. Check `SeedService.js` for current hour coverage.
     2. Verify `ad_player.spec.js` transitions between the two seeded 7PM ads.
 
 #### 2. Missing API Handler Depth
 - **Error**: 404s or empty responses in complex journey steps (e.g., Campaign Review).
 - **Root Cause**: Several API files in `ad-server/src/api/` are stubs.
-- **Instruction**:
+- **Fix**:
     1. Reference `.archives/progress/server/src/api/` to restore missing logic in `ads.js`, `campaigns.js`, and `schedules.js`.
     2. Focus on the GET handlers required for UI population.
 
 #### 3. Cross-Browser Timing (Firefox/WebKit)
 - **Error**: Interaction timeouts.
 - **Root Cause**: `React.lazy` loading speed varies by browser.
-- **Instruction**:
+- **Fix**:
     1. Add `await page.waitForSelector('.main-content-loaded')` or equivalent in layout tests.
     2. Increase global Playwright timeout to 60s for slow environments.
