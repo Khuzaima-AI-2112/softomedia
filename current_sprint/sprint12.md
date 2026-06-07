@@ -2,9 +2,6 @@
 
 **Sprint:** 12
 **Status:** Active
-**Carried from:** `current_sprint/sprint11.md` + `current_sprint/sprint12.md` (task list)
-**Generated:** 2026-06-06
-**Source authority:** `current_sprint/sprint11-sre-qa-analysis.md` @ codebase `682eb456`
 **Cross-referenced with:** `client-app/src/App.jsx` @ `ec3ea058`, `ad-server/src/api/` @ `24b991c9`
 **Guardrails authority:** [`docs/sprint8-sre-retro-consolidated.md`](./sprint8-sre-retro-consolidated.md)
 **Route authority:** [`docs/API_ROUTES.md`](./API_ROUTES.md)
