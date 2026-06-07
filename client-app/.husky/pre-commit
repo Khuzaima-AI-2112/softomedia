@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+# .husky/pre-commit
+#
+# Runs before every git commit. Blocks commits that introduce duplicate
+# component filenames across components/ and pages/.
+#
+# Setup (one time per dev machine, from repo root):
+#   cd client-app && npx husky install
+#
+# To skip in an emergency (use sparingly):
+#   git commit --no-verify -m "your message"
+
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "[pre-commit] Checking for duplicate component filenames..."
+bash "$(dirname -- "$0")/../scripts/check-duplicate-components.sh"
