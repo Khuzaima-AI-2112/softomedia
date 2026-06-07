@@ -40,15 +40,21 @@ router.get('/upload-url', async (req, res) => {
 
 /**
  * PUT /api/telemetry/sink/*
- * Helper Sink for Local Dev/Testing (simulates GCS Bucket)
+ * Helper Sink for Local Dev/Testing (simulates GCS Bucket).
+ *
+ * Sprint 11 — S11-3: guarded behind NODE_ENV !== 'production' so this
+ * unauthenticated write endpoint is never reachable in production.
+ * In production, requests to this path fall through to a 404.
  */
-router.put('/sink/*', (req, res) => {
-    logger.info('Received Batch Telemetry Upload (Sink)', {
-        path: req.params[0],
-        size: req.headers['content-length']
+if (process.env.NODE_ENV !== 'production') {
+    router.put('/sink/*', (req, res) => {
+        logger.info('Received Batch Telemetry Upload (Sink)', {
+            path: req.params[0],
+            size: req.headers['content-length']
+        });
+        res.status(200).send('OK');
     });
-    res.status(200).send('OK');
-});
+}
 
 /**
  * POST /api/telemetry/impression
