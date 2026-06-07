@@ -13,6 +13,22 @@
 
 ---
 
+## Sprint 11 Close-Out Status
+
+The following table reflects the open and unconfirmed items from the Sprint 11 close-out review. Every ❌ or ⚠️ item carries directly into Sprint 12 and must be resolved before the story is marked done.
+
+| Story | Status | Gap |
+|---|---|---|
+| S11-5 · Loop preview + approval workflow | ❌ Open | No commit touches `App.jsx` route registration for `Loops` / `ScheduleCalendar` |
+| S11-6 · Demo Player full wiring | ❌ Open | No commit touches `Player.jsx` or `TelemetryService` wiring |
+| S11-7 · Network Map blank render | ❌ Open | No commit touches `NetworkMap.jsx` or env config |
+| S11-1 / S11-2 · UI persistence | ⚠️ Unconfirmed | API auth done; form wiring + hard-refresh tests not evidenced |
+| Pre-Sprint Checklist | ⚠️ Partial | Duplicate file cleanup done; `BaseRepository.findById`, `ENUM-AUDIT-3`, `MVP_SPRINT_PLAN.md` entry — unconfirmed |
+
+**Sprint 12 entry condition:** Before any story below is opened for implementation, the ⚠️ items must be closed and the three ❌ stories must have their pre-work bash blocks executed and findings logged in the PR description.
+
+---
+
 ## 🔍 Isolation Verdict
 
 **Sprint 12 is PARTIALLY BLOCKING — one genuine cross-cutting risk identified, one env-level risk.**
@@ -61,13 +77,14 @@ Before any story is marked **Ready for implementation**, confirm all five boxes:
 
 ## Carry-over Pre-conditions (from sprint11.md)
 
-- [ ] **ENUM-AUDIT-3** — confirm `campaigns.status` only writes lowercase (`draft`, `pendingapproval`, `scheduled`, `live`, `ended`). `grep -r "'APPROVED'\|'PENDING'" --include="*.js" --include="*.jsx"` must return zero results.
+- [ ] **ENUM-AUDIT-3** — confirm `campaigns.status` only writes lowercase (`draft`, `pendingapproval`, `scheduled`, `live`, `ended`). `grep -r "'APPROVED'\|'PENDING'" --include="*.js" --include="*.jsx"` must return zero results. ⚠️ **Unconfirmed from Sprint 11.**
 - [ ] **SECURITY-V1** — `PATCH /api/campaigns/:id/status` must be wrapped in `requireRole` before any story in this sprint ships. Carried from Sprint 11 — verify it is complete before marking S11-3 done.
 - [ ] **SECURITY-V2** — `DELETE /api/campaigns/:id` must have `requireRole('superadmin')` guard. Same — verify S11-3 completion.
 - [x] **SECURITY-V3** — ~~`POST /api/telemetry/impression` has no rate limit.~~ **RESOLVED** — `impressionLimiter` wired in `telemetry.js` @ `98bd645`. No action needed.
 - [ ] **NODE_ENV guard** — add `if (process.env.NODE_ENV !== 'test')` bypass around `impressionLimiter` in `telemetry.js` before any S11-6 E2E work begins.
 - [ ] **`CampaignApprovalList` duplicate** — resolve ambiguous import before S11-5 merge: `grep -r "CampaignApprovalList" client-app/src --include="*.jsx" -n`
-- [ ] **`docs/MVP_SPRINT_PLAN.md`** — add Sprint 12 entry linking to this file.
+- [ ] **`BaseRepository.findById()`** — confirm method exists; needed by telemetry `play_count` increment. ⚠️ **Unconfirmed from Sprint 11.**
+- [ ] **`docs/MVP_SPRINT_PLAN.md`** — add Sprint 12 entry linking to this file. ⚠️ **Unconfirmed from Sprint 11.**
 
 ---
 
@@ -77,27 +94,29 @@ Resolve all items below before the planning meeting:
 
 - [ ] Run `ls ad-server/src/api/` — confirm which of `users.js`, `retailers.js`, `advertisers.js`, `stores.js` exist *(all four confirmed present at audit time — re-verify)*
 - [ ] Run `grep -n "requireRole" ad-server/src/api/campaigns.js` — confirm V1/V2 guards are in place (S11-3 should be done)
-- [ ] Read `client-app/src/pages/Player.jsx` — confirm or add `TelemetryService.trackImpression()` call site
-- [ ] Run `grep -n "Loops\|ScheduleCalendar" client-app/src/App.jsx` — confirm route registration *(both confirmed registered at audit time)*
+- [ ] Read `client-app/src/pages/Player.jsx` — confirm or add `TelemetryService.trackImpression()` call site ❌ **Not done in Sprint 11**
+- [ ] Run `grep -n "Loops\|ScheduleCalendar" client-app/src/App.jsx` — confirm route registration ❌ **Not done in Sprint 11**
 - [ ] Add `NODE_ENV !== 'test'` guard to `impressionLimiter` before S11-6 E2E tests run (speed-multiplier collision)
-- [ ] Confirm `BaseRepository.findById()` exists — needed by telemetry `play_count` increment
-- [ ] Confirm `ENUM-AUDIT-3`: `grep -r "'APPROVED'\|'PENDING'" --include="*.js" --include="*.jsx"` returns zero results
+- [ ] Confirm `BaseRepository.findById()` exists — needed by telemetry `play_count` increment ⚠️ **Unconfirmed**
+- [ ] Confirm `ENUM-AUDIT-3`: `grep -r "'APPROVED'\|'PENDING'" --include="*.js" --include="*.jsx"` returns zero results ⚠️ **Unconfirmed**
 - [ ] Resolve `CampaignApprovalList` duplicate: `grep -r "CampaignApprovalList" client-app/src --include="*.jsx" -n`
+- [ ] Confirm `NetworkMap.jsx` container has `min-height` set — verify fix applied ❌ **Not done in Sprint 11**
+- [ ] Hard-refresh test for S11-1/S11-2 forms: confirm records persist after `Ctrl+Shift+R` ⚠️ **Unconfirmed**
 
 ---
 
 ## Confidence Scores (SRE/QA Analysis @ `682eb456`)
 
-| Story | Score | Priority | Effort | Merge order |
-|---|---|---|---|---|
-| S11-3 · Security hardening | **97%** | Critical | S | 1 — merge first |
-| S11-1 · Super Admin CRUD — Users & Retailers | 80% | Critical | L | 2 |
-| S11-2 · Super Admin CRUD — Advertisers | 82% | Critical | M | 3 (parallel with S11-1) |
-| S11-5 · Retailer approval workflow | 83% | High | M | 4 (parallel with S11-8) |
-| S11-8 · Tech Ops network-wide data | 85% | Medium | S | 4 (parallel with S11-5) |
-| S11-4 · Retailer CRUD — Add Location | 78% | High | S | after S11-1 |
-| S11-7 · Network Map blank render | 88% | Medium | S | 6 |
-| S11-6 · Demo Player full wiring | 72% | High | M | last — blocked on S11-3 + NODE_ENV guard |
+| Story | Score | Priority | Effort | Carry-over? | Merge order |
+|---|---|---|---|---|---|
+| S11-3 · Security hardening | **97%** | Critical | S | ✅ Should be done | 1 — verify then close |
+| S11-1 · Super Admin CRUD — Users & Retailers | 80% | Critical | L | ⚠️ Persistence unconfirmed | 2 |
+| S11-2 · Super Admin CRUD — Advertisers | 82% | Critical | M | ⚠️ Persistence unconfirmed | 3 (parallel with S11-1) |
+| S11-5 · Retailer approval workflow | 83% | High | M | ❌ Open — route reg missing | 4 (parallel with S11-8) |
+| S11-8 · Tech Ops network-wide data | 85% | Medium | S | No prior work evidenced | 4 (parallel with S11-5) |
+| S11-4 · Retailer CRUD — Add Location | 78% | High | S | No prior work evidenced | after S11-1 |
+| S11-7 · Network Map blank render | 88% | Medium | S | ❌ Open — no commit found | 6 |
+| S11-6 · Demo Player full wiring | 72% | High | M | ❌ Open — Player.jsx unwired | last — blocked on S11-3 + NODE_ENV guard |
 
 ---
 
@@ -120,10 +139,11 @@ Resolve all items below before the planning meeting:
 
 ---
 
-### S11-3 · Security Hardening — campaign auth + telemetry rate limit ⟵ MERGE FIRST
+### S11-3 · Security Hardening — campaign auth + telemetry rate limit ⟵ VERIFY THEN CLOSE
 
 **Priority:** Critical (pre-condition for all other stories)
 **Confidence:** 97%
+**Sprint 11 status:** Should be complete — verify before opening any other story
 **Risk refs:** V1, V2, V3 from sprintWRAPUP
 **Files:**
 - `ad-server/src/api/campaigns.js`
@@ -143,6 +163,9 @@ grep -n "requireRole\|router.patch\|router.delete" \
 grep -n "impressionLimiter" ad-server/src/api/telemetry.js
 # Expected ~line 4:  import { impressionLimiter } from '../middleware/rateLimiter.js';
 # Expected ~line 56: router.post('/impression', impressionLimiter, async (req, res) => {
+
+# Confirm NODE_ENV guard is already in place (if Sprint 11 closed it)
+grep -n "NODE_ENV" ad-server/src/api/telemetry.js
 ```
 
 **Acceptance criteria:**
@@ -174,10 +197,11 @@ router.post('/impression',
 
 ---
 
-### S11-1 · Super Admin CRUD — Users & Retailers (MVP Blocker)
+### S11-1 · Super Admin CRUD — Users & Retailers (MVP Blocker) ⚠️ Persistence Unconfirmed
 
 **Priority:** Critical
 **Confidence:** 80%
+**Sprint 11 status:** ⚠️ API auth done — form wiring + hard-refresh persistence test NOT evidenced
 **TASK refs:** TASK-02, TASK-03, TASK-04, TASK-05, TASK-06
 **Files (corrected):**
 - `client-app/src/pages/admin/UserManagement.jsx` ← ~~Users.jsx does not exist~~
@@ -188,6 +212,8 @@ router.post('/impression',
 - `ad-server/src/repositories/RetailerRepository.js`
 
 **Context:** All Super Admin CRUD forms are UI-only and do not persist to Firestore. No real retailer or user can be onboarded without these routes. `UserManagement.jsx` is 14 569 bytes and `RetailerManagement.jsx` is 50 256 bytes — both are large files; grep for `console.log.*TODO\|// TODO\|stub` inside both before starting.
+
+**Carry-over gap to close this sprint:** The hard-refresh persistence test was not evidenced in Sprint 11. This is the **definition of done gate** — the story cannot close until a hard-refresh (`Ctrl+Shift+R`) confirms records appear in the list after create and disappear after delete.
 
 **Pre-work:**
 
@@ -234,7 +260,7 @@ data-testid="retailer-row-{id}"
 data-testid="delete-retailer-btn-{id}"
 ```
 
-**Persistence check (mandatory):** After each create/delete, hard-refresh (`Ctrl+Shift+R`) the management page. Record must appear / be absent in the list. Story is only passed if the record survives the refresh.
+**Persistence check (mandatory — carry-over gate):** After each create/delete, hard-refresh (`Ctrl+Shift+R`) the management page. Record must appear / be absent in the list. Story is only passed if the record survives the refresh. **This check was not completed in Sprint 11 and is the primary carry-over item.**
 
 **GUARDRAIL checks:**
 - [ ] G1: `apiService.createUser()`, `apiService.deleteUser()`, `apiService.createRetailer()`, `apiService.updateRetailer()`, `apiService.deleteRetailer()` — verify or create in `ApiService.js`
@@ -244,10 +270,11 @@ data-testid="delete-retailer-btn-{id}"
 
 ---
 
-### S11-2 · Super Admin CRUD — Advertisers (MVP Blocker)
+### S11-2 · Super Admin CRUD — Advertisers (MVP Blocker) ⚠️ Persistence Unconfirmed
 
 **Priority:** Critical
 **Confidence:** 82%
+**Sprint 11 status:** ⚠️ API auth done — form wiring + hard-refresh persistence test NOT evidenced
 **TASK refs:** TASK-07, TASK-08
 **Files (corrected):**
 - `client-app/src/pages/admin/AdvertiserManagement.jsx` ← ~~Advertisers.jsx does not exist~~
@@ -255,6 +282,8 @@ data-testid="delete-retailer-btn-{id}"
 - `ad-server/src/repositories/AdvertiserRepository.js` (1 441 bytes — check soft-delete and `findByEmail`)
 
 **Context:** "Add Advertiser" and "Remove Advertiser" buttons are not wired to any API. `AdvertiserRepository.js` at 1 441 bytes is small — may be missing a soft-delete or `findByEmail` for the 409 guard. Check before writing the router.
+
+**Carry-over gap to close this sprint:** Same as S11-1 — hard-refresh persistence test not evidenced.
 
 **Pre-work:**
 
@@ -295,7 +324,7 @@ data-testid="delete-advertiser-btn-{id}"
 data-testid="advertiser-email-input"
 ```
 
-**Persistence check:** Hard-refresh after create and delete. Record must persist / be absent.
+**Persistence check (mandatory — carry-over gate):** Hard-refresh after create and delete. Record must persist / be absent. **This check was not completed in Sprint 11.**
 
 **GUARDRAIL checks:**
 - [ ] G1: `apiService.createAdvertiser()`, `apiService.deleteAdvertiser()` — verify or create
@@ -308,6 +337,7 @@ data-testid="advertiser-email-input"
 
 **Priority:** High
 **Confidence:** 78%
+**Sprint 11 status:** No prior work evidenced — clean start
 **TASK ref:** TASK-20
 **Files (corrected):**
 - `client-app/src/pages/retailer/RetailerDashboard.jsx` ← ~~Locations.jsx does not exist~~
@@ -367,10 +397,11 @@ data-testid="location-row-{id}"
 
 ---
 
-### S11-5 · Retailer Approval Workflow — Loop Preview Page
+### S11-5 · Retailer Approval Workflow — Loop Preview Page ❌ Carry-over Open
 
 **Priority:** High
 **Confidence:** 83%
+**Sprint 11 status:** ❌ Open — no commit touches `App.jsx` route registration for `Loops` or `ScheduleCalendar`
 **Risk refs:** R3, R4 from sprintWRAPUP
 **TASK refs:** TASK-18 (Schedule Calendar), TASK-19 (Go Back crash)
 **Files:**
@@ -378,17 +409,18 @@ data-testid="location-row-{id}"
 - `client-app/src/pages/retailer/ScheduleCalendar.jsx` ← **already exists** (14 241 bytes)
 - `client-app/src/pages/retailer/ScheduleHistory.jsx` ← **already exists** (20 355 bytes)
 - `client-app/src/pages/retailer/ScheduleManager.jsx` ← **already exists** (24 906 bytes)
-- `client-app/src/App.jsx` — confirm route registration for all above
+- `client-app/src/App.jsx` ← **primary carry-over gap** — route registration missing
 - `ad-server/src/api/loops.js` (8 674 bytes — confirmed ✅)
 
-**Context:** The primary risk ("Loops.jsx missing entirely") is eliminated — the file exists at HEAD `682eb456`. The work in this story is route registration, broken navigation links, and the Go Back crash fix. The Schedule Calendar at `/dashboard/retailer/schedule/calendar` may route to a dead path if `App.jsx` registration is missing. The `CampaignApprovalList` duplicate import must be resolved before merge.
+**Context:** The primary risk ("Loops.jsx missing entirely") is eliminated — the file exists at HEAD `682eb456`. The Sprint 11 gap is purely in `App.jsx` — the routes for `/dashboard/retailer/loops` and `/dashboard/retailer/schedule/calendar` were not registered. Until they are, both pages are 404s regardless of component state. The `CampaignApprovalList` duplicate import must also be resolved before merge.
 
 **Pre-work:**
 
 ```bash
-# Confirm Loops.jsx and ScheduleCalendar.jsx are registered in App.jsx
+# THIS IS THE CARRY-OVER GATE — confirm routes are still missing
 grep -n "Loops\|ScheduleCalendar\|schedule/calendar\|retailer/loops" \
   client-app/src/App.jsx
+# If these lines are absent, that is the work to do in Sprint 12
 
 # Confirm the loops API route exists
 grep -n "router.get\|locations.*loops\|retailer.*loops" \
@@ -437,10 +469,11 @@ data-testid="schedule-calendar-container"
 
 ---
 
-### S11-6 · Demo Player — Cascading Selection + Full-Day Playback + Impression Wiring
+### S11-6 · Demo Player — Cascading Selection + Full-Day Playback + Impression Wiring ❌ Carry-over Open
 
 **Priority:** High
 **Confidence:** 72% (lowest in sprint)
+**Sprint 11 status:** ❌ Open — no commit touches `Player.jsx` or `TelemetryService` wiring
 **TASK refs:** TASK-09, TASK-10
 **Files (corrected):**
 - `client-app/src/pages/Player.jsx` ← ~~pages/demo/Player.jsx does not exist~~ (23 KB — largest unknown)
@@ -448,9 +481,9 @@ data-testid="schedule-calendar-container"
 - `ad-server/src/api/telemetry.js` ← NODE_ENV guard to be added here
 - `ad-server/src/repositories/BaseRepository.js`
 
-**Context:** The Demo Player is the primary MVP showcase. `Player.jsx` is 23 KB — its internal wiring is the largest single unknown in this sprint. Impression persistence in `telemetry.js` is **already fully wired** at commit `98bd645`. The V3 pre-condition is resolved.
+**Context:** The Demo Player is the primary MVP showcase. `Player.jsx` is 23 KB — its internal wiring is the largest single unknown in this sprint. Impression persistence in `telemetry.js` is **already fully wired** at commit `98bd645`. The V3 pre-condition is resolved. **No work was done on this story in Sprint 11.**
 
-> ⛔ **BLOCKED** — do not start until S11-3 is merged AND the `NODE_ENV !== 'test'` guard is added to `telemetry.js`. At 60× playback speed = 288 impression calls per session vs. 100 req/min cap → rate limiter will 429 mid-session during E2E tests without the guard.
+> ⛔ **BLOCKED** — do not start until S11-3 is verified closed AND the `NODE_ENV !== 'test'` guard is added to `telemetry.js`. At 60× playback speed = 288 impression calls per session vs. 100 req/min cap → rate limiter will 429 mid-session during E2E tests without the guard.
 
 **Pre-work:**
 
@@ -498,17 +531,18 @@ grep -n "NODE_ENV\|impressionLimiter" ad-server/src/api/telemetry.js
 
 ---
 
-### S11-7 · Network Map — Fix Blank Render
+### S11-7 · Network Map — Fix Blank Render ❌ Carry-over Open
 
 **Priority:** Medium
 **Confidence:** 88%
+**Sprint 11 status:** ❌ Open — no commit touches `NetworkMap.jsx` or env config
 **TASK ref:** TASK-12
 **Files:**
 - `client-app/src/pages/admin/NetworkMap.jsx` (4 203 bytes — confirmed ✅)
 - `.env` / Cloud Run env config
 - `docs/ENVIRONMENT_SETUP.md`
 
-**Context:** The network map renders blank. Root cause is likely a missing `VITE_GOOGLE_MAPS_API_KEY` environment variable or a container with `height: 0`. API key procurement is an external dependency — the fallback message is the mitigation for missing keys.
+**Context:** The network map renders blank. Root cause is likely a missing `VITE_GOOGLE_MAPS_API_KEY` environment variable or a container with `height: 0`. API key procurement is an external dependency — the fallback message is the mitigation for missing keys. **No work was done on this story in Sprint 11.**
 
 **Pre-work:**
 
@@ -557,6 +591,7 @@ VITE_GOOGLE_MAPS_API_KEY=your_key_here   # Required for Network Map
 
 **Priority:** Medium
 **Confidence:** 85%
+**Sprint 11 status:** No prior work evidenced — clean start
 **TASK ref:** TASK-23
 **Files:**
 - `client-app/src/pages/tech/` — confirm exact dashboard filename before starting
@@ -642,22 +677,22 @@ data-testid="sort-by-heartbeat"
 ## Cross-Story Dependency Map
 
 ```
-S11-3 (security + NODE_ENV guard) ── must merge first ──► S11-1 (CRUD writes)
-                                                           S11-2 (CRUD writes)
-                                  ── NODE_ENV guard ─────► S11-6 unblocked ✅
+S11-3 (security + NODE_ENV guard) ── verify closed ──────► S11-1 (CRUD writes)
+                                                            S11-2 (CRUD writes)
+                                  ── NODE_ENV guard ───────► S11-6 unblocked ✅
 
-V3 (telemetry rate limit) ────────── ALREADY DONE ───────► S11-6 no longer blocked by V3 ✅
+V3 (telemetry rate limit) ────────── ALREADY DONE ─────────► S11-6 no longer blocked by V3 ✅
 
-S9-1 (impression persist) ─────────── already in main ───► S11-6 telemetry wiring ✅
+S9-1 (impression persist) ──────────── already in main ────► S11-6 telemetry wiring ✅
 
-S11-1 (onboard retailer) ──────────── enables ───────────► S11-4 (add location)
-                                                            S11-5 (retailer loops need real retailer)
+S11-1 (onboard retailer) ────────────── enables ───────────► S11-4 (add location)
+                                                              S11-5 (retailer loops need real retailer)
 
-S11-8 (GET /api/screens role branch) ─ verify brand safe ► ScreenManagement.jsx + NetworkMap.jsx
-                                                            (superadmin/retaileradmin unchanged ✅)
+S11-8 (GET /api/screens role branch) ─ verify brand safe ──► ScreenManagement.jsx + NetworkMap.jsx
+                                                              (superadmin/retaileradmin unchanged ✅)
 ```
 
-**Recommended merge order:** S11-3 → S11-1 + S11-2 (parallel, split into sub-PRs) → S11-5 + S11-8 (parallel) → S11-4 → S11-7 → S11-6
+**Recommended merge order:** S11-3 (verify/close) → S11-1 + S11-2 (parallel, persistence gate) → S11-5 + S11-8 (parallel) → S11-4 → S11-7 → S11-6
 
 ---
 
@@ -697,20 +732,21 @@ The limiter is fully active in `production` and `staging`. Only the `test` runne
 
 ## Story Point Summary
 
-| Story | Priority | Confidence | Effort (est.) | Blocker? |
-|---|---|---|---|---|
-| S11-3 · Security hardening + NODE_ENV guard | Critical | 97% | S | Yes — merge first |
-| S11-1 · Super Admin CRUD — Users & Retailers | Critical | 80% | L | Yes — no real onboarding without it |
-| S11-2 · Super Admin CRUD — Advertisers | Critical | 82% | M | Yes |
-| S11-4 · Retailer CRUD — Add Location | High | 78% | S | Needs S11-1 |
-| S11-5 · Loop preview + approval workflow | High | 83% | M | No |
-| S11-6 · Demo Player full wiring | High | 72% | M | Needs S11-3 + NODE_ENV guard |
-| S11-7 · Network Map blank render | Medium | 88% | S | No |
-| S11-8 · Tech Ops network-wide data | Medium | 85% | S | No |
+| Story | Priority | Confidence | Effort (est.) | Sprint 11 status | Blocker? |
+|---|---|---|---|---|---|
+| S11-3 · Security hardening + NODE_ENV guard | Critical | 97% | S | ✅ Verify then close | Yes — must be closed first |
+| S11-1 · Super Admin CRUD — Users & Retailers | Critical | 80% | L | ⚠️ Persistence unconfirmed | Yes — no real onboarding without it |
+| S11-2 · Super Admin CRUD — Advertisers | Critical | 82% | M | ⚠️ Persistence unconfirmed | Yes |
+| S11-4 · Retailer CRUD — Add Location | High | 78% | S | Clean start | Needs S11-1 |
+| S11-5 · Loop preview + approval workflow | High | 83% | M | ❌ Open — route reg missing | No |
+| S11-6 · Demo Player full wiring | High | 72% | M | ❌ Open — Player.jsx unwired | Needs S11-3 + NODE_ENV guard |
+| S11-7 · Network Map blank render | Medium | 88% | S | ❌ Open — no commit found | No |
+| S11-8 · Tech Ops network-wide data | Medium | 85% | S | Clean start | No |
 
 **Estimated sprint velocity:** 8 stories — recommend splitting S11-1 into two sub-PRs (Users / Retailers) for easier review.
 
 ---
 
 *Sprint 12 doc created 2026-06-06. Upgraded 2026-06-06 from task-list format to full sprint spec (matching sprint11.md structure) — added SRE rules, guardrails, blast-radius table, isolation verdict, full story sections with pre-work bash blocks, AC tables, data-testid requirements, cross-story dependency map, NODE_ENV guard implementation, deferred section.*
+*Updated 2026-06-06: added Sprint 11 close-out status table, ❌/⚠️ carry-over markers on S11-1/S11-2 (persistence unconfirmed), S11-5/S11-6/S11-7 (open — no commits found), Pre-Sprint Checklist items flagged, and updated Story Point Summary with Sprint 11 status column.*
 *Sources: `sprint11-sre-qa-analysis.md` @ codebase `682eb456`, `App.jsx` @ `ec3ea058`, `ad-server/src/api/` @ `24b991c9`.*
