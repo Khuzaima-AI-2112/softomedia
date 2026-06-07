@@ -10,6 +10,7 @@ function LocationManager() {
     const [isAdding, setIsAdding] = useState(false);
     const [newLocation, setNewLocation] = useState({ name: '', store_profile: 'standard' });
     const [loading, setLoading] = useState(true);
+    const [addError, setAddError] = useState('');
 
     useEffect(() => {
         fetchLocations();
@@ -28,14 +29,21 @@ function LocationManager() {
 
     const handleAdd = async (e) => {
         e.preventDefault();
+        setAddError('');
         try {
-            const added = await apiService.createLocation(newLocation);
+            // S11-4: inject retailer_id from auth context so POST /api/stores
+            // receives the required field and never returns a 400.
+            const added = await apiService.createLocation({
+                ...newLocation,
+                retailer_id: user?.retailer_id,
+            });
             setLocations([...locations, added]);
             setIsAdding(false);
             setNewLocation({ name: '', store_profile: 'standard' });
         } catch (error) {
             console.error('Failed to add location:', error);
-            alert('Failed to add location');
+            const msg = error?.response?.data?.error || error?.message || 'Failed to add location';
+            setAddError(msg);
         }
     };
 
@@ -46,7 +54,7 @@ function LocationManager() {
             <div className="flex items-center justify-between">
                 <h3 className="text-xl font-bold text-slate-900 dark:text-white">Store Locations</h3>
                 <button
-                    onClick={() => setIsAdding(!isAdding)}
+                    onClick={() => { setIsAdding(!isAdding); setAddError(''); }}
                     className="flex items-center gap-2 text-sm font-bold text-primary hover:text-primary-hover transition-colors"
                 >
                     <span className="material-symbols-outlined text-[18px]">{isAdding ? 'close' : 'add_circle'}</span>
@@ -56,7 +64,8 @@ function LocationManager() {
 
             {isAdding && (
                 <GlassCard className="border-2 border-primary/20">
-                    <form onSubmit={handleAdd} className="flex flex-col md:flex-row gap-4 items-end">
+                    {/* S11-4: data-testid added for falsifiable ACs */}
+                    <form data-testid="add-location-form" onSubmit={handleAdd} className="flex flex-col md:flex-row gap-4 items-end">
                         <div className="flex-1 space-y-1">
                             <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Store Name</label>
                             <input
@@ -80,10 +89,17 @@ function LocationManager() {
                                 <option value="compact">Compact</option>
                             </select>
                         </div>
-                        <button type="submit" className="px-6 py-2 bg-primary text-white font-bold rounded-lg hover:bg-primary-hover transition-all shadow-lg shadow-primary/20">
+                        <button
+                            type="submit"
+                            data-testid="save-location-btn"
+                            className="px-6 py-2 bg-primary text-white font-bold rounded-lg hover:bg-primary-hover transition-all shadow-lg shadow-primary/20"
+                        >
                             Save
                         </button>
                     </form>
+                    {addError && (
+                        <p data-testid="add-location-error" className="mt-2 text-sm text-red-500">{addError}</p>
+                    )}
                 </GlassCard>
             )}
 

@@ -58,10 +58,17 @@ router.get('/:id', async (req, res) => {
  * Create a new store.
  *
  * Sprint 11 — S11-4: requireRole('admin') added alongside existing authenticate.
+ * Sprint 12 — S11-4 fix: store_profile now destructured and forwarded to
+ *   StoreRepository.createWithScreens so the field is persisted.
+ *
+ * Acceptance criteria (falsifiable):
+ *   POST with { name, retailer_id, store_profile }        → 201 + store object
+ *   POST missing name or retailer_id                      → 400 { error: 'Name and retailer_id are required' }
+ *   POST as role != admin                                 → 403
  */
 router.post('/', authenticate, requireRole('admin'), async (req, res) => {
     try {
-        const { name, retailer_id, address, city, state, screen_count } = req.body;
+        const { name, retailer_id, store_profile, address, city, state, screen_count } = req.body;
 
         if (!name || !retailer_id) {
             return res.status(400).json({ error: 'Name and retailer_id are required' });
@@ -70,6 +77,7 @@ router.post('/', authenticate, requireRole('admin'), async (req, res) => {
         const store = await StoreRepository.createWithScreens({
             name,
             retailer_id,
+            store_profile: store_profile || 'standard',
             address: address || '',
             city: city || '',
             state: state || '',
