@@ -6,7 +6,7 @@
  * Before adding a route, verify the file exists in the repo.
  * See docs/SofiensBullshit.md for the full prevention plan.
  *
- * Verified file map (as of Sprint 11 — 2026-06-06):
+ * Verified file map (as of Sprint 11 final cleanup — 2026-06-07):
  *
  *   layouts/DashboardLayout.jsx          ✅
  *   pages/Login.jsx                      ✅
@@ -17,7 +17,7 @@
  *   pages/admin/Overview.jsx             ✅
  *   pages/admin/RetailerManagement.jsx   ✅
  *   pages/admin/AdvertiserManagement.jsx ✅
- *   pages/admin/CampaignManagement.jsx   ✅  (served at /dashboard/admin/campaigns) [Sprint 11]
+ *   pages/admin/CampaignManagement.jsx   ✅  (served at /dashboard/admin/campaigns)
  *   pages/admin/ScreenManagement.jsx     ✅
  *   pages/admin/LoopManagement.jsx       ✅
  *   pages/admin/LoopBuilder.jsx          ✅  (served at /dashboard/admin/loops/:id)
@@ -35,12 +35,16 @@
  *   pages/retailer/ScheduleManager.jsx   ✅  (served at /dashboard/retailer/schedule-manager)
  *   pages/retailer/Loops.jsx             ✅  (served at /dashboard/retailer/loops)
  *   pages/retailer/CampaignApprovalList.jsx ✅ (served at /dashboard/retailer/campaign-approvals)
- *                                           ⚠️  PENDING: resolve duplicate with
- *                                               components/CampaignApprovalList.jsx before merging —
- *                                               run: grep -r "CampaignApprovalList" client-app/src --include="*.jsx" -n
+ *                                           Re-exports components/CampaignApprovalList.jsx.
+ *                                           RetailerDashboard imports directly from components/.
+ *                                           Single source of truth — no duplicate implementations.
  *   pages/tech/TechOpsDashboard.jsx      ✅  (served at /dashboard/techoperator)
- *   pages/tickets/TicketDashboard.jsx    ✅  (served at /dashboard/tickets)         [Sprint 10]
- *   pages/tickets/TicketDetail.jsx       ✅  (served at /dashboard/tickets/:id)     [Sprint 10]
+ *   pages/tickets/TicketDashboard.jsx    ✅  (served at /dashboard/tickets)
+ *   pages/tickets/TicketDetail.jsx       ✅  (served at /dashboard/tickets/:id)
+ *
+ * Deleted stale component copies (Sprint 11 cleanup):
+ *   components/TicketDashboard.jsx       ❌  deleted — was hardcoding localhost:8080
+ *   components/TicketDetail.jsx          ❌  deleted — superseded by pages/tickets/
  */
 
 import { lazy, Suspense } from 'react';
