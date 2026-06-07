@@ -1,7 +1,7 @@
 # Sprint 13 — MVP Gap Closure (Continued)
 
 **Sprint:** 13
-**Status:** Planning — bash blocks executed, Step 2 unblocked pending 3 items
+**Status:** Planning — ENUM-AUDIT-3 resolved; Step 2 unblocked pending DECISION-1 + persistence tests
 **Cross-referenced with:** `client-app/src/App.jsx` @ `335f1c2`, `ad-server/src/api/` @ `294fd25`
 **Guardrails authority:** [`docs/sprint8-sre-retro-consolidated.md`](./sprint8-sre-retro-consolidated.md)
 **Route authority:** [`docs/API_ROUTES.md`](./API_ROUTES.md)
@@ -64,14 +64,6 @@ Manual hard-refresh tests for `UserManagement.jsx` and `AdvertiserManagement.jsx
 - Update a record → hard-refresh → updated values persist
 - Delete a record → hard-refresh → record gone
 
-### DECISION-3 — ENUM-AUDIT-3
-
-Not yet run. Add to next PowerShell batch:
-```powershell
-Select-String -Path "ad-server/src","client-app/src" -Recurse -Include "*.js","*.jsx" -Pattern "'APPROVED'|'PENDING'"
-```
-Must return zero results before any story ships.
-
 ---
 
 ## 🔍 Isolation Verdict
@@ -114,7 +106,7 @@ Before any story is marked **Ready for implementation**, confirm all five boxes:
 
 ## Carry-over Pre-conditions (from sprint12.md)
 
-- [ ] **ENUM-AUDIT-3** — confirm `campaigns.status` only writes lowercase (`draft`, `pendingapproval`, `scheduled`, `live`, `ended`). `grep -r "'APPROVED'\|'PENDING'" --include="*.js" --include="*.jsx"` must return zero results. ⚠️ **Not yet run.**
+- [x] **ENUM-AUDIT-3** — ✅ **RESOLVED @ `e0ea260` (2026-06-07).** `Player.jsx` L70 + L187: `status=APPROVED` query param confirmed correct — `LoopRepository` enum is uppercase `APPROVED`. FIXME comments removed. `playlists.js` L31: default `'DRAFT'` (uppercase) was a bug — mismatches canonical `CAMPAIGN_STATUS` enum. Fixed to `'draft'` in same commit. See **Enum Bug Log** below.
 - [x] **SECURITY-V1** — `PATCH /api/campaigns/:id/status` wrapped in `requireRole('retaileradmin')`. **CONFIRMED** @ `campaigns.js` L135.
 - [x] **SECURITY-V2** — `DELETE /api/campaigns/:id` has `requireRole('superadmin')` guard. **CONFIRMED** @ `campaigns.js` L187.
 - [x] **SECURITY-V3** — ~~`POST /api/telemetry/impression` has no rate limit.~~ **RESOLVED** at commit `98bd645`. `impressionLimiter` confirmed @ `telemetry.js` L79.
@@ -122,6 +114,19 @@ Before any story is marked **Ready for implementation**, confirm all five boxes:
 - [x] **`CampaignApprovalList` duplicate** — **RESOLVED** @ `App.jsx` `335f1c2`. `pages/retailer/CampaignApprovalList.jsx` re-exports from `components/`. Single source of truth confirmed.
 - [x] **`BaseRepository.findById()`** — **CONFIRMED** @ `BaseRepository.js` L53. Used internally at L105 + L139.
 - [ ] **`docs/MVP_SPRINT_PLAN.md`** — add Sprint 13 entry linking to this file.
+
+---
+
+## Enum Bug Log
+
+> Canonical enum values are **lowercase** per `docs/DATABASE_SCHEMA.md`. Any uppercase status string is a bug.
+
+| File | Line | Bug | Fix | Commit |
+|---|---|---|---|---|
+| `ad-server/src/api/playlists.js` | L31 | `status = 'DRAFT'` (uppercase default on `POST /api/playlists`) | Changed to `status = 'draft'` | `e0ea260` (2026-06-07) |
+| `client-app/src/pages/Player.jsx` | L70, L187 | `status=APPROVED` in query param — marked FIXME pending enum confirmation | ✅ **Confirmed correct** — `LoopRepository` uses uppercase `APPROVED` for loop status (loops use a separate enum from campaigns). FIXME comments removed. | `e0ea260` (2026-06-07) |
+
+> **Note on two enum systems:** `campaigns.status` uses lowercase (`draft`, `pendingapproval`, `scheduled`, `live`, `ended`). `loops.status` uses uppercase (`APPROVED`, `PENDING`, `DRAFT`). Both are canonical per schema. Do not conflate them.
 
 ---
 
@@ -137,7 +142,7 @@ Before any story is marked **Ready for implementation**, confirm all five boxes:
 - [x] Confirm `BaseRepository.findById()` — **confirmed** @ L53. ✅
 - [x] Read `client-app/src/pages/admin/NetworkMap.jsx` — blank-render fix confirmed via `h-[600px]` Tailwind + error boundary + loading states. ✅
 - [x] Run `grep -n "techops|role|retaileradmin" ad-server/src/api/screens.js` — full role-hierarchy branch **confirmed** (L79–L112). ✅
-- [ ] **ENUM-AUDIT-3** — `Select-String` for `'APPROVED'|'PENDING'` not yet run
+- [x] **ENUM-AUDIT-3** — `Select-String` for `'APPROVED'|'PENDING'` run 2026-06-07. Results: `Player.jsx` L70, L71, L78, L115–L116, L187–L188, L195 — all are **loop status** (uppercase `APPROVED` is canonical for `loops.status`). Zero campaign-status mismatches. Bug found in `playlists.js` L31 (`'DRAFT'` default) — **fixed @ `e0ea260`**. ✅ **CLOSED.**
 - [ ] **S11-1/S11-2 persistence tests** — hard-refresh `Ctrl+Shift+R` on UserManagement + AdvertiserManagement forms (manual, browser only)
 - [ ] **S11-4 persistence test** — hard-refresh after Add Location form submit (manual, browser only)
 - [ ] **DECISION-1** — resolve NODE_ENV guard intent in `telemetry.js`
@@ -151,7 +156,7 @@ All paths confirmed on disk at commit `294fd25` / `App.jsx` @ `335f1c2`.
 | File | Size | Status | Notes |
 |---|---|---|---|
 | `client-app/src/App.jsx` | 11 214 B | ✅ Confirmed | Route authority. All retailer routes registered. |
-| `client-app/src/pages/Player.jsx` | 23 098 B | ✅ Confirmed | `trackImpression` at L296 + L327. Heartbeat at L280. Wiring confirmed. |
+| `client-app/src/pages/Player.jsx` | 23 098 B | ✅ Confirmed | `trackImpression` at L296 + L327. Heartbeat at L280. Wiring confirmed. FIXME comments removed @ `e0ea260`. |
 | `client-app/src/pages/LoopDemoPlayer.jsx` | 35 994 B | ✅ Confirmed — No collision | Registered at `/player/demo`. Zero shared telemetry dependencies with `Player.jsx`. Risk 3 cleared. |
 | `client-app/src/pages/admin/NetworkMap.jsx` | ~4 097 B | ✅ Confirmed — Fix present | `h-[600px]` Tailwind on `GlassCard`. Error boundary `data-testid="network-map-error"`. Loading spinners. Stats: `data-testid="stat-total-screens"`, `"stat-online-rate"`, `"stat-daily-impressions"`. |
 | `client-app/src/pages/admin/UserManagement.jsx` | — | ✅ Confirmed | Via App.jsx verified map |
@@ -170,7 +175,8 @@ All paths confirmed on disk at commit `294fd25` / `App.jsx` @ `335f1c2`.
 | `ad-server/src/api/advertisers.js` | 5 268 B | ✅ Confirmed | — |
 | `ad-server/src/api/stores.js` | 7 426 B | ✅ Confirmed — S11-4 wired | `router.post('/')` + `StoreRepository.createWithScreens()` confirmed. Grew 8% from Sprint 12. |
 | `ad-server/src/api/screens.js` | 6 683 B | ✅ Confirmed — Role branch live | Full `ROLE_HIERARCHY` branch: techoperator → all screens; retaileradmin → scoped; advertiser/unknown → 403. |
-| `ad-server/src/api/loops.js` | 8 674 B | ✅ Confirmed | — |
+| `ad-server/src/api/loops.js` | 8 674 B | ✅ Confirmed | `loops.status` enum is **uppercase** (`APPROVED`, `PENDING`, `DRAFT`) — separate from `campaigns.status`. |
+| `ad-server/src/api/playlists.js` | 2 100 B | ✅ Confirmed — Bug fixed | L31 default `'DRAFT'` → `'draft'` fixed @ `e0ea260`. `playlists.status` follows lowercase campaign enum. |
 | `ad-server/src/api/notifications.js` | 5 216 B | ✅ Confirmed — Deferred | Larger than a bare stub. Do not assume empty before post-MVP planning. |
 | `ad-server/src/repositories/BaseRepository.js` | — | ✅ Confirmed | `findById()` @ L53. Used internally @ L105 + L139. |
 | `ad-server/src/middleware/requireRole.js` | — | ✅ Confirmed | Exports `requireRole`, `ROLE_HIERARCHY`, `normalizeRole`. All confirmed imported in `campaigns.js` and `screens.js`. |
@@ -250,6 +256,10 @@ S11-3 ✅ CLOSED (NODE_ENV flag) ── DECISION-1 ──► unblocks S11-6 E2E
 S11-1 (persistence test) ──► unblocks S11-4 full close
 
 S11-6 ── ✅ CLOSED ── LoopDemoPlayer collision cleared ── no further action
+
+ENUM-AUDIT-3 ── ✅ CLOSED @ e0ea260 ─────────────────────────────────────────
+  └─ Player.jsx 'APPROVED' confirmed correct (loops.status uppercase enum)
+  └─ playlists.js 'DRAFT' → 'draft' bug fixed
 ```
 
 **Recommended merge order for any remaining fixes:** DECISION-1 fix (if needed) → S11-1/S11-2 persistence sign-off → new S13 scope
@@ -269,6 +279,10 @@ S11-6 ── ✅ CLOSED ── LoopDemoPlayer collision cleared ── no furthe
 ### Risk 3 — `LoopDemoPlayer.jsx` × `Player.jsx` collision
 
 **Status:** ✅ CLEARED. `LoopDemoPlayer.jsx` contains zero references to `TelemetryService`, `trackImpression`, or `impression`. The two pages are fully independent. No further mitigation required.
+
+### Risk 4 — Two enum systems: `campaigns.status` vs `loops.status`
+
+**Status:** ✅ Documented (2026-06-07). `campaigns.status` is lowercase (`draft`, `pendingapproval`, `scheduled`, `live`, `ended`). `loops.status` is uppercase (`APPROVED`, `PENDING`, `DRAFT`). These are **separate enums** from separate schema tables. The `playlists.js` bug was caused by conflating them. Any new story touching either must confirm which enum applies before writing status strings.
 
 ---
 
@@ -309,8 +323,8 @@ S11-6 ── ✅ CLOSED ── LoopDemoPlayer collision cleared ── no furthe
 - [x] SECURITY-V1 confirmed — `requireRole('retaileradmin')` on `PATCH /campaigns/:id/status`
 - [x] SECURITY-V2 confirmed — `requireRole('superadmin')` on `DELETE /campaigns/:id`
 - [x] Risk 3 (`LoopDemoPlayer` collision) cleared
+- [x] **ENUM-AUDIT-3** — ✅ CLOSED @ `e0ea260`. `Player.jsx` `status=APPROVED` confirmed correct. `playlists.js` `'DRAFT'` default bug fixed to `'draft'`. Two enum systems documented (Risk 4).
 - [ ] **DECISION-1** — NODE_ENV guard intent documented and fix applied if needed
-- [ ] **ENUM-AUDIT-3** — `grep` for `'APPROVED'|'PENDING'` returns zero results
 - [ ] S11-1 persistence test passed — UserManagement + RetailerManagement hard-refresh confirmed
 - [ ] S11-2 persistence test passed — AdvertiserManagement hard-refresh confirmed
 - [ ] S11-4 persistence test passed — Add Location hard-refresh confirmed
@@ -325,5 +339,6 @@ S11-6 ── ✅ CLOSED ── LoopDemoPlayer collision cleared ── no furthe
 
 *Sprint 13 doc created 2026-06-07. Scaffold only — awaiting Step 1 (Repository Reality Check) to populate story details, confidence scores, and blast-radius table.*
 *Updated 2026-06-07 (commit `fb5ddcf`): Step 1 corrections — S11-5 confirmed closed; route path corrected; `LoopDemoPlayer.jsx` added.*
-*Updated 2026-06-07 (this commit): Bash block results applied — 6 stories confirmed closed; NODE_ENV guard flag raised (DECISION-1); Risk 3 cleared; `BaseRepository.findById()` confirmed; SECURITY-V1/V2 checked off; Known File Inventory fully grounded. Step 2 unblocked pending DECISION-1 + persistence tests.*
+*Updated 2026-06-07 (commit `5b84c94`): Bash block results applied — 6 stories confirmed closed; NODE_ENV guard flag raised (DECISION-1); Risk 3 cleared; `BaseRepository.findById()` confirmed; SECURITY-V1/V2 checked off; Known File Inventory fully grounded. Step 2 unblocked pending DECISION-1 + persistence tests.*
+*Updated 2026-06-07 (commit `e0ea260`): ENUM-AUDIT-3 resolved — `Player.jsx` FIXME comments removed (loops.status uppercase APPROVED confirmed correct); `playlists.js` default `'DRAFT'` → `'draft'` bug fixed. Two enum systems documented as Risk 4. Enum Bug Log added.*
 *Sources: live `App.jsx` @ `335f1c2`, `ad-server/src/api/` @ `294fd25`, PowerShell grep outputs 2026-06-07.*
