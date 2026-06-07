@@ -1,7 +1,7 @@
 # Sprint 13 — MVP Gap Closure (Continued)
 
 **Sprint:** 13
-**Status:** Planning — ENUM-AUDIT-3 resolved; Step 2 unblocked pending DECISION-1 + persistence tests
+**Status:** Step 2 complete — ready for implementation
 **Cross-referenced with:** `client-app/src/App.jsx` @ `335f1c2`, `ad-server/src/api/` @ `294fd25`
 **Guardrails authority:** [`docs/sprint8-sre-retro-consolidated.md`](./sprint8-sre-retro-consolidated.md)
 **Route authority:** [`docs/API_ROUTES.md`](./API_ROUTES.md)
@@ -23,52 +23,229 @@ Pre-Sprint bash blocks executed 2026-06-07 — results logged below.
 | S11-4 · Retailer CRUD — Add Location | ✅ **CLOSED** (pending persistence test) | `router.post('/')` wired with `authenticate` + `requireRole('admin')` @ `stores.js` L69. `StoreRepository.createWithScreens()` called @ L77. Persistence test recommended before closing completely. |
 | S11-5 · Retailer Approval — Loop Preview + App.jsx route reg | ✅ **CLOSED** | All four routes confirmed live in `App.jsx` @ `335f1c2`. `CampaignApprovalList` duplicate resolved. |
 | S11-6 · Demo Player full wiring | ✅ **CLOSED** | `telemetryService.trackImpression()` called at `Player.jsx` L296 and L327. Heartbeat firing at L280. `logTelemetryEvent` + `sendTelemetry` helpers present. No `LoopDemoPlayer` collision — Risk 3 cleared. |
-| S11-7 · Network Map blank render | ✅ **CLOSED** | Container height enforced via Tailwind `h-[600px]` on `GlassCard` (not a CSS `min-height` property — explains grep no-match). Loading spinners, error boundary (`data-testid="network-map-error"`), and stat cards with `data-testid` all present. |
-| S11-8 · Tech Ops network-wide screen data | ✅ **CLOSED** | Full `ROLE_HIERARCHY` branch confirmed in `screens.js`: `techoperator` (level 2) sees all screens; `retaileradmin` (level 1) scoped to own `retailer_id` from JWT; `advertiser` / unknown role → 403. |
+| S11-7 · Network Map blank render | ✅ **CLOSED** | Container height enforced via Tailwind `h-[600px]` on `GlassCard`. Error boundary, loading spinners, stat cards all present. |
+| S11-8 · Tech Ops network-wide screen data | ✅ **CLOSED** | Full `ROLE_HIERARCHY` branch confirmed in `screens.js` L79–L112. |
 
-> ⚠️ **`LoopDemoPlayer.jsx` collision — Risk 3 CLEARED:** Grep of `LoopDemoPlayer.jsx` returned zero matches for `TelemetryService`, `trackImpression`, or `impression`. The two player pages are fully independent. No mitigation required for S11-6.
-
-**Sprint 13 entry condition:** 6 of 8 Sprint 12 stories confirmed closed. Two remaining gates: (1) NODE_ENV guard decision in `telemetry.js`, (2) S11-1/S11-2 hard-refresh persistence tests.
+**Sprint 13 entry condition met.** 6 of 8 Sprint 12 stories confirmed closed. Carry-over gates: NODE_ENV DECISION-1 (open) + S11-1/S11-2/S11-4 persistence tests (manual).
 
 ---
 
-## ⚠️ Open Decisions Before Step 2
+## ⚠️ Open Decisions
 
 ### DECISION-1 — NODE_ENV Guard Logic in `telemetry.js`
 
 **File:** `ad-server/src/api/telemetry.js` Line 49
-**Live code:**
-```js
-if (process.env.NODE_ENV !== 'production') {
-```
-**Sprint spec expected:**
-```js
-if (process.env.NODE_ENV !== 'test') {
-```
-
-**Impact table:**
+**Live code:** `if (process.env.NODE_ENV !== 'production') {`
+**Spec expected:** `if (process.env.NODE_ENV !== 'test') {`
 
 | Guard | Rate limiter in dev? | Rate limiter in test? | Rate limiter in prod? |
 |---|---|---|---|
 | `!== 'production'` (live) | ❌ Bypassed | ❌ Bypassed | ✅ Active |
 | `!== 'test'` (spec intent) | ✅ Active | ❌ Bypassed | ✅ Active |
 
-**The spec intent** was to bypass the rate limiter only during automated tests so E2E suites can fire impressions freely. With `!== 'production'`, the limiter is also bypassed in dev — which may be intentional for local development convenience, or may be a mistake.
+**Required before S11-6 E2E begins.** One-line fix if spec intent (`!== 'test'`) is correct. Document decision either way.
 
-**Required action before S11-6 E2E work begins:** Decide and document which behaviour is correct. If `!== 'test'` is the correct intent, this is a one-line fix. If `!== 'production'` is intentional (bypass in dev + test), update the sprint docs and carry-over pre-condition accordingly.
+### DECISION-2 — S11-1/S11-2/S11-4 Persistence Tests
 
-### DECISION-2 — S11-1/S11-2 Persistence Tests
-
-Manual hard-refresh tests for `UserManagement.jsx` and `AdvertiserManagement.jsx` CRUD forms. Run in browser, not confirmable from source. Check:
-- Create a record → hard-refresh (`Ctrl+Shift+R`) → record still present
-- Update a record → hard-refresh → updated values persist
-- Delete a record → hard-refresh → record gone
+Manual hard-refresh (`Ctrl+Shift+R`) required for UserManagement, AdvertiserManagement, and Add Location forms. Cannot be confirmed from source. Run in browser before marking stories fully closed.
 
 ---
 
 ## 🔍 Isolation Verdict
 
-> ⚠️ **Pending Step 4.** Six stories confirmed closed. Step 4 blast-radius table to be completed in Step 2 session.
+All four new Sprint 13 stories are low blast-radius. No shared repository mutations between S13-1, S13-2, S13-3, S13-4. The only cross-story dependency is DECISION-1, which must be resolved before S13-3 implementation.
+
+---
+
+## 🚨 Sprint 13 New Scope
+
+### Scoping rationale
+
+The four stories below are drawn from the **Known Gaps / Unconfirmed Routes** table in `docs/API_ROUTES.md` and from the MVP spec sections that have no confirmed implementation:
+
+1. **S13-1** — TechOps audit log + screen diagnostics log (`POST /api/audit-log`, `GET /api/screens/:id/logs`) — both FIXMEs in `TechOpsDashboard.jsx` since sprint (PR4)
+2. **S13-2** — Loop reject + bulk approve route confirmation (`POST /api/loops/:loopId/reject`, `POST /api/locations/:id/loops/approve-all`) — both FIXMEs in `ScheduleManager.jsx` since sprint7
+3. **S13-3** — Campaign `DELETE` guard correction — live code has `requireRole('admin')` but Sprint 12 spec + `campaigns.js` L187 confirmed `requireRole('superadmin')`. API_ROUTES.md says `requireRole('admin')`. One source must be made canonical.
+4. **S13-4** — Telemetry impression persistence — `POST /api/telemetry/impression` has a `Phase 2 TODO: persist to Firestore` comment. MVP analytics (proof-of-play) requires persistence. This is the final blocker for the S5 `LoopAnalytics.jsx` dashboard to show real data.
+
+---
+
+### S13-1 · TechOps Audit Log + Screen Diagnostics
+
+**Priority:** High
+**Effort:** M
+**Confidence pre-implementation:** 60% (routes unconfirmed — Step 1 required on `TechOpsDashboard.jsx` before coding)
+**MVP section:** 3.5 — Technical Operator: “Incident tracking and resolution”
+
+#### Pre-implementation Step 1 (mandatory before writing a line of code)
+
+```powershell
+# 1. Confirm what TechOpsDashboard.jsx is calling
+Select-String -Path "client-app/src/pages/tech/TechOpsDashboard.jsx" -Pattern "audit-log|screens.*logs|FIXME" -Context 2,2
+
+# 2. Check if audit-log route exists anywhere
+Select-String -Path "ad-server/src" -Recurse -Include "*.js" -Pattern "audit.log|audit_log"
+
+# 3. Check if screen logs route exists
+Select-String -Path "ad-server/src/api/screens.js" -Pattern "logs"
+```
+
+#### Acceptance Criteria
+
+| # | Criterion | Guardrail |
+|---|---|---|
+| AC-1 | `POST /api/audit-log` registered in `ad-server/src/api/audit.js` (new file) or `screens.js`. Accepts `{ event_type, actor_id, target_id, target_type, detail }`. Returns `201`. | GUARDRAIL-2 — add row to `API_ROUTES.md` before coding |
+| AC-2 | `GET /api/screens/:id/logs` registered in `screens.js`. Returns array of `{ timestamp, event_type, detail }`. Scoped: `techoperator` sees all, `retaileradmin` sees own screens only. | GUARDRAIL-2, GUARDRAIL-3 |
+| AC-3 | Both routes require `requireAuth` minimum; `DELETE` or destructive log operations require `requireRole('superadmin')`. | GUARDRAIL-3 |
+| AC-4 | `TechOpsDashboard.jsx` FIXME comments removed and replaced with live calls. | GUARDRAIL-1 — confirm `apiService` method exists or add it |
+| AC-5 | Incident log panel in `TechOpsDashboard.jsx` renders list of recent audit events with timestamp, event type, and actor. Empty state: “No incidents logged yet.” | — |
+| AC-6 | Screen diagnostics drawer (existing or new) shows `GET /api/screens/:id/logs` results with last 20 entries. | — |
+| AC-7 | `grep -r "FIXME" client-app/src/pages/tech/TechOpsDashboard.jsx` returns zero results at close. | GUARDRAIL-4 |
+
+#### Files expected to touch
+
+- `ad-server/src/api/screens.js` — add `GET /:id/logs` route
+- `ad-server/src/api/audit.js` — new file (or inline in `screens.js`)
+- `client-app/src/pages/tech/TechOpsDashboard.jsx` — wire live calls, remove FIXMEs
+- `client-app/src/services/ApiService.js` — add `getScreenLogs(id)` + `postAuditLog(payload)` if missing
+- `docs/API_ROUTES.md` — add both route rows
+
+---
+
+### S13-2 · Loop Reject + Bulk Approve Route Confirmation
+
+**Priority:** High
+**Effort:** S
+**Confidence pre-implementation:** 55% (both routes marked FIXME since sprint7 — may exist but be unregistered, or may be stub-only)
+**MVP section:** 4.3 — Retailer Validation Workflow: “Retailers can reject specific ads / request replacements”
+
+#### Pre-implementation Step 1 (mandatory)
+
+```powershell
+# 1. Check if reject handler exists in loops.js
+Select-String -Path "ad-server/src/api/loops.js" -Pattern "reject|approve-all|approve_all" -Context 2,2
+
+# 2. Check ScheduleManager.jsx for exact fetch call shapes
+Select-String -Path "client-app/src/pages/retailer/ScheduleManager.jsx" -Pattern "reject|approve.all|FIXME" -Context 2,2
+
+# 3. Check if locations router is registered in app.js/index.js
+Select-String -Path "ad-server/src" -Recurse -Include "*.js" -Pattern "locations"
+```
+
+#### Acceptance Criteria
+
+| # | Criterion | Guardrail |
+|---|---|---|
+| AC-1 | `POST /api/loops/:loopId/reject` confirmed registered in `loops.js`. Accepts `{ reason }`. Returns `200` with updated loop object. Status set to `REJECTED`. | GUARDRAIL-2 |
+| AC-2 | `POST /api/locations/:id/loops/approve-all` confirmed registered. If the `/locations` prefix requires a separate router, that router must be mounted in the app entry file. | GUARDRAIL-2 — confirm mount point |
+| AC-3 | Both routes require `requireRole('retaileradmin')`. | GUARDRAIL-3 |
+| AC-4 | `ScheduleManager.jsx` FIXME comments removed. Reject and bulk-approve calls use confirmed route shapes. | GUARDRAIL-1 |
+| AC-5 | `loops.status` enum on reject writes uppercase `'REJECTED'` — consistent with confirmed `APPROVED`/`PENDING`/`DRAFT` uppercase enum. | GUARDRAIL-4 |
+| AC-6 | `API_ROUTES.md` rows for both routes updated from ⚠️ FIXME unconfirmed to confirmed, with correct body shapes. | GUARDRAIL-2 |
+
+#### Files expected to touch
+
+- `ad-server/src/api/loops.js` — confirm/implement reject + approve-all handlers
+- `ad-server/src/` — confirm `/locations` router mount if needed
+- `client-app/src/pages/retailer/ScheduleManager.jsx` — remove FIXMEs, wire confirmed routes
+- `docs/API_ROUTES.md` — update both loop route rows
+
+---
+
+### S13-3 · Campaign DELETE Guard Canonical Fix
+
+**Priority:** Critical
+**Effort:** XS
+**Confidence pre-implementation:** 95% (one-line discrepancy between `campaigns.js` L187 and `API_ROUTES.md`)
+**MVP section:** 3.1 — Super Administrator: full campaign governance
+
+#### Context
+
+`campaigns.js` L187 confirmed (Sprint 12 bash block): `requireRole('superadmin')` on `DELETE /api/campaigns/:id`.
+`API_ROUTES.md` currently lists `requireRole('admin')` for that row.
+
+One of these is wrong. The code is ground truth. The doc must be corrected.
+
+> **This is a docs fix, not a code change** — unless the intent is `'admin'` (broader role), in which case the code must be changed and the reason documented.
+
+#### Pre-implementation Step 1 (mandatory)
+
+```powershell
+# Confirm live guard at L187
+Select-String -Path "ad-server/src/api/campaigns.js" -Pattern "requireRole|router.delete" -Context 1,1
+```
+
+#### Acceptance Criteria
+
+| # | Criterion | Guardrail |
+|---|---|---|
+| AC-1 | `API_ROUTES.md` `DELETE /api/campaigns/:id` row updated to `requireRole('superadmin')` to match live code. | GUARDRAIL-2 |
+| AC-2 | If the decision is made to change the guard to `'admin'` instead, `campaigns.js` L187 must be updated AND the reason documented in this file under a new DECISION-3. | GUARDRAIL-3 |
+| AC-3 | After fix, `grep -n "requireRole" ad-server/src/api/campaigns.js` output matches every row in `API_ROUTES.md` campaigns section exactly. | GUARDRAIL-3, GUARDRAIL-4 |
+
+#### Files expected to touch
+
+- `docs/API_ROUTES.md` — correct `DELETE /api/campaigns/:id` auth guard row (most likely path)
+- `ad-server/src/api/campaigns.js` — only if decision is to broaden guard to `'admin'`
+
+---
+
+### S13-4 · Telemetry Impression Persistence (Proof-of-Play)
+
+**Priority:** High
+**Effort:** M
+**Confidence pre-implementation:** 70% (handler exists; persistence layer unconfirmed)
+**MVP section:** 4.6 — Analytics: “Proof-of-play per ad” + “Loop delivery confirmation”
+
+#### Context
+
+`POST /api/telemetry/impression` exists and accepts impressions. The handler has an inline comment:
+> `// Phase 2 TODO: persist to Firestore`
+
+`LoopAnalytics.jsx` (Sprint 5) shows a proof-of-play dashboard. If impressions are not persisted, the dashboard has no real data to display. This story wires the persistence layer.
+
+#### Pre-implementation Step 1 (mandatory)
+
+```powershell
+# 1. Read the full impression handler
+Select-String -Path "ad-server/src/api/telemetry.js" -Pattern "impression|Firestore|persist|TODO" -Context 3,3
+
+# 2. Check what TelemetryRepository or equivalent exists
+Get-ChildItem -Path "ad-server/src/repositories" -Filter "*.js" | Select Name
+
+# 3. Check if Firestore client is already initialised anywhere
+Select-String -Path "ad-server/src" -Recurse -Include "*.js" -Pattern "Firestore|firestore|firebase"
+```
+
+#### Acceptance Criteria
+
+| # | Criterion | Guardrail |
+|---|---|---|
+| AC-1 | `POST /api/telemetry/impression` persists `{ screen_id, campaign_id, asset_id, loop_id, played_at, slot_position }` to the persistence layer (Firestore OR a `TelemetryRepository` backed by the existing DB — whichever is live in the codebase). | GUARDRAIL-1 — confirm or create repository method |
+| AC-2 | `GET /api/telemetry/impressions` (new route) accepts `{ screen_id?, campaign_id?, date_from?, date_to? }` query params. Returns paginated array. | GUARDRAIL-2 — add row to `API_ROUTES.md` |
+| AC-3 | `LoopAnalytics.jsx` hourly delivery chart and slot drill-down pull from `GET /api/telemetry/impressions` instead of mock/static data. | GUARDRAIL-1 |
+| AC-4 | `Phase 2 TODO` comment removed from `telemetry.js`. | GUARDRAIL-4 |
+| AC-5 | `POST /api/telemetry/impression` route requires `requireAuth`. `GET /api/telemetry/impressions` requires `requireRole('admin')` or `requireRole('techoperator')`. | GUARDRAIL-3 |
+| AC-6 | If Firestore is not initialised in the codebase, use the existing SQL/JSON repository pattern — do **not** introduce a new dependency mid-sprint without a DECISION entry here. | — |
+
+#### Files expected to touch
+
+- `ad-server/src/api/telemetry.js` — wire persistence in impression handler; add `GET /impressions` route
+- `ad-server/src/repositories/TelemetryRepository.js` — new file (or confirm existing)
+- `client-app/src/pages/admin/LoopAnalytics.jsx` — replace mock data with live API call
+- `client-app/src/services/ApiService.js` — add `getImpressions(params)` method if missing
+- `docs/API_ROUTES.md` — add `GET /api/telemetry/impressions` row
+
+---
+
+## 💥 Blast-Radius Table
+
+| Story | Files Touched | Route(s) | Change Type | Shared Infra? | Can It Break Other Features? | Mitigation |
+|---|---|---|---|---|---|---|
+| S13-1 · TechOps audit log + screen logs | `screens.js`, `audit.js` (new), `TechOpsDashboard.jsx`, `ApiService.js`, `API_ROUTES.md` | `POST /api/audit-log`, `GET /api/screens/:id/logs` | New routes + new file | `screens.js` shared with S11-8 role branch | Adding routes to `screens.js` cannot break the existing `GET /api/screens` role branch if appended cleanly. Run `grep -n "ROLE_HIERARCHY" screens.js` before and after. | |
+| S13-2 · Loop reject + bulk approve | `loops.js`, `ScheduleManager.jsx`, `API_ROUTES.md` | `POST /api/loops/:loopId/reject`, `POST /api/locations/:id/loops/approve-all` | Confirm/implement existing stubs | `loops.js` is used by `Player.jsx` for `GET /api/loops` | Confirming reject/approve-all handlers does not affect the `GET /api/loops?status=APPROVED` query. Verify no global `router.use()` middleware is added that intercepts GET. |
+| S13-3 · Campaign DELETE guard fix | `API_ROUTES.md` (most likely), `campaigns.js` only if guard broadened | `DELETE /api/campaigns/:id` | Docs correction (most likely) | `campaigns.js` guards confirmed in Sprint 12 | Doc-only change is zero blast-radius. If code changes, re-run SECURITY-V2 grep to confirm. |
+| S13-4 · Telemetry persistence | `telemetry.js`, `TelemetryRepository.js` (new), `LoopAnalytics.jsx`, `ApiService.js`, `API_ROUTES.md` | `POST /api/telemetry/impression` (modify), `GET /api/telemetry/impressions` (new) | Persistence layer addition + new GET route | `telemetry.js` has `impressionLimiter` (SECURITY-V3). Adding persistence to the existing POST handler must not bypass or remove the limiter. | Append persistence call inside the existing handler body — do not restructure the handler. Confirm `impressionLimiter` still applied after change. |
 
 ---
 
@@ -76,17 +253,10 @@ Manual hard-refresh tests for `UserManagement.jsx` and `AdvertiserManagement.jsx
 
 These rules are mandatory for every story in this sprint.
 
-1. **No service call without source verification**
-   Every `apiService.X()` call must name the exact existing file and method signature that implements it. If the method does not exist, add a sub-task to create it before UI wiring.
-
-2. **Router file is the API authority**
-   Every API story must list the exact `METHOD /path → body shape` as confirmed in `docs/API_ROUTES.md` and the Express router source file. No frontend endpoint may be written from memory.
-
-3. **Mutation auth must be falsifiable**
-   Every `POST`, `PUT`, `PATCH`, or `DELETE` acceptance criterion must explicitly state the required middleware guard, e.g. `requireRole('superadmin') confirmed`.
-
-4. **Enums and sprint docs must be canonical**
-   All workflow/status values must match the `docs/DATABASE_SCHEMA.md` enum definitions exactly (lowercase, underscore-separated). This file lives at `docs/sprint13.md` per GUARDRAIL-5.
+1. **No service call without source verification** — every `apiService.X()` call must name the exact existing file and method signature that implements it.
+2. **Router file is the API authority** — every API story must list the exact `METHOD /path → body shape` as confirmed in `docs/API_ROUTES.md` and the Express router source.
+3. **Mutation auth must be falsifiable** — every `POST`, `PUT`, `PATCH`, or `DELETE` AC must explicitly state the required middleware guard.
+4. **Enums and sprint docs must be canonical** — all status values must match `docs/DATABASE_SCHEMA.md` exactly. Loops use uppercase; campaigns use lowercase.
 
 ---
 
@@ -106,239 +276,197 @@ Before any story is marked **Ready for implementation**, confirm all five boxes:
 
 ## Carry-over Pre-conditions (from sprint12.md)
 
-- [x] **ENUM-AUDIT-3** — ✅ **RESOLVED @ `e0ea260` (2026-06-07).** `Player.jsx` L70 + L187: `status=APPROVED` query param confirmed correct — `LoopRepository` enum is uppercase `APPROVED`. FIXME comments removed. `playlists.js` L31: default `'DRAFT'` (uppercase) was a bug — mismatches canonical `CAMPAIGN_STATUS` enum. Fixed to `'draft'` in same commit. See **Enum Bug Log** below.
-- [x] **SECURITY-V1** — `PATCH /api/campaigns/:id/status` wrapped in `requireRole('retaileradmin')`. **CONFIRMED** @ `campaigns.js` L135.
-- [x] **SECURITY-V2** — `DELETE /api/campaigns/:id` has `requireRole('superadmin')` guard. **CONFIRMED** @ `campaigns.js` L187.
-- [x] **SECURITY-V3** — ~~`POST /api/telemetry/impression` has no rate limit.~~ **RESOLVED** at commit `98bd645`. `impressionLimiter` confirmed @ `telemetry.js` L79.
+- [x] **ENUM-AUDIT-3** — ✅ **RESOLVED @ `e0ea260` (2026-06-07).** `Player.jsx` `status=APPROVED` confirmed correct. `playlists.js` `'DRAFT'` default fixed to `'draft'`. See **Enum Bug Log** below.
+- [x] **SECURITY-V1** — `requireRole('retaileradmin')` @ `campaigns.js` L135. ✅ CONFIRMED.
+- [x] **SECURITY-V2** — `requireRole('superadmin')` @ `campaigns.js` L187. ✅ CONFIRMED.
+- [x] **SECURITY-V3** — `impressionLimiter` @ `telemetry.js` L79. ✅ CONFIRMED.
 - [ ] **NODE_ENV guard** — live code uses `!== 'production'` (L49). Spec expected `!== 'test'`. **DECISION-1 required** before any S11-6 E2E work begins.
-- [x] **`CampaignApprovalList` duplicate** — **RESOLVED** @ `App.jsx` `335f1c2`. `pages/retailer/CampaignApprovalList.jsx` re-exports from `components/`. Single source of truth confirmed.
-- [x] **`BaseRepository.findById()`** — **CONFIRMED** @ `BaseRepository.js` L53. Used internally at L105 + L139.
+- [x] **`CampaignApprovalList` duplicate** — ✅ RESOLVED @ `App.jsx` `335f1c2`.
+- [x] **`BaseRepository.findById()`** — ✅ CONFIRMED @ `BaseRepository.js` L53.
 - [ ] **`docs/MVP_SPRINT_PLAN.md`** — add Sprint 13 entry linking to this file.
 
 ---
 
 ## Enum Bug Log
 
-> Canonical enum values are **lowercase** per `docs/DATABASE_SCHEMA.md`. Any uppercase status string is a bug.
+> Canonical enum values are **lowercase** for campaigns, **uppercase** for loops, per `docs/DATABASE_SCHEMA.md`.
 
 | File | Line | Bug | Fix | Commit |
-|---|---|---|---|---|
+|---|---|---|---|
+---|
 | `ad-server/src/api/playlists.js` | L31 | `status = 'DRAFT'` (uppercase default on `POST /api/playlists`) | Changed to `status = 'draft'` | `e0ea260` (2026-06-07) |
-| `client-app/src/pages/Player.jsx` | L70, L187 | `status=APPROVED` in query param — marked FIXME pending enum confirmation | ✅ **Confirmed correct** — `LoopRepository` uses uppercase `APPROVED` for loop status (loops use a separate enum from campaigns). FIXME comments removed. | `e0ea260` (2026-06-07) |
+| `client-app/src/pages/Player.jsx` | L70, L187 | `status=APPROVED` in query param — marked FIXME pending enum confirmation | ✅ **Confirmed correct** — `loops.status` is uppercase `APPROVED`. FIXME comments removed. | `e0ea260` (2026-06-07) |
 
-> **Note on two enum systems:** `campaigns.status` uses lowercase (`draft`, `pendingapproval`, `scheduled`, `live`, `ended`). `loops.status` uses uppercase (`APPROVED`, `PENDING`, `DRAFT`). Both are canonical per schema. Do not conflate them.
+> **Two enum systems:** `campaigns.status` is lowercase (`draft`, `pendingapproval`, `scheduled`, `live`, `ended`). `loops.status` is uppercase (`APPROVED`, `PENDING`, `DRAFT`, `REJECTED`). Do not conflate them.
 
 ---
 
 ## Pre-Sprint Checklist
 
-- [x] Run `ls ad-server/src/api/` — `users.js` ✅ · `retailers.js` ✅ · `advertisers.js` ✅ · `stores.js` ✅ · confirmed @ `294fd25`
-- [x] Run `grep -n "requireRole|router.patch|router.delete" ad-server/src/api/campaigns.js` — SECURITY-V1/V2 guards **confirmed** (L135, L187)
-- [x] Run `grep -n "NODE_ENV|impressionLimiter" ad-server/src/api/telemetry.js` — guard present @ L49 as `!== 'production'`. ⚠️ **DECISION-1 required**
-- [x] ~~Run `grep -n "Loops|ScheduleCalendar|schedule/calendar|retailer/loops" client-app/src/App.jsx`~~ — routes confirmed @ `335f1c2`. Correct path is `retailer/schedule`.
-- [x] Run `grep -n "router.post|create" ad-server/src/api/stores.js` — `router.post('/')` + `StoreRepository.createWithScreens()` **confirmed** (L69, L77)
-- [x] Read `client-app/src/pages/Player.jsx` — `telemetryService.trackImpression()` confirmed at L296 + L327. Heartbeat at L280. ✅
-- [x] Check `LoopDemoPlayer.jsx` collision — **zero matches** for TelemetryService/trackImpression/impression. Risk 3 cleared. ✅
-- [x] Confirm `BaseRepository.findById()` — **confirmed** @ L53. ✅
-- [x] Read `client-app/src/pages/admin/NetworkMap.jsx` — blank-render fix confirmed via `h-[600px]` Tailwind + error boundary + loading states. ✅
-- [x] Run `grep -n "techops|role|retaileradmin" ad-server/src/api/screens.js` — full role-hierarchy branch **confirmed** (L79–L112). ✅
-- [x] **ENUM-AUDIT-3** — `Select-String` for `'APPROVED'|'PENDING'` run 2026-06-07. Results: `Player.jsx` L70, L71, L78, L115–L116, L187–L188, L195 — all are **loop status** (uppercase `APPROVED` is canonical for `loops.status`). Zero campaign-status mismatches. Bug found in `playlists.js` L31 (`'DRAFT'` default) — **fixed @ `e0ea260`**. ✅ **CLOSED.**
-- [ ] **S11-1/S11-2 persistence tests** — hard-refresh `Ctrl+Shift+R` on UserManagement + AdvertiserManagement forms (manual, browser only)
-- [ ] **S11-4 persistence test** — hard-refresh after Add Location form submit (manual, browser only)
-- [ ] **DECISION-1** — resolve NODE_ENV guard intent in `telemetry.js`
+- [x] `ls ad-server/src/api/` — all API files confirmed @ `294fd25`
+- [x] SECURITY-V1/V2 guards confirmed (`campaigns.js` L135, L187)
+- [x] NODE_ENV guard present @ `telemetry.js` L49 as `!== 'production'` ⚠️ DECISION-1
+- [x] Routes confirmed @ `App.jsx` `335f1c2`. Correct path is `retailer/schedule`.
+- [x] `router.post('/')` + `StoreRepository.createWithScreens()` confirmed (`stores.js` L69, L77)
+- [x] `telemetryService.trackImpression()` confirmed at `Player.jsx` L296 + L327
+- [x] `LoopDemoPlayer.jsx` collision — zero matches. Risk 3 cleared.
+- [x] `BaseRepository.findById()` confirmed @ L53
+- [x] `NetworkMap.jsx` blank-render fix confirmed
+- [x] `screens.js` role-hierarchy branch confirmed (L79–L112)
+- [x] **ENUM-AUDIT-3** — ✅ CLOSED @ `e0ea260`
+- [ ] **S11-1/S11-2 persistence tests** — manual browser hard-refresh
+- [ ] **S11-4 persistence test** — manual browser hard-refresh
+- [ ] **DECISION-1** — NODE_ENV guard intent in `telemetry.js`
 
 ---
 
-## Known File Inventory (Step 1 + Bash Blocks Confirmed)
-
-All paths confirmed on disk at commit `294fd25` / `App.jsx` @ `335f1c2`.
+## Known File Inventory (Confirmed)
 
 | File | Size | Status | Notes |
 |---|---|---|---|
-| `client-app/src/App.jsx` | 11 214 B | ✅ Confirmed | Route authority. All retailer routes registered. |
-| `client-app/src/pages/Player.jsx` | 23 098 B | ✅ Confirmed | `trackImpression` at L296 + L327. Heartbeat at L280. Wiring confirmed. FIXME comments removed @ `e0ea260`. |
-| `client-app/src/pages/LoopDemoPlayer.jsx` | 35 994 B | ✅ Confirmed — No collision | Registered at `/player/demo`. Zero shared telemetry dependencies with `Player.jsx`. Risk 3 cleared. |
-| `client-app/src/pages/admin/NetworkMap.jsx` | ~4 097 B | ✅ Confirmed — Fix present | `h-[600px]` Tailwind on `GlassCard`. Error boundary `data-testid="network-map-error"`. Loading spinners. Stats: `data-testid="stat-total-screens"`, `"stat-online-rate"`, `"stat-daily-impressions"`. |
-| `client-app/src/pages/admin/UserManagement.jsx` | — | ✅ Confirmed | Via App.jsx verified map |
-| `client-app/src/pages/admin/RetailerManagement.jsx` | — | ✅ Confirmed | Via App.jsx verified map |
-| `client-app/src/pages/admin/AdvertiserManagement.jsx` | — | ✅ Confirmed | Via App.jsx verified map |
-| `client-app/src/pages/retailer/Loops.jsx` | — | ✅ Confirmed | Route: `/dashboard/retailer/loops` |
-| `client-app/src/pages/retailer/ScheduleCalendar.jsx` | — | ✅ Confirmed | Route: `/dashboard/retailer/schedule` (**not** `schedule/calendar`) |
-| `client-app/src/pages/retailer/ScheduleHistory.jsx` | — | ✅ Confirmed | Route: `/dashboard/retailer/schedule-history` |
-| `client-app/src/pages/retailer/ScheduleManager.jsx` | — | ✅ Confirmed | Route: `/dashboard/retailer/schedule-manager` |
-| `client-app/src/pages/retailer/CampaignApprovalList.jsx` | — | ✅ Confirmed | Route: `/dashboard/retailer/campaign-approvals`. Duplicate resolved. |
-| `client-app/src/pages/tech/TechOpsDashboard.jsx` | — | ✅ Confirmed | Route: `/dashboard/techoperator` |
-| `ad-server/src/api/campaigns.js` | 6 323 B | ✅ Confirmed — Guards live | `requireRole('retaileradmin')` @ L135. `requireRole('superadmin')` @ L187. Sprint 9 + 11 history in comments. |
-| `ad-server/src/api/telemetry.js` | 5 135 B | ✅ Confirmed ⚠️ NODE_ENV flag | `impressionLimiter` @ L79. Guard @ L49 uses `!== 'production'`. See DECISION-1. |
-| `ad-server/src/api/users.js` | 8 219 B | ✅ Confirmed | — |
-| `ad-server/src/api/retailers.js` | 5 330 B | ✅ Confirmed | — |
-| `ad-server/src/api/advertisers.js` | 5 268 B | ✅ Confirmed | — |
-| `ad-server/src/api/stores.js` | 7 426 B | ✅ Confirmed — S11-4 wired | `router.post('/')` + `StoreRepository.createWithScreens()` confirmed. Grew 8% from Sprint 12. |
-| `ad-server/src/api/screens.js` | 6 683 B | ✅ Confirmed — Role branch live | Full `ROLE_HIERARCHY` branch: techoperator → all screens; retaileradmin → scoped; advertiser/unknown → 403. |
-| `ad-server/src/api/loops.js` | 8 674 B | ✅ Confirmed | `loops.status` enum is **uppercase** (`APPROVED`, `PENDING`, `DRAFT`) — separate from `campaigns.status`. |
-| `ad-server/src/api/playlists.js` | 2 100 B | ✅ Confirmed — Bug fixed | L31 default `'DRAFT'` → `'draft'` fixed @ `e0ea260`. `playlists.status` follows lowercase campaign enum. |
-| `ad-server/src/api/notifications.js` | 5 216 B | ✅ Confirmed — Deferred | Larger than a bare stub. Do not assume empty before post-MVP planning. |
-| `ad-server/src/repositories/BaseRepository.js` | — | ✅ Confirmed | `findById()` @ L53. Used internally @ L105 + L139. |
-| `ad-server/src/middleware/requireRole.js` | — | ✅ Confirmed | Exports `requireRole`, `ROLE_HIERARCHY`, `normalizeRole`. All confirmed imported in `campaigns.js` and `screens.js`. |
-| `ad-server/src/middleware/rateLimiter.js` | — | ✅ Confirmed | Exports `impressionLimiter`. Confirmed imported in `telemetry.js` L4. |
+| `client-app/src/App.jsx` | 11 214 B | ✅ | Route authority. All retailer routes registered. |
+| `client-app/src/pages/Player.jsx` | 23 098 B | ✅ | `trackImpression` at L296 + L327. FIXMEs removed @ `e0ea260`. |
+| `client-app/src/pages/LoopDemoPlayer.jsx` | 35 994 B | ✅ | No collision with `Player.jsx`. Risk 3 cleared. |
+| `client-app/src/pages/admin/NetworkMap.jsx` | ~4 097 B | ✅ | Blank-render fix present. |
+| `client-app/src/pages/admin/LoopAnalytics.jsx` | — | ✅ (S13-4 target) | Sprint 5 deliverable. Will be wired to live telemetry in S13-4. |
+| `client-app/src/pages/tech/TechOpsDashboard.jsx` | — | ⚠️ FIXMEs present | S13-1 target. Step 1 grep required before coding. |
+| `client-app/src/pages/retailer/ScheduleManager.jsx` | — | ⚠️ FIXMEs present | S13-2 target. Step 1 grep required before coding. |
+| `ad-server/src/api/campaigns.js` | 6 323 B | ✅ | Guards confirmed. DELETE guard doc vs code mismatch — S13-3. |
+| `ad-server/src/api/telemetry.js` | 5 135 B | ⚠️ Phase 2 TODO | Impression handler has no persistence yet. S13-4 target. |
+| `ad-server/src/api/loops.js` | 8 674 B | ⚠️ FIXMEs present | Reject + approve-all handlers unconfirmed. S13-2 target. |
+| `ad-server/src/api/playlists.js` | 2 100 B | ✅ | `'DRAFT'` bug fixed @ `e0ea260`. |
+| `ad-server/src/api/screens.js` | 6 683 B | ✅ | Role branch live. S13-1 will add `GET /:id/logs`. |
+| `ad-server/src/api/users.js` | 8 219 B | ✅ | — |
+| `ad-server/src/api/retailers.js` | 5 330 B | ✅ | — |
+| `ad-server/src/api/advertisers.js` | 5 268 B | ✅ | — |
+| `ad-server/src/api/stores.js` | 7 426 B | ✅ | S11-4 wired. |
+| `ad-server/src/api/notifications.js` | 5 216 B | ⚠️ Deferred | Larger than stub — do not assume empty. |
+| `ad-server/src/repositories/BaseRepository.js` | — | ✅ | `findById()` @ L53. |
+| `ad-server/src/middleware/requireRole.js` | — | ✅ | Exports `requireRole`, `ROLE_HIERARCHY`, `normalizeRole`. |
+| `ad-server/src/middleware/rateLimiter.js` | — | ✅ | `impressionLimiter` @ `telemetry.js` L4. |
 
 ---
 
-## Confidence Scores (Post Bash Blocks)
+## Confidence Scores
 
 | Story | Score | Status | Remaining gate |
 |---|---|---|---|
-| S11-5 · Retailer Approval — routes | ✅ 100% | Closed @ `335f1c2` | None |
-| S11-3 · Security hardening + NODE_ENV | ✅ 95% | Closed ⚠️ NODE_ENV flag | DECISION-1 only — one-line fix if needed |
-| S11-4 · Add Location | ✅ 90% | Closed (API wired) | Persistence test (manual) |
-| S11-6 · Demo Player full wiring | ✅ 90% | Closed | DECISION-1 must be resolved before E2E |
-| S11-7 · Network Map blank render | ✅ 95% | Closed | None — fix confirmed in source |
-| S11-8 · TechOps network-wide data | ✅ 95% | Closed | None — role branch confirmed |
-| S11-1 · Super Admin CRUD — Users & Retailers | ⚠️ 70% | Unconfirmed | Persistence test (manual) only |
-| S11-2 · Super Admin CRUD — Advertisers | ⚠️ 70% | Unconfirmed | Persistence test (manual) only |
+| S13-1 · TechOps audit log + screen logs | 🟡 60% | Ready — Step 1 required | Step 1 grep on `TechOpsDashboard.jsx` + `loops.js` |
+| S13-2 · Loop reject + bulk approve | 🟡 55% | Ready — Step 1 required | Step 1 grep on `loops.js` + `ScheduleManager.jsx` |
+| S13-3 · Campaign DELETE guard fix | 🟢 95% | Ready for implementation | Confirm live guard with one grep, then fix `API_ROUTES.md` |
+| S13-4 · Telemetry impression persistence | 🟡 70% | Ready — Step 1 required | Step 1 grep on `telemetry.js` + repository scan |
+| S11-1 · Super Admin CRUD — Users & Retailers | ⚠️ 70% | Carry-over | Persistence test (manual) |
+| S11-2 · Super Admin CRUD — Advertisers | ⚠️ 70% | Carry-over | Persistence test (manual) |
 
 ---
 
-## 💥 Blast-Radius Table
+## ⚠️ Genuine Cross-Cutting Risks
 
-> ⚠️ **Pending Step 4.** To be completed in Step 2 session now that bash blocks are resolved.
+### Risk 1 — `telemetry.js` NODE_ENV guard × Demo Player E2E
 
-| Task | Files Touched | Route(s) | Change Type | Shared Infra? | Can It Break Other Features? | Mitigation |
-|---|---|---|---|---|---|---|
-| *(to be filled in Step 4)* | — | — | — | — | — | — |
+**Status:** DECISION-1 open. S11-6 wiring confirmed. E2E tests firing impressions in `test` environment will hit the rate limiter if guard stays `!== 'production'`.
 
----
+### Risk 2 — `GET /api/screens` role-conditional expansion
 
-## Backlog
+**Status:** ✅ Role branch confirmed L79–L112. Always run `grep -rn "api/screens" client-app/src/pages/brand/` before merging any screens-touching PR.
 
-> All Sprint 12 stories are now confirmed closed or pending manual persistence tests only. No code carry-over work remains. Sprint 13 new scope to be defined in Step 2 after DECISION-1 + persistence tests are resolved.
+### Risk 3 — `LoopDemoPlayer.jsx` × `Player.jsx` collision
 
----
+**Status:** ✅ CLEARED.
 
-### S12-CARRY · Sprint 12 Carry-overs
+### Risk 4 — Two enum systems: `campaigns.status` vs `loops.status`
 
-| Story | Outcome | Evidence |
-|---|---|---|
-| S11-5 · Routes + CampaignApprovalList | ✅ CLOSED | `App.jsx` @ `335f1c2` |
-| S11-3 · Campaign auth + NODE_ENV | ✅ CLOSED ⚠️ NODE_ENV flag | `campaigns.js` L135, L187 · `telemetry.js` L49 — DECISION-1 open |
-| S11-4 · Add Location | ✅ CLOSED (persistence TBD) | `stores.js` L69, L77 |
-| S11-6 · Demo Player wiring | ✅ CLOSED | `Player.jsx` L296, L327 · LoopDemoPlayer collision cleared |
-| S11-7 · NetworkMap blank render | ✅ CLOSED | `NetworkMap.jsx` `h-[600px]` + error boundary |
-| S11-8 · TechOps role branch | ✅ CLOSED | `screens.js` L79–L112 |
-| S11-1 · Super Admin CRUD — Users & Retailers | ⚠️ Persistence test only | Files on disk — manual test required |
-| S11-2 · Super Admin CRUD — Advertisers | ⚠️ Persistence test only | Files on disk — manual test required |
+**Status:** ✅ Documented (2026-06-07). Uppercase = loops. Lowercase = campaigns. Any new story touching either must confirm which enum applies. S13-2 reject handler must write `'REJECTED'` (uppercase) for `loops.status`.
 
----
+### Risk 5 — `impressionLimiter` must survive S13-4 handler refactor
 
-### S13-NEW · New Scope (to be defined after DECISION-1 + persistence tests)
-
-> ⚠️ **Do not add new stories here until DECISION-1 is resolved and S11-1/S11-2 persistence tests are confirmed.** New scope from the MVP backlog should only be pulled in once carry-over debt is fully known.
-
----
-
-## Route Correction Log
-
-> **IMPORTANT — read before writing any acceptance criteria or bash grep patterns.**
-
-| Old path (Sprint 12) | Correct live path (confirmed @ `335f1c2`) | Notes |
-|---|---|---|
-| `/dashboard/retailer/schedule/calendar` | `/dashboard/retailer/schedule` | `ScheduleCalendar` served at `retailer/schedule` in `App.jsx`. The `/calendar` suffix never existed in the live router. All grep patterns, AC tables, and test assertions must use the corrected path. |
+**Status:** Open. When S13-4 adds Firestore/repository persistence inside the `POST /api/telemetry/impression` handler, the `impressionLimiter` middleware (SECURITY-V3) must remain applied. Do not restructure the handler in a way that moves or removes the limiter. Confirm with `grep -n "impressionLimiter" ad-server/src/api/telemetry.js` after S13-4 is implemented.
 
 ---
 
 ## Cross-Story Dependency Map
 
 ```
-S11-5 ── ✅ CLOSED ──────────────────────────────────────────────────────────────
+S11-5 ── ✅ CLOSED
+S11-3 ── ✅ CLOSED (NODE_ENV flag) ──► DECISION-1 ──► unblocks S11-6 E2E + S13-4 rate-limiter safety
+S11-1 ── ⚠️ persistence test ──► unblocks S11-4 full close
+ENUM-AUDIT-3 ── ✅ CLOSED @ e0ea260
 
-S11-3 ✅ CLOSED (NODE_ENV flag) ── DECISION-1 ──► unblocks S11-6 E2E
-
-S11-1 (persistence test) ──► unblocks S11-4 full close
-
-S11-6 ── ✅ CLOSED ── LoopDemoPlayer collision cleared ── no further action
-
-ENUM-AUDIT-3 ── ✅ CLOSED @ e0ea260 ─────────────────────────────────────────
-  └─ Player.jsx 'APPROVED' confirmed correct (loops.status uppercase enum)
-  └─ playlists.js 'DRAFT' → 'draft' bug fixed
+S13-3 ── doc fix only ── no blockers ── implement first (XS effort)
+S13-2 ── Step 1 grep required ── unblocks ScheduleManager FIXME removal
+S13-1 ── Step 1 grep required ── no external blockers
+S13-4 ── Step 1 grep required ── DECISION-1 must resolve before E2E
+         └─ unblocks LoopAnalytics.jsx real-data display
 ```
 
-**Recommended merge order for any remaining fixes:** DECISION-1 fix (if needed) → S11-1/S11-2 persistence sign-off → new S13 scope
+**Recommended implementation order:** S13-3 (XS, doc only) → S13-2 (S, route confirm) → S13-1 (M, new routes) → S13-4 (M, persistence) → DECISION-1 → S11-6 E2E
 
 ---
 
-## ⚠️ Genuine Cross-Cutting Risks (carry-forward)
-
-### Risk 1 — `telemetry.js` NODE_ENV guard × Demo Player E2E
-
-**Status:** DECISION-1 open. S11-6 wiring is confirmed in `Player.jsx`. However, E2E tests that fire impressions in a `test` environment will hit the rate limiter if the guard remains `!== 'production'`. Resolve DECISION-1 before any E2E suite is run against `/api/telemetry/impression`.
-
-### Risk 2 — `GET /api/screens` role-conditional expansion
-
-**Status:** ✅ Role branch confirmed in `screens.js` L79–L112. S11-8 closed. Residual: always run `grep -rn "api/screens" client-app/src/pages/brand/` before merging any screens-touching PR to confirm Brand pages are not affected by role scoping.
-
-### Risk 3 — `LoopDemoPlayer.jsx` × `Player.jsx` collision
-
-**Status:** ✅ CLEARED. `LoopDemoPlayer.jsx` contains zero references to `TelemetryService`, `trackImpression`, or `impression`. The two pages are fully independent. No further mitigation required.
-
-### Risk 4 — Two enum systems: `campaigns.status` vs `loops.status`
-
-**Status:** ✅ Documented (2026-06-07). `campaigns.status` is lowercase (`draft`, `pendingapproval`, `scheduled`, `live`, `ended`). `loops.status` is uppercase (`APPROVED`, `PENDING`, `DRAFT`). These are **separate enums** from separate schema tables. The `playlists.js` bug was caused by conflating them. Any new story touching either must confirm which enum applies before writing status strings.
-
----
-
-## Deferred to Post-MVP (do not schedule this sprint)
+## Deferred to Post-MVP
 
 - "Report Issue" and "Disconnect/Reestablish" screen actions (TASK-16, TASK-17)
-- Notifications feed (`notifications.js` — deferred; file is 5 216 B, larger than a bare stub — do not assume empty before post-MVP planning)
+- Notifications feed (`notifications.js` — 5 216 B, larger than stub)
 - Advanced analytics / campaign summary dashboard
 - Retailer context selector for Super Admin impersonation (TASK-21)
+- Firestore production setup (if not already initialised — confirm in S13-4 Step 1)
 
 ---
 
 ## Story Point Summary
 
-| Story | Priority | Confidence | Effort (est.) | Sprint 12 status | Blocker? |
+| Story | Priority | Effort | Confidence | Status | Blocker? |
 |---|---|---|---|---|---|
-| S11-5 · Retailer Approval — routes | — | ✅ Closed | — | ✅ Confirmed closed | No |
-| S11-3 · Security hardening + NODE_ENV | Critical | 95% | S | ✅ Closed ⚠️ NODE_ENV flag | DECISION-1 only |
-| S11-4 · Add Location | High | 90% | S | ✅ Closed (API wired) | Persistence test |
-| S11-6 · Demo Player full wiring | High | 90% | — | ✅ Closed | DECISION-1 before E2E |
-| S11-7 · Network Map blank render | Medium | 95% | — | ✅ Closed | No |
-| S11-8 · Tech Ops network-wide data | Medium | 95% | — | ✅ Closed | No |
-| S11-1 · Super Admin CRUD — Users & Retailers | Critical | 70% | L | ⚠️ Persistence unconfirmed | Persistence test |
-| S11-2 · Super Admin CRUD — Advertisers | Critical | 70% | M | ⚠️ Persistence unconfirmed | Persistence test |
+| S13-3 · Campaign DELETE guard fix | Critical | XS | 95% | Ready | None |
+| S13-2 · Loop reject + bulk approve | High | S | 55% | Ready — Step 1 req | Step 1 grep |
+| S13-1 · TechOps audit log + screen logs | High | M | 60% | Ready — Step 1 req | Step 1 grep |
+| S13-4 · Telemetry impression persistence | High | M | 70% | Ready — Step 1 req | Step 1 grep |
+| S11-1 · Super Admin CRUD — Users & Retailers | Critical | L | 70% | Carry-over | Persistence test |
+| S11-2 · Super Admin CRUD — Advertisers | Critical | M | 70% | Carry-over | Persistence test |
 
 ---
 
 ## Definition of Done
 
-- [x] S11-5 confirmed closed — routes and `CampaignApprovalList` resolution evidenced @ `335f1c2`
-- [x] S11-3 confirmed closed — `requireRole` guards at `campaigns.js` L135 + L187; `impressionLimiter` at `telemetry.js` L79
-- [x] S11-4 confirmed closed (API) — `router.post` + `StoreRepository.createWithScreens` at `stores.js` L69 + L77
-- [x] S11-6 confirmed closed — `trackImpression` at `Player.jsx` L296 + L327; LoopDemoPlayer collision cleared
-- [x] S11-7 confirmed closed — `h-[600px]` + error boundary + loading states in `NetworkMap.jsx`
-- [x] S11-8 confirmed closed — role-hierarchy branch at `screens.js` L79–L112
-- [x] `BaseRepository.findById()` confirmed present @ L53
-- [x] `CampaignApprovalList` duplicate resolved @ `App.jsx` `335f1c2`
-- [x] SECURITY-V1 confirmed — `requireRole('retaileradmin')` on `PATCH /campaigns/:id/status`
-- [x] SECURITY-V2 confirmed — `requireRole('superadmin')` on `DELETE /campaigns/:id`
+- [x] S11-5 confirmed closed @ `335f1c2`
+- [x] S11-3 confirmed closed — guards at `campaigns.js` L135 + L187
+- [x] S11-4 confirmed closed (API) — `stores.js` L69 + L77
+- [x] S11-6 confirmed closed — `Player.jsx` L296 + L327; Risk 3 cleared
+- [x] S11-7 confirmed closed — `NetworkMap.jsx` `h-[600px]` + error boundary
+- [x] S11-8 confirmed closed — `screens.js` L79–L112
+- [x] `BaseRepository.findById()` confirmed @ L53
+- [x] `CampaignApprovalList` duplicate resolved
+- [x] SECURITY-V1 + SECURITY-V2 + SECURITY-V3 confirmed
 - [x] Risk 3 (`LoopDemoPlayer` collision) cleared
-- [x] **ENUM-AUDIT-3** — ✅ CLOSED @ `e0ea260`. `Player.jsx` `status=APPROVED` confirmed correct. `playlists.js` `'DRAFT'` default bug fixed to `'draft'`. Two enum systems documented (Risk 4).
-- [ ] **DECISION-1** — NODE_ENV guard intent documented and fix applied if needed
-- [ ] S11-1 persistence test passed — UserManagement + RetailerManagement hard-refresh confirmed
-- [ ] S11-2 persistence test passed — AdvertiserManagement hard-refresh confirmed
-- [ ] S11-4 persistence test passed — Add Location hard-refresh confirmed
-- [ ] Route Correction Log applied — no AC or test references `/dashboard/retailer/schedule/calendar`
-- [ ] Blast-radius table complete (Step 4 executed)
+- [x] **ENUM-AUDIT-3** — ✅ CLOSED @ `e0ea260`. `playlists.js` `'DRAFT'` fixed. Two enum systems documented (Risk 4).
+- [ ] **DECISION-1** — NODE_ENV guard documented + fix applied if needed
+- [ ] S11-1 persistence test passed
+- [ ] S11-2 persistence test passed
+- [ ] S11-4 persistence test passed
+- [ ] **S13-3** — `API_ROUTES.md` `DELETE /api/campaigns/:id` guard row corrected. `grep` confirms match.
+- [ ] **S13-2** — loop reject + bulk approve routes confirmed/implemented. `API_ROUTES.md` rows updated. `ScheduleManager.jsx` FIXMEs removed.
+- [ ] **S13-1** — `POST /api/audit-log` + `GET /api/screens/:id/logs` live. `TechOpsDashboard.jsx` FIXMEs removed. `API_ROUTES.md` updated.
+- [ ] **S13-4** — impression persistence wired. `GET /api/telemetry/impressions` live. `LoopAnalytics.jsx` shows real data. Phase 2 TODO removed.
+- [ ] Route Correction Log applied — no AC references `/dashboard/retailer/schedule/calendar`
+- [ ] Blast-radius table complete ✅
 - [ ] `docs/MVP_SPRINT_PLAN.md` updated with Sprint 13 entry
 - [ ] No story marked Done without a commit SHA cited as evidence
-- [ ] No vague acceptance criteria ("works correctly" language banned)
-- [ ] `GUARDRAIL-5`: this file is at `docs/sprint13.md` and linked from `MVP_SPRINT_PLAN.md`
+- [ ] No vague acceptance criteria
+- [ ] `GUARDRAIL-5`: this file at `docs/sprint13.md`, linked from `MVP_SPRINT_PLAN.md`
 
 ---
 
-*Sprint 13 doc created 2026-06-07. Scaffold only — awaiting Step 1 (Repository Reality Check) to populate story details, confidence scores, and blast-radius table.*
-*Updated 2026-06-07 (commit `fb5ddcf`): Step 1 corrections — S11-5 confirmed closed; route path corrected; `LoopDemoPlayer.jsx` added.*
-*Updated 2026-06-07 (commit `5b84c94`): Bash block results applied — 6 stories confirmed closed; NODE_ENV guard flag raised (DECISION-1); Risk 3 cleared; `BaseRepository.findById()` confirmed; SECURITY-V1/V2 checked off; Known File Inventory fully grounded. Step 2 unblocked pending DECISION-1 + persistence tests.*
-*Updated 2026-06-07 (commit `e0ea260`): ENUM-AUDIT-3 resolved — `Player.jsx` FIXME comments removed (loops.status uppercase APPROVED confirmed correct); `playlists.js` default `'DRAFT'` → `'draft'` bug fixed. Two enum systems documented as Risk 4. Enum Bug Log added.*
-*Sources: live `App.jsx` @ `335f1c2`, `ad-server/src/api/` @ `294fd25`, PowerShell grep outputs 2026-06-07.*
+## Route Correction Log
+
+| Old path (Sprint 12) | Correct live path (confirmed @ `335f1c2`) | Notes |
+|---|---|---|
+| `/dashboard/retailer/schedule/calendar` | `/dashboard/retailer/schedule` | `/calendar` suffix never existed in the live router. |
+
+---
+
+*Sprint 13 doc created 2026-06-07.*
+*Updated 2026-06-07 (`fb5ddcf`): S11-5 closed; route path corrected; `LoopDemoPlayer.jsx` added.*
+*Updated 2026-06-07 (`5b84c94`): Bash block results — 6 stories closed; DECISION-1 raised; Risk 3 cleared.*
+*Updated 2026-06-07 (`e0ea260` + `6f858e6`): ENUM-AUDIT-3 resolved; `playlists.js` bug fixed; Enum Bug Log + Risk 4 added.*
+*Updated 2026-06-07 (this commit): Step 2 complete — 4 new stories scoped (S13-1 through S13-4) with full AC tables, blast-radius table, dependency map, recommended implementation order.*
+*Sources: live `App.jsx` @ `335f1c2`, `ad-server/src/api/` @ `294fd25`, `docs/API_ROUTES.md`, `docs/MVP_SPRINT_PLAN.md`, PowerShell grep outputs 2026-06-07.*
