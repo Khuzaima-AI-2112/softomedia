@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { apiService } from '../services/ApiService.js';
+import apiService from '../services/ApiService.js';
 import StatusBadge from './StatusBadge.jsx';
 import GlassCard from './GlassCard.jsx';
 
