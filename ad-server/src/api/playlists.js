@@ -28,7 +28,9 @@ router.get('/:id', async (req, res) => {
 // POST /api/playlists - Create new
 router.post('/', async (req, res) => {
     try {
-        const { name, description, status = 'DRAFT', items = [], schedule = {}, assignments = [], is_global = false } = req.body;
+        // Sprint 13 ENUM-AUDIT-3 fix: default was 'DRAFT' (uppercase) — corrected to
+        // lowercase 'draft' to match CAMPAIGN_STATUS canonical enum in constants.js.
+        const { name, description, status = 'draft', items = [], schedule = {}, assignments = [], is_global = false } = req.body;
 
         const id = `pli_${uuidv4().split('-')[0]}`;
         const newPlaylist = await playlistRepository.create(id, {
