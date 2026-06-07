@@ -11,6 +11,18 @@
 - [x] Create `verify_predeploy.js` script
 - [ ] **Verify Production Release**: Monitor first deploy logs for successful Rules and dynamic CORS injection.
 
+### Pre-commit Hooks (one-time dev machine setup)
+- [ ] **Each dev must run** (from `client-app/`):
+  ```bash
+  npx husky install
+  ```
+  After that, any commit introducing a duplicate filename across `components/` and
+  `pages/` will be **blocked before it even hits CI**. The hook runs
+  `scripts/check-duplicate-components.sh` automatically on every `git commit`.
+  > This was added in Sprint 11 after `TicketDashboard`, `TicketDetail`, and
+  > `CampaignApprovalList` each existed in two places with diverging implementations,
+  > causing a build failure. Don't skip this step.
+
 ## 🛡️ Security & Vulnerabilities
 - [ ] **Patch High-Severity XSS**: During verification, `/security` identified a high-severity vulnerability in `react-router` (XSS via Open Redirect) within the `client-app`. Run `npm audit fix` or update the dependency in the next cycle.
 
@@ -97,4 +109,3 @@
 - **Instruction**:
     1. Add `await page.waitForSelector('.main-content-loaded')` or equivalent in layout tests.
     2. Increase global Playwright timeout to 60s for slow environments.
-
