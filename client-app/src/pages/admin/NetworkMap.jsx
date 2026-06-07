@@ -1,8 +1,43 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import GlassCard from '../../components/GlassCard';
+import apiService from '../../services/ApiService';
 
 function NetworkMap() {
     const [selectedRegion, setSelectedRegion] = useState('downtown');
+    const [screens,        setScreens]        = useState([]);
+    const [loadingScreens, setLoadingScreens] = useState(true);
+    const [screenError,    setScreenError]    = useState('');
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                setLoadingScreens(true);
+                const data = await apiService.getScreens();
+                if (!cancelled) setScreens(data || []);
+            } catch (err) {
+                if (!cancelled) setScreenError('Failed to load screen data.');
+                console.error('NetworkMap screen fetch error:', err);
+            } finally {
+                if (!cancelled) setLoadingScreens(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
+
+    const totalScreens = screens.length;
+    const onlineScreens = screens.filter(s => s.status === 'online').length;
+    const onlineRate = totalScreens > 0
+        ? ((onlineScreens / totalScreens) * 100).toFixed(1)
+        : '0.0';
+    // Daily impressions: sum play_count across all screens if available,
+    // otherwise fall back to a dash until telemetry aggregation is wired.
+    const dailyImpressions = screens.reduce((acc, s) => acc + (s.play_count || 0), 0);
+    const dailyImpressionsLabel = dailyImpressions > 0
+        ? dailyImpressions >= 1000
+            ? (dailyImpressions / 1000).toFixed(1) + 'K'
+            : String(dailyImpressions)
+        : '—';
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -24,13 +59,23 @@ function NetworkMap() {
                 </div>
             </div>
 
+            {screenError && (
+                <div
+                    data-testid="network-map-error"
+                    className="p-3 bg-red-900/40 border border-red-700 text-red-300 rounded-lg"
+                >
+                    {screenError}
+                </div>
+            )}
+
             <GlassCard className="h-[600px] relative overflow-hidden flex items-center justify-center bg-slate-100 dark:bg-slate-800">
                 {/* Placeholder for actual Map implementation (e.g. Google Maps or Leaflet) */}
                 <div className="text-center p-8 opacity-60">
                     <span className="material-symbols-outlined text-6xl mb-4 text-slate-400">map</span>
                     <h3 className="text-xl font-bold text-slate-600 dark:text-slate-300">Map Visualization</h3>
                     <p className="max-w-md mx-auto mt-2 text-slate-500">
-                        Interactive map view enabled. Showing 45 active screens in {selectedRegion}.
+                        Interactive map view enabled. Showing{' '}
+                        {loadingScreens ? '…' : onlineScreens} active screens in {selectedRegion}.
                     </p>
 
                     {/* Mock Map Points */}
@@ -49,17 +94,46 @@ function NetworkMap() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <GlassCard>
                     <h3 className="font-bold text-lg mb-2">Region Stats</h3>
-                    <div className="text-3xl font-bold text-slate-900 dark:text-white">124</div>
+                    {loadingScreens ? (
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+                    ) : (
+                        <div
+                            data-testid="stat-total-screens"
+                            className="text-3xl font-bold text-slate-900 dark:text-white"
+                        >
+                            {totalScreens}
+                        </div>
+                    )}
                     <p className="text-sm text-slate-500">Total Screens</p>
                 </GlassCard>
+
                 <GlassCard>
                     <h3 className="font-bold text-lg mb-2">Health</h3>
-                    <div className="text-3xl font-bold text-emerald-500">98%</div>
+                    {loadingScreens ? (
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-500" />
+                    ) : (
+                        <div
+                            data-testid="stat-online-rate"
+                            className="text-3xl font-bold text-emerald-500"
+                        >
+                            {onlineRate}%
+                        </div>
+                    )}
                     <p className="text-sm text-slate-500">Online Rate</p>
                 </GlassCard>
+
                 <GlassCard>
                     <h3 className="font-bold text-lg mb-2">Impressions</h3>
-                    <div className="text-3xl font-bold text-primary">45.2K</div>
+                    {loadingScreens ? (
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+                    ) : (
+                        <div
+                            data-testid="stat-daily-impressions"
+                            className="text-3xl font-bold text-primary"
+                        >
+                            {dailyImpressionsLabel}
+                        </div>
+                    )}
                     <p className="text-sm text-slate-500">Daily Views</p>
                 </GlassCard>
             </div>
