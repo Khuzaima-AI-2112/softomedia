@@ -1,8 +1,26 @@
 # Sprint 11 — Critical & High Quality Gap Task List
 
-**Generated:** 2026-06-06  
-**Source authority:** `current_sprint/sprint11-sre-qa-analysis.md` @ codebase `682eb456`  
+**Generated:** 2026-06-06
+**Updated:** 2026-06-06 — added S11-7, S11-8, confidence table, merge order
+**Source authority:** `current_sprint/sprint11-sre-qa-analysis.md` @ codebase `682eb456`
 **Cross-referenced with:** `current_sprint/sprint11.md`
+
+---
+
+## Confidence Score Summary
+
+| Story | Confidence | Priority | Effort | Merge order |
+|---|---|---|---|---|
+| S11-3 · Security hardening | **97%** | Critical | S | 1 — merge first |
+| S11-7 · Network Map blank render | **88%** | Medium | S | 6 |
+| S11-8 · Tech Ops network-wide data | **85%** | Medium | S | 5 |
+| S11-5 · Retailer approval workflow | **83%** | High | M | 4 |
+| S11-2 · Super Admin CRUD — Advertisers | **82%** | Critical | M | 3 |
+| S11-1 · Super Admin CRUD — Users & Retailers | **80%** | Critical | L | 2 |
+| S11-4 · Retailer CRUD — Add Location | **78%** | High | S | after S11-1 |
+| S11-6 · Demo Player full wiring | **72%** | High | M | last |
+
+**Recommended merge order:** S11-3 → S11-1 + S11-2 (parallel) → S11-5 + S11-8 (parallel) → S11-7 → S11-6
 
 ---
 
@@ -103,6 +121,41 @@ All CRUD forms are UI-only — nothing persists to Firestore.
 
 ---
 
+## Medium Priority Gaps
+
+---
+
+### S11-7 · Network Map — Fix Blank Render (88% confidence)
+
+Map renders blank — likely a missing `VITE_GOOGLE_MAPS_API_KEY` env var or a zero-height container.
+
+- [ ] `cat client-app/src/pages/admin/NetworkMap.jsx` — read full file to identify root cause (key check vs. container height vs. missing `useEffect`)
+- [ ] `grep -n "GOOGLE_MAPS\|VITE_GOOGLE" .env.example client-app/.env.example 2>/dev/null` — confirm key is documented
+- [ ] `grep -n "height\|min-height\|style=" client-app/src/pages/admin/NetworkMap.jsx` — confirm map container has a non-zero height (CSS `height: 0` is a common blank-map cause)
+- [ ] **Case A — API key present:** verify Google Maps tiles render; at least one pin visible when `GET /api/screens` returns data; pin click opens tooltip with screen name and status
+- [ ] **Case B — API key absent:** add `data-testid="map-unavailable-msg"` fallback — text must read `"Map unavailable — API key not configured"`; container must have `min-height: 400px`; no uncaught Google Maps JS exception in console
+- [ ] Add `VITE_GOOGLE_MAPS_API_KEY=your_key_here  # Required for Network Map` to `docs/ENVIRONMENT_SETUP.md`
+
+---
+
+### S11-8 · Tech Ops Dashboard — Network-Wide Screen Data (85% confidence)
+
+Dashboard shows filtered/incomplete data instead of the full network view.
+
+- [ ] `ls client-app/src/pages/tech/` — confirm exact Tech Ops dashboard filename before starting
+- [ ] `grep -n "requireRole\|router.get\|techops\|retaileradmin" ad-server/src/api/screens.js` — confirm role-conditional branch exists or add it
+- [ ] `grep -n "findAll\|getAll\|where.*retailer" ad-server/src/repositories/ScreenRepository.js` — confirm unfiltered `findAll()` exists; add if missing
+- [ ] Implement role-conditional query branch:
+  - `techops` → `GET /api/screens` returns **all screens, all retailers** — 200
+  - `retaileradmin` → filtered by `retailer_id` from session — 200
+  - `brand` → 403
+- [ ] Dashboard KPIs must show: total screens, online count, offline count, screens with active campaigns
+- [ ] Screen list must be sortable by status and last heartbeat
+- [ ] Add `data-testid` attributes: `total-screens-kpi`, `online-screens-kpi`, `offline-screens-kpi`, `active-campaigns-kpi`, `screen-table`, `screen-row-{id}`, `sort-by-status`, `sort-by-heartbeat`
+- [ ] **GUARDRAIL-G3:** `requireRole('techops')` confirmed on unfiltered variant
+
+---
+
 ## Pre-Sprint Checklist (resolve before planning meeting)
 
 - [ ] Run `ls ad-server/src/api/` — confirm which of `users.js`, `retailers.js`, `advertisers.js`, `stores.js` exist
@@ -116,3 +169,4 @@ All CRUD forms are UI-only — nothing persists to Firestore.
 ---
 
 *Task list generated 2026-06-06 from `sprint11-sre-qa-analysis.md` cross-referenced with `sprint11.md`.*
+*Updated 2026-06-06 — added S11-7 (Network Map), S11-8 (Tech Ops), confidence score summary table, and recommended merge order.*
