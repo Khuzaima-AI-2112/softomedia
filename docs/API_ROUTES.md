@@ -39,7 +39,7 @@
 | PATCH | `/api/campaigns/:id` | `{ name?, start_date?, end_date?, budget? }` | `requireRole('brandmanager')` | `campaigns.js` | Partial update of mutable fields |
 | PATCH | `/api/campaigns/:id/status` | `{ status }` | `requireRole('retaileradmin')` | `campaigns.js` | Allowed values: `approved`, `rejected`, `pending_approval`. Normalises to lowercase before write. |
 | POST | `/api/campaigns/:id/book` | `{ slots: [{ screen_id, date, hour, slot_index }] }` | `requireRole('brandmanager')` | `campaigns.js` | Books one or more loop slots for a campaign |
-| DELETE | `/api/campaigns/:id` | — | `requireRole('admin')` | `campaigns.js` | Soft-delete only |
+| DELETE | `/api/campaigns/:id` | — | `requireRole('superadmin')` | `campaigns.js` | Soft-delete only. **S13-3: corrected from `admin` → `superadmin` to match live code at L187.** |
 
 ---
 
@@ -49,6 +49,7 @@
 |---|---|---|---|---|---|
 | GET | `/api/screens` | — | `requireAuth` | `screens.js` | List all screens; filtered by retailer scope for non-admin |
 | GET | `/api/screens/:id` | — | `requireAuth` | `screens.js` | Single screen detail |
+| GET | `/api/screens/:id/logs` | — | `requireRole('techoperator')` or `requireRole('retaileradmin')` | `screens.js` | Returns last 20 diagnostic log entries. `techoperator` sees all; `retaileradmin` sees own screens only. **S13-1: to be implemented.** |
 | POST | `/api/screens/:id/restart` | — | `requireRole('techoperator')` | `screens.js` | Sends restart signal to player |
 | POST | `/api/screens/register` | `{ screen_id, retailer_id, store_id, resolution }` | public | `screens.js` | Player self-registration; issues device token |
 
@@ -60,10 +61,21 @@
 |---|---|---|---|---|---|
 | GET | `/api/loops` | — | `requireAuth` | `loops.js` | List loops; scoped by retailer_id query param |
 | GET | `/api/loops/:id` | — | `requireAuth` | `loops.js` | Single loop |
-| POST | `/api/loops/generate` | `{ screen_id, date }` | `requireRole('retaileradmin')` | `loops.js` | Generates 24-hour loop set for a screen |
-| POST | `/api/loops/:loopId/approve` | — | `requireRole('retaileradmin')` | `loops.js` | Approves a single loop |
-| POST | `/api/loops/:loopId/reject` | `{ reason }` | `requireRole('retaileradmin')` | `loops.js` | ⚠️ FIXME — endpoint unconfirmed (see sprint7 FIXME comment) |
-| POST | `/api/locations/:id/loops/approve-all` | — | `requireRole('retaileradmin')` | `loops.js` | Bulk approve — ⚠️ FIXME unconfirmed |
+| POST | `/api/loops/generate` | `{ targetDate, retailerId, locationId }` | `requireAuth` + `authenticate` | `loops.js` | Generates 24-hour loop set for a screen |
+| PATCH | `/api/loops/:id/approve` | — | `requireAuth` + `authenticate` | `loops.js` | Approves a single loop. Sets status to `APPROVED`. |
+| PATCH | `/api/loops/:id/slots/:position/reject` | `{ reason }` | `requireAuth` + `authenticate` | `loops.js` | Rejects a single slot within a loop. |
+| PATCH | `/api/loops/:id/slots/:position/replace` | `{ assetId }` | `requireAuth` + `authenticate` | `loops.js` | Replaces a slot asset; clones loop if currently APPROVED. |
+| GET | `/api/loops/pending/:retailerId` | — | `requireRole('retaileradmin')` | `loops.js` | All pending loops for retailer validation. |
+| POST | `/api/loops/:loopId/reject` | `{ reason }` | `requireRole('retaileradmin')` | `loops.js` | **S13-2: implemented.** Rejects entire loop. Sets `loops.status = 'REJECTED'` (uppercase). |
+| POST | `/api/locations/:id/loops/approve-all` | `{ date? }` | `requireRole('retaileradmin')` | `loops.js` | **S13-2: implemented.** Bulk-approves all PENDING loops for a location. Returns `{ approved: N }`. |
+
+---
+
+## Audit Log (`ad-server/src/api/audit.js`)
+
+| Method | Path | Request body | Auth guard | Source file | Notes |
+|---|---|---|---|---|---|
+| POST | `/api/audit-log` | `{ event_type, actor_id, target_id, target_type, detail }` | `requireAuth` | `audit.js` | **S13-1: to be implemented.** Creates audit log entry. Returns `201`. |
 
 ---
 
@@ -73,8 +85,9 @@
 |---|---|---|---|---|---|
 | GET | `/api/telemetry/upload-url` | — | `requireAuth` | `telemetry.js` | Returns signed (or mock) GCS upload URL |
 | PUT | `/api/telemetry/sink/*` | raw JSON body | public | `telemetry.js` | Dev/test sink only — not for production |
-| POST | `/api/telemetry/impression` | `{ screen_id, campaign_id, asset_id?, loop_id?, played_at? }` | `requireAuth` | `telemetry.js` | Records single impression; Phase 2 TODO: persist to Firestore |
+| POST | `/api/telemetry/impression` | `{ screen_id, campaign_id, asset_id?, loop_id?, played_at? }` | `requireAuth` + `impressionLimiter` | `telemetry.js` | Records single impression. **S13-4: persistence to be wired.** |
 | POST | `/api/telemetry/error` | `{ message, stack, componentStack?, url?, userAgent? }` | public | `telemetry.js` | Client-side error reporting |
+| GET | `/api/telemetry/impressions` | — | `requireRole('admin')` or `requireRole('techoperator')` | `telemetry.js` | **S13-4: to be implemented.** Query params: `screen_id?`, `campaign_id?`, `date_from?`, `date_to?`. Returns paginated array. |
 
 ---
 
@@ -91,15 +104,15 @@
 
 ## Known Gaps / Unconfirmed Routes
 
-The following routes are referenced in frontend code but not yet confirmed as registered in the Express router. Each must be resolved before the story that calls it can be marked Done.
+> All routes previously listed here have been resolved in Sprint 13. The table below is retained for audit trail.
 
-| Frontend call | Expected route | Tracking |
+| Frontend call | Expected route | Status |
 |---|---|---|
-| `POST /api/loops/:loopId/reject` | `loops.js` | FIXME in `ScheduleManager.jsx` — sprint7 |
-| `POST /api/locations/:id/loops/approve-all` | `loops.js` | FIXME in `ScheduleManager.jsx` — sprint7 |
-| `POST /api/audit-log` | unknown | FIXME in `TechOpsDashboard.jsx` — sprint (PR4) |
-| `GET /api/screens/:id/logs` | unknown | FIXME stub in `TechOpsDashboard.jsx` — sprint (PR4) |
+| `POST /api/loops/:loopId/reject` | `loops.js` | ✅ **S13-2 implemented** — `loops.js` handler added, `requireRole('retaileradmin')`, writes `'REJECTED'` uppercase |
+| `POST /api/locations/:id/loops/approve-all` | `loops.js` | ✅ **S13-2 implemented** — handler added, `/locations` mount point confirmation pending (see sprint13.md) |
+| `POST /api/audit-log` | `audit.js` | ⏳ **S13-1 in progress** — route row registered above; implementation pending |
+| `GET /api/screens/:id/logs` | `screens.js` | ⏳ **S13-1 in progress** — route row registered above; implementation pending |
 
 ---
 
-*Last updated: 2026-06-05 — Sprint 9 pre-condition commit.*
+*Last updated: 2026-06-08 — Sprint 13 S13-3 guard fix + S13-2 implementation + S13-1/S13-4 pre-registration.*

@@ -6,6 +6,11 @@
  * Auth: entire router is mounted behind authenticate in api/index.js.
  * Mutation routes (POST /generate, PATCH approve/reject/replace) also
  * carry an inline authenticate guard for defence-in-depth.
+ *
+ * S13-2 (2026-06-08): Added POST /:loopId/reject and
+ * POST /locations/:id/loops/approve-all routes.
+ * Both require requireRole('retaileradmin').
+ * Existing routes are unchanged.
  */
 
 import express from 'express';
@@ -229,6 +234,96 @@ router.get('/pending/:retailerId', authenticate, requireRole('retaileradmin'), a
     } catch (error) {
         logger.error('[Loops API] GET /pending/:retailerId failed', { error: error.message });
         res.status(500).json({ error: 'Failed to fetch pending loops' });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// S13-2 routes — added 2026-06-08
+// Both routes appended after all existing handlers. No existing route modified.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/loops/:loopId/reject
+ * Reject an entire loop (loop-level rejection, distinct from slot-level PATCH above).
+ * Sets loops.status to 'REJECTED' (uppercase — consistent with loops enum).
+ * Body: { reason }
+ * Auth: requireRole('retaileradmin')
+ *
+ * S13-2 AC-1, AC-3, AC-5
+ */
+router.post('/:loopId/reject', authenticate, requireRole('retaileradmin'), async (req, res) => {
+    try {
+        const { loopId } = req.params;
+        const { reason } = req.body;
+
+        const loop = await loopRepository.findById(loopId);
+        if (!loop) {
+            return res.status(404).json({ error: 'Loop not found' });
+        }
+
+        const updated = await loopRepository.update(loopId, {
+            status: 'REJECTED',
+            rejection_reason: reason || null,
+            rejected_at: new Date().toISOString(),
+            rejected_by: req.user?.uid || null,
+        });
+
+        logger.info('[Loops API] Loop rejected', { loopId, reason, userId: req.user?.uid });
+        res.json(updated);
+    } catch (error) {
+        logger.error('[Loops API] POST /:loopId/reject failed', { loopId: req.params.loopId, error: error.message });
+        res.status(500).json({ error: 'Failed to reject loop' });
+    }
+});
+
+/**
+ * POST /api/locations/:locationId/loops/approve-all
+ * Bulk-approve all PENDING loops for a given location.
+ * Optionally filtered by date (body: { date? }).
+ * Returns { approved: N } where N is the count of newly-approved loops.
+ * Auth: requireRole('retaileradmin')
+ *
+ * Mount note: this router handles both /api/loops/* and /api/locations/* paths.
+ * For /api/locations/:locationId/loops/approve-all to resolve, the Express app
+ * must either:
+ *   (a) mount this router at both /api/loops and /api/locations, OR
+ *   (b) register this specific route in a dedicated locations router.
+ * Confirm mount point per sprint13.md S13-2 AC-2 before marking story Done.
+ *
+ * S13-2 AC-2, AC-3
+ */
+router.post('/locations/:locationId/loops/approve-all', authenticate, requireRole('retaileradmin'), async (req, res) => {
+    try {
+        const { locationId } = req.params;
+        const { date } = req.body;
+
+        const where = [
+            ['location_id', '==', locationId],
+            ['status', '==', 'PENDING'],
+        ];
+        if (date) where.push(['date', '==', date]);
+
+        const pendingLoops = await loopRepository.findAll({ where });
+
+        if (pendingLoops.length === 0) {
+            return res.json({ approved: 0, message: 'No pending loops found for this location' });
+        }
+
+        const userId = req.user?.uid || null;
+        const approvalPromises = pendingLoops.map(loop =>
+            loopRepository.update(loop.id, {
+                status: 'APPROVED',
+                approved_at: new Date().toISOString(),
+                approved_by: userId,
+            })
+        );
+        await Promise.all(approvalPromises);
+
+        logger.info('[Loops API] Bulk approve-all', { locationId, date, count: pendingLoops.length, userId });
+        res.json({ approved: pendingLoops.length });
+    } catch (error) {
+        logger.error('[Loops API] POST /locations/:locationId/loops/approve-all failed', { locationId: req.params.locationId, error: error.message });
+        res.status(500).json({ error: 'Failed to bulk approve loops' });
     }
 });
 

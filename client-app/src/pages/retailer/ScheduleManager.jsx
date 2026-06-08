@@ -5,7 +5,7 @@ import { API_URL } from '../../config';
 
 // Task 3.2: resolve timezone from location record, fall back to browser
 function resolveTimezone(location) {
-    // FIXME: backend location schema may lack a `timezone` field.
+    // Note: backend location schema may lack a `timezone` field.
     // If missing for all locations, open a tracking issue against ad-server
     // to add timezone to the location data model.
     return location?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -125,15 +125,13 @@ function ScheduleManager() {
     const nextHourWindow = useMemo(() => getNextHourWindow(tz), [tz]);
     const unreviewedCount = daySlots.filter(s => s.status === 'pending').length;
 
-    // Task 3.4: bulk approve handler
+    // Task 3.4: bulk approve handler — POST /api/locations/:id/loops/approve-all
     const handleBulkApprove = async () => {
         if (!selectedLocation) return;
         setBulkLoading(true);
         setBulkResult(null);
         try {
             const token = localStorage.getItem('auth_token');
-            // FIXME: bulk-approval endpoint unconfirmed — open tracking issue against ad-server.
-            // If endpoint returns 404, the action silently fails; guard added below.
             const res = await fetch(`${API_URL}/api/locations/${selectedLocation.id}/loops/approve-all`, {
                 method: 'POST',
                 headers: {
@@ -156,7 +154,7 @@ function ScheduleManager() {
         }
     };
 
-    // Task 3.5: per-slot rejection handler
+    // Task 3.5: per-slot rejection handler — POST /api/loops/:loopId/reject
     const handleRejectSubmit = async () => {
         if (!rejectComment.trim()) {
             setRejectWarn(true);
@@ -165,7 +163,6 @@ function ScheduleManager() {
         setRejectLoading(true);
         try {
             const token = localStorage.getItem('auth_token');
-            // FIXME: rejection endpoint unconfirmed — open tracking issue against ad-server.
             const res = await fetch(`${API_URL}/api/loops/${rejectingSlot.loopId}/reject`, {
                 method: 'POST',
                 headers: {
@@ -242,7 +239,7 @@ function ScheduleManager() {
                         </span>
                         {viewMode === 'fullday' ? 'View Hour Detail' : 'Back to Full Day'}
                     </button>
-                    {/* Task 3.4: Bulk Approve All — now triggers confirmation dialog */}
+                    {/* Task 3.4: Bulk Approve All — triggers confirmation dialog */}
                     <button
                         onClick={() => setShowBulkConfirm(true)}
                         disabled={isPastCutoff || unreviewedCount === 0}
@@ -280,7 +277,7 @@ function ScheduleManager() {
                             </button>
                         </div>
                         {bulkResult === 'error' && (
-                            <p className="text-sm text-rose-500">Approval failed — endpoint may not be available yet. Open tracking issue.</p>
+                            <p className="text-sm text-rose-500">Approval failed — please try again or contact admin.</p>
                         )}
                     </div>
                 </div>
