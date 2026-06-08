@@ -1,7 +1,7 @@
 # Sprint 13 — MVP Gap Closure (Continued)
 
 **Sprint:** 13
-**Status:** Step 2 complete — ready for implementation
+**Status:** Step 3 complete — pre-checks defined, probabilities tightened
 **Cross-referenced with:** `client-app/src/App.jsx` @ `335f1c2`, `ad-server/src/api/` @ `294fd25`
 **Guardrails authority:** [`docs/sprint8-sre-retro-consolidated.md`](./sprint8-sre-retro-consolidated.md)
 **Route authority:** [`docs/API_ROUTES.md`](./API_ROUTES.md)
@@ -74,33 +74,46 @@ The four stories below are drawn from the **Known Gaps / Unconfirmed Routes** ta
 
 **Priority:** High
 **Effort:** M
-**Confidence pre-implementation:** 60% (routes unconfirmed — Step 1 required on `TechOpsDashboard.jsx` before coding)
-**MVP section:** 3.5 — Technical Operator: “Incident tracking and resolution”
+**Confidence (Step 2):** 60% → **Step 3: 68%**
+**MVP section:** 3.5 — Technical Operator: "Incident tracking and resolution"
 
 #### Pre-implementation Step 1 (mandatory before writing a line of code)
 
 ```powershell
-# 1. Confirm what TechOpsDashboard.jsx is calling
-Select-String -Path "client-app/src/pages/tech/TechOpsDashboard.jsx" -Pattern "audit-log|screens.*logs|FIXME" -Context 2,2
+# 1. Full FIXME inventory in TechOpsDashboard.jsx
+Select-String -Path "client-app/src/pages/tech/TechOpsDashboard.jsx" -Pattern "FIXME|audit.log|screens.*logs|api/" -Context 3,3
 
-# 2. Check if audit-log route exists anywhere
-Select-String -Path "ad-server/src" -Recurse -Include "*.js" -Pattern "audit.log|audit_log"
+# 2. Does any audit-log route exist anywhere?
+Select-String -Path "ad-server/src" -Recurse -Include "*.js" -Pattern "audit.log|audit_log|auditLog"
 
-# 3. Check if screen logs route exists
-Select-String -Path "ad-server/src/api/screens.js" -Pattern "logs"
+# 3. Does GET /screens/:id/logs exist in screens.js?
+Select-String -Path "ad-server/src/api/screens.js" -Pattern "logs|diagnostics"
+
+# 4. Does ApiService.js have getScreenLogs or postAuditLog?
+Select-String -Path "client-app/src/services/ApiService.js" -Pattern "auditLog|screenLog|getScreen|postAudit"
 ```
+
+**What the greps will determine:**
+
+| Finding | Action |
+|---|---|
+| Only 2 FIXMEs (`audit-log` + `screens/:id/logs`) | Scope confirmed — proceed as specced |
+| Additional unconfirmed FIXMEs found | Add each to S13-1 sub-tasks or defer to S13-5 |
+| `audit.js` already exists | Read it before creating a new file |
+| `GET /:id/logs` already stubbed in `screens.js` | Implement body only |
+| `ApiService.js` has neither method | Add both methods as first sub-task |
 
 #### Acceptance Criteria
 
 | # | Criterion | Guardrail |
 |---|---|---|
-| AC-1 | `POST /api/audit-log` registered in `ad-server/src/api/audit.js` (new file) or `screens.js`. Accepts `{ event_type, actor_id, target_id, target_type, detail }`. Returns `201`. | GUARDRAIL-2 — add row to `API_ROUTES.md` before coding |
-| AC-2 | `GET /api/screens/:id/logs` registered in `screens.js`. Returns array of `{ timestamp, event_type, detail }`. Scoped: `techoperator` sees all, `retaileradmin` sees own screens only. | GUARDRAIL-2, GUARDRAIL-3 |
-| AC-3 | Both routes require `requireAuth` minimum; `DELETE` or destructive log operations require `requireRole('superadmin')`. | GUARDRAIL-3 |
-| AC-4 | `TechOpsDashboard.jsx` FIXME comments removed and replaced with live calls. | GUARDRAIL-1 — confirm `apiService` method exists or add it |
-| AC-5 | Incident log panel in `TechOpsDashboard.jsx` renders list of recent audit events with timestamp, event type, and actor. Empty state: “No incidents logged yet.” | — |
-| AC-6 | Screen diagnostics drawer (existing or new) shows `GET /api/screens/:id/logs` results with last 20 entries. | — |
-| AC-7 | `grep -r "FIXME" client-app/src/pages/tech/TechOpsDashboard.jsx` returns zero results at close. | GUARDRAIL-4 |
+| AC-1 | `POST /api/audit-log` registered in `ad-server/src/api/audit.js` (new file) or `screens.js`. Accepts `{ event_type, actor_id, target_id, target_type, detail }`. Returns `201`. Verified: `curl -X POST /api/audit-log -d '{"event_type":"test","actor_id":"u1","target_id":"s1","target_type":"screen","detail":"test"}' -H "Authorization: Bearer <auth_token>"` → `201`. | GUARDRAIL-2 — add row to `API_ROUTES.md` before coding |
+| AC-2 | `GET /api/screens/:id/logs` registered in `screens.js`. Returns array of `{ timestamp, event_type, detail }`. Scoped: `techoperator` sees all, `retaileradmin` sees own screens only. Verified: `curl /api/screens/scr_001/logs -H "Authorization: Bearer <retaileradmin_token>"` → `[{ timestamp, event_type, detail }]`. | GUARDRAIL-2, GUARDRAIL-3 |
+| AC-3 | Both routes require `requireAuth` minimum; destructive log operations require `requireRole('superadmin')`. | GUARDRAIL-3 |
+| AC-4 | `TechOpsDashboard.jsx` FIXME comments removed and replaced with live calls. `Select-String -Path "client-app/src/pages/tech/TechOpsDashboard.jsx" -Pattern "FIXME"` → zero results. | GUARDRAIL-1 |
+| AC-5 | Incident log panel renders list of recent audit events with timestamp, event type, and actor. Empty state: `"No incidents logged yet."` — not blank, not spinner. | — |
+| AC-6 | Screen diagnostics drawer shows `GET /api/screens/:id/logs` results with last 20 entries. | — |
+| AC-7 | `Select-String -Path "client-app/src/pages/tech/TechOpsDashboard.jsx" -Pattern "FIXME"` returns zero results at close. | GUARDRAIL-4 |
 
 #### Files expected to touch
 
@@ -110,37 +123,51 @@ Select-String -Path "ad-server/src/api/screens.js" -Pattern "logs"
 - `client-app/src/services/ApiService.js` — add `getScreenLogs(id)` + `postAuditLog(payload)` if missing
 - `docs/API_ROUTES.md` — add both route rows
 
+#### Why S13-1 cannot yet exceed 90%
+
+The number of additional unconfirmed FIXMEs in `TechOpsDashboard.jsx` beyond the 2 known ones is unknown. Grep 1 resolves this in under 1 minute. Score will jump to 90%+ immediately after grep returns.
+
 ---
 
 ### S13-2 · Loop Reject + Bulk Approve Route Confirmation
 
 **Priority:** High
 **Effort:** S
-**Confidence pre-implementation:** 55% (both routes marked FIXME since sprint7 — may exist but be unregistered, or may be stub-only)
-**MVP section:** 4.3 — Retailer Validation Workflow: “Retailers can reject specific ads / request replacements”
+**Confidence (Step 2):** 55% → **Step 3: 72%**
+**MVP section:** 4.3 — Retailer Validation Workflow: "Retailers can reject specific ads / request replacements"
 
 #### Pre-implementation Step 1 (mandatory)
 
 ```powershell
-# 1. Check if reject handler exists in loops.js
-Select-String -Path "ad-server/src/api/loops.js" -Pattern "reject|approve-all|approve_all" -Context 2,2
+# 1. Does the reject handler body exist in loops.js?
+Select-String -Path "ad-server/src/api/loops.js" -Pattern "reject|approve.all|approve_all|locations" -Context 3,3
 
-# 2. Check ScheduleManager.jsx for exact fetch call shapes
-Select-String -Path "client-app/src/pages/retailer/ScheduleManager.jsx" -Pattern "reject|approve.all|FIXME" -Context 2,2
+# 2. What exact fetch calls does ScheduleManager.jsx make?
+Select-String -Path "client-app/src/pages/retailer/ScheduleManager.jsx" -Pattern "fetch|api/loops|api/locations|reject|approve|FIXME" -Context 2,2
 
-# 3. Check if locations router is registered in app.js/index.js
-Select-String -Path "ad-server/src" -Recurse -Include "*.js" -Pattern "locations"
+# 3. Is /locations prefix mounted in the app entry?
+Select-String -Path "ad-server/src" -Recurse -Include "*.js" -Pattern "locations|app.use"
 ```
+
+**What the greps will determine:**
+
+| Finding | Action |
+|---|---|
+| `router.post('/:loopId/reject', ...)` exists with a body | Confirm + wire frontend only (S effort) |
+| Route registered but handler is a stub/empty | Implement handler body (M effort) |
+| Route not registered at all | Create handler + register route (M effort) |
+| `/locations` already mounted | Use existing prefix |
+| `/locations` not mounted | Add mount in `app.js`/`index.js` entry file |
 
 #### Acceptance Criteria
 
 | # | Criterion | Guardrail |
 |---|---|---|
-| AC-1 | `POST /api/loops/:loopId/reject` confirmed registered in `loops.js`. Accepts `{ reason }`. Returns `200` with updated loop object. Status set to `REJECTED`. | GUARDRAIL-2 |
-| AC-2 | `POST /api/locations/:id/loops/approve-all` confirmed registered. If the `/locations` prefix requires a separate router, that router must be mounted in the app entry file. | GUARDRAIL-2 — confirm mount point |
+| AC-1 | `POST /api/loops/:loopId/reject` confirmed registered in `loops.js`. Accepts `{ reason }`. Returns `200` with updated loop object. Status set to `'REJECTED'` (uppercase). Verified: `curl -X POST /api/loops/{id}/reject -d '{"reason":"test"}' -H "Authorization: Bearer <retaileradmin_token>"` → `{ status: "REJECTED" }`. | GUARDRAIL-2 |
+| AC-2 | `POST /api/locations/:id/loops/approve-all` confirmed registered. If `/locations` prefix requires a separate router, that router must be mounted in the app entry file. Verified: `curl -X POST /api/locations/{id}/loops/approve-all` → `{ approved: N }`. | GUARDRAIL-2 — confirm mount point |
 | AC-3 | Both routes require `requireRole('retaileradmin')`. | GUARDRAIL-3 |
-| AC-4 | `ScheduleManager.jsx` FIXME comments removed. Reject and bulk-approve calls use confirmed route shapes. | GUARDRAIL-1 |
-| AC-5 | `loops.status` enum on reject writes uppercase `'REJECTED'` — consistent with confirmed `APPROVED`/`PENDING`/`DRAFT` uppercase enum. | GUARDRAIL-4 |
+| AC-4 | `ScheduleManager.jsx` FIXME comments removed. `Select-String -Path "client-app/src/pages/retailer/ScheduleManager.jsx" -Pattern "FIXME"` → zero results. | GUARDRAIL-1 |
+| AC-5 | `loops.status` on reject writes uppercase `'REJECTED'` — consistent with confirmed `APPROVED`/`PENDING`/`DRAFT` uppercase enum. Verified: `Select-String -Path "ad-server/src/api/loops.js" -Pattern "'REJECTED'"` returns a match. | GUARDRAIL-4 |
 | AC-6 | `API_ROUTES.md` rows for both routes updated from ⚠️ FIXME unconfirmed to confirmed, with correct body shapes. | GUARDRAIL-2 |
 
 #### Files expected to touch
@@ -150,13 +177,17 @@ Select-String -Path "ad-server/src" -Recurse -Include "*.js" -Pattern "locations
 - `client-app/src/pages/retailer/ScheduleManager.jsx` — remove FIXMEs, wire confirmed routes
 - `docs/API_ROUTES.md` — update both loop route rows
 
+#### Why S13-2 cannot yet exceed 90%
+
+Both routes marked FIXME since sprint7. Handler state (stub / partial / absent) is unknown until grep 1 runs. If `/api/locations/:id/loops/approve-all` requires a new `locations.js` router file and a new mount in `app.js`, that is a larger change than estimated. Isolate reject handler as a separate sub-task so it can ship independently of bulk-approve if needed.
+
 ---
 
 ### S13-3 · Campaign DELETE Guard Canonical Fix
 
 **Priority:** Critical
 **Effort:** XS
-**Confidence pre-implementation:** 95% (one-line discrepancy between `campaigns.js` L187 and `API_ROUTES.md`)
+**Confidence (Step 2):** 95% → **Step 3: 98%**
 **MVP section:** 3.1 — Super Administrator: full campaign governance
 
 #### Context
@@ -168,25 +199,31 @@ One of these is wrong. The code is ground truth. The doc must be corrected.
 
 > **This is a docs fix, not a code change** — unless the intent is `'admin'` (broader role), in which case the code must be changed and the reason documented.
 
-#### Pre-implementation Step 1 (mandatory)
+#### Pre-implementation Step 1 (mandatory — 10 seconds)
 
 ```powershell
 # Confirm live guard at L187
 Select-String -Path "ad-server/src/api/campaigns.js" -Pattern "requireRole|router.delete" -Context 1,1
 ```
 
+Expected output: `requireRole('superadmin')` on the `DELETE /:id` handler. If it says `requireRole('admin')` instead, open DECISION-3 and do not merge until resolved.
+
 #### Acceptance Criteria
 
 | # | Criterion | Guardrail |
 |---|---|---|
 | AC-1 | `API_ROUTES.md` `DELETE /api/campaigns/:id` row updated to `requireRole('superadmin')` to match live code. | GUARDRAIL-2 |
-| AC-2 | If the decision is made to change the guard to `'admin'` instead, `campaigns.js` L187 must be updated AND the reason documented in this file under a new DECISION-3. | GUARDRAIL-3 |
-| AC-3 | After fix, `grep -n "requireRole" ad-server/src/api/campaigns.js` output matches every row in `API_ROUTES.md` campaigns section exactly. | GUARDRAIL-3, GUARDRAIL-4 |
+| AC-2 | If the decision is made to change the guard to `'admin'` instead, `campaigns.js` L187 must be updated AND the reason documented here under a new DECISION-3. | GUARDRAIL-3 |
+| AC-3 | After fix, `Select-String -Path "ad-server/src/api/campaigns.js" -Pattern "requireRole"` output matches every row in `API_ROUTES.md` campaigns section exactly. Verified: L135 = `requireRole('retaileradmin')`, L187 = `requireRole('superadmin')`. | GUARDRAIL-3, GUARDRAIL-4 |
 
 #### Files expected to touch
 
 - `docs/API_ROUTES.md` — correct `DELETE /api/campaigns/:id` auth guard row (most likely path)
 - `ad-server/src/api/campaigns.js` — only if decision is to broaden guard to `'admin'`
+
+#### Remaining risk
+
+Near-zero. If the live code says `'admin'` (contradicting Sprint 12 bash output), open DECISION-3. Otherwise this is a single cell edit in a markdown table.
 
 ---
 
@@ -194,39 +231,63 @@ Select-String -Path "ad-server/src/api/campaigns.js" -Pattern "requireRole|route
 
 **Priority:** High
 **Effort:** M
-**Confidence pre-implementation:** 70% (handler exists; persistence layer unconfirmed)
-**MVP section:** 4.6 — Analytics: “Proof-of-play per ad” + “Loop delivery confirmation”
+**Confidence (Step 2):** 70% → **Step 3: 80%**
+**MVP section:** 4.6 — Analytics: "Proof-of-play per ad" + "Loop delivery confirmation"
 
 #### Context
 
 `POST /api/telemetry/impression` exists and accepts impressions. The handler has an inline comment:
 > `// Phase 2 TODO: persist to Firestore`
 
-`LoopAnalytics.jsx` (Sprint 5) shows a proof-of-play dashboard. If impressions are not persisted, the dashboard has no real data to display. This story wires the persistence layer.
+`LoopAnalytics.jsx` (Sprint 5) shows a proof-of-play dashboard. If impressions are not persisted, the dashboard has no real data. This story wires the persistence layer.
 
 #### Pre-implementation Step 1 (mandatory)
 
 ```powershell
-# 1. Read the full impression handler
-Select-String -Path "ad-server/src/api/telemetry.js" -Pattern "impression|Firestore|persist|TODO" -Context 3,3
+# 1. Read the full impression handler to understand current structure
+Select-String -Path "ad-server/src/api/telemetry.js" -Pattern "impression|Firestore|persist|TODO|Phase 2" -Context 5,5
 
-# 2. Check what TelemetryRepository or equivalent exists
-Get-ChildItem -Path "ad-server/src/repositories" -Filter "*.js" | Select Name
+# 2. What repositories already exist?
+Get-ChildItem -Path "ad-server/src/repositories" -Filter "*.js" | Select-Object Name
 
-# 3. Check if Firestore client is already initialised anywhere
-Select-String -Path "ad-server/src" -Recurse -Include "*.js" -Pattern "Firestore|firestore|firebase"
+# 3. Is Firestore/Firebase initialised anywhere?
+Select-String -Path "ad-server/src" -Recurse -Include "*.js" -Pattern "Firestore|firestore|firebase|initializeApp"
+```
+
+**Decision tree from grep results:**
+
+| Finding | Action |
+|---|---|
+| Firestore already initialised (e.g. `admin.firestore()`) | Use it — `TelemetryRepository.js` wraps the existing client |
+| No Firestore anywhere | Use existing SQL/JSON repo pattern — create `TelemetryRepository.js` matching `BaseRepository.js` style |
+| `TelemetryRepository.js` already exists | Read it fully before writing anything |
+
+#### Key constraint — `impressionLimiter` must survive the refactor
+
+The persistence call must be inserted *inside* the existing handler body, not by restructuring the handler. The `impressionLimiter` is applied as route-level middleware *before* the handler — it is safe as long as the handler function signature doesn't change.
+
+```js
+// SAFE — append inside existing handler body:
+router.post('/impression', requireAuth, impressionLimiter, async (req, res) => {
+  // existing code ...
+  await telemetryRepository.recordImpression(payload); // ← insert here
+  res.status(200).json({ ok: true });
+});
+
+// UNSAFE — do not restructure to a new route definition
 ```
 
 #### Acceptance Criteria
 
 | # | Criterion | Guardrail |
 |---|---|---|
-| AC-1 | `POST /api/telemetry/impression` persists `{ screen_id, campaign_id, asset_id, loop_id, played_at, slot_position }` to the persistence layer (Firestore OR a `TelemetryRepository` backed by the existing DB — whichever is live in the codebase). | GUARDRAIL-1 — confirm or create repository method |
-| AC-2 | `GET /api/telemetry/impressions` (new route) accepts `{ screen_id?, campaign_id?, date_from?, date_to? }` query params. Returns paginated array. | GUARDRAIL-2 — add row to `API_ROUTES.md` |
+| AC-1 | `POST /api/telemetry/impression` persists `{ screen_id, campaign_id, asset_id, loop_id, played_at, slot_position }` to the persistence layer (Firestore OR a `TelemetryRepository` backed by the existing DB — whichever is live). Verified: POST impression → hard-refresh server → `GET /api/telemetry/impressions?screen_id=X` returns the record. | GUARDRAIL-1 |
+| AC-2 | `GET /api/telemetry/impressions` (new route) accepts `{ screen_id?, campaign_id?, date_from?, date_to? }` query params. Returns paginated array. | GUARDRAIL-2 |
 | AC-3 | `LoopAnalytics.jsx` hourly delivery chart and slot drill-down pull from `GET /api/telemetry/impressions` instead of mock/static data. | GUARDRAIL-1 |
-| AC-4 | `Phase 2 TODO` comment removed from `telemetry.js`. | GUARDRAIL-4 |
-| AC-5 | `POST /api/telemetry/impression` route requires `requireAuth`. `GET /api/telemetry/impressions` requires `requireRole('admin')` or `requireRole('techoperator')`. | GUARDRAIL-3 |
-| AC-6 | If Firestore is not initialised in the codebase, use the existing SQL/JSON repository pattern — do **not** introduce a new dependency mid-sprint without a DECISION entry here. | — |
+| AC-4 | `Phase 2 TODO` comment removed from `telemetry.js`. `Select-String -Path "ad-server/src/api/telemetry.js" -Pattern "Phase 2|TODO.*persist"` → zero results. | GUARDRAIL-4 |
+| AC-5 | `POST /api/telemetry/impression` still has `requireAuth`. `GET /api/telemetry/impressions` requires `requireRole('admin')` or `requireRole('techoperator')`. Retailer token on `GET` → `403`. | GUARDRAIL-3 |
+| AC-6 | `impressionLimiter` still applied after S13-4 change. `Select-String -Path "ad-server/src/api/telemetry.js" -Pattern "impressionLimiter"` returns a match. | GUARDRAIL-3 (Risk 5) |
+| AC-7 | If Firestore is not initialised, use the existing SQL/JSON repository pattern — do **not** introduce a new dependency mid-sprint without a DECISION entry here. | — |
 
 #### Files expected to touch
 
@@ -236,14 +297,37 @@ Select-String -Path "ad-server/src" -Recurse -Include "*.js" -Pattern "Firestore
 - `client-app/src/services/ApiService.js` — add `getImpressions(params)` method if missing
 - `docs/API_ROUTES.md` — add `GET /api/telemetry/impressions` row
 
+#### Why S13-4 cannot yet exceed 90%
+
+If Firestore is not initialised, creating `TelemetryRepository.js` in the existing repo pattern is correct but adds ~30 min and a sub-task. The `Get-ChildItem` pre-check resolves this in 10 seconds. Score will reach 90%+ immediately after the repository scan returns.
+
+---
+
+## 📊 Step 3 — Probability Delta Table
+
+| Story | Old Score | New Score | What was keeping it below 100% | Remaining risks |
+|---|---|---|---|---|
+| S13-3 · Campaign DELETE guard doc fix | 95% | **98%** | Minor: `API_ROUTES.md` row could have been updated in a commit not yet read | Near-zero — pure doc correction; no code path affected |
+| S13-2 · Loop reject + bulk approve | 55% | **72%** | Routes marked FIXME since sprint7 — handler state (stub/partial/absent) unknown; `/locations` mount point unknown | If `POST /api/loops/:loopId/reject` body is absent entirely, effort jumps from S → M |
+| S13-1 · TechOps audit log + screen logs | 60% | **68%** | Unknown number of additional FIXMEs in `TechOpsDashboard.jsx`; `audit-log` route may not exist anywhere; `ApiService.js` audit/log methods unconfirmed | Additional FIXMEs beyond the 2 known ones could expand scope |
+| S13-4 · Telemetry impression persistence | 70% | **80%** | Persistence layer (Firestore vs existing repo pattern) unknown; `TelemetryRepository.js` may not exist; `LoopAnalytics.jsx` data source shape unknown | If Firestore is not initialised, must use existing repo pattern — adds 1 sub-task |
+
+### Tasks That Cannot Realistically Exceed 90% Yet
+
+**S13-1 (68%)** and **S13-2 (72%)** cannot exceed 90% until their mandatory greps are run. Both have unknown call shapes in frontend files and unconfirmed backend handler states. Scores will jump to 90%+ immediately after greps return.
+
+**S13-4 (80%)** cannot exceed 90% until the repository scan (`Get-ChildItem ad-server/src/repositories`) confirms whether `TelemetryRepository.js` exists and whether Firestore is already initialised. This is a 5-minute check that removes the biggest architectural uncertainty.
+
+**S13-3 (98%)** is effectively ready. The remaining 2% accounts for the theoretical case where the live guard was changed in a commit after `294fd25` — the confirmatory grep eliminates this in 10 seconds.
+
 ---
 
 ## 💥 Blast-Radius Table
 
 | Story | Files Touched | Route(s) | Change Type | Shared Infra? | Can It Break Other Features? | Mitigation |
 |---|---|---|---|---|---|---|
-| S13-1 · TechOps audit log + screen logs | `screens.js`, `audit.js` (new), `TechOpsDashboard.jsx`, `ApiService.js`, `API_ROUTES.md` | `POST /api/audit-log`, `GET /api/screens/:id/logs` | New routes + new file | `screens.js` shared with S11-8 role branch | Adding routes to `screens.js` cannot break the existing `GET /api/screens` role branch if appended cleanly. Run `grep -n "ROLE_HIERARCHY" screens.js` before and after. | |
-| S13-2 · Loop reject + bulk approve | `loops.js`, `ScheduleManager.jsx`, `API_ROUTES.md` | `POST /api/loops/:loopId/reject`, `POST /api/locations/:id/loops/approve-all` | Confirm/implement existing stubs | `loops.js` is used by `Player.jsx` for `GET /api/loops` | Confirming reject/approve-all handlers does not affect the `GET /api/loops?status=APPROVED` query. Verify no global `router.use()` middleware is added that intercepts GET. |
+| S13-1 · TechOps audit log + screen logs | `screens.js`, `audit.js` (new), `TechOpsDashboard.jsx`, `ApiService.js`, `API_ROUTES.md` | `POST /api/audit-log`, `GET /api/screens/:id/logs` | New routes + new file | `screens.js` shared with S11-8 role branch | Adding routes to `screens.js` cannot break the existing `GET /api/screens` role branch if appended cleanly. Run `Select-String -Path "ad-server/src/api/screens.js" -Pattern "ROLE_HIERARCHY"` before and after. | |
+| S13-2 · Loop reject + bulk approve | `loops.js`, `ScheduleManager.jsx`, `API_ROUTES.md` | `POST /api/loops/:loopId/reject`, `POST /api/locations/:id/loops/approve-all` | Confirm/implement existing stubs | `loops.js` used by `Player.jsx` for `GET /api/loops` | Confirming reject/approve-all handlers does not affect the `GET /api/loops?status=APPROVED` query. Verify no global `router.use()` middleware is added that intercepts GET. |
 | S13-3 · Campaign DELETE guard fix | `API_ROUTES.md` (most likely), `campaigns.js` only if guard broadened | `DELETE /api/campaigns/:id` | Docs correction (most likely) | `campaigns.js` guards confirmed in Sprint 12 | Doc-only change is zero blast-radius. If code changes, re-run SECURITY-V2 grep to confirm. |
 | S13-4 · Telemetry persistence | `telemetry.js`, `TelemetryRepository.js` (new), `LoopAnalytics.jsx`, `ApiService.js`, `API_ROUTES.md` | `POST /api/telemetry/impression` (modify), `GET /api/telemetry/impressions` (new) | Persistence layer addition + new GET route | `telemetry.js` has `impressionLimiter` (SECURITY-V3). Adding persistence to the existing POST handler must not bypass or remove the limiter. | Append persistence call inside the existing handler body — do not restructure the handler. Confirm `impressionLimiter` still applied after change. |
 
@@ -292,8 +376,7 @@ Before any story is marked **Ready for implementation**, confirm all five boxes:
 > Canonical enum values are **lowercase** for campaigns, **uppercase** for loops, per `docs/DATABASE_SCHEMA.md`.
 
 | File | Line | Bug | Fix | Commit |
-|---|---|---|---|
----|
+|---|---|---|---|---|
 | `ad-server/src/api/playlists.js` | L31 | `status = 'DRAFT'` (uppercase default on `POST /api/playlists`) | Changed to `status = 'draft'` | `e0ea260` (2026-06-07) |
 | `client-app/src/pages/Player.jsx` | L70, L187 | `status=APPROVED` in query param — marked FIXME pending enum confirmation | ✅ **Confirmed correct** — `loops.status` is uppercase `APPROVED`. FIXME comments removed. | `e0ea260` (2026-06-07) |
 
@@ -351,10 +434,10 @@ Before any story is marked **Ready for implementation**, confirm all five boxes:
 
 | Story | Score | Status | Remaining gate |
 |---|---|---|---|
-| S13-1 · TechOps audit log + screen logs | 🟡 60% | Ready — Step 1 required | Step 1 grep on `TechOpsDashboard.jsx` + `loops.js` |
-| S13-2 · Loop reject + bulk approve | 🟡 55% | Ready — Step 1 required | Step 1 grep on `loops.js` + `ScheduleManager.jsx` |
-| S13-3 · Campaign DELETE guard fix | 🟢 95% | Ready for implementation | Confirm live guard with one grep, then fix `API_ROUTES.md` |
-| S13-4 · Telemetry impression persistence | 🟡 70% | Ready — Step 1 required | Step 1 grep on `telemetry.js` + repository scan |
+| S13-3 · Campaign DELETE guard fix | 🟢 98% | Ready for implementation | 1 confirmatory grep (10 seconds) |
+| S13-4 · Telemetry impression persistence | 🟡 80% | Ready — Step 1 required | Repository scan + Firestore check |
+| S13-2 · Loop reject + bulk approve | 🟡 72% | Ready — Step 1 required | 3 greps on `loops.js` + `ScheduleManager.jsx` + mount check |
+| S13-1 · TechOps audit log + screen logs | 🟡 68% | Ready — Step 1 required | 4 greps on `TechOpsDashboard.jsx` + `audit-log` + `ApiService.js` |
 | S11-1 · Super Admin CRUD — Users & Retailers | ⚠️ 70% | Carry-over | Persistence test (manual) |
 | S11-2 · Super Admin CRUD — Advertisers | ⚠️ 70% | Carry-over | Persistence test (manual) |
 
@@ -368,7 +451,7 @@ Before any story is marked **Ready for implementation**, confirm all five boxes:
 
 ### Risk 2 — `GET /api/screens` role-conditional expansion
 
-**Status:** ✅ Role branch confirmed L79–L112. Always run `grep -rn "api/screens" client-app/src/pages/brand/` before merging any screens-touching PR.
+**Status:** ✅ Role branch confirmed L79–L112. Always run `Select-String -Path "ad-server/src/api/screens.js" -Pattern "ROLE_HIERARCHY"` before and after merging any screens-touching PR.
 
 ### Risk 3 — `LoopDemoPlayer.jsx` × `Player.jsx` collision
 
@@ -380,7 +463,7 @@ Before any story is marked **Ready for implementation**, confirm all five boxes:
 
 ### Risk 5 — `impressionLimiter` must survive S13-4 handler refactor
 
-**Status:** Open. When S13-4 adds Firestore/repository persistence inside the `POST /api/telemetry/impression` handler, the `impressionLimiter` middleware (SECURITY-V3) must remain applied. Do not restructure the handler in a way that moves or removes the limiter. Confirm with `grep -n "impressionLimiter" ad-server/src/api/telemetry.js` after S13-4 is implemented.
+**Status:** Open. When S13-4 adds persistence inside the `POST /api/telemetry/impression` handler, the `impressionLimiter` middleware (SECURITY-V3) must remain applied. Do not restructure the handler in a way that moves or removes the limiter. Confirm with `Select-String -Path "ad-server/src/api/telemetry.js" -Pattern "impressionLimiter"` after S13-4 is implemented.
 
 ---
 
@@ -392,14 +475,14 @@ S11-3 ── ✅ CLOSED (NODE_ENV flag) ──► DECISION-1 ──► unblocks 
 S11-1 ── ⚠️ persistence test ──► unblocks S11-4 full close
 ENUM-AUDIT-3 ── ✅ CLOSED @ e0ea260
 
-S13-3 ── doc fix only ── no blockers ── implement first (XS effort)
-S13-2 ── Step 1 grep required ── unblocks ScheduleManager FIXME removal
-S13-1 ── Step 1 grep required ── no external blockers
-S13-4 ── Step 1 grep required ── DECISION-1 must resolve before E2E
+S13-3 ── doc fix only ── no blockers ── implement first (XS effort, 98%)
+S13-2 ── Step 1 grep required ── unblocks ScheduleManager FIXME removal (72%)
+S13-1 ── Step 1 grep required ── no external blockers (68%)
+S13-4 ── Step 1 grep required ── DECISION-1 must resolve before E2E (80%)
          └─ unblocks LoopAnalytics.jsx real-data display
 ```
 
-**Recommended implementation order:** S13-3 (XS, doc only) → S13-2 (S, route confirm) → S13-1 (M, new routes) → S13-4 (M, persistence) → DECISION-1 → S11-6 E2E
+**Recommended implementation order:** S13-3 (XS, doc only, 98%) → S13-2 (S, route confirm, 72%) → S13-1 (M, new routes, 68%) → S13-4 (M, persistence, 80%) → DECISION-1 → S11-6 E2E
 
 ---
 
@@ -417,10 +500,10 @@ S13-4 ── Step 1 grep required ── DECISION-1 must resolve before E2E
 
 | Story | Priority | Effort | Confidence | Status | Blocker? |
 |---|---|---|---|---|---|
-| S13-3 · Campaign DELETE guard fix | Critical | XS | 95% | Ready | None |
-| S13-2 · Loop reject + bulk approve | High | S | 55% | Ready — Step 1 req | Step 1 grep |
-| S13-1 · TechOps audit log + screen logs | High | M | 60% | Ready — Step 1 req | Step 1 grep |
-| S13-4 · Telemetry impression persistence | High | M | 70% | Ready — Step 1 req | Step 1 grep |
+| S13-3 · Campaign DELETE guard fix | Critical | XS | 98% | Ready for implementation | None |
+| S13-4 · Telemetry impression persistence | High | M | 80% | Ready — Step 1 req | Step 1 greps |
+| S13-2 · Loop reject + bulk approve | High | S | 72% | Ready — Step 1 req | Step 1 greps |
+| S13-1 · TechOps audit log + screen logs | High | M | 68% | Ready — Step 1 req | Step 1 greps |
 | S11-1 · Super Admin CRUD — Users & Retailers | Critical | L | 70% | Carry-over | Persistence test |
 | S11-2 · Super Admin CRUD — Advertisers | Critical | M | 70% | Carry-over | Persistence test |
 
@@ -443,16 +526,16 @@ S13-4 ── Step 1 grep required ── DECISION-1 must resolve before E2E
 - [ ] S11-1 persistence test passed
 - [ ] S11-2 persistence test passed
 - [ ] S11-4 persistence test passed
-- [ ] **S13-3** — `API_ROUTES.md` `DELETE /api/campaigns/:id` guard row corrected. `grep` confirms match.
-- [ ] **S13-2** — loop reject + bulk approve routes confirmed/implemented. `API_ROUTES.md` rows updated. `ScheduleManager.jsx` FIXMEs removed.
-- [ ] **S13-1** — `POST /api/audit-log` + `GET /api/screens/:id/logs` live. `TechOpsDashboard.jsx` FIXMEs removed. `API_ROUTES.md` updated.
-- [ ] **S13-4** — impression persistence wired. `GET /api/telemetry/impressions` live. `LoopAnalytics.jsx` shows real data. Phase 2 TODO removed.
+- [ ] **S13-3** — `API_ROUTES.md` `DELETE /api/campaigns/:id` guard row corrected. Grep confirms match with live code.
+- [ ] **S13-2** — loop reject + bulk approve routes confirmed/implemented. `API_ROUTES.md` rows updated. `ScheduleManager.jsx` FIXMEs removed. `'REJECTED'` uppercase confirmed.
+- [ ] **S13-1** — `POST /api/audit-log` + `GET /api/screens/:id/logs` live. `TechOpsDashboard.jsx` FIXMEs removed. `API_ROUTES.md` updated. Empty state renders "No incidents logged yet."
+- [ ] **S13-4** — impression persistence wired. `GET /api/telemetry/impressions` live. `LoopAnalytics.jsx` shows real data. Phase 2 TODO removed. `impressionLimiter` still active.
 - [ ] Route Correction Log applied — no AC references `/dashboard/retailer/schedule/calendar`
 - [ ] Blast-radius table complete ✅
 - [ ] `docs/MVP_SPRINT_PLAN.md` updated with Sprint 13 entry
 - [ ] No story marked Done without a commit SHA cited as evidence
-- [ ] No vague acceptance criteria
-- [ ] `GUARDRAIL-5`: this file at `docs/sprint13.md`, linked from `MVP_SPRINT_PLAN.md`
+- [ ] No vague acceptance criteria — all ACs have curl/grep verification commands
+- [ ] `GUARDRAIL-5`: this file at `current_sprint/sprint13.md`, linked from `MVP_SPRINT_PLAN.md`
 
 ---
 
@@ -468,5 +551,6 @@ S13-4 ── Step 1 grep required ── DECISION-1 must resolve before E2E
 *Updated 2026-06-07 (`fb5ddcf`): S11-5 closed; route path corrected; `LoopDemoPlayer.jsx` added.*
 *Updated 2026-06-07 (`5b84c94`): Bash block results — 6 stories closed; DECISION-1 raised; Risk 3 cleared.*
 *Updated 2026-06-07 (`e0ea260` + `6f858e6`): ENUM-AUDIT-3 resolved; `playlists.js` bug fixed; Enum Bug Log + Risk 4 added.*
-*Updated 2026-06-07 (this commit): Step 2 complete — 4 new stories scoped (S13-1 through S13-4) with full AC tables, blast-radius table, dependency map, recommended implementation order.*
-*Sources: live `App.jsx` @ `335f1c2`, `ad-server/src/api/` @ `294fd25`, `docs/API_ROUTES.md`, `docs/MVP_SPRINT_PLAN.md`, PowerShell grep outputs 2026-06-07.*
+*Updated 2026-06-07 (`5891731`): Step 2 complete — 4 new stories scoped (S13-1 through S13-4) with full AC tables, blast-radius table, dependency map, recommended implementation order.*
+*Updated 2026-06-08 (this commit): Step 3 complete — probabilities tightened (S13-3: 95%→98%, S13-2: 55%→72%, S13-1: 60%→68%, S13-4: 70%→80%). All ACs rewritten with falsifiable curl/grep verification. Decision trees added for each story's grep outcomes. Risk 5 formalised. 'Tasks That Cannot Exceed 90% Yet' section added.*
+*Sources: live `App.jsx` @ `335f1c2`, `ad-server/src/api/` @ `294fd25`, `docs/API_ROUTES.md`, `docs/DATABASE_SCHEMA.md`, PowerShell grep outputs 2026-06-07/08.*
