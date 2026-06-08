@@ -7,16 +7,50 @@ import { requireRole } from '../middleware/requireRole.js';
 const router = express.Router();
 
 /**
+ * VALID_TRANSITIONS — ordered state machine for campaign status.
+ *
+ * Sprint 14 — S14-2: replaces the flat ALLOWED_STATUSES array.
+ * Only transitions listed here are permitted; all others return 400.
+ *
+ * pending_approval → approved | rejected   (retaileradmin decision)
+ * approved         → live                  (ops go-live)
+ * live             → completed | paused    (ops or scheduler)
+ * paused           → live                  (ops resume)
+ * completed        → (terminal)
+ * rejected         → (terminal)
+ */
+const VALID_TRANSITIONS = {
+    pending_approval: ['approved', 'rejected'],
+    approved:         ['live'],
+    live:             ['completed', 'paused'],
+    paused:           ['live'],
+    completed:        [],
+    rejected:         [],
+};
+
+/**
  * GET /api/campaigns
- * List campaigns with optional status or advertiser filtering.
- * Public within the dashboard shell (no auth guard — all roles can read).
+ * List campaigns.
+ *
+ * Sprint 14 — S14-2: advertiser callers scoped to their own linked_entity_id.
+ * All other authenticated roles (and unauthenticated callers to preserve
+ * backward compat) continue to see all campaigns, filtered only by the
+ * optional ?status= or ?advertiserId= query params.
+ *
+ * NOTE: req.user may be undefined for unauthenticated callers — optional
+ * chaining is used throughout to avoid TypeError on req.user.role.
  */
 router.get('/', async (req, res) => {
     try {
         const { status, advertiserId } = req.query;
         let campaigns;
 
-        if (advertiserId) {
+        // Advertiser-scoped path — show only the caller's own campaigns
+        if (req.user?.role === 'advertiser') {
+            const where = [['advertiser_id', '==', req.user.linked_entity_id]];
+            if (status) where.push(['status', '==', status.toLowerCase()]);
+            campaigns = await campaignRepository.findAll({ where });
+        } else if (advertiserId) {
             campaigns = await campaignRepository.findAll({
                 where: [['advertiser_id', '==', advertiserId]]
             });
@@ -27,6 +61,7 @@ router.get('/', async (req, res) => {
         } else {
             campaigns = await campaignRepository.findAll();
         }
+
         res.json(campaigns);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -36,6 +71,9 @@ router.get('/', async (req, res) => {
 /**
  * GET /api/campaigns/:id
  * Get a single campaign by ID.
+ *
+ * Sprint 14 — S14-2: advertiser callers receive 403 if the campaign's
+ * advertiser_id does not match their linked_entity_id.
  */
 router.get('/:id', async (req, res) => {
     try {
@@ -43,6 +81,15 @@ router.get('/:id', async (req, res) => {
         if (!campaign) {
             return res.status(404).json({ error: 'Campaign not found' });
         }
+
+        // Ownership guard for advertiser role
+        if (
+            req.user?.role === 'advertiser' &&
+            campaign.advertiser_id !== req.user.linked_entity_id
+        ) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
         res.json(campaign);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -53,13 +100,18 @@ router.get('/:id', async (req, res) => {
  * POST /api/campaigns
  * Create a new campaign (defaults to pending_approval).
  *
- * Sprint 9 — Task 9.2: authenticate guard added.
+ * Sprint 9  — Task 9.2 : authenticate guard added.
+ * Sprint 14 — S14-1    : requireRole('advertiser') added.
+ *   Hierarchical guard (DECISION-2): allows advertiser + all higher roles
+ *   so admin oversight of campaign creation is preserved.
  */
-router.post('/', authenticate, async (req, res) => {
+router.post('/', authenticate, requireRole('advertiser'), async (req, res) => {
     try {
         const id = `cmp_${Date.now()}`;
         const campaignData = {
             ...req.body,
+            // Stamp advertiser_id from JWT so callers cannot spoof it
+            advertiser_id: req.body.advertiser_id ?? req.user.linked_entity_id ?? null,
             status: req.body.status || 'pending_approval',
             created_at: new Date().toISOString()
         };
@@ -123,14 +175,14 @@ router.post('/:id/book', authenticate, async (req, res) => {
 
 /**
  * PATCH /api/campaigns/:id/status
- * Transition campaign state (approved/rejected).
+ * Transition campaign state.
  *
- * Requires: retaileradmin role or higher (S8-3).
- * Status is normalised to lowercase before persisting (S8-4).
- *
- * Allowed transitions:
- *   pending_approval -> approved
- *   pending_approval -> rejected
+ * Sprint 8  — S8-3     : requireRole('retaileradmin') guard.
+ * Sprint 8  — S8-4     : status normalised to lowercase before persisting.
+ * Sprint 14 — S14-2    : flat ALLOWED_STATUSES replaced with VALID_TRANSITIONS
+ *   state machine. Transition is validated against the campaign's CURRENT
+ *   status — callers that skip a state (e.g. pending_approval → live) receive
+ *   400 with from/to/allowed fields for clear debugging.
  */
 router.patch('/:id/status', requireRole('retaileradmin'), async (req, res) => {
     try {
@@ -138,17 +190,28 @@ router.patch('/:id/status', requireRole('retaileradmin'), async (req, res) => {
         const rawStatus = req.body.status;
         if (!rawStatus) return res.status(400).json({ error: 'Status is required' });
 
-        const ALLOWED_STATUSES = ['approved', 'rejected', 'pending_approval'];
-        const status = typeof rawStatus === 'string' ? rawStatus.toLowerCase() : rawStatus;
+        const requestedStatus = typeof rawStatus === 'string'
+            ? rawStatus.toLowerCase()
+            : String(rawStatus);
 
-        if (!ALLOWED_STATUSES.includes(status)) {
+        const campaign = await campaignRepository.findById(id);
+        if (!campaign) {
+            return res.status(404).json({ error: 'Campaign not found' });
+        }
+
+        const currentStatus = campaign.status || 'pending_approval';
+        const allowed = VALID_TRANSITIONS[currentStatus] ?? [];
+
+        if (!allowed.includes(requestedStatus)) {
             return res.status(400).json({
-                error: 'Invalid status',
-                allowed: ALLOWED_STATUSES
+                error: 'Invalid status transition',
+                from:    currentStatus,
+                to:      requestedStatus,
+                allowed,
             });
         }
 
-        const updated = await campaignService.updateStatus(id, status);
+        const updated = await campaignService.updateStatus(id, requestedStatus);
         res.json(updated);
     } catch (error) {
         const statusCode = error.message === 'Campaign not found' ? 404 : 500;
@@ -180,8 +243,8 @@ router.put('/:id', authenticate, async (req, res) => {
 /**
  * DELETE /api/campaigns/:id
  *
- * Sprint 9 — Task 9.2: authenticate + requireRole guard added.
- * Sprint 11 — S11-3: tightened from requireRole('admin') to requireRole('superadmin').
+ * Sprint 9  — Task 9.2: authenticate + requireRole guard added.
+ * Sprint 11 — S11-3   : tightened from requireRole('admin') to requireRole('superadmin').
  *   Only superadmin may hard-delete a campaign record.
  */
 router.delete('/:id', authenticate, requireRole('superadmin'), async (req, res) => {

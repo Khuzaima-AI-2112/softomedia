@@ -6,7 +6,7 @@
  * Before adding a route, verify the file exists in the repo.
  * See docs/SofiensBullshit.md for the full prevention plan.
  *
- * Verified file map (as of Sprint 11 final cleanup — 2026-06-07):
+ * Verified file map (as of Sprint 14 — 2026-06-08):
  *
  *   layouts/DashboardLayout.jsx          ✅
  *   pages/Login.jsx                      ✅
@@ -38,6 +38,9 @@
  *                                           Re-exports components/CampaignApprovalList.jsx.
  *                                           RetailerDashboard imports directly from components/.
  *                                           Single source of truth — no duplicate implementations.
+ *   pages/advertiser/AdvertiserDashboard.jsx   ✅  (served at /dashboard/advertiser)          Sprint 14
+ *   pages/advertiser/AdvertiserCampaigns.jsx   ✅  (served at /dashboard/advertiser/campaigns) Sprint 14
+ *   pages/advertiser/AdvertiserNewCampaign.jsx ✅  (served at /dashboard/advertiser/campaigns/new) Sprint 14
  *   pages/tech/TechOpsDashboard.jsx      ✅  (served at /dashboard/techoperator)
  *   pages/tickets/TicketDashboard.jsx    ✅  (served at /dashboard/tickets)
  *   pages/tickets/TicketDetail.jsx       ✅  (served at /dashboard/tickets/:id)
@@ -88,6 +91,11 @@ const ScheduleHistory   = lazy(() => import('./pages/retailer/ScheduleHistory'))
 const ScheduleManager   = lazy(() => import('./pages/retailer/ScheduleManager'));
 const RetailerLoops     = lazy(() => import('./pages/retailer/Loops'));
 const CampaignApprovals = lazy(() => import('./pages/retailer/CampaignApprovalList'));
+
+// ── Advertiser pages ─────────────────────────────────────────────────────────────
+const AdvertiserDashboard  = lazy(() => import('./pages/advertiser/AdvertiserDashboard'));
+const AdvertiserCampaigns  = lazy(() => import('./pages/advertiser/AdvertiserCampaigns'));
+const AdvertiserNewCampaign = lazy(() => import('./pages/advertiser/AdvertiserNewCampaign'));
 
 // ── Ticket pages ─────────────────────────────────────────────────────────────────
 const TicketDashboard = lazy(() => import('./pages/tickets/TicketDashboard'));
@@ -144,6 +152,11 @@ function App() {
                             <Route path="retailer/schedule-manager"   element={<ScheduleManager />} />
                             <Route path="retailer/loops"              element={<RetailerLoops />} />
                             <Route path="retailer/campaign-approvals" element={<CampaignApprovals />} />
+
+                            {/* Advertiser — Sprint 14 */}
+                            <Route path="advertiser"                    element={<AdvertiserDashboard />} />
+                            <Route path="advertiser/campaigns"          element={<AdvertiserCampaigns />} />
+                            <Route path="advertiser/campaigns/new"      element={<AdvertiserNewCampaign />} />
 
                             {/* Tickets */}
                             <Route path="tickets"     element={<TicketDashboard />} />
