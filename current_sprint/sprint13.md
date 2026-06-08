@@ -1,7 +1,7 @@
 # Sprint 13 — MVP Gap Closure (Continued)
 
 **Sprint:** 13
-**Status:** Step 3 complete — pre-checks defined, probabilities tightened
+**Status:** Step 4 complete — isolation audit done, all four stories cleared for implementation
 **Cross-referenced with:** `client-app/src/App.jsx` @ `335f1c2`, `ad-server/src/api/` @ `294fd25`
 **Guardrails authority:** [`docs/sprint8-sre-retro-consolidated.md`](./sprint8-sre-retro-consolidated.md)
 **Route authority:** [`docs/API_ROUTES.md`](./API_ROUTES.md)
@@ -53,7 +53,7 @@ Manual hard-refresh (`Ctrl+Shift+R`) required for UserManagement, AdvertiserMana
 
 ## 🔍 Isolation Verdict
 
-All four new Sprint 13 stories are low blast-radius. No shared repository mutations between S13-1, S13-2, S13-3, S13-4. The only cross-story dependency is DECISION-1, which must be resolved before S13-3 implementation.
+All four new Sprint 13 stories are low blast-radius. No shared repository mutations between S13-1, S13-2, S13-3, S13-4. The only cross-story dependency is DECISION-1, which must be resolved before S13-3 implementation if the guard is being changed in code (not just docs).
 
 ---
 
@@ -65,7 +65,7 @@ The four stories below are drawn from the **Known Gaps / Unconfirmed Routes** ta
 
 1. **S13-1** — TechOps audit log + screen diagnostics log (`POST /api/audit-log`, `GET /api/screens/:id/logs`) — both FIXMEs in `TechOpsDashboard.jsx` since sprint (PR4)
 2. **S13-2** — Loop reject + bulk approve route confirmation (`POST /api/loops/:loopId/reject`, `POST /api/locations/:id/loops/approve-all`) — both FIXMEs in `ScheduleManager.jsx` since sprint7
-3. **S13-3** — Campaign `DELETE` guard correction — live code has `requireRole('admin')` but Sprint 12 spec + `campaigns.js` L187 confirmed `requireRole('superadmin')`. API_ROUTES.md says `requireRole('admin')`. One source must be made canonical.
+3. **S13-3** — Campaign `DELETE` guard correction — live code has `requireRole('superadmin')` but `API_ROUTES.md` says `requireRole('admin')`. Doc must be made canonical.
 4. **S13-4** — Telemetry impression persistence — `POST /api/telemetry/impression` has a `Phase 2 TODO: persist to Firestore` comment. MVP analytics (proof-of-play) requires persistence. This is the final blocker for the S5 `LoopAnalytics.jsx` dashboard to show real data.
 
 ---
@@ -74,7 +74,7 @@ The four stories below are drawn from the **Known Gaps / Unconfirmed Routes** ta
 
 **Priority:** High
 **Effort:** M
-**Confidence (Step 2):** 60% → **Step 3: 68%**
+**Confidence (Step 3):** 68%
 **MVP section:** 3.5 — Technical Operator: "Incident tracking and resolution"
 
 #### Pre-implementation Step 1 (mandatory before writing a line of code)
@@ -117,7 +117,7 @@ Select-String -Path "client-app/src/services/ApiService.js" -Pattern "auditLog|s
 
 #### Files expected to touch
 
-- `ad-server/src/api/screens.js` — add `GET /:id/logs` route
+- `ad-server/src/api/screens.js` — add `GET /:id/logs` route (**append after L112 only — do not touch ROLE_HIERARCHY block**)
 - `ad-server/src/api/audit.js` — new file (or inline in `screens.js`)
 - `client-app/src/pages/tech/TechOpsDashboard.jsx` — wire live calls, remove FIXMEs
 - `client-app/src/services/ApiService.js` — add `getScreenLogs(id)` + `postAuditLog(payload)` if missing
@@ -133,7 +133,7 @@ The number of additional unconfirmed FIXMEs in `TechOpsDashboard.jsx` beyond the
 
 **Priority:** High
 **Effort:** S
-**Confidence (Step 2):** 55% → **Step 3: 72%**
+**Confidence (Step 3):** 72%
 **MVP section:** 4.3 — Retailer Validation Workflow: "Retailers can reject specific ads / request replacements"
 
 #### Pre-implementation Step 1 (mandatory)
@@ -187,7 +187,7 @@ Both routes marked FIXME since sprint7. Handler state (stub / partial / absent) 
 
 **Priority:** Critical
 **Effort:** XS
-**Confidence (Step 2):** 95% → **Step 3: 98%**
+**Confidence (Step 3):** 98%
 **MVP section:** 3.1 — Super Administrator: full campaign governance
 
 #### Context
@@ -231,7 +231,7 @@ Near-zero. If the live code says `'admin'` (contradicting Sprint 12 bash output)
 
 **Priority:** High
 **Effort:** M
-**Confidence (Step 2):** 70% → **Step 3: 80%**
+**Confidence (Step 3):** 80%
 **MVP section:** 4.6 — Analytics: "Proof-of-play per ad" + "Loop delivery confirmation"
 
 #### Context
@@ -322,14 +322,73 @@ If Firestore is not initialised, creating `TelemetryRepository.js` in the existi
 
 ---
 
-## 💥 Blast-Radius Table
+## 🛡️ Step 4 — Isolation Audit
 
-| Story | Files Touched | Route(s) | Change Type | Shared Infra? | Can It Break Other Features? | Mitigation |
-|---|---|---|---|---|---|---|
-| S13-1 · TechOps audit log + screen logs | `screens.js`, `audit.js` (new), `TechOpsDashboard.jsx`, `ApiService.js`, `API_ROUTES.md` | `POST /api/audit-log`, `GET /api/screens/:id/logs` | New routes + new file | `screens.js` shared with S11-8 role branch | Adding routes to `screens.js` cannot break the existing `GET /api/screens` role branch if appended cleanly. Run `Select-String -Path "ad-server/src/api/screens.js" -Pattern "ROLE_HIERARCHY"` before and after. | |
-| S13-2 · Loop reject + bulk approve | `loops.js`, `ScheduleManager.jsx`, `API_ROUTES.md` | `POST /api/loops/:loopId/reject`, `POST /api/locations/:id/loops/approve-all` | Confirm/implement existing stubs | `loops.js` used by `Player.jsx` for `GET /api/loops` | Confirming reject/approve-all handlers does not affect the `GET /api/loops?status=APPROVED` query. Verify no global `router.use()` middleware is added that intercepts GET. |
-| S13-3 · Campaign DELETE guard fix | `API_ROUTES.md` (most likely), `campaigns.js` only if guard broadened | `DELETE /api/campaigns/:id` | Docs correction (most likely) | `campaigns.js` guards confirmed in Sprint 12 | Doc-only change is zero blast-radius. If code changes, re-run SECURITY-V2 grep to confirm. |
-| S13-4 · Telemetry persistence | `telemetry.js`, `TelemetryRepository.js` (new), `LoopAnalytics.jsx`, `ApiService.js`, `API_ROUTES.md` | `POST /api/telemetry/impression` (modify), `GET /api/telemetry/impressions` (new) | Persistence layer addition + new GET route | `telemetry.js` has `impressionLimiter` (SECURITY-V3). Adding persistence to the existing POST handler must not bypass or remove the limiter. | Append persistence call inside the existing handler body — do not restructure the handler. Confirm `impressionLimiter` still applied after change. |
+### Blast-Radius Table (Definitive)
+
+| Story | Files Touched | Change Type | Shared Infra? | Can It Break Other Features? | Verdict |
+|---|---|---|---|---|---|
+| **S13-3** · Campaign DELETE guard doc fix | `docs/API_ROUTES.md` only (most likely) | Docs correction — additive | No shared code. `API_ROUTES.md` is reference-only, never imported by any runtime file | ❌ No | ✅ **Fully isolated. Zero blast-radius.** Ship first. |
+| **S13-2** · Loop reject + bulk approve | `loops.js`, `ScheduleManager.jsx`, `API_ROUTES.md`. Possibly: app entry file if `/locations` mount is new | Additive — new handler bodies or confirming stubs | `loops.js` consumed by `Player.jsx` via `GET /api/loops?status=APPROVED` | ⚠️ Partial — `loops.js` is shared | ✅ **Safe if additive only.** New POST routes cannot affect the existing GET handler. Verify no `router.use()` middleware is added that intercepts all loop routes. |
+| **S13-1** · TechOps audit log + screen logs | `screens.js`, `audit.js` (new), `TechOpsDashboard.jsx`, `ApiService.js`, `API_ROUTES.md` | New routes + new file + FIXME removal | `screens.js` shared with S11-8 role branch (L79–L112). `ApiService.js` shared across all pages. | ⚠️ Partial — `screens.js` and `ApiService.js` are shared | ✅ **Safe if appended cleanly.** `GET /:id/logs` must be added **after L112** — not inside the ROLE_HIERARCHY block. New `ApiService.js` methods are safely additive. |
+| **S13-4** · Telemetry impression persistence | `telemetry.js`, `TelemetryRepository.js` (new), `LoopAnalytics.jsx`, `ApiService.js`, `API_ROUTES.md` | Persistence inserted inside existing handler body; new GET route appended | `telemetry.js` has `impressionLimiter` (SECURITY-V3). `ApiService.js` shared. | ⚠️ Partial — `telemetry.js` is shared | ✅ **Safe if handler body is not restructured.** `impressionLimiter` survives as long as the route registration line is not touched. Verify with AC-6 grep after merge. |
+
+---
+
+### Isolation Verdict — Story by Story
+
+**S13-3 is fully isolated.** Doc-only change with zero runtime surface. Cannot break anything. Implement first.
+
+**S13-2, S13-1, S13-4 are additive-only changes.** No existing handler, route, method, or component is removed or restructured. Each story only appends new code or fills empty stubs. This is the safest class of change: existing behaviour cannot regress unless a shared file is accidentally modified beyond the intended insertion point.
+
+---
+
+### The Two Genuine Cross-Cutting Risks
+
+#### CCR-1 — `screens.js` ROLE_HIERARCHY block integrity (S13-1)
+
+**Risk:** S13-1 adds `GET /:id/logs` to `screens.js`. If a developer edits inside the S11-8 role-hierarchy block (L79–L112) while adding this route, the `techoperator` / `retaileradmin` scoping on the existing `GET /api/screens` route will break silently.
+
+**Mitigation:** Run before and after the merge:
+```powershell
+Select-String -Path "ad-server/src/api/screens.js" -Pattern "ROLE_HIERARCHY"
+```
+If the match count or line number changes, the PR must not be merged until the block is restored.
+
+**Gate:** This grep is mandatory — it is a PR merge gate, not optional.
+
+#### CCR-2 — `impressionLimiter` survival through S13-4 (Risk 5)
+
+**Risk:** S13-4 inserts persistence logic inside the `POST /api/telemetry/impression` handler. The `impressionLimiter` is applied as route-level middleware at the `router.post(...)` call site. If S13-4 lifts the handler into a named function or rewrites the route registration line, the limiter will be silently dropped — no error, no test failure, but SECURITY-V3 is broken.
+
+**Mitigation:** Run after S13-4 is merged:
+```powershell
+Select-String -Path "ad-server/src/api/telemetry.js" -Pattern "impressionLimiter"
+```
+This is AC-6 in S13-4 and is a hard close condition. Story cannot be marked Done without this grep returning a match.
+
+---
+
+### Backward-Compatible Touch Points — Why Each Is Safe
+
+| Touch point | Story | Why additive = backward compatible |
+|---|---|---|
+| `ad-server/src/api/loops.js` | S13-2 | `POST /:loopId/reject` and `POST .../approve-all` are new path segments. The existing `GET /`, `GET /:id`, `POST /`, `PUT /:id` handlers are matched by method + path — adding new routes cannot affect existing ones. Express does not re-evaluate prior routes. |
+| `ad-server/src/api/screens.js` | S13-1 | `GET /:id/logs` is a new path segment. The existing `GET /` with role-hierarchy branching at L79–L112 matches `/` only. `/:id/logs` will not match `/` or `/:id`. Appending after L112 is safe. |
+| `client-app/src/services/ApiService.js` | S13-1, S13-4 | Adding new exported methods (`getScreenLogs`, `postAuditLog`, `getImpressions`) does not alter existing method signatures. No existing caller is affected. JavaScript module exports are additive. |
+| `ad-server/src/api/telemetry.js` | S13-4 | The `POST /impression` handler body receives an `await` call inserted before `res.json(...)`. The route registration line (`router.post('/impression', requireAuth, impressionLimiter, ...)`) is not changed. The limiter stays bound. The response contract (`200 { ok: true }`) is unchanged. |
+
+---
+
+### Non-Blocking Confirmation
+
+**No story in Sprint 13 blocks another story's implementation start**, with one conditional:
+
+- S13-3 (docs-only fix) can be implemented in any order.
+- S13-1, S13-2, S13-4 can each be implemented in parallel — they touch different API files (`screens.js` vs `loops.js` vs `telemetry.js`) and different frontend pages (`TechOpsDashboard.jsx` vs `ScheduleManager.jsx` vs `LoopAnalytics.jsx`).
+- **DECISION-1** (NODE_ENV guard) must be resolved before S13-4 E2E testing in the `test` environment — but it does not block S13-4 implementation start.
+
+**Recommended implementation order (confirmed in Step 4):** S13-3 (XS, doc, zero risk) → S13-2 (S, route confirm, low risk) → S13-1 (M, new routes, medium) → S13-4 (M, persistence, medium). This order ships the highest-confidence items first and keeps the two M-effort stories at the end where any surprises from Step 1 greps have the most planning time.
 
 ---
 
@@ -409,7 +468,7 @@ Before any story is marked **Ready for implementation**, confirm all five boxes:
 |---|---|---|---|
 | `client-app/src/App.jsx` | 11 214 B | ✅ | Route authority. All retailer routes registered. |
 | `client-app/src/pages/Player.jsx` | 23 098 B | ✅ | `trackImpression` at L296 + L327. FIXMEs removed @ `e0ea260`. |
-| `client-app/src/pages/LoopDemoPlayer.jsx` | 35 994 B | ✅ | No collision with `Player.jsx`. Risk 3 cleared. |
+| `client-app/src/pages/LoopDemoPlayer.jsx` | 35 994 B | ✅ NEW | No collision with `Player.jsx`. Risk 3 cleared. |
 | `client-app/src/pages/admin/NetworkMap.jsx` | ~4 097 B | ✅ | Blank-render fix present. |
 | `client-app/src/pages/admin/LoopAnalytics.jsx` | — | ✅ (S13-4 target) | Sprint 5 deliverable. Will be wired to live telemetry in S13-4. |
 | `client-app/src/pages/tech/TechOpsDashboard.jsx` | — | ⚠️ FIXMEs present | S13-1 target. Step 1 grep required before coding. |
@@ -418,7 +477,7 @@ Before any story is marked **Ready for implementation**, confirm all five boxes:
 | `ad-server/src/api/telemetry.js` | 5 135 B | ⚠️ Phase 2 TODO | Impression handler has no persistence yet. S13-4 target. |
 | `ad-server/src/api/loops.js` | 8 674 B | ⚠️ FIXMEs present | Reject + approve-all handlers unconfirmed. S13-2 target. |
 | `ad-server/src/api/playlists.js` | 2 100 B | ✅ | `'DRAFT'` bug fixed @ `e0ea260`. |
-| `ad-server/src/api/screens.js` | 6 683 B | ✅ | Role branch live. S13-1 will add `GET /:id/logs`. |
+| `ad-server/src/api/screens.js` | 6 683 B | ✅ | Role branch live. S13-1 will add `GET /:id/logs` after L112. |
 | `ad-server/src/api/users.js` | 8 219 B | ✅ | — |
 | `ad-server/src/api/retailers.js` | 5 330 B | ✅ | — |
 | `ad-server/src/api/advertisers.js` | 5 268 B | ✅ | — |
@@ -463,7 +522,7 @@ Before any story is marked **Ready for implementation**, confirm all five boxes:
 
 ### Risk 5 — `impressionLimiter` must survive S13-4 handler refactor
 
-**Status:** Open. When S13-4 adds persistence inside the `POST /api/telemetry/impression` handler, the `impressionLimiter` middleware (SECURITY-V3) must remain applied. Do not restructure the handler in a way that moves or removes the limiter. Confirm with `Select-String -Path "ad-server/src/api/telemetry.js" -Pattern "impressionLimiter"` after S13-4 is implemented.
+**Status:** Open. When S13-4 adds persistence inside the `POST /api/telemetry/impression` handler, the `impressionLimiter` middleware (SECURITY-V3) must remain applied. Do not restructure the handler in a way that moves or removes the limiter. Confirm with `Select-String -Path "ad-server/src/api/telemetry.js" -Pattern "impressionLimiter"` after S13-4 is implemented. This is **CCR-2** in the Step 4 isolation audit — a hard PR merge gate.
 
 ---
 
@@ -480,9 +539,12 @@ S13-2 ── Step 1 grep required ── unblocks ScheduleManager FIXME removal 
 S13-1 ── Step 1 grep required ── no external blockers (68%)
 S13-4 ── Step 1 grep required ── DECISION-1 must resolve before E2E (80%)
          └─ unblocks LoopAnalytics.jsx real-data display
+
+CCR-1: S13-1 merge gate ── ROLE_HIERARCHY grep before + after
+CCR-2: S13-4 merge gate ── impressionLimiter grep after
 ```
 
-**Recommended implementation order:** S13-3 (XS, doc only, 98%) → S13-2 (S, route confirm, 72%) → S13-1 (M, new routes, 68%) → S13-4 (M, persistence, 80%) → DECISION-1 → S11-6 E2E
+**Recommended implementation order (confirmed Step 4):** S13-3 (XS, doc only, 98%) → S13-2 (S, route confirm, 72%) → S13-1 (M, new routes, 68%) → S13-4 (M, persistence, 80%) → DECISION-1 → S11-6 E2E
 
 ---
 
@@ -522,16 +584,16 @@ S13-4 ── Step 1 grep required ── DECISION-1 must resolve before E2E (80%
 - [x] SECURITY-V1 + SECURITY-V2 + SECURITY-V3 confirmed
 - [x] Risk 3 (`LoopDemoPlayer` collision) cleared
 - [x] **ENUM-AUDIT-3** — ✅ CLOSED @ `e0ea260`. `playlists.js` `'DRAFT'` fixed. Two enum systems documented (Risk 4).
+- [x] **Step 4 isolation audit complete** — all four stories cleared. CCR-1 (ROLE_HIERARCHY grep gate) and CCR-2 (impressionLimiter grep gate) defined as hard PR merge gates.
 - [ ] **DECISION-1** — NODE_ENV guard documented + fix applied if needed
 - [ ] S11-1 persistence test passed
 - [ ] S11-2 persistence test passed
 - [ ] S11-4 persistence test passed
 - [ ] **S13-3** — `API_ROUTES.md` `DELETE /api/campaigns/:id` guard row corrected. Grep confirms match with live code.
 - [ ] **S13-2** — loop reject + bulk approve routes confirmed/implemented. `API_ROUTES.md` rows updated. `ScheduleManager.jsx` FIXMEs removed. `'REJECTED'` uppercase confirmed.
-- [ ] **S13-1** — `POST /api/audit-log` + `GET /api/screens/:id/logs` live. `TechOpsDashboard.jsx` FIXMEs removed. `API_ROUTES.md` updated. Empty state renders "No incidents logged yet."
-- [ ] **S13-4** — impression persistence wired. `GET /api/telemetry/impressions` live. `LoopAnalytics.jsx` shows real data. Phase 2 TODO removed. `impressionLimiter` still active.
+- [ ] **S13-1** — `POST /api/audit-log` + `GET /api/screens/:id/logs` live. `TechOpsDashboard.jsx` FIXMEs removed. `API_ROUTES.md` updated. Empty state renders "No incidents logged yet." CCR-1 merge gate passed.
+- [ ] **S13-4** — impression persistence wired. `GET /api/telemetry/impressions` live. `LoopAnalytics.jsx` shows real data. Phase 2 TODO removed. `impressionLimiter` still active (CCR-2 merge gate passed).
 - [ ] Route Correction Log applied — no AC references `/dashboard/retailer/schedule/calendar`
-- [ ] Blast-radius table complete ✅
 - [ ] `docs/MVP_SPRINT_PLAN.md` updated with Sprint 13 entry
 - [ ] No story marked Done without a commit SHA cited as evidence
 - [ ] No vague acceptance criteria — all ACs have curl/grep verification commands
@@ -552,5 +614,6 @@ S13-4 ── Step 1 grep required ── DECISION-1 must resolve before E2E (80%
 *Updated 2026-06-07 (`5b84c94`): Bash block results — 6 stories closed; DECISION-1 raised; Risk 3 cleared.*
 *Updated 2026-06-07 (`e0ea260` + `6f858e6`): ENUM-AUDIT-3 resolved; `playlists.js` bug fixed; Enum Bug Log + Risk 4 added.*
 *Updated 2026-06-07 (`5891731`): Step 2 complete — 4 new stories scoped (S13-1 through S13-4) with full AC tables, blast-radius table, dependency map, recommended implementation order.*
-*Updated 2026-06-08 (this commit): Step 3 complete — probabilities tightened (S13-3: 95%→98%, S13-2: 55%→72%, S13-1: 60%→68%, S13-4: 70%→80%). All ACs rewritten with falsifiable curl/grep verification. Decision trees added for each story's grep outcomes. Risk 5 formalised. 'Tasks That Cannot Exceed 90% Yet' section added.*
+*Updated 2026-06-08 (Step 3): Probabilities tightened (S13-3: 95%→98%, S13-2: 55%→72%, S13-1: 60%→68%, S13-4: 70%→80%). All ACs rewritten with falsifiable curl/grep verification. Decision trees added. Risk 5 formalised.*
+*Updated 2026-06-08 (Step 4): Isolation audit complete. Blast-radius table finalised. CCR-1 (ROLE_HIERARCHY merge gate) and CCR-2 (impressionLimiter merge gate) defined. All four stories cleared for implementation. Non-blocking confirmation recorded.*
 *Sources: live `App.jsx` @ `335f1c2`, `ad-server/src/api/` @ `294fd25`, `docs/API_ROUTES.md`, `docs/DATABASE_SCHEMA.md`, PowerShell grep outputs 2026-06-07/08.*
