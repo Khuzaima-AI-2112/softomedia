@@ -1,5 +1,5 @@
 import express from 'express';
-import { screenRepository } from '../repositories/index.js';
+import { screenRepository, impressionRepository } from '../repositories/index.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole, ROLE_HIERARCHY, normalizeRole } from '../middleware/requireRole.js';
 
@@ -117,6 +117,47 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 /**
+ * GET /api/screens/:id/logs
+ * Return recent activity log entries for a single screen.
+ *
+ * Sprint 13 — S13-1: wires the TechOpsDashboard terminal log viewer.
+ *
+ * Implementation: queries the impressions collection filtered by screen_id,
+ * ordered newest-first, limited to 100 entries. This provides a meaningful
+ * activity trace (what the screen last played and when) until a dedicated
+ * device-side log streaming endpoint is available.
+ *
+ * Auth: authenticate + techoperator (level 2) or above.
+ *
+ * Returns:
+ *   200  { logs: Array<ImpressionRecord> }
+ *   404  { error: 'Screen not found' }  when screen_id does not exist
+ *   403  insufficient role
+ */
+router.get('/:id/logs', authenticate, requireRole('techoperator'), async (req, res) => {
+    try {
+        const screenId = req.params.id;
+
+        // Verify the screen exists before returning logs
+        const screen = await screenRepository.findById(screenId);
+        if (!screen) {
+            return res.status(404).json({ error: 'Screen not found', screen_id: screenId });
+        }
+
+        const logs = await impressionRepository.findAll({
+            where: [['screen_id', '==', screenId]],
+            orderBy: ['timestamp', 'desc'],
+            limit: 100,
+        });
+
+        return res.json({ screen_id: screenId, logs });
+    } catch (error) {
+        console.error('GET /api/screens/:id/logs failed:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
  * DELETE /api/screens/:id
  * Remove a screen from the network.
  */
@@ -145,40 +186,39 @@ router.delete('/:id', authenticate, async (req, res) => {
  *   - Response 409: change rejected due to active/upcoming campaigns
  *       { error: 'SCREEN_STATUS_CHANGE_REJECTED_ACTIVE_CAMPAIGNS', message: string }
  */
-router.patch('/:id/status', authenticate, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { status } = req.body || {};
-
-        if (!id) {
-            return res.status(400).json({ error: 'screenId required' });
-        }
-        if (!status || !['active', 'inactive'].includes(status)) {
-            return res.status(400).json({ error: 'Invalid status. Expected "active" or "inactive".' });
-        }
-
-        // When turning a screen inactive, ensure there are no active/upcoming campaigns
-        if (status === 'inactive') {
-            const hasBlockingCampaigns = await screenRepository.hasActiveOrUpcomingCampaigns(id);
-            if (hasBlockingCampaigns) {
-                return res.status(409).json({
-                    error: 'SCREEN_STATUS_CHANGE_REJECTED_ACTIVE_CAMPAIGNS',
-                    message:
-                        'This screen is part of active or upcoming campaigns. Adjust or cancel those campaigns before setting the screen inactive.'
+router.patch('/:id/status', authenticate,
+    async (req, res) => {
+        try {
+            const { status } = req.body;
+            if (!status || !['active', 'inactive'].includes(status)) {
+                return res.status(400).json({
+                    error: 'status must be \'active\' or \'inactive\''
                 });
             }
-        }
 
-        const updated = await screenRepository.updateStatus(id, status);
-        if (!updated) {
-            return res.status(404).json({ error: 'Screen not found' });
-        }
+            const screen = await screenRepository.findById(req.params.id);
+            if (!screen) {
+                return res.status(404).json({ error: 'Screen not found' });
+            }
 
-        res.json(updated);
-    } catch (error) {
-        console.error('PATCH /api/screens/:id/status failed:', error);
-        res.status(500).json({ error: error.message });
+            // Block deactivation when campaigns are live/upcoming
+            if (status === 'inactive') {
+                const hasBlocking = await screenRepository.hasActiveOrUpcomingCampaigns(req.params.id);
+                if (hasBlocking) {
+                    return res.status(409).json({
+                        error: 'SCREEN_STATUS_CHANGE_REJECTED_ACTIVE_CAMPAIGNS',
+                        message: 'Screen cannot be deactivated while active or upcoming campaigns are assigned to it.'
+                    });
+                }
+            }
+
+            const updated = await screenRepository.updateStatus(req.params.id, status);
+            return res.json(updated);
+        } catch (error) {
+            console.error('PATCH /api/screens/:id/status failed:', error);
+            res.status(500).json({ error: error.message });
+        }
     }
-});
+);
 
 export default router;

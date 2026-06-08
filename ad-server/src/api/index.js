@@ -20,6 +20,7 @@ import pricingRouter from './pricing.js';
 import auditRouter from './audit.js';
 import retailersRouter from './retailers.js';
 import advertisersRouter from './advertisers.js';
+import impressionsRouter from './impressions.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -64,5 +65,6 @@ router.use('/schedules', authenticate, schedulesRouter);
 router.use('/users', authenticate, usersRouter);
 router.use('/ops', authenticate, opsRouter);
 router.use('/audit', authenticate, auditRouter);
+router.use('/impressions', authenticate, impressionsRouter);
 
 export default router;

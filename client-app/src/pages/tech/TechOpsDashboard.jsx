@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import { API_URL } from '../../config';
@@ -14,6 +14,9 @@ function TechOpsDashboard() {
 
     // Task 4.4 — terminal log viewer
     const [terminalTarget, setTerminalTarget] = useState(null); // null | { id }
+    const [terminalLogs, setTerminalLogs] = useState([]);       // ImpressionRecord[]
+    const [terminalLoading, setTerminalLoading] = useState(false);
+    const [terminalError, setTerminalError] = useState(null);
 
     // Task 4.5 — search + filter state
     const [searchQuery, setSearchQuery] = useState('');
@@ -40,6 +43,40 @@ function TechOpsDashboard() {
         }
     };
 
+    // Task 4.4 — fetch logs when terminal panel opens
+    const fetchTerminalLogs = useCallback(async (screenId) => {
+        setTerminalLoading(true);
+        setTerminalError(null);
+        setTerminalLogs([]);
+        try {
+            const token = localStorage.getItem('auth_token');
+            const res = await fetch(`${API_URL}/api/screens/${screenId}/logs`, {
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body.error || `HTTP ${res.status}`);
+            }
+            const data = await res.json();
+            setTerminalLogs(data.logs || []);
+        } catch (err) {
+            setTerminalError(err.message);
+        } finally {
+            setTerminalLoading(false);
+        }
+    }, []);
+
+    const openTerminal = useCallback((screen) => {
+        setTerminalTarget({ id: screen.id });
+        fetchTerminalLogs(screen.id);
+    }, [fetchTerminalLogs]);
+
+    const closeTerminal = useCallback(() => {
+        setTerminalTarget(null);
+        setTerminalLogs([]);
+        setTerminalError(null);
+    }, []);
+
     // Task 4.2 + 4.3 — restart with confirmation + audit log
     const handleRestartConfirm = async () => {
         if (!restartTarget) return;
@@ -58,11 +95,9 @@ function TechOpsDashboard() {
             setRestartResults(prev => ({ ...prev, [screenId]: 'error' }));
         } finally {
             // Task 4.3 — audit log entry (fire-and-forget; failure does not block restart result)
-            // FIXME: backend audit-log endpoint unconfirmed — open tracking issue against ad-server.
-            // Required fields: action, screen_id, user_id, timestamp, outcome.
             try {
                 const token = localStorage.getItem('auth_token');
-                await fetch(`${API_URL}/api/audit-log`, {
+                await fetch(`${API_URL}/api/audit`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -135,7 +170,7 @@ function TechOpsDashboard() {
                                 className="px-4 py-2 bg-amber-500 text-white text-sm font-bold rounded-lg hover:bg-amber-600 transition-all disabled:opacity-60 flex items-center gap-2"
                             >
                                 {restartLoading && <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>}
-                                {restartLoading ? 'Restarting…' : 'Yes, Restart'}
+                                {restartLoading ? 'Restarting\u2026' : 'Yes, Restart'}
                             </button>
                         </div>
                     </div>
@@ -147,32 +182,90 @@ function TechOpsDashboard() {
                 <div className="fixed inset-0 z-50 flex justify-end">
                     <div
                         className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-                        onClick={() => setTerminalTarget(null)}
+                        onClick={closeTerminal}
                     />
                     <div className="relative w-full max-w-lg bg-slate-900 text-slate-100 flex flex-col shadow-2xl z-10">
                         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700">
                             <div className="flex items-center gap-2">
                                 <span className="material-symbols-outlined text-primary">terminal</span>
                                 <span className="font-mono text-sm font-bold">{terminalTarget.id}</span>
-                                <span className="text-xs text-slate-400">Device Log</span>
+                                <span className="text-xs text-slate-400">Activity Log</span>
                             </div>
-                            <button
-                                onClick={() => setTerminalTarget(null)}
-                                className="text-slate-400 hover:text-white transition-colors"
-                                aria-label="Close log viewer"
-                            >
-                                <span className="material-symbols-outlined">close</span>
-                            </button>
+                            <div className="flex items-center gap-2">
+                                {!terminalLoading && (
+                                    <button
+                                        onClick={() => fetchTerminalLogs(terminalTarget.id)}
+                                        aria-label="Refresh logs"
+                                        className="text-slate-400 hover:text-white transition-colors p-1"
+                                    >
+                                        <span className="material-symbols-outlined text-[18px]">refresh</span>
+                                    </button>
+                                )}
+                                <button
+                                    onClick={closeTerminal}
+                                    className="text-slate-400 hover:text-white transition-colors"
+                                    aria-label="Close log viewer"
+                                >
+                                    <span className="material-symbols-outlined">close</span>
+                                </button>
+                            </div>
                         </div>
-                        {/* Task 4.4 — stub per spec: log endpoint not yet available */}
-                        {/* FIXME: replace with real GET /api/screens/:id/logs when backend endpoint is ready */}
-                        <div className="flex-1 flex flex-col items-center justify-center gap-3 p-8 text-center">
-                            <span className="material-symbols-outlined text-[48px] text-slate-600">terminal</span>
-                            <p className="text-slate-400 font-mono text-sm">Log endpoint not yet available.</p>
-                            <p className="text-xs text-slate-600 max-w-xs">
-                                Device log streaming is scheduled for a future backend release.
-                                A tracking issue has been opened against ad-server.
-                            </p>
+
+                        <div className="flex-1 overflow-y-auto p-4 font-mono text-xs space-y-1">
+                            {terminalLoading && (
+                                <div className="space-y-2 animate-pulse">
+                                    {[...Array(8)].map((_, i) => (
+                                        <div
+                                            key={i}
+                                            className="h-3 rounded bg-slate-700"
+                                            style={{ width: `${55 + (i % 4) * 10}%` }}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+
+                            {!terminalLoading && terminalError && (
+                                <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+                                    <span className="material-symbols-outlined text-[36px] text-rose-500">error</span>
+                                    <p className="text-rose-400 text-xs">Failed to load logs</p>
+                                    <p className="text-slate-500 text-[11px]">{terminalError}</p>
+                                    <button
+                                        onClick={() => fetchTerminalLogs(terminalTarget.id)}
+                                        className="mt-2 text-xs text-primary hover:underline"
+                                    >
+                                        Retry
+                                    </button>
+                                </div>
+                            )}
+
+                            {!terminalLoading && !terminalError && terminalLogs.length === 0 && (
+                                <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+                                    <span className="material-symbols-outlined text-[36px] text-slate-600">receipt_long</span>
+                                    <p className="text-slate-400 text-xs">No activity recorded yet for this screen.</p>
+                                </div>
+                            )}
+
+                            {!terminalLoading && !terminalError && terminalLogs.map((log, i) => (
+                                <div key={log.impression_id || i} className="flex gap-2 text-[11px] leading-5">
+                                    <span className="text-slate-500 shrink-0 tabular-nums">
+                                        {log.timestamp
+                                            ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                                            : '--:--:--'}
+                                    </span>
+                                    <span className="text-emerald-400 shrink-0">PLAY</span>
+                                    <span className="text-slate-300 truncate">
+                                        {log.campaign_id || '(unknown campaign)'}
+                                    </span>
+                                    {log.asset_id && (
+                                        <span className="text-slate-500 truncate">· {log.asset_id}</span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="px-5 py-3 border-t border-slate-700 text-[10px] text-slate-500 flex justify-between">
+                            <span>{terminalLogs.length} entr{terminalLogs.length === 1 ? 'y' : 'ies'}</span>
+                            <span>Showing last 100 · newest first</span>
                         </div>
                     </div>
                 </div>
@@ -231,7 +324,7 @@ function TechOpsDashboard() {
                     <div className="flex flex-wrap gap-2">
                         <input
                             type="text"
-                            placeholder="Search screen ID…"
+                            placeholder="Search screen ID\u2026"
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                             className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -306,9 +399,9 @@ function TechOpsDashboard() {
                                                 >
                                                     <span className="material-symbols-outlined text-[18px]">restart_alt</span>
                                                 </button>
-                                                {/* Task 4.4 — terminal opens log viewer panel */}
+                                                {/* Task 4.4 — terminal opens live activity log panel */}
                                                 <button
-                                                    onClick={() => setTerminalTarget({ id: screen.id })}
+                                                    onClick={() => openTerminal(screen)}
                                                     aria-label={`Open log viewer for screen ${screen.id}`}
                                                     className="p-1 rounded hover:bg-primary/10 text-slate-400 hover:text-primary transition-colors"
                                                 >
