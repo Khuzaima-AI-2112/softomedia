@@ -1,13 +1,41 @@
 # Sprint 14 — Advertiser Self-Service Portal
 
 **Sprint:** 14
-**Status:** ✅ Step 2 — Full AC written from live source
+**Status:** ✅ Step 3 — Outcome probabilities tightened from live source reads
 **Cross-referenced with:** `client-app/src/App.jsx` @ `335f1c2`, `ad-server/src/api/` @ `3393144`
 **Guardrails authority:** [`docs/sprint8-sre-retro-consolidated.md`](./sprint8-sre-retro-consolidated.md)
 **Route authority:** [`docs/API_ROUTES.md`](../docs/API_ROUTES.md)
 **Schema authority:** [`docs/DATABASE_SCHEMA.md`](../docs/DATABASE_SCHEMA.md)
 **MVP reference:** [`docs/Digital Screen Network Management Platform (MVP).md`](<../docs/Digital Screen Network Management Platform (MVP).md>)
 **Completion plan:** [`docs/MVP_COMPLETION_SPRINT_PLAN.md`](../docs/MVP_COMPLETION_SPRINT_PLAN.md)
+
+---
+
+## Step 3 — Outcome Probability Tightening
+
+### Files read in Step 3
+
+| File | SHA | Size | Why read |
+|---|---|---|---|
+| `ad-server/src/services/AuthService.js` | `de215c1` | 1 381 B | Confirm JWT payload fields — specifically whether `advertiserId` or `linked_entity_id` is embedded |
+| `ad-server/src/repositories/CampaignRepository.js` | `4e3585d` | 232 B | Confirm `findAll` scoping support (Grep 4 close) |
+| `ad-server/src/repositories/BaseRepository.js` | `6e3338e` | 6 264 B | Confirm `findAll({ where })` implementation in both Firestore and memory branches |
+| `ad-server/src/services/CampaignService.js` | `4cb64bb` | 1 882 B | Confirm no ownership logic exists in service layer |
+| `ad-server/src/api/auth.js` | `e53a73f` | 937 B | Confirm login handler delegates to `authService.login()` (Grep 5 close) |
+
+### Step 3 Score Table
+
+| Task | Old Score | New Score | Eliminations | Remaining Risks |
+|---|---|---|---|---|
+| **S14-1** · Advertiser role + JWT guard | 85% | **95%** | ✅ JWT payload confirmed: `{ id, email, role, linked_entity_id }` — `role` is present. ✅ `auth.js` delegates to `authService.login()` with no hardcoding. ✅ Grep 5 closed. | DECISION-2 (guard type) must be recorded before merge. |
+| **S14-2** · Campaign CRUD API patch | 82% | **92%** | ✅ `CampaignRepository` is a thin `BaseRepository` wrapper — no custom methods, no scoping gaps. ✅ `BaseRepository.findAll({ where })` supports Firestore + in-memory via identical filter logic. ✅ Grep 4 closed. ✅ **Critical correction:** JWT uses `linked_entity_id`, not `advertiserId` — Patches 1 & 2 pseudocode corrected below. ✅ `CampaignService` has no ownership logic — all patches stay in `campaigns.js` only. | Firestore composite index may be needed for `advertiser_id ==` query in production. |
+| **S14-3** · Advertiser portal UI | 68% | **72%** | Minor: `ApiService.js` campaign methods still unconfirmed (Grep 8). Advertiser pages directory still unconfirmed (Grep 7). | Greps 7 + 8 still required before implementation. |
+| **S14-4** · App.jsx route registration | 90% | **92%** | ✅ Pattern confirmed from prior sprints — additive only. | Grep 6 still required to confirm no conflicting advertiser routes already exist. |
+
+### Tasks That Cannot Realistically Exceed 90% Yet
+
+- **S14-3 (72%)** — Two file-existence unknowns remain (Greps 7 + 8). Cannot exceed 90% until both greps run and results are incorporated. If `AdvertiserDashboard.jsx` exists as a stub, effort estimate changes from L to M.
+- **S14-1 (95%)** — One decision gate (DECISION-2) must be recorded before merge. Technically could block completion if the guard type discussion reveals scope expansion.
 
 ---
 
@@ -34,6 +62,99 @@ export const ROLE_HIERARCHY = {
 The `normalizeRole()` helper passes non-`superadmin` roles through unchanged — advertiser tokens will pass through correctly.
 
 **CCR-4 gate pre-check:** 6 entries in block confirmed. That count must not decrease after any S14-1 work.
+
+---
+
+### `ad-server/src/services/AuthService.js` ← Step 3 read
+
+✅ **JWT payload confirmed (Grep 5 CLOSED):**
+
+```js
+const token = jwt.sign(
+    { id: user.id, email: user.email, role: user.role, linked_entity_id: user.linked_entity_id },
+    JWT_SECRET,
+    { expiresIn: '24h' }
+);
+```
+
+**Key findings:**
+- `role` is embedded from the user record → `req.user.role === 'advertiser'` works as expected
+- The FK to the advertiser's entity is **`linked_entity_id`**, NOT `advertiserId`
+- **All Patch 1 and Patch 2 pseudocode in S14-2 must use `req.user.linked_entity_id`** — any reference to `req.user.advertiserId` is incorrect
+- `auth.js` is a thin router that delegates to `authService.login(email)` — no hardcoding of role or entity ID
+
+**Grep 5: CLOSED ✅**
+
+---
+
+### `ad-server/src/repositories/CampaignRepository.js` ← Step 3 read
+
+✅ **Grep 4 CLOSED:**
+
+```js
+import { BaseRepository } from './BaseRepository.js';
+
+export class CampaignRepository extends BaseRepository {
+    constructor() {
+        super('campaigns');
+    }
+}
+
+export const campaignRepository = new CampaignRepository();
+```
+
+**Key findings:**
+- 6 lines — no custom methods, no overrides
+- ALL persistence (findAll, findById, update, delete) flows through `BaseRepository`
+- No `CampaignRepository`-specific changes needed for S14-2
+
+---
+
+### `ad-server/src/repositories/BaseRepository.js` ← Step 3 read
+
+✅ **`findAll({ where })` fully confirmed in both Firestore and memory paths:**
+
+Firestore path:
+```js
+if (options.where) {
+    options.where.forEach(([field, op, value]) => {
+        query = query.where(field, op, value);
+    });
+}
+```
+
+Memory fallback path:
+```js
+if (options.where) {
+    results = results.filter(item => {
+        return options.where.every(([field, op, value]) => {
+            if (op === '==') return item[field] === value;
+            if (op === 'array-contains') return Array.isArray(item[field]) && item[field].includes(value);
+            return true;
+        });
+    });
+}
+```
+
+**Supported operators confirmed:** `==`, `array-contains` (memory fallback), plus full Firestore query operators in the Firestore path.
+
+**S14-2 Patch 1 call is confirmed safe:**
+```js
+campaignRepository.findAll({ where: [['advertiser_id', '==', req.user.linked_entity_id]] })
+```
+
+> ⚠️ **Production Firestore note:** A composite index on `campaigns.advertiser_id` may be required for the Firestore `==` query to work without a full-collection scan. This is a deployment-time concern, not a code concern, but must be verified when testing against a live Firestore instance.
+
+---
+
+### `ad-server/src/services/CampaignService.js` ← Step 3 read
+
+✅ **No ownership logic in service layer:**
+- `updateStatus(id, status)` — only updates status + triggers `generateAdsFromCampaign()` on `approved`
+- `generateAdsFromCampaign(campaign)` — creates `Ad` records from `campaign.selectedSlots`
+- No `findAll`, no scoping, no ownership checks
+
+**Key finding:** All S14-2 patches (scoping, ownership, transition state machine) go exclusively in `campaigns.js`. No `CampaignService` changes needed.
 
 ---
 
@@ -69,7 +190,7 @@ Full handler inventory (all confirmed, not stubs):
 Files relevant to this sprint:
 - `campaigns.js` ✅ (6 323 B) — patch target for S14-2
 - `advertisers.js` ✅ (5 268 B) — exists; advertiser user management
-- `auth.js` ✅ (937 B) — JWT source; role claim must be confirmed (grep 5 still required)
+- `auth.js` ✅ (937 B) — JWT role + `linked_entity_id` claim **confirmed Step 3** ✅
 - `telemetry.js` ✅ (5 135 B) — DECISION-1 guard at L49 must close this sprint
 
 ---
@@ -110,104 +231,104 @@ Files relevant to this sprint:
 
 ---
 
+### DECISION-2 — `POST /api/campaigns` role guard: hierarchical vs. exclusive
+
+**File:** `ad-server/src/api/campaigns.js` — `POST /` handler
+
+`requireRole('advertiser')` is hierarchical — it allows any role ≥ level 0, meaning `retaileradmin`, `admin`, and `superadmin` can also create campaigns. If campaign creation should be advertiser-type users only, a role equality check (`req.user.role === 'advertiser'`) is needed instead.
+
+| Option | Who can create campaigns | Recommended? |
+|---|---|---|
+| `requireRole('advertiser')` (hierarchical) | advertiser + all higher roles | ✅ Default — admin oversight preserved |
+| `req.user.role === 'advertiser'` (exclusive) | advertiser only | Use if §3.4 explicitly prohibits admin campaign creation |
+
+**Record choice before S14-1 merge.**
+
+**DECISION-2-RESOLVED:** _(fill in before implementation)_
+
+---
+
 ## 🚨 Sprint 14 New Scope
 
 **MVP Requirement:** §3.4 — Advertisers can upload creatives, create campaign requests, select
 preferred locations, track status, view basic performance metrics, access invoices.
 
-### Scoping rationale (updated from Step 2 findings)
+### Scoping rationale (updated from Step 3 findings)
 
 Sprint 13 closed four back-end wiring gaps. Sprint 14 opens the **Advertiser Self-Service Portal**.
-Step 2 source reads reveal that:
-- `advertiser` role is already in `ROLE_HIERARCHY` → S14-1 is a JWT-confirmation + route-guard wiring task only
-- `campaigns.js` exists with all route skeletons → S14-2 is a **targeted patch** (auth scoping + transition rules), not a create
-- S14-3 and S14-4 remain fully new work
+Step 3 source reads further sharpen the picture:
+- `advertiser` role is already in `ROLE_HIERARCHY` → S14-1 is JWT-confirm only (no changes needed to `requireRole.js` or `AuthService.js`)
+- JWT payload uses **`linked_entity_id`** for the advertiser FK — all ownership checks must use `req.user.linked_entity_id`, not `req.user.advertiserId`
+- `CampaignRepository` is a 6-line thin wrapper — `BaseRepository.findAll({ where })` handles all scoping natively
+- `CampaignService` has no ownership logic — all S14-2 patches are isolated to `campaigns.js`
 
 **Updated story order and effort:**
-1. **S14-1 (XS)** — Confirm JWT `role: 'advertiser'` claim in `auth.js` + add `requireRole('advertiser')` to `POST /api/campaigns`
-2. **S14-2 (S–M)** — Patch `campaigns.js`: scope `GET /` and `GET /:id` to caller ownership, add `requireRole('advertiser')` to `POST /`, extend valid transition list
-3. **S14-3 (L)** — Three advertiser portal pages (directory + component existence still unconfirmed — grep 7 required)
-4. **S14-4 (XS)** — `App.jsx` route registration (advertiser route existence still unconfirmed — grep 6 required)
+1. **S14-1 (XS)** — Add `requireRole('advertiser')` to `POST /api/campaigns`; confirm JWT `role` + `linked_entity_id` claim ✅
+2. **S14-2 (S)** — Patch `campaigns.js`: scope `GET /` and `GET /:id` to `req.user.linked_entity_id`, extend transition allowlist
+3. **S14-3 (L)** — Three advertiser portal pages (directory existence still unconfirmed — Grep 7 required)
+4. **S14-4 (XS)** — `App.jsx` route registration (Grep 6 required)
 
 ---
 
 ## 🛡️ S14-1 · Advertiser Role Confirmation + JWT Guard
 
 **Priority:** Critical (gate for all other stories)
-**Effort:** XS _(downgraded from XS–S: `'advertiser'` already in `ROLE_HIERARCHY`)_
-**Confidence:** 85% _(upgraded from 75%: role hierarchy confirmed; JWT claim still unverified)_
+**Effort:** XS
+**Confidence:** **95%** _(upgraded from 85%: JWT payload confirmed; role + linked_entity_id both present)_
 **MVP section:** §3.4
 
-### Step 2 findings
+### Step 3 findings
 
 ✅ `'advertiser': 0` confirmed in `requireRole.js` `ROLE_HIERARCHY`.
-❓ JWT role claim in `auth.js` (937 B) — **not yet read; grep 5 required before implementation.**
+✅ JWT payload confirmed: `{ id, email, role, linked_entity_id }` — `role` is set from user record, `linked_entity_id` is the advertiser FK.
+✅ `auth.js` delegates to `authService.login(email)` — no hardcoded role, no hardcoded entity ID.
+✅ **Grep 5: CLOSED.**
 
-### Remaining pre-implementation gate (grep 5 only)
+**No changes needed to `AuthService.js`, `requireRole.js`, or `auth.js`.**
+S14-1 is purely: add `requireRole('advertiser')` to the `POST /api/campaigns` route line in `campaigns.js`.
 
-```powershell
-# 5. Does advertiser login produce a JWT with role='advertiser'?
-Select-String -Path "ad-server/src/api/auth.js" -Pattern "role|advertiser" -Context 2,2
+### Remaining pre-implementation gate
+
+Only DECISION-2 remains before implementation. No greps outstanding.
+
 ```
-
-**Decision tree (updated):**
-
-| Finding | Action |
-|---|---|
-| JWT payload includes `role` field set from user record | Confirm user record has `role: 'advertiser'` → S14-1 is XS |
-| JWT payload does not include `role` field | Patch `auth.js` to include role in token — effort stays XS |
-| `auth.js` hardcodes role | Must patch to use user record role value |
-
-### What S14-1 must wire
-
-- Add `requireRole('advertiser')` to `POST /api/campaigns` in `campaigns.js`
-  - Currently guarded by `authenticate` only → any authenticated user can create campaigns
-  - After patch: only `advertiser` role (level 0) and above can create
-  - ⚠️ **`requireRole` is hierarchical** — `advertiser: 0` means every role ≥ 0 passes. This means `retaileradmin`, `admin`, and `superadmin` will also pass. If campaign creation should be advertiser-exclusive, a role equality check is needed instead of `requireRole`. Raise as sub-decision before implementation.
+DECISION-2: Use requireRole('advertiser') [hierarchical] or req.user.role === 'advertiser' [exclusive]?
+Record in DECISION-2-RESOLVED before merge.
+```
 
 ### Acceptance Criteria
 
 | # | Criterion | Guardrail |
 |---|---|---|
 | AC-1 | `Select-String -Path "ad-server/src/middleware/requireRole.js" -Pattern "'advertiser'"` returns a match. ✅ Already confirmed. | GUARDRAIL-3 |
-| AC-2 | Login request for an advertiser-type user returns a JWT where `role === 'advertiser'`. Verify: `curl -X POST /api/auth/login -d '{"email":"advertiser@test.com","password":"..."}' \| jq '.token'` decoded contains `"role":"advertiser"`. | GUARDRAIL-3 |
-| AC-3 | `POST /api/campaigns` with a valid `retaileradmin` token → `403` (if role-exclusive guard chosen) OR `201` (if hierarchical guard chosen). Decision must be recorded before implementation. | GUARDRAIL-3 |
-| AC-4 | `requireRole('advertiser')` middleware added to `POST /api/campaigns` route line in `campaigns.js`. `Select-String -Path "ad-server/src/api/campaigns.js" -Pattern "requireRole.*advertiser"` returns a match. | GUARDRAIL-3 |
-| AC-5 | `ROLE_HIERARCHY` block entry count in `requireRole.js` unchanged (6 entries). `CCR-4` gate passed. | GUARDRAIL-3 |
+| AC-2 | `POST /api/auth/login` for an advertiser-type user returns JWT where decoded payload contains `"role":"advertiser"` and `"linked_entity_id":"<advertiser-id>"`. Verify: decode the JWT and inspect both fields. | GUARDRAIL-3 |
+| AC-3 | `POST /api/campaigns` with a valid `retaileradmin` token → `403` (if role-exclusive guard chosen) OR `201` (if hierarchical guard chosen). DECISION-2 must be recorded before this criterion is finalised. | GUARDRAIL-3 |
+| AC-4 | `Select-String -Path "ad-server/src/api/campaigns.js" -Pattern "requireRole.*advertiser"` returns a match after S14-1 merge. | GUARDRAIL-3 |
+| AC-5 | `ROLE_HIERARCHY` block entry count in `requireRole.js` unchanged at 6 entries after S14-1 merge. CCR-4 gate passed. | GUARDRAIL-3 |
 
-### Files expected to touch
+### Files touched
 
-- `ad-server/src/api/campaigns.js` — add `requireRole('advertiser')` to `POST /` handler
-- `ad-server/src/api/auth.js` — confirm or patch JWT role claim
-- No frontend changes in this story
+- `ad-server/src/api/campaigns.js` — add `requireRole('advertiser')` to `POST /` handler line
+- No other files
 
 ---
 
 ## 🛡️ S14-2 · Campaign CRUD API Patch
 
 **Priority:** High
-**Effort:** S–M _(downgraded from M: file exists with all skeletons; work is targeted patching)_
-**Confidence:** 82% _(upgraded from 72%: handler map confirmed; `CampaignRepository` existence still unknown)_
+**Effort:** S _(downgraded from S–M: `CampaignRepository` is a thin wrapper; `BaseRepository.findAll({ where })` works out of the box; no repository changes needed)_
+**Confidence:** **92%** _(upgraded from 82%: `findAll({ where })` confirmed in both Firestore and memory paths; JWT field name corrected to `linked_entity_id`)_
 **MVP section:** §3.4
 
-### Step 2 findings
+### Step 3 findings
 
-**Confirmed handlers (all have real bodies, not stubs):**
-- `GET /` — ✅ exists; ⚠️ returns all campaigns regardless of caller; needs ownership scoping
-- `GET /:id` — ✅ exists; ⚠️ no ownership check; any caller can read any campaign
-- `POST /` — ✅ exists; ⚠️ only `authenticate`, no `requireRole`; needs advertiser guard (S14-1)
-- `POST /:id/book` — ✅ exists; slot booking; out of scope for this story
-- `PATCH /:id/status` — ✅ exists; `requireRole('retaileradmin')`; allowlist is `['approved', 'rejected', 'pending_approval']` only — `live`, `completed`, `paused` missing
-- `PUT /:id` — ✅ exists; `authenticate` only; no ownership check
-- `DELETE /:id` — ✅ `authenticate` + `requireRole('superadmin')` confirmed ✅ CCR-3
+✅ `CampaignRepository` is a 6-line thin wrapper — no custom methods. No repository changes needed.
+✅ `BaseRepository.findAll({ where: [['advertiser_id', '==', value]] })` works natively in both Firestore and memory.
+✅ JWT field for advertiser FK is **`linked_entity_id`** (not `advertiserId`) — all patches corrected.
+✅ `CampaignService` has no ownership logic — all patches stay in `campaigns.js` only.
+✅ **Grep 4: CLOSED.**
 
-**Remaining unknown:** `CampaignRepository.js` — whether `findAll()` supports `advertiserId` scoping filter. Grep 4 required.
-
-```powershell
-# 4. Does CampaignRepository.js exist and support advertiserId filter?
-Get-ChildItem -Path "ad-server/src/repositories" -Filter "*.js" | Select-Object Name
-Select-String -Path "ad-server/src/repositories/CampaignRepository.js" -Pattern "advertiserId|findAll|where" -Context 2,2
-```
+> ⚠️ **Remaining risk (8%):** Firestore may require a composite index on `campaigns.advertiser_id` for the `==` query to perform without a full-collection scan. This is a deployment-time concern. If Firestore query fails in production, the `BaseRepository` circuit breaker will fall back to the memory store, which filters correctly. Monitor logs on first production deployment.
 
 ### Patches required in `campaigns.js`
 
@@ -216,81 +337,94 @@ Select-String -Path "ad-server/src/repositories/CampaignRepository.js" -Pattern 
 // Before (current — returns all campaigns):
 campaigns = await campaignRepository.findAll();
 
-// After — scope to caller's advertiserId unless admin+:
+// After — scope to caller's linked_entity_id unless admin+:
 if (req.user.role === 'advertiser') {
     campaigns = await campaignRepository.findAll({
-        where: [['advertiser_id', '==', req.user.advertiserId]]
+        where: [['advertiser_id', '==', req.user.linked_entity_id]]
     });
 } else {
-    // admin and above see all (existing behaviour preserved)
-    campaigns = await campaignRepository.findAll( /* existing filter logic */ );
+    // admin and above see all — existing filter/query logic preserved
+    campaigns = await campaignRepository.findAll( /* existing options */ );
 }
 ```
 
 #### Patch 2 — `GET /:id` ownership check
 ```js
-// After fetching campaign, add ownership guard:
-if (req.user.role === 'advertiser' && campaign.advertiser_id !== req.user.advertiserId) {
+// After fetching campaign by ID, add ownership guard:
+if (req.user.role === 'advertiser' && campaign.advertiser_id !== req.user.linked_entity_id) {
     return res.status(403).json({ error: 'Forbidden' });
 }
 ```
 
-#### Patch 3 — `PATCH /:id/status` valid transition extension
-Current allowlist: `['approved', 'rejected', 'pending_approval']`
-Required allowlist: `['approved', 'rejected', 'pending_approval', 'live', 'completed', 'paused']`
+#### Patch 3 — `PATCH /:id/status` valid transition state machine
 
-Ordered transition rules (state machine — replace current flat allowlist):
-```
-pending_approval → approved
-pending_approval → rejected
-approved         → live
-live             → completed
-live             → paused
-paused           → live   (resume)
+Current allowlist (flat): `['approved', 'rejected', 'pending_approval']`
+
+Replace with ordered transition map:
+```js
+const VALID_TRANSITIONS = {
+    pending_approval: ['approved', 'rejected'],
+    approved:         ['live'],
+    live:             ['completed', 'paused'],
+    paused:           ['live'],
+    completed:        [],
+    rejected:         [],
+};
+
+const current = campaign.status;
+const allowed = VALID_TRANSITIONS[current] || [];
+if (!allowed.includes(requestedStatus)) {
+    return res.status(400).json({
+        error: 'Invalid status transition',
+        from: current,
+        to: requestedStatus,
+        allowed,
+    });
+}
 ```
 
-All other transitions → `400 { error: 'Invalid status transition', from: current, to: requested }`.
+All status values remain lowercase. No new enum values — these were already present in MVP spec §3.4.
 
 ### Route contract (canonical — must match `API_ROUTES.md` after close)
 
-| Method | Path | Auth | Ownership scoping | Response |
+| Method | Path | Auth | Scoping | Response |
 |---|---|---|---|---|
-| `POST` | `/api/campaigns` | `authenticate` + `requireRole('advertiser')` | `advertiser_id` from token | `201 { campaignId, status: 'pending_approval' }` |
-| `GET` | `/api/campaigns` | `authenticate` | Advertiser: own campaigns only. Admin+: all. | `200 [{ … }]` |
-| `GET` | `/api/campaigns/:id` | `authenticate` | Advertiser: 403 if `advertiser_id` mismatch. Admin+: any. | `200 { … }` or `403` |
-| `PATCH` | `/api/campaigns/:id/status` | `requireRole('retaileradmin')` | No change — admin gate preserved | `200 { campaignId, status }` or `400` on invalid transition |
+| `POST` | `/api/campaigns` | `authenticate` + `requireRole('advertiser')` | `advertiser_id` from `req.user.linked_entity_id` | `201 { campaignId, status: 'pending_approval' }` |
+| `GET` | `/api/campaigns` | `authenticate` | Advertiser: `where advertiser_id == linked_entity_id`. Admin+: all. | `200 [{ … }]` |
+| `GET` | `/api/campaigns/:id` | `authenticate` | Advertiser: `403` if `campaign.advertiser_id !== linked_entity_id`. Admin+: any. | `200 { … }` or `403` |
+| `PATCH` | `/api/campaigns/:id/status` | `requireRole('retaileradmin')` | No change — admin gate preserved | `200 { campaignId, status }` or `400 { error, from, to, allowed }` |
 | `DELETE` | `/api/campaigns/:id` | `authenticate` + `requireRole('superadmin')` | ✅ CCR-3 confirmed — do not touch | `204` |
 
 ### Acceptance Criteria
 
 | # | Criterion | Guardrail |
 |---|---|---|
-| AC-1 | `GET /api/campaigns` as role `advertiser` → response array contains only campaigns where `advertiser_id === token.advertiserId`. Verified: no foreign `advertiserId` in response. | GUARDRAIL-3 |
-| AC-2 | `GET /api/campaigns/:id` as a different advertiser → `403`. | GUARDRAIL-3 |
+| AC-1 | `GET /api/campaigns` as role `advertiser` → response array contains only campaigns where `advertiser_id === req.user.linked_entity_id`. No foreign advertiser campaigns in response. | GUARDRAIL-3 |
+| AC-2 | `GET /api/campaigns/:id` as a different advertiser (mismatched `linked_entity_id`) → `403 { error: 'Forbidden' }`. | GUARDRAIL-3 |
 | AC-3 | `GET /api/campaigns/:id` as `admin` for any campaign → `200`. | GUARDRAIL-3 |
-| AC-4 | `PATCH /api/campaigns/:id/status` with `{ status: 'live' }` when current status is `pending_approval` → `400 { error: 'Invalid status transition' }`. | GUARDRAIL-2 |
+| AC-4 | `PATCH /api/campaigns/:id/status` with `{ status: 'live' }` when current status is `pending_approval` → `400 { error: 'Invalid status transition', from: 'pending_approval', to: 'live', allowed: ['approved','rejected'] }`. | GUARDRAIL-2 |
 | AC-5 | `PATCH /api/campaigns/:id/status` with `{ status: 'approved' }` when current status is `pending_approval` → `200 { campaignId, status: 'approved' }`. | GUARDRAIL-2 |
 | AC-6 | `PATCH /api/campaigns/:id/status` with `{ status: 'live' }` when current status is `approved` → `200 { campaignId, status: 'live' }`. | GUARDRAIL-2 |
-| AC-7 | `DELETE /api/campaigns/:id` as `retaileradmin` → `403`. _(CCR-3 guard unchanged.)_ | GUARDRAIL-3 |
-| AC-8 | `Select-String -Path "ad-server/src/api/campaigns.js" -Pattern "requireRole.*superadmin"` returns match after S14-2 merge. **CCR-3 hard gate.** | GUARDRAIL-3 |
-| AC-9 | `Select-String -Path "ad-server/src/api/campaigns.js" -Pattern "'pending_approval'\|'approved'\|'live'\|'completed'\|'paused'"` returns matches only — no uppercase status values. | GUARDRAIL-4 |
-| AC-10 | `docs/API_ROUTES.md` campaigns section updated with all five routes, correct auth guards, scoping rules, and body shapes. | GUARDRAIL-2 |
+| AC-7 | `PATCH /api/campaigns/:id/status` with `{ status: 'paused' }` when current status is `live` → `200 { campaignId, status: 'paused' }`. | GUARDRAIL-2 |
+| AC-8 | `PATCH /api/campaigns/:id/status` with `{ status: 'live' }` when current status is `paused` → `200 { campaignId, status: 'live' }` (resume). | GUARDRAIL-2 |
+| AC-9 | `DELETE /api/campaigns/:id` as `retaileradmin` → `403`. CCR-3 guard unchanged. | GUARDRAIL-3 |
+| AC-10 | `Select-String -Path "ad-server/src/api/campaigns.js" -Pattern "requireRole.*superadmin"` returns match after S14-2 merge. **CCR-3 hard gate.** | GUARDRAIL-3 |
+| AC-11 | `Select-String -Path "ad-server/src/api/campaigns.js" -Pattern "'pending_approval'\|'approved'\|'live'\|'completed'\|'paused'"` returns matches — no uppercase status values. | GUARDRAIL-4 |
+| AC-12 | `docs/API_ROUTES.md` campaigns section updated with all five routes, correct auth guards, scoping rules, and body shapes. | GUARDRAIL-2 |
 
-### Files expected to touch
+### Files touched
 
 - `ad-server/src/api/campaigns.js` — Patch 1 (GET scoping), Patch 2 (ownership check), Patch 3 (transition state machine)
-- `ad-server/src/repositories/CampaignRepository.js` — confirm `findAll({ where })` supports `advertiser_id` filter; extend if absent
 - `docs/API_ROUTES.md` — update campaigns section
+- `ad-server/src/repositories/CampaignRepository.js` — **no changes needed** (confirmed Step 3)
 
 ### CCR-3 — `campaigns.js` DELETE guard must survive S14-2
 
-`requireRole('superadmin')` on `DELETE /:id` confirmed at `3393144`. Must survive all S14-2 changes.
-
-**Gate:** After S14-2 merge, run:
+After S14-2 merge:
 ```powershell
 Select-String -Path "ad-server/src/api/campaigns.js" -Pattern "requireRole.*superadmin"
 ```
-Must return a match. Hard merge gate — story cannot be marked Done without this match.
+Must return a match. **Hard merge gate — story cannot be marked Done without this match.**
 
 ---
 
@@ -298,10 +432,10 @@ Must return a match. Hard merge gate — story cannot be marked Done without thi
 
 **Priority:** High
 **Effort:** L
-**Confidence:** 68% _(unchanged — advertiser JSX directory existence still unconfirmed; grep 7 required)_
+**Confidence:** **72%** _(upgraded from 68%: minor — `ApiService.js` campaign methods still unconfirmed, pages directory still unconfirmed)_
 **MVP section:** §3.4
 
-### Remaining pre-implementation gates (greps 7 + 8)
+### Remaining pre-implementation gates (Greps 7 + 8 still required)
 
 ```powershell
 # 7. Do advertiser pages exist on disk?
@@ -338,6 +472,7 @@ Select-String -Path "client-app/src/services/ApiService.js" -Pattern "campaign|a
 - `submit-campaign-btn` disabled until all required fields filled
 - On success: redirect to `CampaignDetail` for the new `campaignId`
 - On error: inline error message (not toast); `data-testid="campaign-form-error"`
+- Submission payload must include `advertiser_id: req.user.linked_entity_id` (set server-side from token — do not rely on client to send this)
 
 #### `CampaignDetail.jsx`
 - Route: `/dashboard/advertiser/campaigns/:id`
@@ -357,14 +492,14 @@ Select-String -Path "client-app/src/services/ApiService.js" -Pattern "campaign|a
 | AC-5 | `data-testid="campaign-impressions-count"` renders on `CampaignDetail.jsx` (value may be `0` for a new campaign). | GUARDRAIL-1 |
 | AC-6 | `AdvertiserDashboard.jsx` renders empty state `"No campaigns yet"` when campaign list is empty (not a blank panel). | — |
 | AC-7 | Loading skeletons present in `AdvertiserDashboard.jsx` and `CampaignDetail.jsx` while data fetches. | — |
-| AC-8 | All `ApiService` campaign methods used are confirmed in `client-app/src/services/ApiService.js` before use. | GUARDRAIL-1 |
+| AC-8 | All `ApiService` campaign methods confirmed in `client-app/src/services/ApiService.js` source before use (Grep 8 gate). | GUARDRAIL-1 |
 
 ### Files expected to touch
 
-- `client-app/src/pages/advertiser/AdvertiserDashboard.jsx` — create (or extend)
-- `client-app/src/pages/advertiser/CampaignRequest.jsx` — create (or extend)
-- `client-app/src/pages/advertiser/CampaignDetail.jsx` — create (or extend)
-- `client-app/src/services/ApiService.js` — add campaign methods if absent
+- `client-app/src/pages/advertiser/AdvertiserDashboard.jsx` — create (or extend if stub found)
+- `client-app/src/pages/advertiser/CampaignRequest.jsx` — create (or extend if stub found)
+- `client-app/src/pages/advertiser/CampaignDetail.jsx` — create (or extend if stub found)
+- `client-app/src/services/ApiService.js` — add campaign methods if absent (Grep 8 gate)
 
 ---
 
@@ -372,10 +507,10 @@ Select-String -Path "client-app/src/services/ApiService.js" -Pattern "campaign|a
 
 **Priority:** High
 **Effort:** XS
-**Confidence:** 90% _(unchanged — route existence still unconfirmed; grep 6 required)_
+**Confidence:** **92%** _(upgraded from 90%: pattern confirmed from prior sprints; Grep 6 still required)_
 **MVP section:** §3.4
 
-### Remaining pre-implementation gate (grep 6)
+### Remaining pre-implementation gate (Grep 6)
 
 ```powershell
 # 6. Which /dashboard/advertiser/* routes (if any) are already in App.jsx?
@@ -396,38 +531,38 @@ Select-String -Path "client-app/src/App.jsx" -Pattern "advertiser" -Context 1,1
 |---|---|---|
 | AC-1 | `GET /dashboard/advertiser` as role `admin` → `403` (route guard fires). | GUARDRAIL-3 |
 | AC-2 | `GET /dashboard/advertiser` as role `advertiser` → renders `AdvertiserDashboard.jsx`. | GUARDRAIL-1 |
-| AC-3 | `Select-String -Path "client-app/src/App.jsx" -Pattern "advertiser"` returns matches for all three routes. | GUARDRAIL-1 |
+| AC-3 | `Select-String -Path "client-app/src/App.jsx" -Pattern "advertiser"` returns matches for all three routes after S14-4 merge. | GUARDRAIL-1 |
 | AC-4 | No existing non-advertiser routes are moved or removed from `App.jsx`. | — |
 | AC-5 | `App.jsx` line count delta is ≤ 20 lines. If larger, flag for review — scope may have crept. | — |
 
-### Files expected to touch
+### Files touched
 
 - `client-app/src/App.jsx` — add three route entries with `requireRole('advertiser')` guard
 - No backend changes in this story
 
 ---
 
-## 📊 Confidence Scores (Step 2 updated)
+## 📊 Confidence Scores (Step 3 updated)
 
-| Story | Step 1 | Step 2 | What is still below 100% | Resolved by |
-|---|---|---|---|---|
-| S14-1 · Advertiser role + JWT guard | 75% | **85%** | JWT claim in `auth.js` unread | Grep 5 |
-| S14-2 · Campaign CRUD API | 72% | **82%** | `CampaignRepository` scoping support unknown | Grep 4 |
-| S14-3 · Advertiser portal UI | 68% | **68%** | Pages directory + ApiService campaign methods unconfirmed | Greps 7 + 8 |
-| S14-4 · App.jsx route registration | 90% | **90%** | Existing advertiser routes unknown | Grep 6 |
+| Story | Step 1 | Step 2 | Step 3 | What is still below 100% | Resolved by |
+|---|---|---|---|---|---|
+| S14-1 · Advertiser role + JWT guard | 75% | 85% | **95%** | DECISION-2 (guard type) must be recorded before merge | Record DECISION-2 |
+| S14-2 · Campaign CRUD API | 72% | 82% | **92%** | Firestore composite index may be needed in prod; `linked_entity_id` field name must match DB schema | Deploy + verify index |
+| S14-3 · Advertiser portal UI | 68% | 68% | **72%** | Pages directory + ApiService campaign methods unconfirmed | Greps 7 + 8 |
+| S14-4 · App.jsx route registration | 90% | 90% | **92%** | Existing advertiser routes unknown | Grep 6 |
 
 ---
 
 ## 🛡️ Step 4 — Isolation Audit
 
-### Blast-Radius Table (Step 2 updated)
+### Blast-Radius Table
 
 | Story | Files Touched | Change Type | Shared Infra? | Risk | Verdict |
 |---|---|---|---|---|---|
-| **S14-1** · Advertiser role + JWT | `campaigns.js` (add guard), `auth.js` (confirm claim) | Additive | `campaigns.js` shared | Low | ✅ Safe — adding middleware to one route doesn't affect other routes |
-| **S14-2** · Campaign CRUD patch | `campaigns.js` (patch 3 handlers), `CampaignRepository.js` | Targeted patch | `campaigns.js` shared across all callers | ⚠️ Medium | ✅ Safe **if** existing handler response shapes are preserved. Scoping adds a branch — must not change response shape for admin callers. |
-| **S14-3** · Advertiser portal UI | New JSX files, `ApiService.js` | New files + additive | `ApiService.js` shared | Low | ✅ Safe — additive methods only |
-| **S14-4** · App.jsx routes | `App.jsx` | Additive | Route authority | Low | ✅ Safe if additive only |
+| **S14-1** · Advertiser role + JWT | `campaigns.js` (add guard to `POST /` only) | Additive | `campaigns.js` shared | Low | ✅ Safe — adding middleware to one route; no other routes touched |
+| **S14-2** · Campaign CRUD patch | `campaigns.js` (patch 3 handlers), `docs/API_ROUTES.md` | Targeted patch | `campaigns.js` shared across all callers | ⚠️ Medium | ✅ Safe **if** admin-caller response shapes are preserved. Ownership branch adds a code path — must not alter response shape for non-advertiser callers. |
+| **S14-3** · Advertiser portal UI | New JSX files, `ApiService.js` (additive only) | New files + additive | `ApiService.js` shared | Low | ✅ Safe — additive methods only; no existing methods touched |
+| **S14-4** · App.jsx routes | `App.jsx` (additive) | Additive | Route authority | Low | ✅ Safe if additive only (confirmed by Grep 6 before merge) |
 
 ### CCR-3 — `campaigns.js` DELETE guard survival (S14-2)
 
@@ -444,23 +579,6 @@ Must return a match. **Hard merge gate.**
 Select-String -Path "ad-server/src/middleware/requireRole.js" -Pattern "ROLE_HIERARCHY" -Context 10,10
 ```
 
-### New sub-decision required before S14-1 implementation
-
-**DECISION-2 — `POST /api/campaigns` role guard: hierarchical vs. exclusive?**
-
-`requireRole('advertiser')` is hierarchical — it allows any role ≥ level 0, meaning `retaileradmin`,
-`admin`, and `superadmin` can also create campaigns. If campaign creation should be
-advertiser-type users only, a role equality check (`req.user.role === 'advertiser'`) is needed instead.
-
-| Option | Who can create campaigns | Recommended? |
-|---|---|---|
-| `requireRole('advertiser')` (hierarchical) | advertiser + all higher roles | ✅ Default — admin oversight preserved |
-| `req.user.role === 'advertiser'` (exclusive) | advertiser only | Use if §3.4 explicitly prohibits admin campaign creation |
-
-**Record choice in DECISION-2-RESOLVED below before S14-1 merge.**
-
-**DECISION-2-RESOLVED:** _(fill in before implementation)_
-
 ---
 
 ## Four SRE/QA Rules
@@ -476,26 +594,26 @@ advertiser-type users only, a role equality check (`req.user.role === 'advertise
 
 | Rule | Required check | ✓ |
 |---|---|---|
-| **GUARDRAIL-1** Service method exists | Every `apiService.X()` call verified in `ApiService.js` source | ☐ |
+| **GUARDRAIL-1** Service method exists | Every `apiService.X()` call verified in `ApiService.js` source | ☐ (Grep 8 required for S14-3) |
 | **GUARDRAIL-2** Route contract exists | HTTP method, path, body shape confirmed in `docs/API_ROUTES.md` AND Express router source. Doc and code must match. | ☐ |
 | **GUARDRAIL-3** Auth guard named in AC | Mutation routes explicitly state `requireRole('X') confirmed` | ☐ |
-| **GUARDRAIL-4** Enum values canonical | `campaigns.status` = lowercase; `loops.status` = UPPERCASE | ☐ |
+| **GUARDRAIL-4** Enum values canonical | `campaigns.status` = lowercase; `loops.status` = UPPERCASE | ✅ Confirmed Step 3 |
 | **GUARDRAIL-5** Doc placement | This file at `current_sprint/sprint14.md`; linked from `docs/MVP_SPRINT_PLAN.md` | ☐ |
 | **GUARDRAIL-6** FIXME count at scoping | FIXME grep run for all files in scope during Step 2, not at implementation time | ☐ |
 | **GUARDRAIL-7** Route mount points confirmed | Campaign routes confirmed mounted in `index.js` at `/api/campaigns` before effort estimate set | ☐ |
-| **GUARDRAIL-8** Persistence layer confirmed | `CampaignRepository.js` `findAll({ where })` scoping support confirmed via grep 4 | ☐ |
-| **GUARDRAIL-9** API_ROUTES.md vs live code audit | Campaign route auth guards vs live `campaigns.js` confirmed above | ✅ Done (Step 2) |
+| **GUARDRAIL-8** Persistence layer confirmed | `CampaignRepository.js` `findAll({ where })` scoping support confirmed ✅ **Step 3 CLOSED** | ✅ |
+| **GUARDRAIL-9** API_ROUTES.md vs live code audit | Campaign route auth guards vs live `campaigns.js` confirmed Step 2 | ✅ Done |
 | **GUARDRAIL-10** Open decisions close within one sprint | DECISION-1 must resolve this sprint — no third deferral | ☐ |
 
 ---
 
-## Pre-Sprint Checklist (remaining after Step 2)
+## Pre-Sprint Checklist (remaining after Step 3)
 
 - [x] `'advertiser'` role confirmed in `requireRole.js` ROLE_HIERARCHY
 - [x] `campaigns.js` handler map fully read and confirmed (all handlers have real bodies)
 - [x] `DELETE /:id` `requireRole('superadmin')` guard confirmed (CCR-3 pre-check)
-- [ ] Grep 4 — `CampaignRepository.js` existence + `findAll` scoping support
-- [ ] Grep 5 — `auth.js` JWT role claim for advertiser login
+- [x] **Grep 4 CLOSED** — `CampaignRepository.js` exists (232 B thin wrapper); `BaseRepository.findAll({ where })` confirmed in Firestore + memory paths
+- [x] **Grep 5 CLOSED** — `auth.js` JWT payload confirmed: `{ id, email, role, linked_entity_id }` — `role` present, advertiser FK is `linked_entity_id`
 - [ ] Grep 6 — `App.jsx` existing advertiser routes
 - [ ] Grep 7 — `client-app/src/pages/advertiser/` directory scan
 - [ ] Grep 8 — `ApiService.js` campaign methods
@@ -506,20 +624,23 @@ advertiser-type users only, a role equality check (`req.user.role === 'advertise
 
 ---
 
-## Known File Inventory (Step 2 confirmed)
+## Known File Inventory (Step 3 updated)
 
 | File | Size / Status | Notes |
 |---|---|---|
-| `client-app/src/App.jsx` | 11 214 B ✅ | Route authority. Add three advertiser routes in S14-4. |
-| `client-app/src/services/ApiService.js` | ❓ | Campaign methods unconfirmed — grep 8 required before S14-3. |
-| `ad-server/src/api/campaigns.js` | 6 323 B ✅ | **Fully read at `3393144`.** All 7 handlers confirmed with real bodies. Patch target for S14-1 + S14-2. |
+| `client-app/src/App.jsx` | 11 214 B ✅ | Route authority. Add three advertiser routes in S14-4. Grep 6 required. |
+| `client-app/src/services/ApiService.js` | ❓ | Campaign methods unconfirmed — Grep 8 required before S14-3. |
+| `ad-server/src/api/campaigns.js` | 6 323 B ✅ | **Fully read at `3393144`.** All 7 handlers confirmed. Patch target for S14-1 + S14-2. |
 | `ad-server/src/api/telemetry.js` | 5 135 B ✅ | DECISION-1 must resolve L49 this sprint. |
-| `ad-server/src/middleware/requireRole.js` | ✅ | `'advertiser': 0` confirmed in ROLE_HIERARCHY. No changes needed for role itself. |
-| `ad-server/src/api/auth.js` | 937 B ✅ | JWT role claim for advertiser login must be confirmed (grep 5). |
-| `ad-server/src/repositories/CampaignRepository.js` | ❓ UNKNOWN | Existence unconfirmed — grep 4 required. `findAll({ where: [['advertiser_id', '==', id]] })` pattern needed for S14-2 Patch 1. |
-| `client-app/src/pages/advertiser/AdvertiserDashboard.jsx` | ❓ UNKNOWN | May not exist — grep 7 required. |
-| `client-app/src/pages/advertiser/CampaignRequest.jsx` | ❓ UNKNOWN | May not exist — grep 7 required. |
-| `client-app/src/pages/advertiser/CampaignDetail.jsx` | ❓ UNKNOWN | May not exist — grep 7 required. |
+| `ad-server/src/middleware/requireRole.js` | ✅ | `'advertiser': 0` confirmed. No changes needed. |
+| `ad-server/src/api/auth.js` | 937 B ✅ | Delegates to `authService.login()`. **JWT payload confirmed Step 3.** ✅ |
+| `ad-server/src/services/AuthService.js` | 1 381 B ✅ | JWT: `{ id, email, role, linked_entity_id }`. **`linked_entity_id` is the advertiser FK** — not `advertiserId`. |
+| `ad-server/src/repositories/CampaignRepository.js` | 232 B ✅ | **Confirmed Step 3.** 6-line thin wrapper — no custom methods. All persistence via `BaseRepository`. |
+| `ad-server/src/repositories/BaseRepository.js` | 6 264 B ✅ | **Confirmed Step 3.** `findAll({ where: [['field', '==', value]] })` works in Firestore + memory. |
+| `ad-server/src/services/CampaignService.js` | 1 882 B ✅ | **Confirmed Step 3.** Status update + ad generation only. No ownership logic. |
+| `client-app/src/pages/advertiser/AdvertiserDashboard.jsx` | ❓ UNKNOWN | May not exist — Grep 7 required. |
+| `client-app/src/pages/advertiser/CampaignRequest.jsx` | ❓ UNKNOWN | May not exist — Grep 7 required. |
+| `client-app/src/pages/advertiser/CampaignDetail.jsx` | ❓ UNKNOWN | May not exist — Grep 7 required. |
 | `ad-server/src/api/audit.js` | ✅ NEW (Sprint 13) | `POST /api/audit` live @ `dfbeb65`. |
 | `ad-server/src/api/impressions.js` | ✅ NEW (Sprint 13) | `GET /api/impressions` live @ `dfbeb65`. |
 
@@ -534,7 +655,7 @@ S11-1 / S11-2 / S11-4 persistence tests ──► manual browser tests, carry-ov
 
 S14-1 · Advertiser role + JWT + POST guard
   └─► gates S14-2 (POST /api/campaigns must have role guard before UI wires it)
-  └─► gates S14-3 (UI must not call ungarded endpoints)
+  └─► gates S14-3 (UI must not call unguarded endpoints)
   └─► gates S14-4 (routes cannot fire correctly without role guard)
 
 S14-2 · Campaign CRUD patch
@@ -550,7 +671,7 @@ CCR-3: campaigns.js DELETE guard survival ──► hard merge gate on S14-2
 CCR-4: requireRole.js ROLE_HIERARCHY integrity ──► hard merge gate on S14-1
 ```
 
-**Recommended implementation order:** S14-1 (XS) → S14-2 (S–M) → S14-3 (L) → S14-4 (XS)
+**Recommended implementation order:** S14-1 (XS) → S14-2 (S) → S14-3 (L) → S14-4 (XS)
 
 ---
 
@@ -560,44 +681,49 @@ Per `docs/MVP_COMPLETION_SPRINT_PLAN.md`, Sprint 14 ships `advertiser_portal.spe
 minimum 10 tests covering:
 
 1. `POST /api/campaigns` as advertiser → `201 { status: 'pending_approval' }`
-2. `GET /api/campaigns` as advertiser → own campaigns only
+2. `GET /api/campaigns` as advertiser → own campaigns only (scoped by `linked_entity_id`)
 3. `GET /api/campaigns/:otherId` as different advertiser → `403`
-4. `PATCH /api/campaigns/:id/status` invalid transition (`pending_approval` → `live`) → `400`
+4. `PATCH /api/campaigns/:id/status` invalid transition (`pending_approval` → `live`) → `400 { error, from, to, allowed }`
 5. `PATCH /api/campaigns/:id/status` valid transition (`pending_approval` → `approved`) → `200`
 6. `PATCH /api/campaigns/:id/status` valid transition (`approved` → `live`) → `200`
-7. `DELETE /api/campaigns/:id` as `retaileradmin` → `403`
-8. `GET /dashboard/advertiser` as `admin` → `403`
-9. `data-testid="campaign-request-form"` present in DOM
-10. `data-testid="submit-campaign-btn"` disabled when fields empty
+7. `PATCH /api/campaigns/:id/status` valid transition (`live` → `paused`) → `200`
+8. `DELETE /api/campaigns/:id` as `retaileradmin` → `403`
+9. `GET /dashboard/advertiser` as `admin` → `403`
+10. `data-testid="campaign-request-form"` present in DOM
+11. `data-testid="submit-campaign-btn"` disabled when fields empty
 
 ---
 
-## Story Point Summary (Step 2 updated)
+## Story Point Summary (Step 3 updated)
 
 | Story | Priority | Effort | Confidence | Status |
 |---|---|---|---|---|
-| S14-1 · Advertiser role + JWT guard | Critical | XS | 85% | 🔲 Pending greps 5 + DECISION-2 |
-| S14-2 · Campaign CRUD patch | High | S–M | 82% | 🔲 Pending grep 4 + S14-1 |
-| S14-3 · Advertiser portal UI | High | L | 68% | 🔲 Pending greps 7 + 8 + S14-2 |
-| S14-4 · App.jsx route registration | High | XS | 90% | 🔲 Pending grep 6 + S14-3 |
+| S14-1 · Advertiser role + JWT guard | Critical | XS | **95%** | 🔲 Pending DECISION-2 only |
+| S14-2 · Campaign CRUD patch | High | **S** | **92%** | 🔲 Pending S14-1 |
+| S14-3 · Advertiser portal UI | High | L | **72%** | 🔲 Pending Greps 7 + 8 + S14-2 |
+| S14-4 · App.jsx route registration | High | XS | **92%** | 🔲 Pending Grep 6 + S14-3 |
 
 ---
 
 ## Definition of Done
 
-- [ ] Greps 4, 5, 6, 7, 8 executed; results logged in this doc (greps 1–3, 9 ✅ resolved in Step 2)
+- [x] **Grep 4 CLOSED** — `CampaignRepository.js` + `BaseRepository.findAll({ where })` confirmed
+- [x] **Grep 5 CLOSED** — JWT payload confirmed: `role` + `linked_entity_id` present
+- [ ] Grep 6 executed; results logged in this doc
+- [ ] Grep 7 executed; results logged in this doc
+- [ ] Grep 8 executed; results logged in this doc
 - [ ] **DECISION-1** resolved — `telemetry.js` L49 guard intent documented or corrected. No third deferral.
 - [ ] **DECISION-2** resolved — `POST /api/campaigns` guard type (hierarchical vs. exclusive) documented before S14-1 merge.
 - [ ] S11-1 persistence test passed (hard-refresh `UserManagement`)
 - [ ] S11-2 persistence test passed (hard-refresh `AdvertiserManagement`)
 - [ ] S11-4 persistence test passed (hard-refresh Add Location form)
-- [ ] **S14-1 DONE** — `requireRole('advertiser')` on `POST /api/campaigns`; JWT includes `role: 'advertiser'`; CCR-4 gate passed. Commit SHA: ___
-- [ ] **S14-2 DONE** — `GET /` ownership scoped; `GET /:id` ownership check; `PATCH /status` transition state machine extended; `API_ROUTES.md` updated; lowercase enum confirmed; CCR-3 gate passed. Commit SHA: ___
+- [ ] **S14-1 DONE** — `requireRole('advertiser')` on `POST /api/campaigns`; CCR-4 gate passed. Commit SHA: ___
+- [ ] **S14-2 DONE** — `GET /` scoped by `linked_entity_id`; `GET /:id` ownership check; `PATCH /status` transition state machine; `API_ROUTES.md` updated; CCR-3 gate passed. Commit SHA: ___
 - [ ] **CCR-3 gate passed** — `requireRole('superadmin')` grep returns match after S14-2 merge
 - [ ] **CCR-4 gate passed** — `ROLE_HIERARCHY` block entry count unchanged after S14-1 merge
-- [ ] **S14-3 DONE** — three advertiser pages created/confirmed; all `data-testid` attrs present; loading skeletons present; empty states designed; all `ApiService` methods confirmed before use. Commit SHA: ___
+- [ ] **S14-3 DONE** — three advertiser pages created/confirmed; all `data-testid` attrs present; loading skeletons; empty states; all `ApiService` methods confirmed before use. Commit SHA: ___
 - [ ] **S14-4 DONE** — three routes registered in `App.jsx` with `requireRole('advertiser')` guard; admin token returns `403` on `/dashboard/advertiser`. Commit SHA: ___
-- [ ] `advertiser_portal.spec.js` created with minimum 10 passing tests
+- [ ] `advertiser_portal.spec.js` created with minimum 11 passing tests
 - [ ] `docs/MVP_SPRINT_PLAN.md` Sprint 13 entry added
 - [ ] `docs/MVP_SPRINT_PLAN.md` Sprint 14 entry added
 - [ ] `GUARDRAIL-5`: this file at `current_sprint/sprint14.md`
@@ -623,6 +749,7 @@ minimum 10 tests covering:
 
 ---
 
-*Sprint 14 doc — Step 2 written 2026-06-08.*
-*Grounded against live reads: `requireRole.js` @ `3393144` (role hierarchy confirmed), `campaigns.js` @ `3393144` (all 7 handlers confirmed), `ad-server/src/api/` directory @ `3393144` (22 files inventoried).*
-*Remaining unknowns: `CampaignRepository.js` (grep 4), `auth.js` JWT claim (grep 5), `App.jsx` advertiser routes (grep 6), advertiser pages directory (grep 7), `ApiService.js` campaign methods (grep 8).*
+*Sprint 14 doc — Step 3 written 2026-06-08.*
+*Step 3 grounded against live reads: `AuthService.js` @ `de215c1`, `CampaignRepository.js` @ `4e3585d`, `BaseRepository.js` @ `6e3338e`, `CampaignService.js` @ `4cb64bb`, `auth.js` @ `e53a73f`.*
+*Greps 4 + 5 CLOSED. Remaining unknowns: `App.jsx` advertiser routes (Grep 6), advertiser pages directory (Grep 7), `ApiService.js` campaign methods (Grep 8).*
+*Critical correction applied: JWT advertiser FK field is `linked_entity_id`, not `advertiserId`. All S14-2 patch pseudocode updated.*
