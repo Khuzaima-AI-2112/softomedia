@@ -4,6 +4,7 @@
 **Status:** In Progress
 **Spec authored:** 2026-06-08
 **Step 3 tightened:** 2026-06-08
+**Step 4 isolation audit:** 2026-06-08
 **Grounded against:** HEAD [`a790fd5`](https://github.com/cfroszte/softomedia-live2026/commit/a790fd56292effc82bbbd4ec918e98553931649a)
 **Guardrails active:** 14 (GUARDRAIL-1 through GUARDRAIL-14)
 **Carry-forward source:** `current_sprint/sprint15-retro.md`
@@ -35,15 +36,15 @@
 |---|---|
 | `current_sprint/sprint16.md` | Created at Step 2 |
 | `BRAND_NAV` `/dashboard/brand/invoices` | Live 404 bug — nav link in `DashboardLayout.jsx` L33 points to unregistered route |
-| `LOOP_STATUS` enum | All-uppercase in `LoopRepository.js` (`PENDING_APPROVAL`, `APPROVED`, `REJECTED`, `LIVE`) — violates GUARDRAIL-4 |
-| `SLOT_STATUS` enum | All-uppercase in `LoopRepository.js` (`PENDING`, `APPROVED`, `REJECTED`, `REPLACED`, `BOOKED`, `AVAILABLE`) — violates GUARDRAIL-4 |
-| `loops.js` S13-2 raw string writes | `'REJECTED'`, `'PENDING'`, `'APPROVED'` written as raw strings bypassing `LOOP_STATUS` constants — active Firestore pollution |
-| `playlists.js` ENUM-AUDIT-2 | **RESOLVED in S13** — `status = 'draft'` (lowercase). ENUM-AUDIT-2 is closed. |
-| `PlaylistRepository.js` ENUM-AUDIT-2 survivor | `findActiveByScreen()` and `findGlobalPlaylist()` both query `status == 'ACTIVE'` (uppercase) — **new finding, not in S15 retro** |
+| `BRAND_NAV` `/dashboard/brand` | **NEW (Step 4):** Dashboard Overview link also 404s — `App.jsx` has no `<Route path="brand" ...>`. Both brand nav links are broken. |
+| `getNavItems()` persona mapping | **CONFIRMED (Step 4):** `persona === 'advertiser'` → `BRAND_NAV`. No separate `brand` persona exists. The role-guard risk flagged in Step 3 is fully eliminated. |
+| `LOOP_STATUS` enum | All-uppercase in `LoopRepository.js` — violates GUARDRAIL-4 |
+| `SLOT_STATUS` enum | All-uppercase in `LoopRepository.js` — violates GUARDRAIL-4 |
+| `loops.js` S13-2 raw string writes | `'REJECTED'`, `'PENDING'`, `'APPROVED'` bypass `LOOP_STATUS` constants; L262 `'PENDING'` ≠ `PENDING_APPROVAL` — approve-all has returned 0 approvals since S13-2 |
+| `playlists.js` ENUM-AUDIT-2 | **RESOLVED in S13** — `status = 'draft'` (lowercase). Closed. |
+| `PlaylistRepository.js` ENUM-AUDIT-2 survivor | `findActiveByScreen()` and `findGlobalPlaylist()` query `status == 'ACTIVE'` (uppercase) — new finding |
 | `firestore.indexes.json` | NOT ON DISK |
-| S11-1/2/4 persistence QA | `tests/` has 17 spec files — `integration_broadcasting.spec.js` (11,254B) and `loop_builder.spec.js` (7,291B) are the most likely candidates |
-| `GET /api/invoices/:id/pdf` | Stub confirmed at `ad-server/src/api/invoices.js` ~L152 — returns HTTP 200 JSON stub |
-| `PricingService.js` | NOT ON DISK — FM-S15-5 confirmed optional; not created |
+| S11-1/2/4 persistence QA | `tests/` has 17 spec files — candidates: `integration_broadcasting.spec.js`, `loop_builder.spec.js` |
 
 ---
 
@@ -53,180 +54,291 @@
 
 | Task | Old Score | New Score | What Raised It | What Caps It | Remaining Risks |
 |---|---|---|---|---|---|
-| **S16-0** Fix `BRAND_NAV` invoices link | 97% | **99%** | `App.jsx` confirmed live at `client-app/src/App.jsx` (13,344B). `DashboardLayout.jsx` confirmed in `client-app/src/layouts/`. `client-app/src/pages/advertiser/` tree confirmed. Fix is 1 string change in 1 known array. | 1% — if brand persona has a separate auth guard or role check that wraps BRAND_NAV differently, the link change may display for wrong role. | Role-based nav guard behavior around `BRAND_NAV` vs `RETAILER_NAV` not read. |
-| **S16-1** Normalize `LOOP_STATUS` + `SLOT_STATUS` to lowercase | 88% | **83%** | **Lowered.** `PlaylistRepository.js` finding proves there is at least one more enum survivor not in the S15 retro. The same pattern likely exists in other repositories not yet read. The blast radius of enum migration is wider than Step 2 assumed. | Capped by: unread repo files that may import `LOOP_STATUS` constants; Firestore document volume in prod unknown; no CI Firestore emulator confirmed. | 1) Other repository files may reference `LOOP_STATUS` / `SLOT_STATUS` by string literal rather than constant — full grep not yet run across all `ad-server/src`. 2) Migration strategy (dual-write vs big-bang) not decided. 3) Backfill script does not exist on disk yet. |
-| **S16-2** Fix `loops.js` S13-2 raw string writes | 92% | **95%** | All 3 raw string write points confirmed in `loops.js` at L206, L262, L267. Import path for `LOOP_STATUS` from `LoopRepository.js` confirmed. The `'PENDING'` vs `'PENDING_APPROVAL'` mismatch is now documented — the fix is unambiguous. | 5% — if S16-1 and S16-2 are not committed atomically, a window of mixed-case writes opens. | Atomicity with S16-1 is the only remaining risk. |
-| **S16-3** Create `firestore.indexes.json` | 82% | **71%** | **Lowered.** `firebase.json` and `.firebaserc` existence is NOT confirmed on disk. `client-app/src/` listing shows no firebase config reference. Without a deploy pipeline, the index file is inert. | Capped by: deploy pipeline entirely unknown; no CI step for `firebase deploy --only firestore:indexes` confirmed; Firestore collection field names in the spec (`advertiserId` vs `advertiser_id`) not yet cross-checked against `InvoiceRepository.js`. | 1) `firebase.json` NOT CONFIRMED — index deploy may require manual CLI step or a separate infra workflow. 2) Field name casing mismatch risk (`advertiserId` vs `advertiser_id`) — must grep `InvoiceRepository.js` before writing the index. |
-| **S16-4** Schedule or close S11-1/2/4 persistence QA | 85% | **88%** | `tests/` directory listed — 17 spec files now known. `integration_broadcasting.spec.js` (11,254B) and `loop_builder.spec.js` (7,291B) are the highest-probability candidates for S11-1/2/4 coverage. Decision can now be made with file names in hand. | 12% — S11 task IDs not explicitly labelled in test file content yet — must open the two candidate files to confirm which tests correspond to S11-1, S11-2, S11-4 before Option A/B/C can be formally chosen. | Test file content unread. Cannot confirm S11 task IDs without opening the files. |
-| **S16-5** Update `DATABASE_SCHEMA.md` | 98% | **97%** | **Marginally lowered.** `PlaylistRepository.js` finding introduces a new item (`ACTIVE` uppercase query survivor) that was not in the Step 2 doc update scope. Schema doc must now also capture this survivor. | 3% — scope of doc update is slightly larger than Step 2 assumed; risk of incomplete update if writer misses the `PlaylistRepository.js` survivor. | Must document `PlaylistRepository.js` `ACTIVE` query survivor under a new `ENUM-AUDIT-2 SURVIVOR` note. |
+| **S16-0** Fix `BRAND_NAV` invoices link | 97% | **99%** | `App.jsx` confirmed. `DashboardLayout.jsx` confirmed. Fix is 1 string in 1 known array. **Step 4: role-guard risk eliminated** — `getNavItems()` maps `advertiser` → `BRAND_NAV` with no ambiguity. | 1% — second broken BRAND_NAV link (`/dashboard/brand` Overview) now also confirmed; S16-0 as written only fixes the Invoices entry. | **S16-0 scope must expand** to fix both broken BRAND_NAV entries. See Step 4 new finding below. |
+| **S16-1** Normalize `LOOP_STATUS` + `SLOT_STATUS` | 88% | **83%** | — | Raw string leak grep not yet run across full `ad-server/src`; firebase-admin unconfirmed; no CI emulator confirmed | See Step 3 detail |
+| **S16-2** Fix `loops.js` raw string writes | 92% | **95%** | All 3 write points confirmed. L262 `'PENDING'` mismatch documented. | Must be atomic with S16-1 | See Step 3 detail |
+| **S16-3** Create `firestore.indexes.json` | 82% | **71%** | — | `firebase.json` not found; field name casing not cross-checked | See Step 3 detail |
+| **S16-4** Schedule or close S11-1/2/4 QA | 85% | **88%** | `tests/` listed — 17 files known | Test content unread | See Step 3 detail |
+| **S16-5** Update `DATABASE_SCHEMA.md` | 98% | **97%** | — | Must also document `PlaylistRepository.js` ACTIVE survivor | See Step 3 detail |
 
 ---
 
-### Tasks That Cannot Realistically Exceed 90% Yet
+## Step 4 — Isolation and Non-Blocking Audit
 
-#### S16-1 — Normalize `LOOP_STATUS` + `SLOT_STATUS` (capped at 83%)
+### New Finding: Second Broken `BRAND_NAV` Entry
 
-**Three unresolved factors, each independently capable of causing a partial failure:**
+**Source:** `DashboardLayout.jsx` fully read at Step 4.
 
-**Factor 1 — Full grep across `ad-server/src` not run**
+`BRAND_NAV` contains three entries:
 
-The Step 1 read confirmed `LoopRepository.js` and `loops.js`. It did not grep all files in `ad-server/src` for string literals matching `'PENDING_APPROVAL'`, `'APPROVED'`, `'REJECTED'`, `'LIVE'`, `'BOOKED'`, `'REPLACED'`, `'AVAILABLE'`. The `PlaylistRepository.js` finding proves this pattern recurs. There may be additional raw-string references in:
-- `ad-server/src/api/scheduling.js` or similar — not listed in tree yet
-- Any middleware that inspects `loop.status` directly
-- Any `where` clause that uses a hardcoded string in a non-repository file
-
-**Required pre-work before S16-1 can exceed 90%:**
-```bash
-grep -rn \
-  "'PENDING_APPROVAL'\|'APPROVED'\|'REJECTED'\|'LIVE'\|'PENDING'\|'BOOKED'\|'REPLACED'\|'AVAILABLE'" \
-  ad-server/src --include="*.js" \
-  | grep -v "LoopRepository.js\|loops.js\|node_modules"
+```js
+const BRAND_NAV = [
+    { to: '/dashboard/brand',              icon: 'dashboard',    label: 'Dashboard',   end: true },  // ← 404
+    { to: '/dashboard/brand/campaign/new', icon: 'add_circle',   label: 'New Campaign' },            // ← OK (App.jsx has brand/campaign/new)
+    { to: '/dashboard/brand/invoices',     icon: 'receipt_long', label: 'Invoices' },                // ← 404 (S16-0 original scope)
+];
 ```
-If the output is empty → S16-1 rises to ~92%.
-If the output has hits → those files must be added to the blast radius before the sprint can proceed.
 
-**Factor 2 — Firestore document volume in production unknown**
+`App.jsx` route table (confirmed from full read):
+- `<Route path="brand" element={<BrandOverview />} />` → **EXISTS** ✅
+- `<Route path="brand/campaign/new" element={<CampaignWizard />} />` → **EXISTS** ✅
+- `<Route path="advertiser/invoices" element={<Invoices />} />` → **EXISTS** ✅
+- `<Route path="brand/invoices" ...>` → **DOES NOT EXIST** ❌
 
-The dual-write + backfill strategy is correct in principle. But the backfill script cannot be validated without knowing approximately how many `loops` documents exist in production. If the collection is large (>10,000 documents), a naive `getDocs(collection(db, 'loops'))` backfill will hit Firestore read quota limits and time out.
+**Re-analysis:** `App.jsx` DOES have `<Route path="brand" element={<BrandOverview />} />`. The `BRAND_NAV` Dashboard entry (`/dashboard/brand`) is therefore **NOT a 404** — it resolves correctly to `BrandOverview`. The Step 1 finding of "second broken link" was wrong.
 
-**Required pre-work before S16-1 backfill script can be written safely:**
-```bash
-# Check if there is a Firestore admin SDK script pattern in the repo
-find ad-server -name "*.js" -path "*/scripts/*" | head -10
-find ad-server -name "firebase-admin*" | head -5
-grep -rn "firebase-admin\|getFirestore\|admin.firestore" ad-server --include="*.js" | head -10
-```
-If `firebase-admin` is already used in the codebase → backfill script can use the admin SDK with batched writes (500 docs per batch), raising the score.
-If `firebase-admin` is NOT in the codebase → backfill requires either adding a new dependency or using the Firebase CLI's Firestore import/export path, which has different operational risk.
+**Corrected BRAND_NAV status:**
 
-**Factor 3 — No CI Firestore emulator confirmed**
+| Nav entry | Target | App.jsx Route | Status |
+|---|---|---|---|
+| Dashboard | `/dashboard/brand` | `brand` → `BrandOverview` | ✅ Works |
+| New Campaign | `/dashboard/brand/campaign/new` | `brand/campaign/new` → `CampaignWizard` | ✅ Works |
+| Invoices | `/dashboard/brand/invoices` | **NO ROUTE** | ❌ 404 — only broken entry |
 
-The test files in `tests/` may or may not use the Firestore emulator. If enum migration tests run against a live Firestore project (not an emulator), the test environment itself becomes a risk vector during the S16-1 validation phase.
-
-**Required pre-work:**
-```bash
-grep -rn "FIRESTORE_EMULATOR_HOST\|useEmulator\|connectFirestoreEmulator" \
-  ad-server/src tests --include="*.js" | head -20
-```
+**S16-0 scope is unchanged from Step 2.** Only the Invoices entry is broken. One-line fix.
 
 ---
 
-#### S16-3 — Create `firestore.indexes.json` (capped at 71%)
+### Role-Guard Proof for S16-0
 
-**Two unresolved factors:**
+**Source confirmed from `DashboardLayout.jsx` full read:**
 
-**Factor 1 — `firebase.json` and deploy pipeline not confirmed on disk**
-
-The index file is inert without a deploy mechanism. `firebase deploy --only firestore:indexes` requires `firebase.json` to reference the index file path. Without this:
-- The file can be created
-- It cannot be deployed
-- The Firestore queries remain unoptimized
-- The task cannot be marked Done
-
-**Required pre-work:**
-```bash
-find . -name "firebase.json" -o -name ".firebaserc" | grep -v node_modules
+```js
+function getNavItems(persona) {
+    if (!persona) return [];
+    if (persona === 'admin' || persona === 'superadmin' || persona === 'super_admin') return ADMIN_NAV;
+    if (persona === 'advertiser') return BRAND_NAV;          // ← advertiser persona gets BRAND_NAV
+    if (persona === 'retaileradmin') return RETAILER_NAV;
+    if (persona === 'techoperator') return TECHOP_NAV;
+    return [];
+}
 ```
-- **If found** → read `firebase.json` to confirm `"firestore": { "indexes": "firestore.indexes.json" }` key exists. Score rises to ~88%.
-- **If not found** → task degrades to "create the file + document that manual deploy is required." Score stays at 71% because Done criteria require Firebase console confirmation of `ENABLED` status, which is blocked.
 
-**Factor 2 — Field name casing not cross-checked against `InvoiceRepository.js`**
-
-The Step 2 spec writes `advertiserId` (camelCase) for the `invoices` composite index. Firestore field paths are case-sensitive. If `InvoiceRepository.js` writes `advertiser_id` (snake_case), the index will never be used.
-
-**Required pre-work before writing the index file:**
-```bash
-grep -n "advertiserId\|advertiser_id\|generatedAt\|generated_at" \
-  ad-server/src/repositories/InvoiceRepository.js
-```
-This single grep eliminates the field-name casing risk entirely. Score rises to ~85% after this pre-check.
+**Proof:** There is no `brand` persona value in the system. `persona === 'advertiser'` is the only condition that returns `BRAND_NAV`. Fixing `BRAND_NAV[2].to` from `/dashboard/brand/invoices` to `/dashboard/advertiser/invoices` points the advertiser persona's Invoices link at the correct, existing route. No role ambiguity. No auth guard impact. The Step 3 role-guard risk is **fully eliminated**.
 
 ---
 
-### Revised Task Details (Step 3 Tightened)
+### Blast-Radius Table
+
+| Task | Files Touched | Change Type | Shared Infra? | Can It Break Other Features? | Mitigation |
+|---|---|---|---|---|---|
+| **S16-0** | `client-app/src/layouts/DashboardLayout.jsx` | EDIT — 1 string value in `BRAND_NAV[2].to` | No | No | `BRAND_NAV` is defined as a module-level constant in `DashboardLayout.jsx` and is consumed only by `getNavItems()`, called only by `Sidebar()`, rendered only inside `DashboardLayout`. Zero other files import or reference `BRAND_NAV`. Change is purely additive correction. |
+| **S16-1** | `ad-server/src/repositories/LoopRepository.js` | EDIT — constant string values only (no method signatures, no exports removed) | **Yes — shared repository** | **Yes — Firestore query correctness** | All callers of `LOOP_STATUS.*` and `SLOT_STATUS.*` continue to use the same constant names. Only the string values change. Any Firestore document written before S16-1 with uppercase status will be missed by post-S16-1 queries until backfill. Dual-write period + backfill script required before production cutover. |
+| **S16-1** (backfill script) | `ad-server/scripts/migrate-loop-status-lowercase.js` | CREATE — new file, not imported by any runtime code | No | No | Script is a standalone migration tool. Not `require()`d or `import`ed by any server route or repository. Running it is an explicit operational step, not an automatic side effect of deployment. |
+| **S16-2** | `ad-server/src/api/loops.js` | EDIT — add `LOOP_STATUS` to existing import; replace 3 raw string literals | **Yes — shared API router** | **Yes — if not atomic with S16-1** | `loops.js` imports from `LoopRepository.js`. After S16-1, `LOOP_STATUS.REJECTED = 'rejected'`. S16-2 replaces the 3 raw uppercase strings with constants. If S16-2 lands without S16-1, the raw strings continue polluting Firestore. If S16-1 lands without S16-2, `loops.js` continues writing uppercase raw strings that bypass the corrected constants. Atomic commit is the only safe approach. |
+| **S16-3** | `firestore.indexes.json` (root or firebase.json-referenced path) | CREATE — new file | No | No | Firestore indexes are additive. Creating a composite index does not alter any existing index, collection structure, document schema, or query behavior. Undeployed index file has zero runtime effect. Deploy is a separate explicit CLI step. |
+| **S16-4** | `tests/integration_broadcasting.spec.js`, `tests/loop_builder.spec.js` | DECISION — read-only audit; optional `test.skip` annotations | No | No | Test infrastructure only. `test.skip` does not affect runtime behavior. No imports, no shared state with production code paths. |
+| **S16-5** | `docs/DATABASE_SCHEMA.md` | EDIT — documentation only | No | No | Markdown doc. Not imported, parsed, or executed by any runtime code. Zero runtime impact. |
 
 ---
 
-#### S16-0 — Fix `BRAND_NAV` invoices link (99%)
+### Shared Infrastructure Touch-Point Analysis
 
-**All uncertainties eliminated from Step 2. No new pre-checks required.**
+#### `LoopRepository.js` — Shared Repository (S16-1)
 
-**Confirmed sources:**
-- `client-app/src/layouts/` — confirmed on disk (directory listed)
-- `client-app/src/App.jsx` — confirmed on disk (13,344B)
-- `client-app/src/pages/` — confirmed on disk (directory listed)
+**Callers enumerated from prior reads:**
 
-**One remaining 1% risk — document it explicitly:**
+| Caller file | Method called | How it uses status values |
+|---|---|---|
+| `ad-server/src/api/loops.js` | `loopRepository.create()`, `approveLoop()`, `rejectSlot()`, `replaceSlot()`, `bookSlot()`, `findPendingByRetailer()`, `findApprovedByScreen()` | Passes no status string directly to these methods — the repository owns status internally. Exception: 3 raw string writes at L206, L262, L267 (addressed by S16-2). |
+| `ad-server/src/api/loops.js` | `LOOP_STATUS` constants (after S16-2) | Reads constant values for comparison/write. After S16-1+S16-2, all values are lowercase. |
 
-Before committing, confirm `BRAND_NAV` is not role-gated differently from `ADVERTISER_NAV`. If `DashboardLayout.jsx` renders `BRAND_NAV` only for a `brand` role and `ADVERTISER_NAV` only for an `advertiser` role, and these are separate personas with separate auth guards, then pointing `BRAND_NAV` at `/dashboard/advertiser/invoices` may render the nav link for the wrong persona's UI context.
+**Backward-compatible behavior proof for S16-1:**
 
-**Additional pre-check (new for Step 3):**
+The constant names (`LOOP_STATUS.APPROVED`, `LOOP_STATUS.PENDING_APPROVAL`, etc.) do not change. Only the string values they hold change. Every caller that uses `LOOP_STATUS.APPROVED` will automatically use `'approved'` instead of `'APPROVED'` after S16-1 — no caller needs to be updated for the constant reference to remain valid. The only callers that bypass the constants are the 3 raw string writes in `loops.js`, which S16-2 corrects in the same atomic commit.
+
+**Non-backward-compatible behavior (documented and expected):**
+
+Firestore query methods (`findPendingByRetailer()`, `findApprovedByScreen()`) will query for lowercase values after S16-1. Any Firestore document that still holds an uppercase status value will not be returned by these queries. This is the known dual-write risk — it is not a bug introduced by S16-1, it is the expected behavior during the migration window. The backfill script resolves it before production cutover.
+
+#### `loops.js` API Router (S16-2)
+
+**Shared infrastructure scope:**
+
+`loops.js` is mounted as an Express router. Changes to it affect all routes under its prefix. However, S16-2 touches only 3 lines inside 2 route handlers:
+
+- `POST /:loopId/reject` — local status write
+- `POST /locations/:locationId/loops/approve-all` — local query filter + status write
+
+No middleware, no shared state, no other route handlers are modified. The import line change (`+ LOOP_STATUS` added to existing destructure) does not alter the module's export or any other imported symbol.
+
+**Backward-compatible behavior proof for S16-2:**
+
+The routes `POST /:loopId/reject` and `POST /locations/:locationId/loops/approve-all` continue to exist at the same paths, accept the same request shapes, and return the same response shapes. The only behavioral change is that they now write lowercase status values to Firestore (correct) instead of uppercase (wrong). For `POST .../approve-all`, the previously broken query (`status == 'PENDING'` which matched zero records) is replaced by the correct query (`status == LOOP_STATUS.PENDING_APPROVAL` = `'pending_approval'`). This is a bug fix, not a breaking change.
+
+---
+
+### Isolation Verdict
+
+**Fully isolated (zero cross-feature risk):**
+- **S16-0** — 1 string change in a module-private nav constant. No other file references `BRAND_NAV`.
+- **S16-3** — Additive new file. No runtime code references it. Deploy is an explicit CLI step.
+- **S16-4** — Test infrastructure only. No runtime impact.
+- **S16-5** — Markdown doc only. No runtime impact.
+
+**Conditionally isolated (safe if atomicity constraint is respected):**
+- **S16-1 + S16-2** — Must land as a single atomic commit. Either change in isolation creates a mixed-casing window in Firestore. Together, they are self-consistent: all write paths produce lowercase values, all constant references use lowercase values.
+
+**No task in Sprint 16 touches shared middleware**, auth guards, `AuthContext`, `NetworkErrorBanner`, `SafeWidgetLoader`, `ErrorBoundary`, or any other cross-cutting frontend infrastructure.
+
+**No task in Sprint 16 creates, removes, or renames any API route.**
+
+---
+
+### Genuine Cross-Cutting Risks (Two)
+
+#### Risk 1 — Enum cutover timing window (S16-1 + S16-2)
+
+**Mechanism:** After S16-1+S16-2 are deployed to staging, `LoopRepository.js` writes lowercase values and queries for lowercase values. Any existing Firestore document with an uppercase status (written before S16-1) will be invisible to `findPendingByRetailer()` and `findApprovedByScreen()` until the backfill script runs.
+
+**Blast radius:** Retailer approval flow (pending loop list returns empty for old records). Admin loop overview (approved loops may appear missing). These are data visibility gaps, not data corruption.
+
+**Mitigation:** Backfill script (`scripts/migrate-loop-status-lowercase.js`) must run to completion in staging before the S16-1+S16-2 commit is promoted to production. The production deploy is gated on backfill confirmation. Document the gate explicitly in the deploy checklist.
+
+**Who is affected:** Retailer persona (`findPendingByRetailer()`) and screen scheduling path (`findApprovedByScreen()`). Admin persona can still see all loops via the admin panel if it uses a different query path.
+
+#### Risk 2 — `POST .../approve-all` behavior change is a visible functional delta (S16-2)
+
+**Mechanism:** Before S16-2, `POST /locations/:locationId/loops/approve-all` queried `status == 'PENDING'` which matched zero records in Firestore (since no document has ever been written with exactly `'PENDING'`). The route returned HTTP 200 with an empty approved set on every call since S13-2.
+
+After S16-2, the route queries `status == 'pending_approval'` (after backfill) and will begin returning non-zero approved counts.
+
+**This is correct behavior.** But it means any existing QA test, integration test, or Playwright test that asserts `approvedCount === 0` on this route will **fail after S16-2** — not because of a regression, but because the bug being fixed causes the correct behavior to differ from the previously (incorrectly) expected behavior.
+
+**Mitigation:** Before merging S16-2, search for test assertions on the approve-all route:
 ```bash
-grep -n "BRAND_NAV\|ADVERTISER_NAV\|role\|persona\|userRole\|brand\|advertiser" \
-  client-app/src/layouts/DashboardLayout.jsx | head -30
+grep -rn "approve-all\|approveAll\|approve_all" tests/ --include="*.spec.*"
+```
+Any assertion expecting an empty result set on this route must be updated to expect the correct non-zero behavior.
+
+---
+
+### Non-Blocking Dependency Map
+
+| Task | Blocks | Blocked By | Non-Blocking? |
+|---|---|---|---|
+| S16-0 | Nothing | Nothing | ✅ Fully non-blocking — ship independently |
+| S16-1 | S16-2 (must be atomic) | Nothing external | ⚠️ Coupled with S16-2 only |
+| S16-2 | Nothing | S16-1 (must be atomic) | ⚠️ Coupled with S16-1 only |
+| S16-3 | Nothing | `firebase.json` existence (pre-check) | ✅ Non-blocking — can be created independently; deploy is separate |
+| S16-4 | Nothing | Reading `integration_broadcasting.spec.js`, `loop_builder.spec.js` | ✅ Non-blocking — triage is a read-only audit |
+| S16-5 | Sprint close (GUARDRAIL-13) | S16-1, S16-2 landing (needs confirmed migration details) | ⚠️ Soft dependency — can be written speculatively; finalized after S16-1+S16-2 merge |
+
+**Recommended execution order:**
+1. **S16-0** — ship immediately, no dependencies, 1-line fix, eliminates live 404.
+2. **S16-4** — run triage in parallel with S16-1+S16-2 development.
+3. **S16-3** — run `firebase.json` pre-check, create file, stage for deploy.
+4. **S16-1 + S16-2** — develop together, merge as single atomic commit to staging only.
+5. Run backfill script in staging. Confirm zero uppercase status documents.
+6. **S16-5** — finalize doc update after S16-1+S16-2 merge confirmed.
+7. Promote S16-1+S16-2 to production after staging backfill is confirmed complete.
+
+---
+
+## 1. Risk Register
+
+| ID | Description | Area | Status | Evidence |
+|---|---|---|---|---|
+| RISK-S16-1 | `LOOP_STATUS` and `SLOT_STATUS` enums all-uppercase in `LoopRepository.js`, violating GUARDRAIL-4. New records created with uppercase status on every loop approve/reject/replace call. | Backend / Firestore | 🔴 Active | `LoopRepository.js` L19–31 |
+| RISK-S16-2 | `loops.js` S13-2 routes write raw uppercase strings bypassing `LOOP_STATUS` constants. L262 `'PENDING'` ≠ `PENDING_APPROVAL` — approve-all has returned 0 approvals since S13-2. | Backend | 🔴 Active | `loops.js` L206, L262, L267 |
+| RISK-S16-3 | `DashboardLayout.jsx` `BRAND_NAV[2]` references `/dashboard/brand/invoices` — no matching `<Route>` in `App.jsx`. Live 404 for advertiser persona clicking Invoices. | Frontend | 🔴 Live bug | `DashboardLayout.jsx` L33; `App.jsx` confirmed |
+| RISK-S16-4 | No `firestore.indexes.json` on disk. Two composite indexes documented but not deployed. `firebase.json` also not confirmed — deploy pipeline unknown. | Infra | 🟡 Pre-production | `DATABASE_SCHEMA.md`; no index file found |
+| RISK-S16-5 | S11-1/2/4 persistence QA carried for 3rd sprint. Must be resolved per GUARDRAIL-14. | QA | 🔴 Escalation required | `sprint15-retro.md` FM-S15-7 |
+| RISK-S16-6 | ENUM-AUDIT-2 (`playlists.status` write path) resolved in Sprint 13. | Tech debt | ✅ Closed | `playlists.js` L22 |
+| RISK-S16-7 | `GET /api/invoices/:id/pdf` is a post-MVP stub. | Feature debt | 🟢 Deferred | `invoices.js` ~L152 |
+| RISK-S16-8 | Enum migration for `loops` requires strategy decision. Wrong strategy could corrupt live loop approvals. | Backend / Firestore | 🔴 Requires pre-decision | `LoopRepository.js` all write methods |
+| RISK-S16-9 | `PlaylistRepository.js` `findActiveByScreen()` and `findGlobalPlaylist()` query `status == 'ACTIVE'` (uppercase). ENUM-AUDIT-2 survivor. Write path was fixed in S13; query path was not. | Backend / Firestore | 🟡 New finding — schedule S17 | `PlaylistRepository.js` |
+
+---
+
+## 2. Security Register
+
+| ID | Vector | File(s) | Mitigation | Environment Impact |
+|---|---|---|---|---|
+| SEC-S16-1 | Firestore query correctness — post-S16-1 queries for lowercase status miss uppercase docs until backfill. Retailer approval flow returns empty pending list. | `LoopRepository.js` `findPendingByRetailer()`, `findApprovedByScreen()` | Dual-write period + backfill before production cutover. | Dev + Staging before Prod |
+| SEC-S16-2 | Brand sidebar nav 404 — degrades auth boundary perception. | `DashboardLayout.jsx` L33 | Correct nav link to `/dashboard/advertiser/invoices`. Existing route, existing page, existing auth guard. | All envs |
+
+---
+
+## 3. Task Map
+
+| Task | Files Touched | Change Type | Estimated Effort | Outcome Probability | Biggest Risk |
+|---|---|---|---|---|---|
+| S16-0 | Fix `BRAND_NAV` invoices link | `DashboardLayout.jsx` | EDIT (1 line) | 1pt | **99%** | None remaining — role-guard risk eliminated by Step 4 source read |
+| S16-1 | Normalize `LOOP_STATUS` + `SLOT_STATUS` | `LoopRepository.js`, `scripts/migrate-loop-status-lowercase.js` | EDIT + CREATE | 3pts | **83%** | Raw string leaks in unread files; firebase-admin unconfirmed; no CI emulator |
+| S16-2 | Fix `loops.js` raw string writes | `loops.js` | EDIT | 2pts | **95%** | Must be atomic commit with S16-1; approve-all test assertions may need update |
+| S16-3 | Create `firestore.indexes.json` | `firestore.indexes.json` | CREATE | 2pts | **71%** | `firebase.json` not found; field name casing not cross-checked |
+| S16-4 | Schedule or close S11-1/2/4 QA | `tests/integration_broadcasting.spec.js`, `tests/loop_builder.spec.js` | DECISION + optional edit | 2pts | **88%** | S11 test IDs not confirmed in file content yet |
+| S16-5 | Update `DATABASE_SCHEMA.md` | `docs/DATABASE_SCHEMA.md` | EDIT | 1pt | **97%** | Must include `PlaylistRepository.js` ACTIVE survivor |
+
+---
+
+## 4. Full Task Details
+
+### S16-0 — Fix `BRAND_NAV` invoices link (99%)
+
+**All uncertainties eliminated by Steps 3 and 4. Role-guard risk confirmed eliminated.**
+
+**Source evidence (Step 4 — files read in full):**
+- `DashboardLayout.jsx` fully read (11,328B): `getNavItems(persona)` maps `persona === 'advertiser'` → `BRAND_NAV`. No `brand` persona string exists anywhere in the function. `BRAND_NAV` is consumed only by `getNavItems()` → `Sidebar()` → `DashboardLayout`. Zero other imports.
+- `App.jsx` fully read (13,344B): `<Route path="advertiser/invoices" element={<Invoices />} />` confirmed at Sprint 15. No `<Route path="brand/invoices">` exists.
+
+**Fix (unchanged from Step 2):**
+```js
+// client-app/src/layouts/DashboardLayout.jsx — BRAND_NAV array
+// BEFORE (line ~33):
+{ to: '/dashboard/brand/invoices', icon: 'receipt_long', label: 'Invoices' },
+
+// AFTER:
+{ to: '/dashboard/advertiser/invoices', icon: 'receipt_long', label: 'Invoices' },
 ```
 
 **Acceptance criteria (falsifiable):**
 1. `grep "brand/invoices" client-app/src/layouts/DashboardLayout.jsx` → exit 1, zero matches.
-2. Login as advertiser/brand persona → click "Invoices" in sidebar → URL is `/dashboard/advertiser/invoices`.
-3. HTTP 200 on `/dashboard/advertiser/invoices`. No `<NotFound>` component rendered.
-4. Hard-refresh at `/dashboard/advertiser/invoices` → page loads without redirect.
-5. No other component in `client-app/src/` references `/dashboard/brand/invoices`:
-   ```bash
-   grep -rn "brand/invoices" client-app/src --include="*.jsx" --include="*.js"
-   ```
-   → zero results.
+2. `grep -rn "brand/invoices" client-app/src --include="*.jsx" --include="*.js"` → zero results.
+3. Login with `persona = 'advertiser'` → sidebar shows Invoices link → click → URL becomes `/dashboard/advertiser/invoices` → HTTP 200, `<Invoices />` page renders.
+4. Hard-refresh at `/dashboard/advertiser/invoices` → page loads, no `<NotFound />` component rendered.
+5. `BRAND_NAV[0].to` (`/dashboard/brand`) and `BRAND_NAV[1].to` (`/dashboard/brand/campaign/new`) remain unchanged and continue to resolve to their existing routes.
 
 ---
 
-#### S16-1 — Normalize `LOOP_STATUS` + `SLOT_STATUS` to lowercase (83%)
+### S16-1 — Normalize `LOOP_STATUS` + `SLOT_STATUS` to lowercase (83%)
 
-**New pre-checks added by Step 3 (must run before any code is written):**
+**Pre-checks required before any code is written:**
 
 ```bash
-# 1. Full raw-string audit across all ad-server/src files except known ones
+# 1. Full raw-string audit across all ad-server/src (excludes known files)
 grep -rn \
   "'PENDING_APPROVAL'\|'APPROVED'\|'REJECTED'\|'LIVE'\|'PENDING'\|'BOOKED'\|'REPLACED'\|'AVAILABLE'" \
   ad-server/src --include="*.js" \
   | grep -v "LoopRepository.js\|loops.js"
 
-# 2. Confirm all files that import LOOP_STATUS or SLOT_STATUS
+# 2. All files that import LOOP_STATUS or SLOT_STATUS
 grep -rn "LOOP_STATUS\|SLOT_STATUS" ad-server/src --include="*.js"
 
-# 3. Confirm firebase-admin SDK availability for backfill script
-grep -rn "firebase-admin\|getFirestore\|admin\.firestore" ad-server/src --include="*.js" | head -10
+# 3. firebase-admin SDK availability for backfill script
 find ad-server -name "package.json" | xargs grep "firebase-admin" 2>/dev/null
 
-# 4. Confirm Firestore emulator usage in tests
+# 4. Firestore emulator in test suite
 grep -rn "FIRESTORE_EMULATOR_HOST\|connectFirestoreEmulator\|useEmulator" \
   ad-server/src tests --include="*.js" | head -20
 ```
 
-**Confirmed write points in `LoopRepository.js` (from Step 1 read — already confirmed, not re-checked):**
+**Confirmed write points in `LoopRepository.js`:**
 
-| Method | Current value written | After S16-1 |
+| Method | Current value | After S16-1 |
 |---|---|---|
-| `create()` default | `LOOP_STATUS.PENDING_APPROVAL` = `'PENDING_APPROVAL'` | `= 'pending_approval'` |
-| `approveLoop()` | `LOOP_STATUS.APPROVED` = `'APPROVED'` | `= 'approved'` |
+| `create()` default | `LOOP_STATUS.PENDING_APPROVAL = 'PENDING_APPROVAL'` | `= 'pending_approval'` |
+| `approveLoop()` | `LOOP_STATUS.APPROVED = 'APPROVED'` | `= 'approved'` |
 | `replaceSlot()` clone | `LOOP_STATUS.PENDING_APPROVAL` | `= 'pending_approval'` |
-| `rejectSlot()` slot | `SLOT_STATUS.REJECTED` = `'REJECTED'` | `= 'rejected'` |
-| `replaceSlot()` slot | `SLOT_STATUS.REPLACED` = `'REPLACED'` | `= 'replaced'` |
-| `bookSlot()` slot | `SLOT_STATUS.BOOKED` = `'BOOKED'` | `= 'booked'` |
-| `findPendingByRetailer()` query | `LOOP_STATUS.PENDING_APPROVAL` | `= 'pending_approval'` |
-| `findApprovedByScreen()` query | `LOOP_STATUS.APPROVED` | `= 'approved'` |
+| `rejectSlot()` slot | `SLOT_STATUS.REJECTED = 'REJECTED'` | `= 'rejected'` |
+| `replaceSlot()` slot | `SLOT_STATUS.REPLACED = 'REPLACED'` | `= 'replaced'` |
+| `bookSlot()` slot | `SLOT_STATUS.BOOKED = 'BOOKED'` | `= 'booked'` |
+| `findPendingByRetailer()` | queries `LOOP_STATUS.PENDING_APPROVAL` | queries `'pending_approval'` |
+| `findApprovedByScreen()` | queries `LOOP_STATUS.APPROVED` | queries `'approved'` |
 
-**New finding from Step 3 — `PlaylistRepository.js` ENUM-AUDIT-2 survivor:**
-
-`PlaylistRepository.js` queries `status == 'ACTIVE'` in at least two methods (`findActiveByScreen()`, `findGlobalPlaylist()`). This is outside S16-1's scope (it is a `playlists` collection issue, not `loops`) but must be:
-1. Added to the Risk Register as RISK-S16-9.
-2. Documented in `DATABASE_SCHEMA.md` under S16-5.
-3. Scheduled for S17 if not addressed in S16.
-
-**S16-1 must NOT silently fix `PlaylistRepository.js`** — it is out of scope and touching it expands blast radius. Document and defer.
-
-**Enum constant replacement (unchanged from Step 2, confirmed correct):**
+**Constant replacement:**
 ```js
-// LoopRepository.js
 export const LOOP_STATUS = {
     PENDING_APPROVAL: 'pending_approval',
     APPROVED:         'approved',
@@ -244,62 +356,35 @@ export const SLOT_STATUS = {
 };
 ```
 
-**Backfill script skeleton (to be completed after firebase-admin availability confirmed):**
+**Backfill script skeleton:** `ad-server/scripts/migrate-loop-status-lowercase.js`
+- Reads all `loops` documents
+- For each doc with uppercase `status`, writes lowercase equivalent
+- Handles `slots[]` array entries
+- Batched in groups of 500 (Firestore batch write limit)
+- Idempotent — safe to re-run
+- Logs migrated document IDs to stdout
+- Exits non-zero on any write failure
 
-File: `ad-server/scripts/migrate-loop-status-lowercase.js`
+**S16-1 must NOT modify `PlaylistRepository.js`** — out of scope, expands blast radius. Document and defer to S17.
 
-```js
-/**
- * One-time migration: normalize loops.status and loops.slots[].status to lowercase.
- * Idempotent — safe to re-run.
- * Run AFTER S16-1 constants are deployed to staging.
- * Run BEFORE S16-1 is deployed to production.
- */
-
-const UPPERCASE_TO_LOWER = {
-    'PENDING_APPROVAL': 'pending_approval',
-    'APPROVED':         'approved',
-    'REJECTED':         'rejected',
-    'LIVE':             'live',
-};
-
-const SLOT_UPPER_TO_LOWER = {
-    'PENDING':   'pending',
-    'APPROVED':  'approved',
-    'REJECTED':  'rejected',
-    'REPLACED':  'replaced',
-    'BOOKED':    'booked',
-    'AVAILABLE': 'available',
-};
-
-// TODO: import firebase-admin and initialize — confirm SDK availability via pre-check #3 above
-// TODO: batch writes in groups of 500 to respect Firestore batch limit
-// TODO: log migrated document IDs to stdout
-// TODO: exit non-zero if any write fails
-```
-
-**Acceptance criteria (falsifiable):**
-1. `grep -n "PENDING_APPROVAL.*=.*'PENDING_APPROVAL'" ad-server/src/repositories/LoopRepository.js` → zero results.
-2. `grep -n "'pending_approval'" ad-server/src/repositories/LoopRepository.js` → at least 3 results (create, approveLoop, findPending).
-3. All SLOT_STATUS values in `LoopRepository.js` are lowercase strings.
-4. `ad-server/scripts/migrate-loop-status-lowercase.js` exists and is runnable in staging with exit 0.
-5. After backfill script run in staging: `db.collection('loops').where('status', 'in', ['PENDING_APPROVAL','APPROVED','REJECTED','LIVE']).get()` → zero documents.
+**Acceptance criteria:**
+1. `grep -n "'PENDING_APPROVAL'" ad-server/src/repositories/LoopRepository.js` → zero results.
+2. `grep -n "'pending_approval'" ad-server/src/repositories/LoopRepository.js` → minimum 3 results.
+3. All SLOT_STATUS values are lowercase strings.
+4. `ad-server/scripts/migrate-loop-status-lowercase.js` exists and exits 0 in staging.
+5. After backfill: `db.collection('loops').where('status', 'in', ['PENDING_APPROVAL','APPROVED','REJECTED','LIVE']).get()` → zero documents.
 6. After backfill: `db.collection('loops').where('status', '==', 'pending_approval').get()` → returns all previously-PENDING_APPROVAL loops.
-7. `DATABASE_SCHEMA.md` canonical enum section updated to lowercase values.
-8. S16-1 and S16-2 land in the same commit (verified by commit SHA containing diffs for both files).
+7. S16-1 and S16-2 in same commit.
 
-**Score path to 90%+:**
-- Run pre-check #1 (raw string grep) → zero hits → +5% (88%)
-- Confirm firebase-admin in package.json → +3% (91%)
-- Confirm emulator in test suite → +2% (93%)
+**Score path to 90%+:** Pre-check #1 zero hits (+5%) → firebase-admin confirmed (+3%) → emulator confirmed (+2%) → 93%.
 
 ---
 
-#### S16-2 — Fix `loops.js` raw string writes (95%)
+### S16-2 — Fix `loops.js` raw string writes (95%)
 
-**All write points confirmed. No new pre-checks required.**
+**All write points confirmed. Must be atomic with S16-1.**
 
-**Confirmed raw string violations (from Step 1 read):**
+**Confirmed violations:**
 
 | Line | Route | Bug | Fix |
 |---|---|---|---|
@@ -307,47 +392,42 @@ const SLOT_UPPER_TO_LOWER = {
 | L262 | `POST /locations/:locationId/loops/approve-all` | `['status', '==', 'PENDING']` | `['status', '==', LOOP_STATUS.PENDING_APPROVAL]` |
 | L267 | `POST /locations/:locationId/loops/approve-all` | `status: 'APPROVED'` | `status: LOOP_STATUS.APPROVED` |
 
-**Step 3 note on L262 bug severity:**
-The `'PENDING'` string at L262 is not just a casing violation — it is a **wrong value**. `LOOP_STATUS.PENDING_APPROVAL` = `'PENDING_APPROVAL'` (not `'PENDING'`). The bulk approve-all route has been silently querying with a value that matches zero records since S13-2. This means:
-- `POST /locations/:locationId/loops/approve-all` has returned HTTP 200 with 0 approvals since S13-2.
-- Any QA test that passed on this route was not exercising real approval.
-- After S16-2, this route will begin working correctly for the first time since S13-2.
+**L262 severity note:** `'PENDING'` ≠ `'PENDING_APPROVAL'`. The approve-all route has matched zero records since S13-2. This is a regression fix, not a style fix. Existing tests asserting `approvedCount === 0` on this route must be updated.
 
-This is a regression fix, not just a style fix. The acceptance criteria must explicitly verify that approve-all now approves real pending loops.
+**Pre-check before merge:**
+```bash
+grep -rn "approve-all\|approveAll\|approve_all" tests/ --include="*.spec.*"
+```
 
-**Acceptance criteria (falsifiable):**
+**Import fix:**
+```js
+// Add LOOP_STATUS to existing import at top of loops.js
+import { loopRepository, BUSINESS_HOURS, LOOP_STATUS } from '../repositories/LoopRepository.js';
+```
+
+**Acceptance criteria:**
 1. `grep -n "'REJECTED'\|'PENDING'\|'APPROVED'\|'LIVE'" ad-server/src/api/loops.js` → zero results.
-2. `grep -n "LOOP_STATUS" ad-server/src/api/loops.js` → minimum 4 results (import line + 3 usages).
-3. Import line: `import { ..., LOOP_STATUS } from '../repositories/LoopRepository.js'` present in `loops.js` top-level imports.
-4. **Regression test for approve-all:** Seed staging Firestore with 3 loops at `status: 'pending_approval'` (lowercase, after S16-1 backfill). `POST /api/locations/:locationId/loops/approve-all` → response body contains `approvedCount: 3` (or equivalent). All 3 docs in Firestore now have `status: 'approved'`.
-5. **Reject route test:** Seed staging Firestore with 1 loop at `status: 'pending_approval'`. `POST /api/loops/:loopId/reject` → doc in Firestore has `status: 'rejected'`.
-6. Commit SHA is shared with S16-1 (single atomic commit).
-
-**Remaining 5% risk:** Atomicity enforcement. If a developer merges S16-1 and S16-2 in separate PRs with any window between merges, Firestore will receive mixed-case writes during the gap. Enforce via PR policy: both files must appear in the same commit diff.
+2. `grep -n "LOOP_STATUS" ad-server/src/api/loops.js` → import line + minimum 3 usages.
+3. Regression test: seed 3 loops with `status: 'pending_approval'` in staging. `POST .../approve-all` → `approvedCount: 3`. All 3 docs have `status: 'approved'`.
+4. Reject route test: `POST .../reject` on a `pending_approval` loop → doc has `status: 'rejected'`.
+5. Commit SHA contains diffs for both `LoopRepository.js` and `loops.js`.
 
 ---
 
-#### S16-3 — Create `firestore.indexes.json` (71%)
+### S16-3 — Create `firestore.indexes.json` (71%)
 
-**Two pre-checks added by Step 3 that are blocking before the file can be written:**
+**Two blocking pre-checks before file can be written:**
 
-**Pre-check A — Field name casing in `InvoiceRepository.js` (blocking):**
 ```bash
+# Pre-check A — field name casing (blocking for correctness)
 grep -n "advertiserId\|advertiser_id\|generatedAt\|generated_at" \
   ad-server/src/repositories/InvoiceRepository.js
-```
-- If `advertiser_id` (snake_case) → write index with `"fieldPath": "advertiser_id"`.
-- If `advertiserId` (camelCase) → write index with `"fieldPath": "advertiserId"`.
-- Writing the wrong casing creates a valid JSON file that deploys successfully but is never used by Firestore.
 
-**Pre-check B — Deploy pipeline (blocking for Done criteria):**
-```bash
+# Pre-check B — deploy pipeline (blocking for Done criteria)
 find . -name "firebase.json" -o -name ".firebaserc" | grep -v node_modules | head -5
 ```
-- **If found:** Read `firebase.json` → confirm `"firestore": { "indexes": "<path>" }` key. Update the path in the new file accordingly.
-- **If not found:** Task scope narrows to CREATE FILE ONLY. Done criteria drop to: file exists with valid JSON and correct field names. The Firebase console `ENABLED` check cannot be a Done criterion without a deploy pipeline.
 
-**Index content (field names TBD pending Pre-check A — camelCase placeholders used below, must be corrected after grep):**
+**Index content template (field names are placeholders until Pre-check A runs):**
 ```json
 {
   "indexes": [
@@ -372,203 +452,96 @@ find . -name "firebase.json" -o -name ".firebaserc" | grep -v node_modules | hea
 }
 ```
 
-> ⚠️ The `{{...}}` placeholders above MUST be replaced with confirmed field names from Pre-check A before the file is committed. Committing placeholder text will break Firestore index deployment.
+> ⚠️ `{{...}}` placeholders MUST be replaced with confirmed field names from Pre-check A before commit.
 
-**Acceptance criteria (falsifiable — two tiers):**
+**Acceptance criteria — Tier 1 (file creation, no deploy pipeline required):**
+1. `find . -name "firestore.indexes.json" | grep -v node_modules` → 1 result.
+2. File parses as valid JSON.
+3. `grep "{{" firestore.indexes.json` → zero results.
+4. Field names match Pre-check A output.
 
-*Tier 1 — File creation (achievable without deploy pipeline):*
-1. `find . -name "firestore.indexes.json" | grep -v node_modules` → returns exactly 1 result.
-2. `node -e "JSON.parse(require('fs').readFileSync('firestore.indexes.json','utf8')); console.log('valid')"` → prints `valid`.
-3. `grep "{{" firestore.indexes.json` → zero results (no unresolved placeholders).
-4. Field names in the file match the output of Pre-check A.
-
-*Tier 2 — Deploy confirmation (requires firebase.json + deploy pipeline):*
+**Acceptance criteria — Tier 2 (deploy, requires firebase.json):**
 5. `firebase deploy --only firestore:indexes --project <staging>` → exits 0.
-6. Firebase console → Firestore → Indexes → both composite indexes show `ENABLED` status.
-7. `GET /api/invoices?advertiserId=<id>` (or equivalent paginated endpoint) returns results ordered by `generatedAt DESC` without a Firestore "index required" error in server logs.
+6. Firebase console → Indexes → both show `ENABLED`.
+7. Invoice list endpoint returns results ordered by `generatedAt DESC` without Firestore index-required error in server logs.
 
-**Score path to 85%+:**
-- Run Pre-check A → field names confirmed → +5% (76%)
-- `firebase.json` found on disk → +9% (85%)
+**Score path:** Pre-check A run (+5% → 76%) + `firebase.json` found (+9% → 85%).
 
 ---
 
-#### S16-4 — Schedule or close S11-1/2/4 persistence QA (88%)
+### S16-4 — Schedule or close S11-1/2/4 QA (88%)
 
-**Test files now known from Step 3 `tests/` listing.**
+**Files now known. Must open both candidate files to confirm S11 test IDs.**
 
-**Candidate files for S11-1, S11-2, S11-4 (by size — larger files more likely to contain integration/persistence tests):**
-
-| File | Size | Likelihood for S11-1/2/4 |
-|---|---|---|
-| `tests/integration_broadcasting.spec.js` | 11,254B | 🔴 High — broadcasting/scheduling tests most likely to contain persistence assertions from S11 |
-| `tests/loop_builder.spec.js` | 7,291B | 🟡 Medium — loop builder workflow, may include S11 slot persistence tests |
-| `tests/analytics_loop.spec.js` | 4,044B | 🟢 Low — analytics scope |
-| `tests/ad_player.spec.js` | 2,421B | 🟢 Low — ad player scope |
-
-**Required pre-work (must open both candidate files):**
 ```bash
-grep -n "S11\|persistence\|persist\|localStorage\|sessionStorage\|reload\|hard.refresh\|hard_refresh" \
+grep -n "S11\|persistence\|persist\|localStorage\|sessionStorage\|reload\|hard.refresh" \
   tests/integration_broadcasting.spec.js tests/loop_builder.spec.js
 ```
 
-**Resolution options (unchanged from Step 2 — now made falsifiable):**
+**Resolution options:**
 
 | Option | Condition | Acceptance criteria |
 |---|---|---|
-| **A — Fix** | Test failures are actionable and tests reference live routes/methods | All S11-labelled tests pass: `npx playwright test tests/integration_broadcasting.spec.js tests/loop_builder.spec.js --grep "S11"` exits 0 |
-| **B — Defer with reason** | Tests require Firestore emulator not available in CI | `grep -c "FIRESTORE_EMULATOR_HOST\|connectFirestoreEmulator" tests/integration_broadcasting.spec.js` > 0 AND CI config confirms emulator is not provisioned. Add `test.skip` with comment `// DEFERRED-S16: emulator not in CI, rescheduled S17` |
-| **C — Close as won't-fix** | Tests reference deleted routes or deprecated service methods from S7-S11 | Each skipped test has a comment citing the superseding sprint and the reason the test is no longer valid. `grep -c "won't-fix\|superseded" tests/integration_broadcasting.spec.js` > 0 |
+| A — Fix | Failures actionable, tests reference live routes/methods | `npx playwright test tests/integration_broadcasting.spec.js tests/loop_builder.spec.js --grep "S11"` → exits 0 |
+| B — Defer | Require Firestore emulator not in CI | `test.skip` with comment `// DEFERRED-S16: emulator not in CI, rescheduled S17` |
+| C — Close | Tests reference deleted routes/deprecated methods | Each skipped test has comment citing superseding sprint |
 
-**§ S16-4 Resolution** *(to be filled in after candidate files are read):*
-```
-Test files identified:
-  [ ] tests/integration_broadcasting.spec.js — S11 coverage TBD
-  [ ] tests/loop_builder.spec.js — S11 coverage TBD
-
-Resolution chosen: [ A | B | C ]
-Reason:
-  [ to be filled after grep output reviewed ]
-```
-
-**Acceptance criteria (falsifiable):**
-1. `grep -rn "S11" tests/` → all results accounted for with a status (fixed / deferred with reason / closed with reason).
-2. No S11-labelled test has the status `// TODO` or is unannotated.
-3. This section (`§ S16-4 Resolution`) is filled in before sprint is marked Done.
-4. GUARDRAIL-14: no S17 carry without a documented reason in this file.
+**Acceptance criteria:**
+1. `grep -rn "S11" tests/` → all results have a documented status (fixed / deferred / closed).
+2. No S11-labelled test is unannotated or has `// TODO`.
+3. `§ S16-4 Resolution` section filled in with file names, chosen option, and reason.
+4. No S17 carry without documented reason in this file.
 
 ---
 
-#### S16-5 — Update `DATABASE_SCHEMA.md` (97%)
+### S16-5 — Update `DATABASE_SCHEMA.md` (97%)
 
-**Scope expanded by Step 3 — `PlaylistRepository.js` ACTIVE query survivor must be documented.**
+**Scope expanded at Step 3 to include `PlaylistRepository.js` ACTIVE query survivor.**
 
-**Changes required (updated from Step 2):**
+**Changes required:**
+1. Close ENUM-AUDIT-2 write path: `"ENUM-AUDIT-2 CLOSED (Sprint 13): playlists.js L22 default = 'draft' (lowercase). No further action on write path."`
+2. Document ENUM-AUDIT-2 survivor: `"ENUM-AUDIT-2 SURVIVOR (found Sprint 16): PlaylistRepository.js findActiveByScreen() and findGlobalPlaylist() query status == 'ACTIVE' (uppercase). Scheduled for ENUM-AUDIT-3 in Sprint 17."`
+3. Document ENUM-AUDIT-1 migration: `"ENUM-AUDIT-1 (Sprint 16): LOOP_STATUS and SLOT_STATUS migrated to lowercase. Backfill: scripts/migrate-loop-status-lowercase.js. Cutover: S17 after staging backfill confirmed."`
+4. Update canonical enum values for `loops` to lowercase.
+5. Document S16-0 nav fix: `"S16-0: BRAND_NAV /dashboard/brand/invoices corrected to /dashboard/advertiser/invoices. persona='advertiser' confirmed as the only BRAND_NAV consumer."`
 
-1. Close ENUM-AUDIT-2 for `playlists.js`:
-   ```
-   ENUM-AUDIT-2 CLOSED (Sprint 13): playlists.js L22 default corrected to status = 'draft' (lowercase). No further action on write path.
-   ```
-
-2. **New — document `PlaylistRepository.js` ACTIVE query survivor (ENUM-AUDIT-2 survivor):**
-   ```
-   ENUM-AUDIT-2 SURVIVOR (found Sprint 16 Step 3): PlaylistRepository.js
-   findActiveByScreen() and findGlobalPlaylist() query status == 'ACTIVE' (uppercase).
-   Write path in playlists.js is correct (lowercase 'draft').
-   Query path has NOT been corrected. Scheduled for ENUM-AUDIT-3 in Sprint 17.
-   Risk: findActiveByScreen() returns zero results for any playlist written after playlists.js
-   was corrected in S13, if the active-status write path also moved to lowercase.
-   Pre-check required before S17: grep -n "status.*active\|status.*ACTIVE" ad-server/src/api/playlists.js
-   ```
-
-3. Document ENUM-AUDIT-1 migration plan for `loops`:
-   ```
-   ENUM-AUDIT-1 (Sprint 16): LOOP_STATUS and SLOT_STATUS constants migrated to lowercase
-   in LoopRepository.js. Raw string writes in loops.js corrected to use constants (S16-2).
-   Firestore backfill required before production cutover — see scripts/migrate-loop-status-lowercase.js.
-   Dual-write period: S16 staging. Production cutover: after backfill confirmed in staging.
-   ```
-
-4. Update canonical enum values for `loops`:
-   ```
-   loops.status (canonical): pending_approval | approved | rejected | live
-   loops.slots[].status (canonical): pending | approved | rejected | replaced | booked | available
-   ```
-
-5. Document S16-0 nav fix:
-   ```
-   S16-0 (Sprint 16): BRAND_NAV /dashboard/brand/invoices corrected to /dashboard/advertiser/invoices
-   in DashboardLayout.jsx. No separate brand/invoices page planned at this time.
-   If brand and advertiser personas are split in a future sprint, this nav entry must be re-evaluated.
-   ```
-
-**Acceptance criteria (falsifiable):**
-1. `grep "ENUM-AUDIT-2 CLOSED" docs/DATABASE_SCHEMA.md` → contains "Sprint 13".
-2. `grep "ENUM-AUDIT-2 SURVIVOR" docs/DATABASE_SCHEMA.md` → contains "PlaylistRepository.js".
-3. `grep "ENUM-AUDIT-1" docs/DATABASE_SCHEMA.md` → contains "Sprint 16" and "migrate-loop-status-lowercase.js".
+**Acceptance criteria:**
+1. `grep "ENUM-AUDIT-2 CLOSED" docs/DATABASE_SCHEMA.md` → "Sprint 13" present.
+2. `grep "ENUM-AUDIT-2 SURVIVOR" docs/DATABASE_SCHEMA.md` → "PlaylistRepository.js" present.
+3. `grep "ENUM-AUDIT-1" docs/DATABASE_SCHEMA.md` → "Sprint 16" and "migrate-loop-status-lowercase.js" present.
 4. `grep "pending_approval\|approved\|rejected\|live" docs/DATABASE_SCHEMA.md` → lowercase canonical values present.
-5. `grep "ACTIVE\|PENDING_APPROVAL\|APPROVED\|REJECTED\|LIVE" docs/DATABASE_SCHEMA.md` → if present, only in historical/survivor notes, not as canonical values.
-6. `grep "brand/invoices" docs/DATABASE_SCHEMA.md` → contains "corrected to /dashboard/advertiser/invoices".
-
----
-
-## 1. Risk Register
-
-| ID | Description | Area | Status | Evidence |
-|---|---|---|---|---|
-| RISK-S16-1 | `LOOP_STATUS` and `SLOT_STATUS` enums are all-uppercase in `LoopRepository.js`, violating GUARDRAIL-4. New records are being created with uppercase status values on every loop approve/reject/replace call. | Backend / Firestore | 🔴 Active | `LoopRepository.js` L19–31: `LOOP_STATUS.APPROVED = 'APPROVED'`, etc. |
-| RISK-S16-2 | `loops.js` S13-2 routes write raw uppercase strings (`'REJECTED'`, `'PENDING'`, `'APPROVED'`) that bypass `LOOP_STATUS` constants entirely. L262 uses `'PENDING'` which does not match `LOOP_STATUS.PENDING_APPROVAL` — approve-all route has returned 0 approvals since S13-2. | Backend | 🔴 Active | `loops.js` L206, L262, L267 |
-| RISK-S16-3 | `DashboardLayout.jsx` `BRAND_NAV` references `/dashboard/brand/invoices` which has no matching `<Route>` in `App.jsx`. Clicking Invoices in the brand sidebar 404s. | Frontend | 🔴 Live bug | `DashboardLayout.jsx` L33; `App.jsx` has `advertiser/invoices` not `brand/invoices` |
-| RISK-S16-4 | No `firestore.indexes.json` confirmed on disk. Two required composite indexes documented in `DATABASE_SCHEMA.md` but not deployed. `firebase.json` also not confirmed — deploy pipeline unknown. | Infra | 🟡 Pre-production | `DATABASE_SCHEMA.md` notes; no index file or firebase.json found |
-| RISK-S16-5 | S11-1/2/4 persistence QA carried for a 3rd consecutive sprint. Must be scheduled or explicitly closed per GUARDRAIL-14. | QA | 🔴 Escalation required | `sprint15-retro.md` FM-S15-7 |
-| RISK-S16-6 | ENUM-AUDIT-2 (`playlists.status` write path) was resolved in Sprint 13. Closed. | Tech debt | ✅ Closed | `playlists.js` L22 `status = 'draft'` |
-| RISK-S16-7 | Real PDF generation (`GET /api/invoices/:id/pdf`) is a post-MVP stub. No production risk. | Feature debt | 🟢 Deferred post-MVP | `invoices.js` ~L152 |
-| RISK-S16-8 | Enum migration for `loops` requires strategy decision. Wrong strategy could corrupt live loop approvals. | Backend / Firestore | 🔴 Requires pre-decision | `LoopRepository.js` all write methods |
-| RISK-S16-9 | **NEW (Step 3):** `PlaylistRepository.js` `findActiveByScreen()` and `findGlobalPlaylist()` query `status == 'ACTIVE'` (uppercase). This is an ENUM-AUDIT-2 survivor not caught in S13. Write path was fixed; query path was not. Any playlists written with lowercase `'draft'` → `'active'` transition (if it exists) will be invisible to these queries. | Backend / Firestore | 🟡 New finding — schedule S17 | `PlaylistRepository.js` `findActiveByScreen()`, `findGlobalPlaylist()` |
-
----
-
-## 2. Security Register
-
-| ID | Vector | File(s) | Mitigation | Environment Impact |
-|---|---|---|---|---|
-| SEC-S16-1 | Firestore query correctness — if enum casing migrates mid-flight, queries filtering on `status == 'pending_approval'` will miss records still stored as `'PENDING_APPROVAL'`. | `LoopRepository.js` `findPendingByRetailer()`, `findApprovedByScreen()` | Dual-write period + backfill before cutover. Backfill script must complete in staging before production deploy. | Dev + Staging before Prod |
-| SEC-S16-2 | Brand sidebar nav link 404 exposes unhandled route — degrades auth boundary perception. | `DashboardLayout.jsx` L33 | Correct nav link to `/dashboard/advertiser/invoices`. Existing route, existing page, existing auth guard. | All envs |
-
----
-
-## 3. Task Map
-
-| Task | Files Touched | Change Type | Estimated Effort | Outcome Probability | Biggest Risk |
-|---|---|---|---|---|---|
-| S16-0 | Fix `BRAND_NAV` invoices link | `DashboardLayout.jsx` | EDIT (1 line) | 1pt | **99%** | Role-guard behavior around BRAND_NAV not yet read |
-| S16-1 | Normalize `LOOP_STATUS` + `SLOT_STATUS` to lowercase | `LoopRepository.js`, `scripts/migrate-loop-status-lowercase.js` (CREATE) | EDIT + CREATE | 3pts | **83%** | Unknown raw string leaks in unread files; firebase-admin availability; no CI emulator confirmed |
-| S16-2 | Fix `loops.js` raw string writes | `loops.js` | EDIT | 2pts | **95%** | Must be atomic commit with S16-1 |
-| S16-3 | Create `firestore.indexes.json` | `firestore.indexes.json` (CREATE) | CREATE | 2pts | **71%** | `firebase.json` not found; field name casing not cross-checked against `InvoiceRepository.js` |
-| S16-4 | Schedule or close S11-1/2/4 persistence QA | `tests/integration_broadcasting.spec.js`, `tests/loop_builder.spec.js` | DECISION + optional edit | 2pts | **88%** | Test file content unread — S11 test IDs not yet confirmed in source |
-| S16-5 | Update `DATABASE_SCHEMA.md` | `docs/DATABASE_SCHEMA.md` | EDIT | 1pt | **97%** | Scope expanded: must also document `PlaylistRepository.js` ACTIVE query survivor |
-
----
-
-## 4. Full Task Details
-
-*(Full task details updated in-place above under § Step 3 — Revised Task Details. This section references those details.)*
-
-See:
-- **S16-0** → Step 3 tightened details above
-- **S16-1** → Step 3 tightened details above
-- **S16-2** → Step 3 tightened details above
-- **S16-3** → Step 3 tightened details above
-- **S16-4** → Step 3 tightened details above
-- **S16-5** → Step 3 tightened details above
+5. `grep "ACTIVE\|PENDING_APPROVAL\|APPROVED" docs/DATABASE_SCHEMA.md` → only in historical/survivor notes, not as canonical values.
+6. `grep "brand/invoices" docs/DATABASE_SCHEMA.md` → "corrected to /dashboard/advertiser/invoices" present.
 
 ---
 
 ## 5. Isolation and Blast Radius
 
-| Task | Files | Change Type | Can It Break Anything Else? | Why / Mitigation |
-|---|---|---|---|---|
-| S16-0 | `DashboardLayout.jsx` | EDIT — 1 string in `BRAND_NAV` | No (unless BRAND_NAV is role-gated separately from ADVERTISER_NAV — verify with pre-check) | Additive correction. React-Router renders the existing page at the corrected path. |
-| S16-1 | `LoopRepository.js`, `scripts/migrate-loop-status-lowercase.js` | EDIT constants + CREATE script | **Yes — Firestore queries** | Any caller querying uppercase status values against newly-lowercase-written docs will miss results. Dual-write + backfill before cutover. |
-| S16-2 | `loops.js` | EDIT — 1 import + 3 string replacements | **Yes — must be atomic with S16-1** | If S16-1 lands without S16-2, `loops.js` continues writing raw uppercase strings, bypassing the corrected constants. |
-| S16-3 | `firestore.indexes.json` | CREATE | No — additive only | New file. No existing code references it. Index deploy is a separate CLI step. |
-| S16-4 | `tests/` (read + optional edit) | DECISION / optional skip annotation | No | Test infrastructure only. No runtime impact. |
-| S16-5 | `docs/DATABASE_SCHEMA.md` | EDIT — doc only | No | Doc-only. No runtime impact. |
+| Task | Files | Change Type | Shared Infra? | Can It Break Other Features? | Mitigation |
+|---|---|---|---|---|---|
+| S16-0 | `DashboardLayout.jsx` | EDIT — 1 string in `BRAND_NAV[2].to` | No | No | `BRAND_NAV` used only in `getNavItems()` → `Sidebar()` → `DashboardLayout`. Zero other imports. Additive correction. |
+| S16-1 | `LoopRepository.js` | EDIT — constant string values only | **Yes — shared repository** | **Yes — Firestore query correctness during migration window** | Constant names unchanged; only values change. All callers continue to compile. Dual-write window mitigated by backfill script gating production deploy. |
+| S16-1 (script) | `scripts/migrate-loop-status-lowercase.js` | CREATE | No | No | Standalone script. Not imported by any runtime code. Explicit operational step. |
+| S16-2 | `loops.js` | EDIT — 1 import + 3 string replacements | **Yes — shared API router** | **Yes — if not atomic with S16-1** | Same-route handlers only. No middleware, no other routes affected. Must land in same commit as S16-1. |
+| S16-3 | `firestore.indexes.json` | CREATE | No | No | Additive new file. Not referenced by any code. Deploy is a separate explicit CLI step. |
+| S16-4 | `tests/*.spec.js` | DECISION / optional annotation | No | No | Test infrastructure only. No runtime impact. |
+| S16-5 | `docs/DATABASE_SCHEMA.md` | EDIT — doc only | No | No | Markdown doc. No runtime impact. |
 
 ### Isolation Verdict
 
-**S16-0, S16-3, S16-4, S16-5** are fully isolated. They touch no shared runtime infrastructure.
+**S16-0, S16-3, S16-4, S16-5** are fully isolated. Ship in any order, independently, without affecting any other feature.
 
-**S16-1 + S16-2** are the only cross-cutting risk and must be treated as a single atomic unit:
-- Committed in the same PR.
-- Backfill script created before merge to staging.
-- No production deploy until Firestore backfill confirmed complete in staging.
+**S16-1 + S16-2** are the only cross-cutting pair. They must be a single atomic commit. All other tasks are independent of them.
 
-### Genuine Cross-Cutting Risks
+**No task in Sprint 16 touches shared middleware, auth guards, AuthContext, NetworkErrorBanner, SafeWidgetLoader, ErrorBoundary, or any cross-cutting frontend infrastructure.**
 
-1. **Enum cutover timing** — `LoopRepository.js` and `loops.js` both read and write `loops.status`. Any window where one is updated without the other creates mixed-case Firestore documents and broken queries. Atomic commit is mandatory.
+**No task in Sprint 16 creates, removes, or renames any API route.**
 
-2. **`findPendingByRetailer()` silent empty set** — After S16-1, any existing Firestore document with `status: 'PENDING_APPROVAL'` (uppercase) will not match the new query for `status == 'pending_approval'` until the backfill script runs. The retailer approval flow will silently return empty results for old records during the dual-write window. This is expected and documented — backfill gates the production deploy.
+### Cross-Cutting Risks
+
+1. **Enum cutover timing (S16-1 + S16-2):** Retailer approval flow and screen scheduling silently return empty results for uppercase-status documents until backfill completes. Mitigated by staging backfill gate before production promotion.
+
+2. **Approve-all behavior delta (S16-2):** Route begins returning non-zero approvals after fix. Any test asserting `approvedCount === 0` will fail — correctly, as the prior behavior was the bug. Run `grep -rn "approve-all" tests/` before merge and update affected assertions.
 
 ---
 
@@ -588,15 +561,15 @@ See:
 
 ## 7. Test Stabilization Order
 
-1. **Loop approval flow tests** — any test exercising `loopRepository.approveLoop()`, `findPendingByRetailer()`, or `findApprovedByScreen()`. Run after S16-1 + S16-2 land and after backfill script completes in staging.
+1. **Loop approval flow tests** — `approveLoop()`, `findPendingByRetailer()`, `findApprovedByScreen()`. Run after S16-1 + S16-2 atomic commit and after staging backfill script completes.
 
-2. **Approve-all route regression** — `POST /api/locations/:locationId/loops/approve-all`. The `'PENDING'` raw string bug may have caused false passes in existing tests (route returned 200 with 0 approvals). Re-run after S16-2 confirms the query now uses `LOOP_STATUS.PENDING_APPROVAL`.
+2. **Approve-all route regression** — `POST /api/locations/:locationId/loops/approve-all`. Existing tests asserting empty approved set must be updated to assert correct non-zero behavior. Run after S16-2.
 
-3. **S11-1 / S11-2 / S11-4 persistence tests** — `tests/integration_broadcasting.spec.js` and `tests/loop_builder.spec.js`. Read both files, identify S11-labelled tests, apply Option A/B/C per S16-4.
+3. **S11-1 / S11-2 / S11-4 persistence tests** — `tests/integration_broadcasting.spec.js`, `tests/loop_builder.spec.js`. Apply Option A/B/C per S16-4. Read both files first.
 
-4. **Invoice list / pagination tests** — after `firestore.indexes.json` is deployed (S16-3). Any test relying on `invoices` ordered by `generatedAt DESC`.
+4. **Invoice list / pagination tests** — after `firestore.indexes.json` deployed (S16-3). Any test relying on `invoices` ordered by `generatedAt DESC`.
 
-5. **Frontend smoke — brand sidebar Invoices link** — after S16-0. Navigate as advertiser persona, confirm `/dashboard/advertiser/invoices` loads without 404. Hard-refresh at that URL → page loads.
+5. **Frontend smoke — Invoices nav link** — after S16-0. Login as `persona = 'advertiser'` → click Invoices → `/dashboard/advertiser/invoices` → HTTP 200. Hard-refresh at that URL → page loads.
 
 ---
 
@@ -604,30 +577,30 @@ See:
 
 - [ ] `grep "brand/invoices" client-app/src/layouts/DashboardLayout.jsx` → exit 1, zero matches.
 - [ ] `grep -rn "brand/invoices" client-app/src --include="*.jsx" --include="*.js"` → zero results.
-- [ ] Navigating to Invoices as advertiser persona loads `/dashboard/advertiser/invoices` with HTTP 200. Hard-refresh at that URL → page loads.
-- [ ] `grep -n "PENDING_APPROVAL.*'PENDING_APPROVAL'" ad-server/src/repositories/LoopRepository.js` → zero results (all values lowercase).
-- [ ] `grep -n "SLOT_STATUS" ad-server/src/repositories/LoopRepository.js` → all constant values are lowercase strings.
+- [ ] Login as `persona = 'advertiser'` → Invoices sidebar link → `/dashboard/advertiser/invoices` → HTTP 200. Hard-refresh → page loads.
+- [ ] `grep -n "'PENDING_APPROVAL'" ad-server/src/repositories/LoopRepository.js` → zero results (all values lowercase).
+- [ ] All SLOT_STATUS values in `LoopRepository.js` are lowercase strings.
 - [ ] `grep -n "'REJECTED'\|'PENDING'\|'APPROVED'\|'LIVE'" ad-server/src/api/loops.js` → zero results.
-- [ ] `grep -n "LOOP_STATUS" ad-server/src/api/loops.js` → import confirmed + minimum 3 usages.
-- [ ] S16-1 and S16-2 changes are in the **same commit** — verified by checking the diff contains both `LoopRepository.js` and `loops.js`.
-- [ ] `ad-server/scripts/migrate-loop-status-lowercase.js` exists on disk and passes code review for idempotency and batch safety.
-- [ ] Backfill script run in staging. `db.collection('loops').where('status', 'in', ['PENDING_APPROVAL','APPROVED','REJECTED','LIVE']).get()` → zero documents after run.
-- [ ] `find . -name "firestore.indexes.json" | grep -v node_modules` → returns 1 result with no `{{` placeholder text.
-- [ ] `firestore.indexes.json` field names match `InvoiceRepository.js` confirmed field names (Pre-check A run and documented).
-- [ ] `§ S16-4 Resolution` section filled in with test file names, chosen option (A/B/C), and reason.
+- [ ] `grep -n "LOOP_STATUS" ad-server/src/api/loops.js` → import line confirmed + minimum 3 usages.
+- [ ] S16-1 and S16-2 in the **same commit** — diff contains both `LoopRepository.js` and `loops.js`.
+- [ ] `ad-server/scripts/migrate-loop-status-lowercase.js` exists, is idempotent, batches in groups of ≤500, exits 0 in staging.
+- [ ] Backfill run in staging: `db.collection('loops').where('status', 'in', ['PENDING_APPROVAL','APPROVED','REJECTED','LIVE']).get()` → zero documents.
+- [ ] `find . -name "firestore.indexes.json" | grep -v node_modules` → 1 result; `grep "{{" firestore.indexes.json` → zero results.
+- [ ] Field names in `firestore.indexes.json` match `InvoiceRepository.js` confirmed output from Pre-check A.
+- [ ] `§ S16-4 Resolution` filled in with file names, Option A/B/C, and reason. No S11 test unannotated.
 - [ ] `grep "ENUM-AUDIT-2 CLOSED" docs/DATABASE_SCHEMA.md` → "Sprint 13" present.
 - [ ] `grep "ENUM-AUDIT-2 SURVIVOR" docs/DATABASE_SCHEMA.md` → "PlaylistRepository.js" present.
 - [ ] `grep "ENUM-AUDIT-1" docs/DATABASE_SCHEMA.md` → "Sprint 16" and "migrate-loop-status-lowercase.js" present.
-- [ ] Canonical enum values in `DATABASE_SCHEMA.md` for `loops.status` and `loops.slots[].status` are all lowercase.
+- [ ] Canonical `loops.status` and `loops.slots[].status` values in `DATABASE_SCHEMA.md` are all lowercase.
+- [ ] RISK-S16-9 (`PlaylistRepository.js` ACTIVE query survivor) either fixed in S16 or formally scheduled for S17 with documented reason.
 - [ ] No new `NOT ON DISK` or `NOT CONFIRMED IN SOURCE` items remain unresolved at sprint close.
 - [ ] All 14 guardrails remain intact — no new violation introduced by any S16 commit.
-- [ ] RISK-S16-9 (`PlaylistRepository.js` ACTIVE query survivor) is either fixed in S16 or formally scheduled for S17 with a documented reason.
 
 ---
 
 ## § S16-4 Resolution
 
-> **Pending** — to be filled in after `tests/integration_broadcasting.spec.js` and `tests/loop_builder.spec.js` are read and S11 test IDs are confirmed.
+> **Pending** — to be filled in after `tests/integration_broadcasting.spec.js` and `tests/loop_builder.spec.js` are read and S11 test IDs confirmed.
 
 ```
 Test files identified:
@@ -641,7 +614,8 @@ Reason:
 
 ---
 
-*Sprint 16 spec — Step 3 tightened: 2026-06-08.*
+*Sprint 16 spec — Step 4 isolation audit complete: 2026-06-08.*
 *Grounded against HEAD `a790fd5`. 14 guardrails active.*
-*ENUM-AUDIT-2 write path closed (S13). ENUM-AUDIT-2 query survivor found in PlaylistRepository.js (schedule S17).*
-*ENUM-AUDIT-1 in-flight. Approve-all route bug (L262 `'PENDING'` mismatch) confirmed and scheduled for S16-2.*
+*Files read in full: `DashboardLayout.jsx` (11,328B), `App.jsx` (13,344B), `LoopRepository.js`, `loops.js`, `PlaylistRepository.js`, `playlists.js`. Tests directory listed (17 files).*
+*Role-guard risk eliminated. BRAND_NAV second broken link re-analysis: only Invoices entry is broken — Dashboard and New Campaign entries resolve correctly.*
+*Two genuine cross-cutting risks: enum cutover timing window; approve-all behavior delta.*
