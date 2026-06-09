@@ -3,14 +3,14 @@
 
 import express from 'express';
 import PricingRepository from '../repositories/PricingRepository.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
 /**
  * GET /api/pricing
  * Root stub — returns empty structure so PricingService initialises
- * without a 404 crash. Replace with real implementation in Sprint 3.
+ * without a 404 crash.
  */
 router.get('/', async (req, res) => {
     try {
@@ -21,7 +21,6 @@ router.get('/', async (req, res) => {
             meta: { stub: false }
         });
     } catch {
-        // PricingRepository not yet seeded — return safe empty response
         res.status(200).json({
             tiers: [],
             currency: 'USD',
@@ -34,9 +33,9 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /api/pricing/config
- * Get current pricing configuration
+ * Get current pricing configuration — admin only (SEC-S15-5)
  */
-router.get('/config', async (req, res) => {
+router.get('/config', authenticate, authorize(['admin', 'superadmin']), async (req, res) => {
     try {
         const config = await PricingRepository.getConfig();
         res.json(config);
@@ -48,10 +47,19 @@ router.get('/config', async (req, res) => {
 
 /**
  * PUT /api/pricing/config
- * Update pricing configuration (requires auth)
+ * Update pricing configuration — admin only (SEC-S15-6)
  */
-router.put('/config', authenticate, async (req, res) => {
+router.put('/config', authenticate, authorize(['admin', 'superadmin']), async (req, res) => {
     try {
+        // Validate allocation sum if allocation block is present
+        if (req.body.allocation) {
+            const paid     = Number(req.body.allocation.paid     ?? 0);
+            const retailer = Number(req.body.allocation.retailer ?? 0);
+            const internal = Number(req.body.allocation.internal ?? 0);
+            if (paid + retailer + internal !== 100) {
+                return res.status(400).json({ error: 'Allocation must sum to 100' });
+            }
+        }
         const config = await PricingRepository.updateConfig(req.body);
         res.json(config);
     } catch (error) {
@@ -117,6 +125,22 @@ router.get('/calculate', async (req, res) => {
         console.error('Failed to calculate price:', error);
         res.status(500).json({ error: 'Failed to calculate price' });
     }
+});
+
+/**
+ * GET /api/pricing/estimate
+ * Estimate cost for a given slot count and CPM rate — pure calculation, no DB call
+ * Query params: slots (number), cpm (number)
+ */
+router.get('/estimate', authenticate, async (req, res) => {
+    const slots = parseFloat(req.query.slots);
+    const cpm   = parseFloat(req.query.cpm);
+
+    if (isNaN(slots) || isNaN(cpm)) {
+        return res.status(400).json({ error: 'slots and cpm are required' });
+    }
+
+    return res.json({ estimatedCost: (slots * cpm / 1000).toFixed(4) });
 });
 
 export default router;
