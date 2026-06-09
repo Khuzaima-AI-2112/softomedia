@@ -44,6 +44,15 @@ All status and workflow string values must match the definitions in this section
 | `active` | Live and assigned to screens |
 | `draft` | In preparation, not yet assigned |
 
+### `invoices.status`
+
+| Value | Meaning | Set by |
+|---|---|---|
+| `generated` | Invoice created by admin; not yet sent | `POST /api/invoices/generate` |
+| `sent` | Delivered to advertiser | Future billing workflow |
+| `paid` | Payment confirmed | Future billing workflow |
+| `void` | Cancelled / superseded | Admin action |
+
 ### `stores.status` / `retailers.status` / `advertisers.status`
 
 | Value | Meaning |
@@ -133,6 +142,7 @@ Specific advertising initiatives.
 | `end_date` | String | YYYY-MM-DD |
 | `budget` | Number | Campaign-specific budget |
 | `spent` | Number | Actual spend to date |
+| `impressionsDelivered` | Number | Total impressions served; used for invoice calculation |
 | `booked_slots` | Number | Count of reserved slots |
 
 ### `media`
@@ -162,7 +172,7 @@ Ordered collections of media for distribution.
 ## Operations & Pricing
 
 ### `pricing_config`
-Global and overridden pricing rules.
+Global and overridden pricing rules. Single document with `id = 'global'`.
 | Field | Type | Description |
 | :--- | :--- | :--- |
 | `id` | String | Always `global` |
@@ -170,10 +180,12 @@ Global and overridden pricing rules.
 | `currency` | String | e.g., `USD` |
 | `slotDuration` | Number | Standard slot length (e.g., 5s) |
 | `slotsPerLoop` | Number | Number of slots in a 1-minute loop |
+| `allocation` | Map | `{ paid: Number, retailer: Number, internal: Number }` — must sum to 100 (integer); enforced by `PUT /api/pricing/config`. **S15-1: field added.** |
 | `trafficTiers` | Map | Tiers with `multiplier`, `label`, `color`, `hours` |
 | `dateOverrides` | Map | Date-specific multipliers (Key: `YYYY-MM-DD`) |
-| `retailerOverrides`| Map | Retailer-specific base CPMs |
+| `retailerOverrides` | Map | Retailer-specific base CPMs |
 | `updatedAt` | String | Last update timestamp |
+| `updatedBy` | String | `user_id` of last admin to write; stamped server-side by `PUT /api/pricing/config`. **S15-1: field added.** |
 
 ### `loops`
 The daily schedule for a specific screen and hour.
@@ -198,9 +210,26 @@ Analytical logs of actual ad plays.
 | `asset_id` | String | Optional — specific creative asset |
 | `loop_id` | String | Optional — loop this slot belongs to |
 | `played_at` | String | ISO Timestamp provided by Player or server time |
-| `playlist_source`| String | `assigned`, `fallback` |
+| `playlist_source` | String | `assigned`, `fallback` |
 
 > **Phase 2 TODO:** `POST /api/telemetry/impression` currently logs via Winston only. Firestore persistence to this collection is the Phase 2 sub-task.
+
+### `invoices`
+Generated billing records per completed campaign. Added S15-2.
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `id` | String | Auto-generated Firestore document ID |
+| `campaignId` | String | Reference to `campaigns` |
+| `advertiser_id` | String | Stamped server-side from campaign record — never from request body (SEC-S15-2) |
+| `impressionsDelivered` | Number | Snapshot of `campaigns.impressionsDelivered` at generation time |
+| `cpmRate` | Number | Effective CPM rate applied (from `pricing_config`) |
+| `amount` | Number | `impressionsDelivered × cpmRate / 1000` |
+| `currency` | String | Inherited from `pricing_config.currency` |
+| `status` | String | See **Canonical Enum Values → invoices.status** above |
+| `generatedAt` | String | ISO Timestamp of invoice creation |
+| `generatedBy` | String | `user_id` of admin who triggered `POST /api/invoices/generate` |
+
+> **Firestore index required (post-MVP):** composite index on `(advertiser_id ASC, generatedAt DESC)` for paginated advertiser invoice list queries.
 
 ### `scheduling_audits`
 History of manual or automated scheduling changes.
@@ -213,4 +242,4 @@ History of manual or automated scheduling changes.
 
 ---
 
-*Last updated: 2026-06-05 — Sprint 9 pre-condition commit. Enum audit (ENUM-AUDIT-1, ENUM-AUDIT-2) pending full migration sprint.*
+*Last updated: 2026-06-08 — S15-6: `invoices` collection added; `pricing_config.allocation` and `pricing_config.updatedBy` fields added; `campaigns.impressionsDelivered` field added; `invoices.status` enum added.*

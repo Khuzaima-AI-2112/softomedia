@@ -8,23 +8,25 @@ import NetworkErrorBanner from '../components/NetworkErrorBanner';
 
 // ── Role-aware sidebar nav items ───────────────────────────────────────────────
 const ADMIN_NAV = [
-    { to: '/dashboard/admin',                   icon: 'dashboard',    label: 'Overview',        end: true },
-    { to: '/dashboard/admin/retailers',         icon: 'storefront',   label: 'Retailers' },
-    { to: '/dashboard/admin/advertisers',       icon: 'campaign',     label: 'Advertisers' },
-    { to: '/dashboard/admin/campaigns',         icon: 'sell',         label: 'Campaigns' },
-    { to: '/dashboard/admin/screens',           icon: 'tv',           label: 'Screens' },
-    { to: '/dashboard/admin/loops',             icon: 'subscriptions', label: 'Loops' },
-    { to: '/dashboard/admin/loop-analytics',    icon: 'analytics',    label: 'Loop Analytics' },
-    { to: '/dashboard/admin/users',             icon: 'group',        label: 'Users' },
-    { to: '/dashboard/admin/hours',             icon: 'schedule',     label: 'Business Hours' },
-    { to: '/dashboard/admin/pricing',           icon: 'payments',     label: 'Pricing' },
-    { to: '/dashboard/admin/map',               icon: 'map',          label: 'Network Map' },
-    { to: '/dashboard/admin/ai-log',            icon: 'smart_toy',    label: 'AI Log' },
+    { to: '/dashboard/admin',                        icon: 'dashboard',    label: 'Overview',        end: true },
+    { to: '/dashboard/admin/retailers',              icon: 'storefront',   label: 'Retailers' },
+    { to: '/dashboard/admin/advertisers',            icon: 'campaign',     label: 'Advertisers' },
+    { to: '/dashboard/admin/campaigns',              icon: 'sell',         label: 'Campaigns' },
+    { to: '/dashboard/admin/screens',                icon: 'tv',           label: 'Screens' },
+    { to: '/dashboard/admin/loops',                  icon: 'subscriptions', label: 'Loops' },
+    { to: '/dashboard/admin/loop-analytics',         icon: 'analytics',    label: 'Loop Analytics' },
+    { to: '/dashboard/admin/users',                  icon: 'group',        label: 'Users' },
+    { to: '/dashboard/admin/hours',                  icon: 'schedule',     label: 'Business Hours' },
+    { to: '/dashboard/admin/pricing',                icon: 'payments',     label: 'Pricing' },
+    { to: '/dashboard/admin/pricing-config',         icon: 'tune',         label: 'Pricing Config' },
+    { to: '/dashboard/admin/map',                    icon: 'map',          label: 'Network Map' },
+    { to: '/dashboard/admin/ai-log',                 icon: 'smart_toy',    label: 'AI Log' },
 ];
 
 const BRAND_NAV = [
-    { to: '/dashboard/brand',              icon: 'dashboard',   label: 'Dashboard',   end: true },
-    { to: '/dashboard/brand/campaign/new', icon: 'add_circle',  label: 'New Campaign' },
+    { to: '/dashboard/brand',              icon: 'dashboard',    label: 'Dashboard',   end: true },
+    { to: '/dashboard/brand/campaign/new', icon: 'add_circle',   label: 'New Campaign' },
+    { to: '/dashboard/brand/invoices',     icon: 'receipt_long', label: 'Invoices' },
 ];
 
 const RETAILER_NAV = [

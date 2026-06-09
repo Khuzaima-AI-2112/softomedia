@@ -102,6 +102,35 @@
 
 ---
 
+## Pricing (`ad-server/src/api/pricing.js`)
+
+> S14 GUARDRAIL-7 debt cleared. S15-1 hardening applied.
+
+| Method | Path | Request body | Auth guard | Source file | Notes |
+|---|---|---|---|---|---|
+| GET | `/api/pricing` | — | `requireAuth` | `pricing.js` | Returns full pricing config for display |
+| GET | `/api/pricing/config` | — | `authenticate` + `requireRole('admin')` | `pricing.js` | Admin-only read of raw config doc. **S15-1: hardened from public.** |
+| PUT | `/api/pricing/config` | `{ baseCPM?, allocation?: { paid, retailer, internal }, ...overrides? }` | `authenticate` + `requireRole('admin')` | `pricing.js` | Overwrites config. `allocation` values must sum to 100 (integer) — returns `400` otherwise. **S15-1: role guard added.** |
+| POST | `/api/pricing/overrides` | `{ date, multiplier }` | `requireAuth` | `pricing.js` | Add a date-specific override |
+| GET | `/api/pricing/overrides/:date` | — | `requireAuth` | `pricing.js` | Get override for a specific date |
+| GET | `/api/pricing/calculate` | — (query: `hour`, `screen_id?`) | `requireAuth` | `pricing.js` | Calculate effective CPM for a given hour/screen |
+| GET | `/api/pricing/estimate` | — (query: `slots`, `cpm`) | `authenticate` | `pricing.js` | **S15-1: new.** Returns `{ estimatedCost }` = `slots × cpm / 1000`. Pure calculation, no Firestore read. |
+
+---
+
+## Invoices (`ad-server/src/api/invoices.js`)
+
+> Added S15-2. Mounted at `router.use('/invoices', authenticate, invoicesRouter)` in `src/api/index.js`.
+
+| Method | Path | Request body | Auth guard | Source file | Notes |
+|---|---|---|---|---|---|
+| POST | `/api/invoices/generate` | `{ campaignId }` | `authenticate` + `requireRole('admin')` | `invoices.js` | Campaign must have `status = 'completed'`; `advertiser_id` stamped server-side. Returns `201 { invoiceId, campaignId, impressionsDelivered, cpmRate, amount, generatedAt }`. |
+| GET | `/api/invoices` | — (query: `page?`, `limit?`) | `authenticate` | `invoices.js` | Role `advertiser` → scoped to `req.user.linked_entity_id`. Role `admin`/`superadmin` → all, paginated. |
+| GET | `/api/invoices/:id` | — | `authenticate` | `invoices.js` | Returns `403` if advertiser requests another advertiser's invoice. |
+| GET | `/api/invoices/:id/pdf` | — | `authenticate` | `invoices.js` | Ownership check identical to `GET /:id`. Returns `200 { message, invoiceData }` stub — real PDF deferred post-MVP. |
+
+---
+
 ## Known Gaps / Unconfirmed Routes
 
 > All routes previously listed here have been resolved in Sprint 13. The table below is retained for audit trail.
@@ -115,4 +144,4 @@
 
 ---
 
-*Last updated: 2026-06-08 — Sprint 13 S13-3 guard fix + S13-2 implementation + S13-1/S13-4 pre-registration.*
+*Last updated: 2026-06-08 — S15-5: Pricing (S14 GUARDRAIL-7 debt + S15-1 hardening) and Invoices (S15-2) sections added.*
