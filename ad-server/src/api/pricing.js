@@ -33,7 +33,8 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /api/pricing/config
- * Get current pricing configuration — admin only (SEC-S15-5)
+ * Get current pricing configuration — admin only.
+ * SEC-S15-5: was public; hardened in S15.
  */
 router.get('/config', authenticate, authorize(['admin', 'superadmin']), async (req, res) => {
     try {
@@ -47,15 +48,14 @@ router.get('/config', authenticate, authorize(['admin', 'superadmin']), async (r
 
 /**
  * PUT /api/pricing/config
- * Update pricing configuration — admin only (SEC-S15-6)
+ * Update pricing configuration — admin only.
+ * SEC-S15-6: was authenticate-only; role guard added in S15.
  */
 router.put('/config', authenticate, authorize(['admin', 'superadmin']), async (req, res) => {
     try {
-        // Validate allocation sum if allocation block is present
+        // Validate allocation sum if provided
         if (req.body.allocation) {
-            const paid     = Number(req.body.allocation.paid     ?? 0);
-            const retailer = Number(req.body.allocation.retailer ?? 0);
-            const internal = Number(req.body.allocation.internal ?? 0);
+            const { paid = 0, retailer = 0, internal = 0 } = req.body.allocation;
             if (paid + retailer + internal !== 100) {
                 return res.status(400).json({ error: 'Allocation must sum to 100' });
             }
@@ -66,6 +66,21 @@ router.put('/config', authenticate, authorize(['admin', 'superadmin']), async (r
         console.error('Failed to update pricing config:', error);
         res.status(500).json({ error: 'Failed to update pricing config' });
     }
+});
+
+/**
+ * GET /api/pricing/estimate
+ * Estimate cost for a given slot count and CPM rate.
+ * Pure calculation — no Firestore dependency.
+ * Query params: slots (number), cpm (number)
+ */
+router.get('/estimate', authenticate, async (req, res) => {
+    const slots = parseFloat(req.query.slots);
+    const cpm   = parseFloat(req.query.cpm);
+    if (isNaN(slots) || isNaN(cpm)) {
+        return res.status(400).json({ error: 'slots and cpm are required' });
+    }
+    return res.json({ estimatedCost: (slots * cpm / 1000).toFixed(4) });
 });
 
 /**
@@ -125,22 +140,6 @@ router.get('/calculate', async (req, res) => {
         console.error('Failed to calculate price:', error);
         res.status(500).json({ error: 'Failed to calculate price' });
     }
-});
-
-/**
- * GET /api/pricing/estimate
- * Estimate cost for a given slot count and CPM rate — pure calculation, no DB call
- * Query params: slots (number), cpm (number)
- */
-router.get('/estimate', authenticate, async (req, res) => {
-    const slots = parseFloat(req.query.slots);
-    const cpm   = parseFloat(req.query.cpm);
-
-    if (isNaN(slots) || isNaN(cpm)) {
-        return res.status(400).json({ error: 'slots and cpm are required' });
-    }
-
-    return res.json({ estimatedCost: (slots * cpm / 1000).toFixed(4) });
 });
 
 export default router;
