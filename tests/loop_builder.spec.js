@@ -22,12 +22,12 @@ test.describe('Loop Management - Sprint 2', () => {
                         hour,
                         retailer_id: 'ret_demo',
                         location_id: 'loc_downtown',
-                        status: 'PENDING_APPROVAL',
+                        status: 'pending_approval',
                         slots: Array.from({ length: 12 }, (_, i) => ({
                             position: i,
                             asset_id: `mock_asset_${i}`,
                             duration: 5,
-                            status: 'PENDING'
+                            status: 'pending'
                         }))
                     });
                 }
@@ -44,12 +44,12 @@ test.describe('Loop Management - Sprint 2', () => {
                         id: `2026-01-03_${hour}_loc_downtown`,
                         date: '2026-01-03',
                         hour,
-                        status: 'PENDING_APPROVAL',
+                        status: 'pending_approval',
                         slots: Array.from({ length: 12 }, (_, i) => ({
                             position: i,
                             asset_id: `mock_asset_${i}`,
                             duration: 5,
-                            status: 'PENDING'
+                            status: 'pending'
                         }))
                     });
                 }
@@ -67,14 +67,14 @@ test.describe('Loop Management - Sprint 2', () => {
                         id: '2026-01-03_14_loc_downtown',
                         date: '2026-01-03',
                         hour: 14,
-                        status: 'PENDING_APPROVAL',
+                        status: 'pending_approval',
                         slots: Array.from({ length: 12 }, (_, i) => ({
                             position: i,
                             asset_id: i < 8 ? `mock_asset_${i}` : null,
                             asset_name: i < 8 ? `Mock Asset ${i}` : null,
                             asset_thumbnail: i < 8 ? '📦' : null,
                             duration: 5,
-                            status: 'PENDING'
+                            status: 'pending'
                         }))
                     })
                 });

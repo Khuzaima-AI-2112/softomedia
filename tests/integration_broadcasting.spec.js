@@ -49,13 +49,13 @@ test.describe('Broadcasting Engine - Full E2E Workflow', () => {
                     id: `${testDate}_${hour}_loc_downtown`,
                     date: testDate,
                     hour,
-                    status: 'PENDING_APPROVAL',
+                    status: 'pending_approval',
                     slots: Array.from({ length: 12 }, (_, i) => ({
                         position: i,
                         asset_id: `asset_${i}`,
                         asset_name: `Test Ad ${i + 1}`,
                         duration: 5,
-                        status: 'PENDING'
+                        status: 'pending'
                     }))
                 });
             }
@@ -98,14 +98,14 @@ test.describe('Broadcasting Engine - Full E2E Workflow', () => {
                     id: generatedLoopId,
                     date: testDate,
                     hour: testHour,
-                    status: 'PENDING_APPROVAL',
+                    status: 'pending_approval',
                     slots: Array.from({ length: 12 }, (_, i) => ({
                         position: i,
                         asset_id: `asset_${i}`,
                         asset_name: `Test Ad ${i + 1}`,
                         asset_thumbnail: '📦',
                         duration: 5,
-                        status: 'PENDING'
+                        status: 'pending'
                     }))
                 })
             });
@@ -130,12 +130,12 @@ test.describe('Broadcasting Engine - Full E2E Workflow', () => {
                     id: `${testDate}_${hour}_loc_downtown`,
                     date: testDate,
                     hour,
-                    status: 'PENDING_APPROVAL',
+                    status: 'pending_approval',
                     slots: Array.from({ length: 12 }, (_, i) => ({
                         position: i,
                         asset_id: `asset_${i}`,
                         duration: 5,
-                        status: 'PENDING'
+                        status: 'pending'
                     }))
                 });
             }
@@ -162,12 +162,12 @@ test.describe('Broadcasting Engine - Full E2E Workflow', () => {
                     id: `${testDate}_${hour}_loc_downtown`,
                     date: testDate,
                     hour,
-                    status: 'PENDING_APPROVAL',
+                    status: 'pending_approval',
                     slots: Array.from({ length: 12 }, (_, i) => ({
                         position: i,
                         asset_id: `asset_${i}`,
                         duration: 5,
-                        status: 'PENDING'
+                        status: 'pending'
                     }))
                 });
             }
@@ -183,7 +183,7 @@ test.describe('Broadcasting Engine - Full E2E Workflow', () => {
             route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({ status: 'APPROVED' })
+                body: JSON.stringify({ status: 'approved' })
             });
         });
 
@@ -206,14 +206,14 @@ test.describe('Broadcasting Engine - Full E2E Workflow', () => {
                 id: `${new Date().toISOString().split('T')[0]}_${currentHour}_loc_downtown`,
                 date: new Date().toISOString().split('T')[0],
                 hour: currentHour,
-                status: 'APPROVED',
+                status: 'approved',
                 slots: Array.from({ length: 12 }, (_, i) => ({
                     position: i,
                     asset_id: `asset_${i}`,
                     asset_name: `Test Ad ${i + 1}`,
                     url: `https://placehold.co/1920x1080/3b82f6/white?text=Slot+${i + 1}`,
                     duration: 5,
-                    status: 'APPROVED'
+                    status: 'approved'
                 }))
             }];
             route.fulfill({
