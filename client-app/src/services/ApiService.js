@@ -284,15 +284,56 @@ class ApiService {
     }
 
     // ============================================
-    // PRICING
+    // PRICING  (Sprint 15: /pricing/config endpoints)
     // ============================================
 
+    /**
+     * Get current CPM pricing configuration — admin only.
+     * Backend: GET /api/pricing/config (authenticate + authorize(['admin','superadmin'])).
+     * Was previously wired to the public /api/pricing root stub; corrected in S15.
+     *
+     * @returns {Promise<object>} Pricing config document
+     */
     async getPricingConfig() {
-        return apiClient.get('/api/pricing');
+        return apiClient.get('/api/pricing/config');
     }
 
+    /**
+     * Update CPM pricing configuration — admin only.
+     * Backend: PUT /api/pricing/config (authenticate + authorize(['admin','superadmin'])).
+     * Also validates allocation sum server-side; client enforces the same rule.
+     *
+     * @param {object} data - { cpm_rates: {}, allocation: { paid, retailer, internal } }
+     * @returns {Promise<object>} Updated config document
+     */
     async updatePricingConfig(data) {
-        return apiClient.put('/api/pricing', data);
+        return apiClient.put('/api/pricing/config', data);
+    }
+
+    // ============================================
+    // GENERIC REQUEST (used by Invoices.jsx)
+    // ============================================
+
+    /**
+     * Generic HTTP request wrapper.
+     * Useful for feature pages that call one-off endpoints without
+     * needing a dedicated method.
+     *
+     * @param {'GET'|'POST'|'PUT'|'PATCH'|'DELETE'} method
+     * @param {string} path   - Relative path, e.g. '/invoices'
+     * @param {object} [body] - Optional request body
+     * @returns {Promise<object>}
+     */
+    async request(method, path, body) {
+        const url = `/api${path}`;
+        switch (method.toUpperCase()) {
+            case 'GET':    return apiClient.get(url);
+            case 'POST':   return apiClient.post(url, body);
+            case 'PUT':    return apiClient.put(url, body);
+            case 'PATCH':  return apiClient.patch(url, body);
+            case 'DELETE': return apiClient.delete(url);
+            default: throw new Error(`Unsupported method: ${method}`);
+        }
     }
 
     // ============================================
