@@ -1,7 +1,7 @@
 # Sprint 15 — Monetization, Pricing Config & Billing
 
 **Sprint:** 15
-**Status:** 🔵 In Progress
+**Status:** 🔵 In Progress — Step 3 Not Yet Executed
 **Grounded against:** commit `2e3c3bf` (2026-06-08)
 **Cross-referenced with:** `client-app/src/App.jsx` (S14 confirmed), `ad-server/src/api/` (S14 confirmed)
 **Guardrails authority:** [`docs/sprint8-sre-retro-consolidated.md`](../docs/sprint8-sre-retro-consolidated.md)
@@ -10,6 +10,38 @@
 **MVP reference:** [`docs/Digital Screen Network Management Platform (MVP).md`](<../docs/Digital Screen Network Management Platform (MVP).md>)
 **Completion plan:** [`docs/MVP_COMPLETION_SPRINT_PLAN.md`](../docs/MVP_COMPLETION_SPRINT_PLAN.md)
 **Pricing reference:** [`docs/CPM_PRICING_MODEL.md`](../docs/CPM_PRICING_MODEL.md)
+
+---
+
+## Step 3 Status — Build (2026-06-08)
+
+Step 3 was initiated but **not executed**. No files were written to the repo.
+
+**Confirmed absent (re-verified against HEAD `067b2f2`):**
+
+| File | Operation | Status |
+|---|---|---|
+| `ad-server/src/services/PricingService.js` | CREATE | ❌ NOT ON DISK |
+| `ad-server/src/api/pricing.js` | CREATE | ❌ NOT ON DISK |
+| `ad-server/src/api/invoices.js` | CREATE | ❌ NOT ON DISK |
+| `client-app/src/pages/admin/PricingConfig.jsx` | CREATE | ❌ NOT ON DISK |
+| `client-app/src/pages/advertiser/Invoices.jsx` | CREATE | ❌ NOT ON DISK |
+| `pricing_billing.spec.js` | CREATE | ❌ NOT ON DISK |
+| `client-app/src/App.jsx` | EDIT (lazy imports + routes) | ⏳ PENDING |
+| `docs/API_ROUTES.md` | EDIT | ⏳ PENDING |
+| `docs/DATABASE_SCHEMA.md` | EDIT | ⏳ PENDING |
+
+**App.jsx SHA at last check:** `e3cb96439386fb9f08959a34e3f95e0fc658cdb0`
+**Services dir SHA at last check:** HEAD `067b2f2af2061d5135961436a4e9f618542a2645` — `PricingService.js` absent confirmed.
+
+**Next action:** Execute Step 3 in full. Build order:
+1. `PricingService.js` → `pricing.js` → register in server router
+2. `invoices.js` → register in server router
+3. `PricingConfig.jsx` → GUARDRAIL-1/2 gate → `App.jsx` lazy import + route
+4. `Invoices.jsx` → GUARDRAIL-1/2 gate → `App.jsx` lazy import + route
+5. `pricing_billing.spec.js`
+6. `docs/API_ROUTES.md` patch (11 rows)
+7. `docs/DATABASE_SCHEMA.md` patch (2 collections)
 
 ---
 
@@ -240,13 +272,13 @@ ls client-app/src/pages/admin/
 // Under // ── Admin pages
 const PricingConfig = lazy(() => import('./pages/admin/PricingConfig'));
 // Route:
-<Route path="/dashboard/admin/pricing" element={<PricingConfig />} />
+<Route path="/dashboard/admin/pricing-config" element={<PricingConfig />} />
 ```
 
 **Acceptance criteria**
 - `data-testid="pricing-save-btn"` has `disabled` attribute when `paid + retailer + internal ≠ 100`
 - `data-testid="pricing-save-btn"` does NOT have `disabled` when sum equals exactly `100`
-- `data-testid="pricing-config-form"` present in DOM on `/dashboard/admin/pricing`
+- `data-testid="pricing-config-form"` present in DOM on `/dashboard/admin/pricing-config`
 - Skeleton renders before API responds on initial load
 - Successful save shows confirmation feedback without full page reload
 
@@ -433,17 +465,17 @@ Minimum 10 tests:
 
 ## 6. File Inventory
 
-| File | Operation | Linked Task(s) |
-|---|---|---|
-| `ad-server/src/services/PricingService.js` | CREATE | S15-1 |
-| `ad-server/src/api/pricing.js` | CREATE | S15-1 |
-| `ad-server/src/api/invoices.js` | CREATE | S15-2 |
-| `client-app/src/pages/admin/PricingConfig.jsx` | CREATE | S15-3 |
-| `client-app/src/pages/advertiser/Invoices.jsx` | CREATE | S15-4 |
-| `pricing_billing.spec.js` | CREATE | S15-7 |
-| `client-app/src/App.jsx` | EDIT | S15-3, S15-4 |
-| `docs/API_ROUTES.md` | EDIT | S15-5 |
-| `docs/DATABASE_SCHEMA.md` | EDIT | S15-6 |
+| File | Operation | Linked Task(s) | Status |
+|---|---|---|---|
+| `ad-server/src/services/PricingService.js` | CREATE | S15-1 | ❌ Not yet written |
+| `ad-server/src/api/pricing.js` | CREATE | S15-1 | ❌ Not yet written |
+| `ad-server/src/api/invoices.js` | CREATE | S15-2 | ❌ Not yet written |
+| `client-app/src/pages/admin/PricingConfig.jsx` | CREATE | S15-3 | ❌ Not yet written |
+| `client-app/src/pages/advertiser/Invoices.jsx` | CREATE | S15-4 | ❌ Not yet written |
+| `pricing_billing.spec.js` | CREATE | S15-7 | ❌ Not yet written |
+| `client-app/src/App.jsx` | EDIT | S15-3, S15-4 | ⏳ Pending component files |
+| `docs/API_ROUTES.md` | EDIT | S15-5 | ⏳ Pending |
+| `docs/DATABASE_SCHEMA.md` | EDIT | S15-6 | ⏳ Pending |
 
 **No files deleted this sprint.**
 
@@ -476,7 +508,7 @@ Minimum 10 tests:
 - [ ] `data-testid="pricing-save-btn"` is `disabled` when allocation sum ≠ 100
 - [ ] `client-app/src/pages/advertiser/Invoices.jsx` exists; `data-testid="invoice-download-btn"` present per row
 - [ ] Empty state renders on `Invoices.jsx` when no invoices exist
-- [ ] `App.jsx` has lazy imports and routes for `/dashboard/admin/pricing` and `/dashboard/advertiser/invoices`
+- [ ] `App.jsx` has lazy imports and routes for `/dashboard/admin/pricing-config` and `/dashboard/advertiser/invoices`
 - [ ] GUARDRAIL-1/2: both component files confirmed on disk before `App.jsx` routes registered
 - [ ] GUARDRAIL-3: `requireRole` grep run and confirmed on `pricing.js` and `invoices.js`
 - [ ] GUARDRAIL-6: no hardcoded `localhost` in `PricingConfig.jsx` or `Invoices.jsx`
@@ -516,6 +548,7 @@ Minimum 10 tests:
 ---
 
 *Step 2 spec written: 2026-06-08.*
+*Step 3 status updated: 2026-06-08 — no files written yet; all 6 CREATE + 3 EDIT operations remain pending.*
 *Grounded against commit `2e3c3bf`. All file existence confirmed via pre-work grep (see `docs/sprint15.md`).*
 *`LoopGenerationService.js` SHA `cf7c43fa` — `paid > retailer > internal` priority confirmed live; zero patch required.*
 *ENUM-AUDIT-3 CLOSED: `'PENDING'` in `LoopGenerationService.js` L110 is slot-init only.*
