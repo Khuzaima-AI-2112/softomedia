@@ -21,6 +21,7 @@ import auditRouter from './audit.js';
 import retailersRouter from './retailers.js';
 import advertisersRouter from './advertisers.js';
 import impressionsRouter from './impressions.js';
+import invoicesRouter from './invoices.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -66,5 +67,6 @@ router.use('/users', authenticate, usersRouter);
 router.use('/ops', authenticate, opsRouter);
 router.use('/audit', authenticate, auditRouter);
 router.use('/impressions', authenticate, impressionsRouter);
+router.use('/invoices', authenticate, invoicesRouter);
 
 export default router;
