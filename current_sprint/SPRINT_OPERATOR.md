@@ -13,6 +13,90 @@ Execution rule:
 
 ---
 
+## Step 0 — Sprint Start
+
+Use this step to initialize a new sprint session.
+
+Invocation phrase:
+**"start sprint [sprint number]"** or **"start new sprint"**
+
+This step grounds the AI in the live repo state and active sprint file before any planning or execution begins.
+
+---
+
+### Pre-conditions
+
+Before running Step 0, confirm the following exist on disk:
+
+- `current_sprint/sprint[N].md` — the active sprint spec
+- `current_sprint/SPRINT_OPERATOR.md` — this file
+- `App.jsx` — client route authority
+- Server router files — confirmed from repo tree
+
+---
+
+### Step 0 Prompt (paste this to start any sprint session)
+
+```
+You are operating under the SPRINT_OPERATOR.md system located at:
+current_sprint/SPRINT_OPERATOR.md
+in the softomedia-live2026 repo.
+
+Read and internalize ALL operating rules and step definitions from that file
+before proceeding. Do not skip any section.
+
+---
+
+Active sprint file: current_sprint/sprint[N].md
+
+Session constraints — enforce these before every action in this session:
+
+1. Do NOT invent files, routes, components, tests, repositories, or endpoints.
+2. Do NOT assume any file or route exists unless confirmed from live source.
+3. If a file, route, or component cannot be confirmed, mark it:
+   NOT ON DISK or NOT CONFIRMED IN SOURCE
+   and add a deterministic discovery command (grep / find / ls / read-first)
+   before any planning or editing step.
+4. App.jsx is the authority for all client-side routes unless live source
+   proves otherwise.
+5. Server routing must be confirmed from the repo tree — not assumed.
+6. Every acceptance criterion must be falsifiable with exact paths,
+   query params, HTTP status codes, data-testids, or persistence checks.
+   Ban vague language like "works correctly."
+7. Do not skip steps.
+8. Execute only the step you are told to run unless explicitly asked to continue.
+
+---
+
+for current sprint start with step 1
+```
+
+> Replace `sprint[N]` with the actual sprint number (e.g. `sprint16.md`) before pasting.
+
+---
+
+### What Step 0 Does
+
+| Action | Why |
+|--------|-----|
+| Anchors the AI to `SPRINT_OPERATOR.md` | Prevents drift into generic assistant behavior |
+| Names the active sprint file explicitly | Eliminates ambiguity when multiple sprint files exist on disk |
+| Re-enforces anti-hallucination constraints upfront | Double-enforcement before Step 1 reads the repo |
+| Repeats `App.jsx` and server-router grounding rules | Highest-frequency failure modes across sprints |
+| Repeats falsifiable acceptance criteria rule | Prevents vague DoD items from entering the spec |
+| Ends with the official invocation phrase | Triggers Step 1 exactly as defined — no skipping |
+
+---
+
+### Operating instructions for Step 0
+
+- Run Step 0 at the beginning of every new sprint session, even if resuming mid-sprint.
+- After pasting the prompt, wait for Step 1 output before continuing.
+- To advance, say: **"continue to step 2"**
+- To run all steps sequentially: replace the final line with **"run all steps"** — but expect the operator to stop and flag blockers when live-source confirmation is missing.
+
+---
+
 ## Step 1 — Repository Reality Check
 
 You are a senior SRE and QA lead working on the `softomedia-live2026` repo.
@@ -324,6 +408,7 @@ Output:
 ## Operating instructions
 
 If the user says:
+- **"start sprint [N]"** or **"start new sprint"** → run Step 0 to initialize the session
 - **"for current sprint start with step 1"** → run only Step 1
 - **"continue to step 2"** → run only Step 2
 - **"do step 4 for current sprint"** → run only Step 4
