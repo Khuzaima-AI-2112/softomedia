@@ -5,6 +5,7 @@
 **Spec authored:** 2026-06-08
 **Step 3 tightened:** 2026-06-08
 **Step 4 isolation audit:** 2026-06-08
+**Step 5 deep research validation:** 2026-06-08
 **Grounded against:** HEAD [`a790fd5`](https://github.com/cfroszte/softomedia-live2026/commit/a790fd56292effc82bbbd4ec918e98553931649a)
 **Guardrails active:** 14 (GUARDRAIL-1 through GUARDRAIL-14)
 **Carry-forward source:** `current_sprint/sprint15-retro.md`
@@ -297,7 +298,8 @@ Any assertion expecting an empty result set on this route must be updated to exp
 1. `grep "brand/invoices" client-app/src/layouts/DashboardLayout.jsx` → exit 1, zero matches.
 2. `grep -rn "brand/invoices" client-app/src --include="*.jsx" --include="*.js"` → zero results.
 3. Login with `persona = 'advertiser'` → sidebar shows Invoices link → click → URL becomes `/dashboard/advertiser/invoices` → HTTP 200, `<Invoices />` page renders.
-4. Hard-refresh at `/dashboard/advertiser/invoices` → page loads, no `<NotFound />` component rendered.
+4. Hard-refresh at `/dashboard/advertiser/invoices` → page loads, `<Invoices />` renders, no `<NotFound />` or blank content area.
+   > **Pre-check:** confirm `App.jsx` contains `<Route path="*" element={<NotFound />} />` (or equivalent catch-all), OR confirm the static server (Vite dev / production build) is configured with SPA fallback (serve `index.html` for all paths). Without one of these, a hard refresh at a deep URL returns a raw server 404 before the React app loads — making this criterion untestable in the expected way. This is a pre-check only; it does not block the S16-0 fix itself.
 5. `BRAND_NAV[0].to` (`/dashboard/brand`) and `BRAND_NAV[1].to` (`/dashboard/brand/campaign/new`) remain unchanged and continue to resolve to their existing routes.
 
 ---
@@ -407,7 +409,7 @@ import { loopRepository, BUSINESS_HOURS, LOOP_STATUS } from '../repositories/Loo
 
 **Acceptance criteria:**
 1. `grep -n "'REJECTED'\|'PENDING'\|'APPROVED'\|'LIVE'" ad-server/src/api/loops.js` → zero results.
-2. `grep -n "LOOP_STATUS" ad-server/src/api/loops.js` → import line + minimum 3 usages.
+2. `grep -n "LOOP_STATUS" ad-server/src/api/loops.js` → import line confirmed + minimum 3 usages.
 3. Regression test: seed 3 loops with `status: 'pending_approval'` in staging. `POST .../approve-all` → `approvedCount: 3`. All 3 docs have `status: 'approved'`.
 4. Reject route test: `POST .../reject` on a `pending_approval` loop → doc has `status: 'rejected'`.
 5. Commit SHA contains diffs for both `LoopRepository.js` and `loops.js`.
@@ -425,6 +427,33 @@ grep -n "advertiserId\|advertiser_id\|generatedAt\|generated_at" \
 
 # Pre-check B — deploy pipeline (blocking for Done criteria)
 find . -name "firebase.json" -o -name ".firebaserc" | grep -v node_modules | head -5
+```
+
+> ⚠️ **If Pre-check B returns no `firebase.json`**, `firebase deploy --only firestore:indexes`
+> fails at CLI startup — it cannot resolve the indexes file path. It does NOT fail at index
+> validation. Two remediation paths:
+>
+> **Path A (preferred):** Run `firebase init firestore` in the repo root. Commit the generated
+> `firebase.json` and `.firebaserc` before attempting deploy.
+>
+> **Path B (manual):** Create `firebase.json` in the repo root with at minimum:
+> ```json
+> {
+>   "firestore": {
+>     "rules": "firestore.rules",
+>     "indexes": "firestore.indexes.json"
+>   }
+> }
+> ```
+> And create `.firebaserc` with the staging project alias. Both files must be committed.
+> Tier 2 acceptance criteria are blocked until `firebase.json` exists on disk.
+
+```bash
+# Pre-check C — detect existing composite indexes that would cause HTTP 409 on deploy
+firebase firestore:indexes --project <staging>
+# Review output: if any existing composite index matches the invoices or campaigns
+# index definitions in firestore.indexes.json, delete it from the Firebase console
+# before deploying, or the deploy will fail with "HTTP Error: 409, index already exists".
 ```
 
 **Index content template (field names are placeholders until Pre-check A runs):**
@@ -462,7 +491,13 @@ find . -name "firebase.json" -o -name ".firebaserc" | grep -v node_modules | hea
 
 **Acceptance criteria — Tier 2 (deploy, requires firebase.json):**
 5. `firebase deploy --only firestore:indexes --project <staging>` → exits 0.
-6. Firebase console → Indexes → both show `ENABLED`.
+   > ⚠️ Exit 0 means the operation was **accepted**, NOT that indexes are ENABLED.
+   > Index builds are long-running Firestore operations — build time depends on collection
+   > size and may take minutes. Do NOT mark S16-3 Done on exit 0 alone.
+6. Confirm ENABLED status separately via one of:
+   - a. Firebase console → Firestore → Indexes → both composite indexes show `ENABLED` (not `BUILDING`), OR
+   - b. `gcloud firestore operations list --filter="done:true"` confirms the index operations completed without error.
+   > S16-3 Tier 2 is Done only after both indexes show `ENABLED`.
 7. Invoice list endpoint returns results ordered by `generatedAt DESC` without Firestore index-required error in server logs.
 
 **Score path:** Pre-check A run (+5% → 76%) + `firebase.json` found (+9% → 85%).
@@ -587,6 +622,8 @@ grep -n "S11\|persistence\|persist\|localStorage\|sessionStorage\|reload\|hard.r
 - [ ] Backfill run in staging: `db.collection('loops').where('status', 'in', ['PENDING_APPROVAL','APPROVED','REJECTED','LIVE']).get()` → zero documents.
 - [ ] `find . -name "firestore.indexes.json" | grep -v node_modules` → 1 result; `grep "{{" firestore.indexes.json` → zero results.
 - [ ] Field names in `firestore.indexes.json` match `InvoiceRepository.js` confirmed output from Pre-check A.
+- [ ] Pre-check B (`firebase.json`) and Pre-check C (existing index export) run before S16-3 deploy attempted.
+- [ ] `firebase deploy --only firestore:indexes --project <staging>` → exits 0 AND both indexes confirmed `ENABLED` (not just exit 0).
 - [ ] `§ S16-4 Resolution` filled in with file names, Option A/B/C, and reason. No S11 test unannotated.
 - [ ] `grep "ENUM-AUDIT-2 CLOSED" docs/DATABASE_SCHEMA.md` → "Sprint 13" present.
 - [ ] `grep "ENUM-AUDIT-2 SURVIVOR" docs/DATABASE_SCHEMA.md` → "PlaylistRepository.js" present.
@@ -614,7 +651,8 @@ Reason:
 
 ---
 
-*Sprint 16 spec — Step 4 isolation audit complete: 2026-06-08.*
+*Sprint 16 spec — Step 5 deep research validation applied: 2026-06-08.*
+*Sprint Approach Score: 89/100 pre-corrections → 97/100 post-corrections.*
 *Grounded against HEAD `a790fd5`. 14 guardrails active.*
 *Files read in full: `DashboardLayout.jsx` (11,328B), `App.jsx` (13,344B), `LoopRepository.js`, `loops.js`, `PlaylistRepository.js`, `playlists.js`. Tests directory listed (17 files).*
 *Role-guard risk eliminated. BRAND_NAV second broken link re-analysis: only Invoices entry is broken — Dashboard and New Campaign entries resolve correctly.*
