@@ -26,7 +26,7 @@ const ADMIN_NAV = [
 const BRAND_NAV = [
     { to: '/dashboard/brand',              icon: 'dashboard',    label: 'Dashboard',   end: true },
     { to: '/dashboard/brand/campaign/new', icon: 'add_circle',   label: 'New Campaign' },
-    { to: '/dashboard/brand/invoices',     icon: 'receipt_long', label: 'Invoices' },
+    { to: '/dashboard/advertiser/invoices', icon: 'receipt_long', label: 'Invoices' },
 ];
 
 const RETAILER_NAV = [
