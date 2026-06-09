@@ -14,23 +14,25 @@ export const BUSINESS_HOURS = {
     get TOTAL_LOOPS() { return this.END - this.START; }
 };
 
-// Valid loop statuses
-export const LOOP_STATUS = {
-    PENDING_APPROVAL: 'PENDING_APPROVAL',
-    APPROVED: 'APPROVED',
-    REJECTED: 'REJECTED',
-    LIVE: 'LIVE'
-};
+// Valid loop statuses — canonical stored values are lowercase.
+// Uppercase property names are preserved as the import API for existing callers.
+export const LOOP_STATUS = Object.freeze({
+    get PENDING_APPROVAL() { return 'pending_approval'; },
+    get APPROVED() { return 'approved'; },
+    get REJECTED() { return 'rejected'; },
+    get LIVE() { return 'live'; },
+});
 
-// Slot statuses
-export const SLOT_STATUS = {
-    PENDING: 'PENDING',
-    APPROVED: 'APPROVED',
-    REJECTED: 'REJECTED',
-    REPLACED: 'REPLACED',
-    BOOKED: 'BOOKED',
-    AVAILABLE: 'AVAILABLE'
-};
+// Slot statuses — canonical stored values are lowercase.
+// Uppercase property names are preserved as the import API for existing callers.
+export const SLOT_STATUS = Object.freeze({
+    get PENDING() { return 'pending'; },
+    get APPROVED() { return 'approved'; },
+    get REJECTED() { return 'rejected'; },
+    get REPLACED() { return 'replaced'; },
+    get BOOKED() { return 'booked'; },
+    get AVAILABLE() { return 'available'; },
+});
 
 export class LoopRepository extends BaseRepository {
     constructor() {
