@@ -1,245 +1,151 @@
-# Database Schema: SoftoMedia Ad Network
+# Database Schema
 
-This document describes the Firestore database structure used by the SoftoMedia Ad Network.
+Softomedia Live 2026 — Firestore collections reference.
 
----
-
-## ⚠️ Canonical Enum Values (GUARDRAIL-4)
-
-All status and workflow string values must match the definitions in this section exactly. **Canonical values are lowercase and underscore-separated.** Any uppercase variant in the codebase is a bug.
-
-### `Campaign.status`
-
-| Value | Meaning | Set by |
-|---|---|---|
-| `pending_approval` | Campaign submitted by brand manager; awaiting retailer review | `BrandCampaignWizard.jsx` on submit; `POST /api/campaigns` |
-| `approved` | Retailer admin has approved; eligible for loop scheduling | `PATCH /api/campaigns/:id/status` |
-| `rejected` | Retailer admin has rejected; not eligible for scheduling | `PATCH /api/campaigns/:id/status` |
-| `active` | Campaign is live and currently serving impressions | System / scheduler |
-| `paused` | Temporarily suspended by brand manager or admin | Brand manager action |
-| `completed` | Campaign end_date has passed | System / scheduler |
-
-> **Grep audit required before Sprint 9 closes:**  
-> `grep -r "'APPROVED'\|'REJECTED'\|'PENDING'\|'pending'" --include="*.js" --include="*.jsx"` must return zero results outside of test fixtures or comments.
-
-### `loops.status` ⚠️ ENUM-AUDIT-1
-
-> **Current schema stores `APPROVED`, `DRAFT`, `LOCKED` (uppercase).** This is a known casing violation.  
-> Canonical target values: `approved`, `draft`, `locked`.  
-> Migration tracked as **ENUM-AUDIT-1** — do not introduce new uppercase writes; normalise in the next loop-generation sprint.
-
-| Value | Meaning |
-|---|---|
-| `draft` | Generated but not yet reviewed |
-| `approved` | Retailer has approved for broadcast |
-| `locked` | Past D-1 cutoff; cannot be edited |
-
-### `playlists.status` ⚠️ ENUM-AUDIT-2
-
-> **Current schema stores `ACTIVE`, `DRAFT` (uppercase).** Canonical target: `active`, `draft`.  
-> Migration tracked as **ENUM-AUDIT-2**.
-
-| Value | Meaning |
-|---|---|
-| `active` | Live and assigned to screens |
-| `draft` | In preparation, not yet assigned |
-
-### `invoices.status`
-
-| Value | Meaning | Set by |
-|---|---|---|
-| `generated` | Invoice created by admin; not yet sent | `POST /api/invoices/generate` |
-| `sent` | Delivered to advertiser | Future billing workflow |
-| `paid` | Payment confirmed | Future billing workflow |
-| `void` | Cancelled / superseded | Admin action |
-
-### `stores.status` / `retailers.status` / `advertisers.status`
-
-| Value | Meaning |
-|---|---|
-| `active` | Operational |
-| `inactive` / `suspended` | Disabled — see per-collection notes below |
+> **Canonical status values are lowercase** as of Sprint 16 (S16-1).
+> All `loop.status` and `slot.status` values stored in Firestore use
+> lowercase strings (`pending_approval`, `approved`, `rejected`, `live`,
+> `pending`, `replaced`, `booked`, `available`).
+> Import constants via `LOOP_STATUS` / `SLOT_STATUS` from `LoopRepository.js`.
 
 ---
 
-## Overview
-The system uses a flat collection structure in Firestore, with cross-references using document IDs.
-
-## Core Collections
-
-### `retailers`
-Stores information about the retail partners.
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `id` | String | Unique retailer ID (e.g., `ret_001`) |
-| `name` | String | Full name of the retailer |
-| `logo` | String | Emoji or URL to logo |
-| `contact_email` | String | Administrative contact |
-| `status` | String | `active`, `inactive` |
-
-### `locations`
-Geographic or logical regions for store grouping.
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `id` | String | Region ID (e.g., `loc_downtown`) |
-| `name` | String | Display name |
-| `type` | String | `region`, `district`, etc. |
-
-### `stores`
-Individual physical store locations.
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `id` | String | Store ID (e.g., `str_001`) |
-| `retailer_id` | String | Reference to `retailers` |
-| `location_id` | String | Reference to `locations` |
-| `name` | String | Store display name |
-| `address` | String | Physical address |
-| `city` | String | City location |
-| `screen_count` | Number | Number of active screens |
-| `traffic_level` | String | `high`, `medium`, `low` |
-| `status` | String | `active`, `offline` |
-
-### `screens`
-Digital display hardware units.
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `id` | String | Unique ID (e.g., `scr_001_01`) |
-| `screen_id` | String | Hardware serial or ID |
-| `name` | String | Display name |
-| `status` | String | `online`, `offline` |
-| `store_id` | String | Reference to `stores` |
-| `retailer_id` | String | Reference to `retailers` |
-| `location_id` | String | Reference to `locations` (inherited) |
-| `resolution` | String | Screen resolution (e.g., `1920x1080`) |
-| `last_seen` | String | ISO Timestamp of last heartbeat |
-
----
-
-## Advertising & Content
-
-### `advertisers`
-Companies or brands running campaigns.
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `id` | String | Advertiser ID (e.g., `adv_001`) |
-| `name` | String | Brand name |
-| `industry` | String | Business category |
-| `contact_email` | String | Marketing contact |
-| `budget` | Number | Total account budget |
-| `status` | String | `active`, `suspended` |
-
-### `campaigns`
-Specific advertising initiatives.
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `id` | String | Campaign ID (e.g., `cmp_001`) |
-| `advertiser_id` | String | Reference to `advertisers` |
-| `name` | String | Campaign name |
-| `status` | String | See **Canonical Enum Values → Campaign.status** above |
-| `creative_url` | String | Primary asset URL |
-| `duration` | Number | Slot duration in seconds |
-| `start_date` | String | YYYY-MM-DD |
-| `end_date` | String | YYYY-MM-DD |
-| `budget` | Number | Campaign-specific budget |
-| `spent` | Number | Actual spend to date |
-| `impressionsDelivered` | Number | Total impressions served; used for invoice calculation |
-| `booked_slots` | Number | Count of reserved slots |
-
-### `media`
-Reusable media assets.
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `id` | String | Asset ID (e.g., `asset_001`) |
-| `filename` | String | Original filename |
-| `file_type` | String | `image`, `video` |
-| `duration` | Number | Playback duration |
-| `url` | String | Storage URL |
-
-### `playlists`
-Ordered collections of media for distribution.
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `id` | String | Playlist ID (e.g., `ply_001`) |
-| `name` | String | Display name |
-| `description` | String | Usage notes |
-| `status` | String | See **Canonical Enum Values → playlists.status** ⚠️ ENUM-AUDIT-2 |
-| `is_global` | Boolean | True if applies to all screens |
-| `assignments` | Array | List of target IDs (Store/Retailer or `ALL`) |
-| `items` | Array | Objects: `{ media_id, duration, order }` |
-
----
-
-## Operations & Pricing
-
-### `pricing_config`
-Global and overridden pricing rules. Single document with `id = 'global'`.
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `id` | String | Always `global` |
-| `baseCPM` | Number | The anchor price per 1000 impressions |
-| `currency` | String | e.g., `USD` |
-| `slotDuration` | Number | Standard slot length (e.g., 5s) |
-| `slotsPerLoop` | Number | Number of slots in a 1-minute loop |
-| `allocation` | Map | `{ paid: Number, retailer: Number, internal: Number }` — must sum to 100 (integer); enforced by `PUT /api/pricing/config`. **S15-1: field added.** |
-| `trafficTiers` | Map | Tiers with `multiplier`, `label`, `color`, `hours` |
-| `dateOverrides` | Map | Date-specific multipliers (Key: `YYYY-MM-DD`) |
-| `retailerOverrides` | Map | Retailer-specific base CPMs |
-| `updatedAt` | String | Last update timestamp |
-| `updatedBy` | String | `user_id` of last admin to write; stamped server-side by `PUT /api/pricing/config`. **S15-1: field added.** |
+## Collections
 
 ### `loops`
-The daily schedule for a specific screen and hour.
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `id` | String | Format: `{screen_id}_{date}_{hour}` |
-| `screen_id` | String | Reference to `screens` |
-| `store_id` | String | Reference to `stores` |
-| `date` | String | YYYY-MM-DD |
-| `hour` | Number | 0-23 |
-| `slots` | Array | 12 slots with `status`, `campaign_id`, `creative_url` |
-| `status` | String | See **Canonical Enum Values → loops.status** ⚠️ ENUM-AUDIT-1 |
 
-### `impressions`
-Analytical logs of actual ad plays.
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `id` | String | Random ID |
-| `impression_id` | String | UUID generated by `POST /api/telemetry/impression` |
-| `campaign_id` | String | Reference to `campaigns` |
-| `screen_id` | String | Reference to `screens` |
-| `asset_id` | String | Optional — specific creative asset |
-| `loop_id` | String | Optional — loop this slot belongs to |
-| `played_at` | String | ISO Timestamp provided by Player or server time |
-| `playlist_source` | String | `assigned`, `fallback` |
+Hourly broadcast loops. One document per `{date}_{hour}_{location_id}`.
 
-> **Phase 2 TODO:** `POST /api/telemetry/impression` currently logs via Winston only. Firestore persistence to this collection is the Phase 2 sub-task.
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | `{date}_{hour}_{location_id}` |
+| `date` | string | `YYYY-MM-DD` |
+| `hour` | number | 0–23 |
+| `retailer_id` | string | |
+| `location_id` | string | |
+| `screen_id` | string | Legacy single-screen field |
+| `screen_ids` | string[] | Multi-screen support (S10+) |
+| `status` | string | **Lowercase.** `pending_approval` \| `approved` \| `rejected` \| `live` |
+| `slots` | Slot[] | 12 entries, positions 0–11 |
+| `version` | number | Incremented on slot replacement |
+| `parentLoopId` | string? | Set when loop is a replacement clone |
+| `generated_at` | ISO string | |
+| `approved_at` | ISO string? | |
+| `approved_by` | string? | UID of approving user |
+| `rejected_at` | ISO string? | |
+| `rejected_by` | string? | |
+| `rejection_reason` | string? | |
 
-### `invoices`
-Generated billing records per completed campaign. Added S15-2.
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `id` | String | Auto-generated Firestore document ID |
-| `campaignId` | String | Reference to `campaigns` |
-| `advertiser_id` | String | Stamped server-side from campaign record — never from request body (SEC-S15-2) |
-| `impressionsDelivered` | Number | Snapshot of `campaigns.impressionsDelivered` at generation time |
-| `cpmRate` | Number | Effective CPM rate applied (from `pricing_config`) |
-| `amount` | Number | `impressionsDelivered × cpmRate / 1000` |
-| `currency` | String | Inherited from `pricing_config.currency` |
-| `status` | String | See **Canonical Enum Values → invoices.status** above |
-| `generatedAt` | String | ISO Timestamp of invoice creation |
-| `generatedBy` | String | `user_id` of admin who triggered `POST /api/invoices/generate` |
+#### Slot sub-document
 
-> **Firestore index required (post-MVP):** composite index on `(advertiser_id ASC, generatedAt DESC)` for paginated advertiser invoice list queries.
-
-### `scheduling_audits`
-History of manual or automated scheduling changes.
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `id` | String | Audit ID |
-| `action` | String | e.g., `loop_gen`, `slot_book` — lowercase per GUARDRAIL-4 |
-| `timestamp` | String | ISO Timestamp |
-| `metadata` | Map | Detailed changes and user context |
+| Field | Type | Notes |
+|---|---|---|
+| `position` | number | 0–11 |
+| `asset_id` | string? | |
+| `asset_name` | string? | |
+| `status` | string | **Lowercase.** `pending` \| `approved` \| `rejected` \| `replaced` \| `booked` \| `available` |
+| `campaign_id` | string? | Set when booked via advertiser campaign |
+| `advertiser_id` | string? | |
+| `creative_url` | string? | |
+| `booked_at` | ISO string? | |
+| `rejection_reason` | string? | |
+| `rejected_at` | ISO string? | |
+| `replaced_at` | ISO string? | |
 
 ---
 
-*Last updated: 2026-06-08 — S15-6: `invoices` collection added; `pricing_config.allocation` and `pricing_config.updatedBy` fields added; `campaigns.impressionsDelivered` field added; `invoices.status` enum added.*
+### `invoices`
+
+Generated per completed campaign. Inline `InvoiceRepository` in
+`ad-server/src/api/invoices.js` (no separate repository file).
+
+| Field | Type | Notes |
+|---|---|---|
+| `invoiceId` | string | UUID v4 |
+| `campaignId` | string | FK → `campaigns` |
+| `advertiserId` | string | Copied from `campaign.advertiser_id` at generation time |
+| `impressionsDelivered` | number | From campaign; falls back to `impressions_delivered` |
+| `cpmRate` | number | CPM rate at time of generation (default 15.00) |
+| `amount` | number | `impressionsDelivered × cpmRate / 1000`, 4dp |
+| `generatedAt` | ISO string | Generation timestamp |
+| `generatedBy` | string | `req.user.id` \| `req.user.email` \| `'system'` |
+
+> **Note on field casing:** Invoice fields use camelCase (`advertiserId`,
+> `generatedAt`, `impressionsDelivered`, `cpmRate`, `generatedBy`).
+> This differs from the snake_case convention used in `loops` and most
+> other collections. Do not rename — existing Firestore documents and the
+> `advertiserId` composite index depend on this casing.
+
+---
+
+### `campaigns`
+
+Advertiser ad campaigns. Managed via `CampaignRepository.js`.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | |
+| `advertiser_id` | string | FK → `advertisers` |
+| `status` | string | `draft` \| `active` \| `completed` \| `cancelled` |
+| `screen_type` | string? | Used for CPM rate lookup |
+| `impressionsDelivered` | number? | camelCase variant |
+| `impressions_delivered` | number? | snake_case variant (legacy) |
+
+---
+
+### `impressions`
+
+Per-play impression records. Managed via `ImpressionRepository.js`.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | |
+| `campaign_id` | string | |
+| `screen_id` | string | |
+| `played_at` | ISO string | |
+| `duration` | number | seconds |
+
+---
+
+### `screens`
+
+Registered display screens. Managed via `ScreenRepository.js`.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | |
+| `retailer_id` | string | |
+| `location_id` | string | |
+| `status` | string | `active` \| `inactive` \| `maintenance` |
+| `last_heartbeat` | ISO string? | |
+
+---
+
+## Firestore Indexes
+
+Composite indexes are defined in `firestore.indexes.json` at the repo root.
+Deploy with:
+
+```bash
+firebase deploy --only firestore:indexes --project <project-id>
+```
+
+| Collection | Fields | Order | Purpose |
+|---|---|---|---|
+| `invoices` | `advertiserId`, `generatedAt` | ASC, DESC | Advertiser invoice list, newest first |
+| `invoices` | `advertiserId`, `amount` | ASC, DESC | Invoice totals by value |
+| `loops` | `retailer_id`, `status`, `date` | ASC, ASC, DESC | Pending loops by retailer |
+| `loops` | `location_id`, `status`, `date` | ASC, ASC, DESC | Bulk approve-all by location |
+| `loops` | `status`, `date` | ASC, DESC | Approved loops cross-location |
+
+---
+
+## Sprint Changelog
+
+| Sprint | Change |
+|---|---|
+| S16 (2026-06-08) | **Status normalization (S16-1/S16-2):** `LOOP_STATUS` and `SLOT_STATUS` enum values changed to lowercase. Backfill: `ad-server/scripts/migrate-loop-status-lowercase.js`. |
+| S16 (2026-06-08) | **Composite indexes (S16-3):** `firestore.indexes.json` added. Covers `invoices` (advertiserId) and `loops` (retailer\_id, location\_id, status) query patterns. |
+| S15 | Invoices collection introduced. `InvoiceRepository` inlined in `ad-server/src/api/invoices.js`. |
+| S13-2 | Loop-level reject and bulk approve-all routes added to `loops.js`. |
+| S10 | `screen_ids` array added to loops for multi-screen support. |
