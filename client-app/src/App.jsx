@@ -6,7 +6,7 @@
  * Before adding a route, verify the file exists in the repo.
  * See docs/SofiensBullshit.md for the full prevention plan.
  *
- * Verified file map (as of Sprint 14 — 2026-06-08):
+ * Verified file map (as of Sprint 15 — 2026-06-08):
  *
  *   layouts/DashboardLayout.jsx          ✅
  *   pages/Login.jsx                      ✅
@@ -27,6 +27,7 @@
  *   pages/admin/AILog.jsx                ✅
  *   pages/admin/CPMCalendar.jsx          ✅  (served at /dashboard/admin/pricing)
  *   pages/admin/LoopAnalytics.jsx        ✅  (served at /dashboard/admin/loop-analytics)
+ *   pages/admin/PricingConfig.jsx        ✅  (served at /dashboard/admin/pricing-config) Sprint 15
  *   pages/brand/BrandDashboard.jsx       ✅
  *   pages/brand/BrandCampaignWizard.jsx  ✅
  *   pages/retailer/RetailerDashboard.jsx ✅
@@ -41,6 +42,7 @@
  *   pages/advertiser/AdvertiserDashboard.jsx   ✅  (served at /dashboard/advertiser)          Sprint 14
  *   pages/advertiser/AdvertiserCampaigns.jsx   ✅  (served at /dashboard/advertiser/campaigns) Sprint 14
  *   pages/advertiser/AdvertiserNewCampaign.jsx ✅  (served at /dashboard/advertiser/campaigns/new) Sprint 14
+ *   pages/advertiser/Invoices.jsx              ✅  (served at /dashboard/advertiser/invoices)   Sprint 15
  *   pages/tech/TechOpsDashboard.jsx      ✅  (served at /dashboard/techoperator)
  *   pages/tickets/TicketDashboard.jsx    ✅  (served at /dashboard/tickets)
  *   pages/tickets/TicketDetail.jsx       ✅  (served at /dashboard/tickets/:id)
@@ -56,16 +58,16 @@ import { AuthProvider } from './contexts/AuthContext';
 import NetworkErrorBanner from './components/NetworkErrorBanner';
 import NotFound from './pages/NotFound';
 
-// ── Layout shell ─────────────────────────────────────────────────────────────────
+// ── Layout shell ──────────────────────────────────────────────────────────────────────────
 const Dashboard = lazy(() => import('./layouts/DashboardLayout'));
 
-// ── Top-level pages ────────────────────────────────────────────────────────────
+// ── Top-level pages ────────────────────────────────────────────────────────────────────────
 const Player         = lazy(() => import('./pages/Player'));
 const LoopDemoPlayer = lazy(() => import('./pages/LoopDemoPlayer'));
 const Login          = lazy(() => import('./pages/Login'));
 const Health         = lazy(() => import('./pages/Health'));
 
-// ── Admin pages ─────────────────────────────────────────────────────────────────
+// ── Admin pages ───────────────────────────────────────────────────────────────────────────
 const AdminOverview           = lazy(() => import('./pages/admin/Overview'));
 const RetailerManagement      = lazy(() => import('./pages/admin/RetailerManagement'));
 const AdvertiserManagement    = lazy(() => import('./pages/admin/AdvertiserManagement'));
@@ -79,12 +81,13 @@ const NetworkMap              = lazy(() => import('./pages/admin/NetworkMap'));
 const AILog                   = lazy(() => import('./pages/admin/AILog'));
 const CPMCalendar             = lazy(() => import('./pages/admin/CPMCalendar'));
 const LoopAnalytics           = lazy(() => import('./pages/admin/LoopAnalytics'));
+const PricingConfig           = lazy(() => import('./pages/admin/PricingConfig'));  // Sprint 15
 
-// ── Brand pages ─────────────────────────────────────────────────────────────────
+// ── Brand pages ───────────────────────────────────────────────────────────────────────────
 const BrandOverview  = lazy(() => import('./pages/brand/BrandDashboard'));
 const CampaignWizard = lazy(() => import('./pages/brand/BrandCampaignWizard'));
 
-// ── Retailer pages ──────────────────────────────────────────────────────────────
+// ── Retailer pages ─────────────────────────────────────────────────────────────────────────
 const RetailerOverview  = lazy(() => import('./pages/retailer/RetailerDashboard'));
 const ScheduleCalendar  = lazy(() => import('./pages/retailer/ScheduleCalendar'));
 const ScheduleHistory   = lazy(() => import('./pages/retailer/ScheduleHistory'));
@@ -92,16 +95,17 @@ const ScheduleManager   = lazy(() => import('./pages/retailer/ScheduleManager'))
 const RetailerLoops     = lazy(() => import('./pages/retailer/Loops'));
 const CampaignApprovals = lazy(() => import('./pages/retailer/CampaignApprovalList'));
 
-// ── Advertiser pages ─────────────────────────────────────────────────────────────
-const AdvertiserDashboard  = lazy(() => import('./pages/advertiser/AdvertiserDashboard'));
-const AdvertiserCampaigns  = lazy(() => import('./pages/advertiser/AdvertiserCampaigns'));
+// ── Advertiser pages ──────────────────────────────────────────────────────────────────────────
+const AdvertiserDashboard   = lazy(() => import('./pages/advertiser/AdvertiserDashboard'));
+const AdvertiserCampaigns   = lazy(() => import('./pages/advertiser/AdvertiserCampaigns'));
 const AdvertiserNewCampaign = lazy(() => import('./pages/advertiser/AdvertiserNewCampaign'));
+const Invoices              = lazy(() => import('./pages/advertiser/Invoices'));             // Sprint 15
 
-// ── Ticket pages ─────────────────────────────────────────────────────────────────
+// ── Ticket pages ───────────────────────────────────────────────────────────────────────────
 const TicketDashboard = lazy(() => import('./pages/tickets/TicketDashboard'));
 const TicketDetail    = lazy(() => import('./pages/tickets/TicketDetail'));
 
-// ── Tech Operator pages ──────────────────────────────────────────────────────────
+// ── Tech Operator pages ────────────────────────────────────────────────────────────────────────
 const TechOpsDashboard = lazy(() => import('./pages/tech/TechOpsDashboard'));
 
 function App() {
@@ -127,19 +131,20 @@ function App() {
                             <Route index element={<Navigate to="admin" replace />} />
 
                             {/* Admin */}
-                            <Route path="admin"                 element={<AdminOverview />} />
-                            <Route path="admin/retailers"       element={<RetailerManagement />} />
-                            <Route path="admin/advertisers"     element={<AdvertiserManagement />} />
-                            <Route path="admin/campaigns"       element={<CampaignManagement />} />
-                            <Route path="admin/screens"         element={<ScreenManagement />} />
-                            <Route path="admin/loops"           element={<LoopManagement />} />
-                            <Route path="admin/loops/:id"       element={<LoopBuilder />} />
-                            <Route path="admin/users"           element={<UserManagement />} />
-                            <Route path="admin/hours"           element={<BusinessHoursManagement />} />
-                            <Route path="admin/map"             element={<NetworkMap />} />
-                            <Route path="admin/ai-log"          element={<AILog />} />
-                            <Route path="admin/pricing"         element={<CPMCalendar />} />
-                            <Route path="admin/loop-analytics"  element={<LoopAnalytics />} />
+                            <Route path="admin"                  element={<AdminOverview />} />
+                            <Route path="admin/retailers"        element={<RetailerManagement />} />
+                            <Route path="admin/advertisers"      element={<AdvertiserManagement />} />
+                            <Route path="admin/campaigns"        element={<CampaignManagement />} />
+                            <Route path="admin/screens"          element={<ScreenManagement />} />
+                            <Route path="admin/loops"            element={<LoopManagement />} />
+                            <Route path="admin/loops/:id"        element={<LoopBuilder />} />
+                            <Route path="admin/users"            element={<UserManagement />} />
+                            <Route path="admin/hours"            element={<BusinessHoursManagement />} />
+                            <Route path="admin/map"              element={<NetworkMap />} />
+                            <Route path="admin/ai-log"           element={<AILog />} />
+                            <Route path="admin/pricing"          element={<CPMCalendar />} />
+                            <Route path="admin/loop-analytics"   element={<LoopAnalytics />} />
+                            <Route path="admin/pricing-config"   element={<PricingConfig />} />   {/* Sprint 15 */}
 
                             {/* Brand */}
                             <Route path="brand"              element={<BrandOverview />} />
@@ -153,10 +158,11 @@ function App() {
                             <Route path="retailer/loops"              element={<RetailerLoops />} />
                             <Route path="retailer/campaign-approvals" element={<CampaignApprovals />} />
 
-                            {/* Advertiser — Sprint 14 */}
+                            {/* Advertiser — Sprint 14 + 15 */}
                             <Route path="advertiser"                    element={<AdvertiserDashboard />} />
                             <Route path="advertiser/campaigns"          element={<AdvertiserCampaigns />} />
                             <Route path="advertiser/campaigns/new"      element={<AdvertiserNewCampaign />} />
+                            <Route path="advertiser/invoices"           element={<Invoices />} />           {/* Sprint 15 */}
 
                             {/* Tickets */}
                             <Route path="tickets"     element={<TicketDashboard />} />
