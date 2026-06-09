@@ -20,19 +20,23 @@ export class RetailerRepository extends BaseRepository {
     }
 
     /**
-     * Soft-delete a retailer by setting status to 'inactive'.
+     * Soft-delete a retailer by setting status to 'inactive' and stamping deleted_at.
+     * deleted_at is the canonical deletion marker — distinguishes delete from the
+     * PATCH status toggle which also sets status: 'inactive' but does NOT set deleted_at.
      * Preserves referential integrity with stores, screens, loops, impressions.
      * @param {string} id
      * @returns {Promise<object>} Updated snapshot
      */
     async softDelete(id) {
+        const deletedAt = new Date().toISOString();
+
         if (!this.collection) {
             // Memory fallback: update in-memory store
             const existing = await this.findById(id);
             if (!existing) {
                 throw new Error(`Retailer document ${id} not found`);
             }
-            return this.update(id, { status: 'inactive' });
+            return this.update(id, { status: 'inactive', deleted_at: deletedAt });
         }
 
         const docRef = this.collection.doc(id);
@@ -47,7 +51,8 @@ export class RetailerRepository extends BaseRepository {
         await this.breaker.execute(() =>
             docRef.set({
                 status: 'inactive',
-                updated_at: new Date().toISOString()
+                deleted_at: deletedAt,
+                updated_at: deletedAt
             }, { merge: true })
         );
 
@@ -56,7 +61,8 @@ export class RetailerRepository extends BaseRepository {
     }
 
     /**
-     * Update the status of a retailer.
+     * Update the status of a retailer (intentional deactivation/reactivation toggle).
+     * Does NOT set deleted_at — this is not a deletion.
      * @param {string} id
      * @param {string} status - 'active' or 'inactive'
      * @returns {Promise<object>} Updated snapshot

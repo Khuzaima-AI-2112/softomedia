@@ -8,11 +8,14 @@ const router = express.Router();
 
 /**
  * GET /api/advertisers
- * List all advertisers — public within dashboard shell (all roles can read).
+ * List all non-deleted advertisers — public within dashboard shell (all roles can read).
+ * S17-3: filters where deleted_at == null so soft-deleted advertisers are excluded.
  */
 router.get('/', async (req, res) => {
     try {
-        const advertisers = await advertiserRepository.findAll();
+        const advertisers = await advertiserRepository.findAll({
+            where: [['deleted_at', '==', null]]
+        });
         res.json(advertisers);
     } catch (error) {
         logger.error('Failed to fetch advertisers:', error);
@@ -23,11 +26,12 @@ router.get('/', async (req, res) => {
 /**
  * GET /api/advertisers/:id
  * Get a single advertiser by ID — public within dashboard shell.
+ * S17-4: returns 404 if the advertiser has been soft-deleted (deleted_at is set).
  */
 router.get('/:id', async (req, res) => {
     try {
         const advertiser = await advertiserRepository.findById(req.params.id);
-        if (!advertiser) {
+        if (!advertiser || advertiser.deleted_at) {
             return res.status(404).json({ error: 'Advertiser not found' });
         }
         res.json(advertiser);
@@ -126,10 +130,12 @@ router.patch('/:id', authenticate, requireRole('admin'), async (req, res) => {
 
 /**
  * DELETE /api/advertisers/:id
- * Soft-delete: sets status to 'suspended'.
- * Preserves referential integrity with campaigns that reference advertiserid.
+ * Soft-delete: sets status to 'suspended' and stamps deleted_at.
+ * Preserves referential integrity with campaigns that reference advertiser_id.
+ * Record is excluded from GET / list after this operation.
  *
  * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added.
+ * S17-2: deleted_at field written to Firestore as canonical deletion marker.
  */
 router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
     try {

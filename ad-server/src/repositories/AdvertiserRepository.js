@@ -7,10 +7,15 @@ export class AdvertiserRepository extends BaseRepository {
     }
 
     /**
-     * Soft-delete: sets status to 'suspended' and stamps updated_at.
-     * Campaigns reference advertiserid so we never hard-delete.
+     * Soft-delete: sets status to 'suspended' and stamps deleted_at.
+     * deleted_at is the canonical deletion marker.
+     * status: 'suspended' is preserved for campaign referential integrity —
+     * campaign documents reference advertiser_id and must not be orphaned.
+     * Campaigns referencing this advertiser are unaffected by this operation.
      */
     async softDelete(id) {
+        const deletedAt = new Date().toISOString();
+
         const existing = await this.findById(id);
         if (!existing) {
             throw new Error(`Advertiser ${id} not found`);
@@ -23,7 +28,8 @@ export class AdvertiserRepository extends BaseRepository {
                 await this.breaker.execute(() =>
                     this.collection.doc(id).set({
                         status: 'suspended',
-                        updated_at: new Date().toISOString()
+                        deleted_at: deletedAt,
+                        updated_at: deletedAt
                     }, { merge: true })
                 );
             }
@@ -36,7 +42,7 @@ export class AdvertiserRepository extends BaseRepository {
         }
 
         // Keep MOCK_STORAGE in sync via parent update()
-        return this.update(id, { status: 'suspended' });
+        return this.update(id, { status: 'suspended', deleted_at: deletedAt });
     }
 }
 

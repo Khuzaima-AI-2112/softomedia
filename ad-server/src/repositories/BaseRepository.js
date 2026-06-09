@@ -91,7 +91,9 @@ export class BaseRepository {
         if (options.where) {
             results = results.filter(item => {
                 return options.where.every(([field, op, value]) => {
-                    if (op === '==') return item[field] === value;
+                    // S17-3: use ?? null so absent fields match a null filter correctly.
+                    // Backward-compatible: for concrete non-null values, (v ?? null) === v.
+                    if (op === '==') return (item[field] ?? null) === value;
                     if (op === 'array-contains') return Array.isArray(item[field]) && item[field].includes(value);
                     return true;
                 });

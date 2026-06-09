@@ -8,11 +8,15 @@ const router = express.Router();
 
 /**
  * GET /api/retailers
- * List all retailers — public within dashboard shell (all roles can read).
+ * List all non-deleted retailers — public within dashboard shell (all roles can read).
+ * S17-3: filters where deleted_at == null so soft-deleted retailers are excluded.
+ * Intentionally-inactive retailers (PATCH toggle, no deleted_at) are still returned.
  */
 router.get('/', async (req, res) => {
     try {
-        const retailers = await retailerRepository.findAll();
+        const retailers = await retailerRepository.findAll({
+            where: [['deleted_at', '==', null]]
+        });
         res.json(retailers);
     } catch (error) {
         logger.error('Failed to fetch retailers:', error);
@@ -23,11 +27,12 @@ router.get('/', async (req, res) => {
 /**
  * GET /api/retailers/:id
  * Get a single retailer by ID — public within dashboard shell.
+ * S17-4: returns 404 if the retailer has been soft-deleted (deleted_at is set).
  */
 router.get('/:id', async (req, res) => {
     try {
         const retailer = await retailerRepository.findById(req.params.id);
-        if (!retailer) {
+        if (!retailer || retailer.deleted_at) {
             return res.status(404).json({ error: 'Retailer not found' });
         }
         res.json(retailer);
@@ -106,10 +111,12 @@ router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
 
 /**
  * DELETE /api/retailers/:id
- * Soft-delete a retailer (sets status to 'inactive').
+ * Soft-delete a retailer (sets status: 'inactive' and deleted_at timestamp).
  * Preserves referential integrity with stores, screens, loops, impressions.
+ * Record is excluded from GET / list after this operation.
  *
  * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added.
+ * S17-1: deleted_at field written to Firestore as canonical deletion marker.
  */
 router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
     try {
@@ -127,6 +134,7 @@ router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
 /**
  * PATCH /api/retailers/:id
  * Toggle retailer status between 'active' and 'inactive'.
+ * Does NOT set deleted_at — this is intentional deactivation, not deletion.
  *
  * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added.
  */
