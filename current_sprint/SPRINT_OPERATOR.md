@@ -167,7 +167,104 @@ Hard rules:
 
 ---
 
-## Step 5 — Update MVP_SPRINT_PLAN.md
+## Step 5 — Deep Research Validation
+
+You are a senior SRE and external-standards reviewer.
+
+The sprint has been grounded against the live repo (Steps 1–4). Now validate whether the **technical approaches chosen** hold up against external documentation, community-established patterns, and known failure modes.
+
+This step does not touch the repo. It produces a research report that either confirms the sprint's approach or flags where the plan contradicts documented best practice — before a single byte of code is committed.
+
+---
+
+### What to research
+
+For each technical decision in the current sprint spec, identify the external technical surface and ask:
+
+1. **Is this the documented approach for the tool/library/service being used?**
+   - Check official docs for version-specific correctness (e.g. Firestore index file format for the Firebase CLI version in use, React Router v6 `<Route>` nesting conventions, Express middleware ordering guarantees).
+
+2. **Are there known failure modes for this approach at the scale described?**
+   - e.g. Firestore batch write limits, enum migration strategies for live databases, Node.js ESM vs CJS import edge cases.
+
+3. **Is there a community-established safer or simpler pattern?**
+   - Search for post-mortems, GitHub issues, or authoritative community resources for the specific combination of tool + problem.
+
+4. **Do the acceptance criteria reflect the documented observable outcomes for this tool?**
+   - e.g. Does `firebase deploy --only firestore:indexes` actually exit 0 on success? Does it require `--project` to be set in `.firebaserc`? Does React Router 404 silently or throw?
+
+---
+
+### How to build the research scope
+
+Read the current sprint spec (e.g. `current_sprint/sprint16.md`) and extract every external technical decision — one research question per task. Format each as:
+
+> *"What does [official doc / community source] say about [specific approach] when applied to [specific context in this sprint]?"*
+
+Avoid researching internal repo decisions (file naming, test IDs, route strings) — those are grounded by Steps 1–4 against live source. Only research the **external technical surface**: library behaviour, CLI tool flags, database engine constraints, framework conventions, and known CVEs or deprecations.
+
+---
+
+### Output format
+
+For each research question:
+
+```
+**Task:** [Task ID]
+**Question:** [Exact question researched]
+**Finding:** [What external sources say — cite URL or doc section]
+**Verdict:** CONFIRMS sprint approach | CONTRADICTS sprint approach | REFINES sprint approach
+**Action (if not CONFIRMS):** [Specific correction to make to the sprint spec before coding begins]
+```
+
+End Step 5 with:
+
+- A **Validation Summary** table:
+  `Task | Verdict | Action Required Before Coding`
+
+- A **Sprint Approach Score** (0–100%) reflecting how much of the sprint's external-validity surface is confirmed by documentation vs. unverified assumptions.
+
+- A **Corrections to Apply** section listing any spec lines that must be updated based on findings, with exact replacement text ready to paste.
+
+---
+
+### Hard rules
+
+- Every finding must cite a source (URL, doc section, RFC, or named community resource). No unattributed assertions.
+- If a finding cannot be confirmed from an authoritative external source, mark it `UNVERIFIED` and add a mandatory pre-check to the sprint spec.
+- Do not change the sprint spec directly — output corrections for the operator to apply manually after reviewing findings.
+- Do not re-do repo grounding work from Steps 1–4. If a question is answered by the live repo, skip it here.
+- If Deep Research surfaces a deprecation, CVE, or breaking change relevant to any sprint task, flag it as `🔴 BLOCKER` and require operator sign-off before coding begins.
+
+---
+
+## Step 6 — Mid-Sprint SRE/QA Health Check
+
+You are a senior SRE/QA reviewing the current sprint mid-execution.
+
+Inputs:
+- current task statuses
+- recent commits
+- files touched by the sprint
+
+For each task:
+1. Map recent commits to the task.
+2. Check whether changes remain inside the planned blast radius.
+3. Verify:
+   - new data-testids are documented
+   - retry/fallback/guard logic is present where required
+   - ad-hoc code changes did not create hidden scope creep
+4. Flag any new risk introduced outside the sprint plan.
+
+Output:
+- A table:
+  `Task | Latest Commit(s) | Deviations from Plan | New Risk? | Action`
+- A short recommendation:
+  `Keep Scope`, `Cut Scope`, or `Split to Next Sprint`
+
+---
+
+## Step 7 — Update MVP_SPRINT_PLAN.md
 
 You are maintaining `MVP_SPRINT_PLAN.md` for the `softomedia-live2026` repo.
 
@@ -200,33 +297,7 @@ Output:
 
 ---
 
-## Step 6 — Mid-Sprint SRE/QA Health Check
-
-You are a senior SRE/QA reviewing the current sprint mid-execution.
-
-Inputs:
-- current task statuses
-- recent commits
-- files touched by the sprint
-
-For each task:
-1. Map recent commits to the task.
-2. Check whether changes remain inside the planned blast radius.
-3. Verify:
-   - new data-testids are documented
-   - retry/fallback/guard logic is present where required
-   - ad-hoc code changes did not create hidden scope creep
-4. Flag any new risk introduced outside the sprint plan.
-
-Output:
-- A table:
-  `Task | Latest Commit(s) | Deviations from Plan | New Risk? | Action`
-- A short recommendation:
-  `Keep Scope`, `Cut Scope`, or `Split to Next Sprint`
-
----
-
-## Step 7 — Retrospective and Guardrail Update
+## Step 8 — Retrospective and Guardrail Update
 
 You are a senior SRE and QA lead performing the sprint retrospective.
 
@@ -256,7 +327,8 @@ If the user says:
 - **"for current sprint start with step 1"** → run only Step 1
 - **"continue to step 2"** → run only Step 2
 - **"do step 4 for current sprint"** → run only Step 4
-- **"run all steps"** → execute Steps 1 through 7 in order, but stop and flag blockers when live-source confirmation is missing
+- **"do step 5"** → run only Step 5 (Deep Research Validation) — use Deep Research to check external sources for every technical decision in the current sprint spec
+- **"run all steps"** → execute Steps 1 through 8 in order, but stop and flag blockers when live-source confirmation is missing
 
 Always optimize for:
 - repo truth over assumption
