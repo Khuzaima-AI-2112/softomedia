@@ -1,0 +1,68 @@
+{
+  "_comment": [
+    "S16-3: Composite Firestore indexes.",
+    "",
+    "Pre-check A: InvoiceRepository.js not present in repo.",
+    "Field names (advertiserId, generatedAt, status) inferred from DATABASE_SCHEMA.md",
+    "(invoices collection, S15 commit 1051b85). Verify against live collection before",
+    "first deploy. If field names differ, update this file and re-deploy.",
+    "",
+    "Pre-check B: firebase.json not found in repo root or ad-server/.",
+    "To deploy these indexes you must first create firebase.json (or .firebaserc)",
+    "and run: firebase deploy --only firestore:indexes",
+    "Alternatively, apply via Firebase console or Terraform.",
+    "",
+    "Idempotency: deploying indexes that already exist returns HTTP 409 from the",
+    "Firestore API; the Firebase CLI treats this as a no-op (non-fatal)."
+  ],
+  "indexes": [
+    {
+      "_comment": "invoices-1: Advertiser invoice list, newest-first. Primary query for advertiser portal.",
+      "collectionGroup": "invoices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "advertiserId", "order": "ASCENDING" },
+        { "fieldPath": "generatedAt",  "order": "DESCENDING" }
+      ]
+    },
+    {
+      "_comment": "invoices-2: Advertiser invoice list filtered by status (e.g. UNPAID, PAID). Newest-first.",
+      "collectionGroup": "invoices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "advertiserId", "order": "ASCENDING" },
+        { "fieldPath": "status",        "order": "ASCENDING" },
+        { "fieldPath": "generatedAt",  "order": "DESCENDING" }
+      ]
+    },
+    {
+      "_comment": "invoices-3: Admin view — all invoices by status, newest-first.",
+      "collectionGroup": "invoices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status",       "order": "ASCENDING" },
+        { "fieldPath": "generatedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "_comment": "loops-1: Loop management — filter by status + date (e.g. pending loops for a given date).",
+      "collectionGroup": "loops",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "date",   "order": "ASCENDING" }
+      ]
+    },
+    {
+      "_comment": "loops-2: approve-all query (S13-2 / S16-2) — location_id + status + date.",
+      "collectionGroup": "loops",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "location_id", "order": "ASCENDING" },
+        { "fieldPath": "status",      "order": "ASCENDING" },
+        { "fieldPath": "date",        "order": "ASCENDING" }
+      ]
+    }
+    ],
+  "fieldOverrides": []
+}
