@@ -11,10 +11,14 @@
  * POST /locations/:id/loops/approve-all routes.
  * Both require requireRole('retaileradmin').
  * Existing routes are unchanged.
+ *
+ * S16-2 (2026-06-09): Replaced all raw enum strings with LOOP_STATUS constants.
+ * Added LOOP_STATUS to import. Bug fix: /approve-all where clause used
+ * 'PENDING' (a SLOT_STATUS) — corrected to LOOP_STATUS.PENDING_APPROVAL.
  */
 
 import express from 'express';
-import { loopRepository, BUSINESS_HOURS } from '../repositories/LoopRepository.js';
+import { loopRepository, LOOP_STATUS, BUSINESS_HOURS } from '../repositories/LoopRepository.js';
 import { loopGenerationService } from '../services/LoopGenerationService.js';
 import { BusinessHoursService } from '../services/BusinessHoursService.js';
 import { authenticate } from '../middleware/auth.js';
@@ -245,7 +249,7 @@ router.get('/pending/:retailerId', authenticate, requireRole('retaileradmin'), a
 /**
  * POST /api/loops/:loopId/reject
  * Reject an entire loop (loop-level rejection, distinct from slot-level PATCH above).
- * Sets loops.status to 'REJECTED' (uppercase — consistent with loops enum).
+ * Sets loops.status to LOOP_STATUS.REJECTED (via constant — S16-2).
  * Body: { reason }
  * Auth: requireRole('retaileradmin')
  *
@@ -262,7 +266,7 @@ router.post('/:loopId/reject', authenticate, requireRole('retaileradmin'), async
         }
 
         const updated = await loopRepository.update(loopId, {
-            status: 'REJECTED',
+            status: LOOP_STATUS.REJECTED,
             rejection_reason: reason || null,
             rejected_at: new Date().toISOString(),
             rejected_by: req.user?.uid || null,
@@ -278,7 +282,7 @@ router.post('/:loopId/reject', authenticate, requireRole('retaileradmin'), async
 
 /**
  * POST /api/locations/:locationId/loops/approve-all
- * Bulk-approve all PENDING loops for a given location.
+ * Bulk-approve all PENDING_APPROVAL loops for a given location.
  * Optionally filtered by date (body: { date? }).
  * Returns { approved: N } where N is the count of newly-approved loops.
  * Auth: requireRole('retaileradmin')
@@ -291,6 +295,8 @@ router.post('/:loopId/reject', authenticate, requireRole('retaileradmin'), async
  * Confirm mount point per sprint13.md S13-2 AC-2 before marking story Done.
  *
  * S13-2 AC-2, AC-3
+ * S16-2: fixed where clause ('PENDING' → LOOP_STATUS.PENDING_APPROVAL) and
+ *        status write ('APPROVED' → LOOP_STATUS.APPROVED).
  */
 router.post('/locations/:locationId/loops/approve-all', authenticate, requireRole('retaileradmin'), async (req, res) => {
     try {
@@ -299,7 +305,7 @@ router.post('/locations/:locationId/loops/approve-all', authenticate, requireRol
 
         const where = [
             ['location_id', '==', locationId],
-            ['status', '==', 'PENDING'],
+            ['status', '==', LOOP_STATUS.PENDING_APPROVAL],
         ];
         if (date) where.push(['date', '==', date]);
 
@@ -312,7 +318,7 @@ router.post('/locations/:locationId/loops/approve-all', authenticate, requireRol
         const userId = req.user?.uid || null;
         const approvalPromises = pendingLoops.map(loop =>
             loopRepository.update(loop.id, {
-                status: 'APPROVED',
+                status: LOOP_STATUS.APPROVED,
                 approved_at: new Date().toISOString(),
                 approved_by: userId,
             })
