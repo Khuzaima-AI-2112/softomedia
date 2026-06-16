@@ -6,7 +6,7 @@
  * Before adding a route, verify the file exists in the repo.
  * See docs/SofiensBullshit.md for the full prevention plan.
  *
- * Verified file map (as of Sprint 15 — 2026-06-08):
+ * Verified file map (as of Sprint 22 — 2026-06-16):
  *
  *   layouts/DashboardLayout.jsx          ✅
  *   pages/Login.jsx                      ✅
@@ -41,7 +41,6 @@
  *                                           Single source of truth — no duplicate implementations.
  *   pages/advertiser/AdvertiserDashboard.jsx   ✅  (served at /dashboard/advertiser)          Sprint 14
  *   pages/advertiser/AdvertiserCampaigns.jsx   ✅  (served at /dashboard/advertiser/campaigns) Sprint 14
- *   pages/advertiser/AdvertiserNewCampaign.jsx ✅  (served at /dashboard/advertiser/campaigns/new) Sprint 14
  *   pages/advertiser/Invoices.jsx              ✅  (served at /dashboard/advertiser/invoices)   Sprint 15
  *   pages/tech/TechOpsDashboard.jsx      ✅  (served at /dashboard/techoperator)
  *   pages/tickets/TicketDashboard.jsx    ✅  (served at /dashboard/tickets)
@@ -50,6 +49,12 @@
  * Deleted stale component copies (Sprint 11 cleanup):
  *   components/TicketDashboard.jsx       ❌  deleted — was hardcoding localhost:8080
  *   components/TicketDetail.jsx          ❌  deleted — superseded by pages/tickets/
+ *
+ * Sprint 22 — S22-1 follow-up:
+ *   pages/advertiser/AdvertiserNewCampaign.jsx ❌  retired — campaign creation now handled
+ *     by CampaignWizardModal inside AdvertiserCampaigns.jsx.
+ *     Route /dashboard/advertiser/campaigns/new now redirects to /dashboard/advertiser/campaigns.
+ *     File kept on disk for one sprint as safety net; lazy import removed here.
  */
 
 import { lazy, Suspense } from 'react';
@@ -96,10 +101,10 @@ const RetailerLoops     = lazy(() => import('./pages/retailer/Loops'));
 const CampaignApprovals = lazy(() => import('./pages/retailer/CampaignApprovalList'));
 
 // ── Advertiser pages ──────────────────────────────────────────────────────────────────────────
-const AdvertiserDashboard   = lazy(() => import('./pages/advertiser/AdvertiserDashboard'));
-const AdvertiserCampaigns   = lazy(() => import('./pages/advertiser/AdvertiserCampaigns'));
-const AdvertiserNewCampaign = lazy(() => import('./pages/advertiser/AdvertiserNewCampaign'));
-const Invoices              = lazy(() => import('./pages/advertiser/Invoices'));             // Sprint 15
+const AdvertiserDashboard = lazy(() => import('./pages/advertiser/AdvertiserDashboard'));
+const AdvertiserCampaigns = lazy(() => import('./pages/advertiser/AdvertiserCampaigns'));
+// AdvertiserNewCampaign retired S22-1 — route below redirects to /campaigns (modal-based creation)
+const Invoices            = lazy(() => import('./pages/advertiser/Invoices'));             // Sprint 15
 
 // ── Ticket pages ───────────────────────────────────────────────────────────────────────────
 const TicketDashboard = lazy(() => import('./pages/tickets/TicketDashboard'));
@@ -159,10 +164,18 @@ function App() {
                             <Route path="retailer/campaign-approvals" element={<CampaignApprovals />} />
 
                             {/* Advertiser — Sprint 14 + 15 */}
-                            <Route path="advertiser"                    element={<AdvertiserDashboard />} />
-                            <Route path="advertiser/campaigns"          element={<AdvertiserCampaigns />} />
-                            <Route path="advertiser/campaigns/new"      element={<AdvertiserNewCampaign />} />
-                            <Route path="advertiser/invoices"           element={<Invoices />} />           {/* Sprint 15 */}
+                            <Route path="advertiser"               element={<AdvertiserDashboard />} />
+                            <Route path="advertiser/campaigns"     element={<AdvertiserCampaigns />} />
+                            {/*
+                             * /campaigns/new retired S22-1 — creation is now via CampaignWizardModal.
+                             * Hard redirect so any saved bookmarks or back-button navigations land
+                             * on /campaigns with the modal trigger visible, not a dead route.
+                             */}
+                            <Route
+                                path="advertiser/campaigns/new"
+                                element={<Navigate to="/dashboard/advertiser/campaigns" replace />}
+                            />
+                            <Route path="advertiser/invoices" element={<Invoices />} />  {/* Sprint 15 */}
 
                             {/* Tickets */}
                             <Route path="tickets"     element={<TicketDashboard />} />
