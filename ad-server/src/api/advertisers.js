@@ -114,24 +114,36 @@ router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
 /**
  * PATCH /api/advertisers/:id
  * Partial update — only overwrites supplied fields.
- * Used for field-level edits (name, logo, industry, contactemail, budget).
+ * Used for field-level edits (name, logo, industry, contactemail, budget)
+ * and active/inactive status toggles.
  *
  * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added.
  * S21-2 (SEC-S21-1): explicit field allowlist added. deleted_at is owned
  * exclusively by softDelete() and cannot be overwritten via PATCH —
- * GUARDRAIL-15. status is not patchable here; for advertisers, status
- * transitions are handled by softDelete() (DELETE /:id) and create().
+ * GUARDRAIL-15.
+ * S21-3 resolution: requireRole('admin') is the correct and sufficient
+ * guard for all retailer and advertiser mutation routes; superadmin is
+ * not required. Caller audit confirmed all mutations originate from
+ * admin-gated management pages only.
+ * S21-3: 'status' added to allowlist for active/inactive toggles —
+ * mirrors the retailers PATCH pattern. 'suspended' is reserved for
+ * softDelete() exclusively and is rejected with 400 if sent here.
  * A PATCH body containing only non-allowlisted fields returns 400.
  */
 router.patch('/:id', authenticate, requireRole('admin'), async (req, res) => {
     try {
         // Allowlist: only non-sensitive business fields are patchable.
-        // deleted_at — owned exclusively by softDelete(); blocked per GUARDRAIL-15.
-        // status     — set by softDelete() or create(); not a PATCH concern here.
-        const ALLOWED_PATCH_FIELDS = ['name', 'logo', 'industry', 'contactemail', 'budget'];
+        // deleted_at  — owned exclusively by softDelete(); blocked per GUARDRAIL-15.
+        // status      — active/inactive toggle allowed; 'suspended' rejected below
+        //               (reserved for softDelete() only).
+        const ALLOWED_PATCH_FIELDS = ['name', 'logo', 'industry', 'contactemail', 'budget', 'status'];
         const patch = {};
         for (const field of ALLOWED_PATCH_FIELDS) {
             if (req.body[field] !== undefined) patch[field] = req.body[field];
+        }
+        // Guard: 'suspended' is softDelete() territory — cannot be set via PATCH.
+        if (patch.status !== undefined && !['active', 'inactive'].includes(patch.status)) {
+            return res.status(400).json({ error: 'Status must be one of: active, inactive' });
         }
         if (Object.keys(patch).length === 0) {
             return res.status(400).json({ error: 'No patchable fields provided' });

@@ -10,12 +10,31 @@ const router = express.Router();
  * GET /api/retailers
  * List all non-deleted retailers — public within dashboard shell (all roles can read).
  * S17-3: filters where deleted_at == null so soft-deleted retailers are excluded.
- * Intentionally-inactive retailers (PATCH toggle, no deleted_at) are still returned.
+ * Intentionally-inactive retailers (PATCH toggle, no deleted_at) are still returned
+ * in the default (no query param) response for admin awareness.
+ *
+ * S21-4: ?for=campaign branch
+ * When ?for=campaign is present, the response is further filtered to only retailers
+ * with status='active'. This is the endpoint the Campaign Wizard and scheduler use
+ * to populate retailer dropdowns with only bookable (active) venues.
+ * Inactive retailers (deactivated via PATCH toggle, no deleted_at) are excluded.
+ *
+ * NOTE: ?for=campaign requires a composite Firestore index on the retailers
+ * collection: (deleted_at ASC, status ASC). Verify firestore.indexes.json
+ * before deploying to production.
  */
 router.get('/', async (req, res) => {
     try {
+        const { for: forParam } = req.query;
+        const whereClause = [['deleted_at', '==', null]];
+
+        if (forParam === 'campaign') {
+            // Scheduler/CampaignWizard context: active retailers only.
+            whereClause.push(['status', '==', 'active']);
+        }
+
         const retailers = await retailerRepository.findAll({
-            where: [['deleted_at', '==', null]]
+            where: whereClause
         });
         res.json(retailers);
     } catch (error) {
