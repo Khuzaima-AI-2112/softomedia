@@ -33,6 +33,17 @@ class ApiService {
         return apiClient.get('/api/retailers');
     }
 
+    /**
+     * Fetch active retailers only — for use by Campaign Wizard and scheduler.
+     * Calls GET /api/retailers?for=campaign, which filters status='active'
+     * in addition to the standard deleted_at==null guard (S21-4).
+     * Inactive retailers (deactivated via admin toggle) are excluded.
+     * Do NOT use getRetailers() in campaign creation flows — use this method.
+     */
+    async getRetailersForCampaign() {
+        return apiClient.get('/api/retailers?for=campaign');
+    }
+
     async getRetailer(id) {
         return apiClient.get(`/api/retailers/${id}`);
     }
