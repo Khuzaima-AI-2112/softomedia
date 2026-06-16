@@ -296,6 +296,11 @@ zero ghost records remain, then run in production.
 | `backfill-playlist-status.js` | `playlists` with `status: 'ACTIVE'` | Normalise to lowercase `'active'` (S17-6 / RISK-S16-9) | Yes |
 | `seed-test-retailer-a.js` | Creates `ret_test_a` fixture | Seed only — run in staging/emulator for E2E tests | Yes |
 
+### Backfill Execution History (2026-06-16)
+- **Retailers**: 5 updated (Staging run), 0 (Production run)
+- **Advertisers**: 0 updated (Staging run), 0 (Production run)
+- **Playlists**: 1 updated (Staging run), 0 (Production run)
+
 ### Retailers backfill — Option A rationale
 
 All pre-S17 `inactive` retailers with no `deleted_at` are treated as

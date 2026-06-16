@@ -90,4 +90,16 @@ router.get('/', (req, res) => {
     res.json(baseSchedules);
 });
 
+/**
+ * POST /api/schedules
+ * Stub endpoint for creating schedules (Testing RBAC enforcement)
+ */
+import { authenticate } from '../middleware/auth.js';
+import { requireRole } from '../middleware/requireRole.js';
+
+router.post('/', authenticate, requireRole('admin'), (req, res) => {
+    // In actual implementation, we would insert to ScheduleRepository here
+    res.status(201).json({ id: 'sched_' + Date.now(), ...req.body });
+});
+
 export default router;
