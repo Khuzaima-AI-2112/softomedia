@@ -3,9 +3,99 @@
 **Sprint:** 22
 **Status:** Planned
 **Spec authored:** 2026-06-16
+**Spec updated:** 2026-06-16 (post S21-1 / S21-2 operator session)
 **Grounded against:** HEAD [`f384e34`](https://github.com/cfroszte/softomedia-live2026/commit/f384e348656f59231e937a097388587df84523be)
 **Guardrails active:** 15 (GUARDRAIL-1 through GUARDRAIL-15)
 **Carry-forward sources:** `current_sprint/sprint21.md` (S21-5 deferred, S21-4 index deploy deferred, S21-1 execution deferred)
+
+---
+
+## Completed in S21 Session (Carry-in Resolutions)
+
+The following tasks were **completed or resolved during the S21 operator session on 2026-06-16** and are recorded here as the authoritative audit trail. They are **DONE — no rework required in S22.**
+
+### S21-1 Resolution — Backfill Script Audit ✅
+
+All three backfill scripts were confirmed present on `main` and structurally correct:
+
+| Script | Target | Pattern | Status |
+|---|---|---|---|
+| `backfill-deleted-retailers.js` | `status='inactive'` + no `deleted_at` | Batched 500, idempotent, exits non-zero on error | ✅ Present; header diff applied (see below) |
+| `backfill-deleted-advertisers.js` | `status='suspended'` + no `deleted_at` | Batched 500, idempotent, exits non-zero on error | ✅ Present; strategy documented in header |
+| `backfill-playlist-status.js` | `status='ACTIVE'` → lowercase `'active'` | Batched 500, idempotent, writes `updated_at` alongside | ✅ Present; fully correct |
+
+**One diff applied to `backfill-deleted-retailers.js`** — the script was missing the strategy decision documentation block that `backfill-deleted-advertisers.js` already had. The following header comment was added:
+
+```
+STRATEGY DECISION: OPTION A (Aggressive)
+All retailers with status='inactive' and no deleted_at are treated as
+soft-deleted records (ghost records) and will receive a deleted_at backfill.
+Rationale: admin UI has a separate PATCH /api/retailers status-toggle endpoint
+(updateStatus) that sets status='inactive' without deleting. However, prior to
+the S17 deploy, the admin UI did NOT use a separate deactivate path — any
+"deactivation" in earlier sprints was implemented as a DELETE (soft-delete call).
+Therefore, all pre-S17 inactive retailers are presumed deleted, not deactivated.
+If your data includes legitimate pre-S17 deactivations, switch to Option B
+(manual review: filter by has_stores / has_screens before writing deleted_at).
+```
+
+**Commit message used:** `fix(scripts): document Option A strategy decision in backfill-deleted-retailers header (S21-1)`
+
+**S21-1 acceptance criteria final status:**
+
+| Criterion | Status |
+|---|---|
+| All 3 backfill scripts present | ✅ |
+| All 3 are idempotent | ✅ |
+| All 3 are batched ≤ 500 | ✅ |
+| All 3 exit non-zero on error | ✅ |
+| Strategy decision documented in retailers script header | ✅ Diff applied |
+| Post-staging ghost-record count = 0 | 🔲 Execution is S22-3 (ops window) |
+
+---
+
+### S21-2 Resolution — PATCH /api/advertisers Hardened ✅
+
+**Bug confirmed:** `advertisers.js` PATCH handler passed `req.body` directly to `advertiserRepository.update()` with no filtering, allowing any admin to send `{ deleted_at: null }` to silently resurrect a soft-deleted advertiser (SEC-S21-1 / GUARDRAIL-15 violation).
+
+**Pre-check required (must be run locally before merging):**
+```bash
+grep -rn "deleted_at" client-app/src --include="*.js" --include="*.jsx"
+```
+Expected result: zero matches. No legitimate caller should send `deleted_at` via PATCH.
+
+**Diff applied to `ad-server/src/api/advertisers.js`:**
+
+```diff
+ router.patch('/:id', authenticate, requireRole('admin'), async (req, res) => {
+     try {
+-        const advertiser = await advertiserRepository.update(req.params.id, req.body);
++        // Allowlist: only non-sensitive business fields are patchable.
++        // deleted_at — owned exclusively by softDelete(); GUARDRAIL-15.
++        // status     — for advertisers, status is set by softDelete() or create().
++        const ALLOWED_PATCH_FIELDS = ['name', 'logo', 'industry', 'contactemail', 'budget'];
++        const patch = {};
++        for (const field of ALLOWED_PATCH_FIELDS) {
++            if (req.body[field] !== undefined) patch[field] = req.body[field];
++        }
++        if (Object.keys(patch).length === 0) {
++            return res.status(400).json({ error: 'No patchable fields provided' });
++        }
++        const advertiser = await advertiserRepository.update(req.params.id, patch);
+         res.json(advertiser);
+```
+
+**Commit message used:** `fix(api): add field allowlist to PATCH /api/advertisers — block deleted_at overwrite (S21-2, SEC-S21-1, GUARDRAIL-15)`
+
+**S21-2 acceptance criteria final status:**
+
+| Criterion | Status |
+|---|---|
+| `PATCH { deleted_at: null }` → 400 (stripped → empty patch → 400) | ✅ |
+| `PATCH { name: 'New Name' }` → 200, `deleted_at` untouched | ✅ |
+| Soft-deleted advertiser cannot be resurrected via PATCH | ✅ |
+| `GET /:id` on soft-deleted record still returns 404 after PATCH attempt | ✅ |
+| Grep confirms no caller sends `deleted_at` via PATCH | 🔲 Run locally to close |
 
 ---
 
@@ -47,7 +137,7 @@ All three S22 tasks were explicitly deferred from S21 for distinct reasons. None
 |---|---|---|---|---|
 | RISK-S22-1 | `CampaignManagement.jsx` currently has no creation modal. `ApiService.getRetailersForCampaign()` is wired (S21-5) but no UI calls it yet. Campaign creation is not possible from the frontend. | Frontend | 🔴 Must resolve this sprint | `e10e6e1` commit message explicitly defers creation modal to S22 |
 | RISK-S22-2 | `GET /api/retailers?for=campaign` runs a Firestore compound query (`deleted_at == null AND status == 'active'`). Without a composite index, this query will fail or cause a full collection scan under production load. | Backend / Infra | 🔴 Must deploy before `?for=campaign` goes live | S21-4 commit `7cde389` names this caveat explicitly |
-| RISK-S22-3 | Pre-S17 ghost records (retailers/advertisers soft-deleted before S17 deploy, missing `deleted_at`) remain in Firestore. Backfill scripts are written and staged but not yet executed. No regression is active — ghosts do not currently reappear — but data hygiene is unresolved. | Data | 🟡 No regression; schedule ops window | `backfill-deleted-retailers.js`, `backfill-deleted-advertisers.js` on `main` |
+| RISK-S22-3 | Pre-S17 ghost records (retailers/advertisers soft-deleted before S17 deploy, missing `deleted_at`) remain in Firestore. Backfill scripts are written, audited, and strategy-documented (S21-1 session). Not yet executed. No active regression — ghosts do not currently reappear — but data hygiene is unresolved. | Data | 🟡 No regression; schedule ops window | `backfill-deleted-retailers.js`, `backfill-deleted-advertisers.js` on `main`; S21-1 header diff applied |
 
 ---
 
@@ -56,6 +146,7 @@ All three S22 tasks were explicitly deferred from S21 for distinct reasons. None
 | ID | Vector | File(s) | Mitigation |
 |---|---|---|---|
 | SEC-S22-1 | If `?for=campaign` endpoint is called before the composite index is deployed, Firestore SDK may return an unfiltered result set (SDK version dependent) or throw. Either outcome is a functional or data-exposure bug. | `retailers.js` GET / | Deploy index (S22-2) before any production traffic hits `?for=campaign`. |
+| ~~SEC-S21-1~~ | ~~PATCH /api/advertisers accepted `deleted_at` in `req.body`, allowing admin to resurrect soft-deleted records.~~ | ~~`advertisers.js`~~ | ✅ **CLOSED S21-2** — Field allowlist applied; `deleted_at` not in `ALLOWED_PATCH_FIELDS`. |
 
 ---
 
@@ -160,7 +251,7 @@ If the `retailers` composite index entry is absent, add it following the S16 pat
 
 ### S22-3 — Backfill Script Execution (Ops) (95%)
 
-**Context:** Three backfill scripts are on `main` and are idempotent, batched, and documented. They have not been run against staging or production. Pre-S17 ghost records (retailers/advertisers soft-deleted before S17 code deployed, carrying no `deleted_at` field) remain in Firestore. No active regression is present — the API correctly excludes them — but the data hygiene gap means Firestore documents exist that the API treats inconsistently from their intended deletion state.
+**Context:** Three backfill scripts are on `main`, idempotent, batched, and fully documented (including Option A strategy decisions — confirmed and header-documented during S21-1 session on 2026-06-16). They have not been run against staging or production. Pre-S17 ghost records (retailers/advertisers soft-deleted before S17 code deployed, carrying no `deleted_at` field) remain in Firestore. No active regression is present — the API correctly excludes them — but the data hygiene gap means Firestore documents exist that the API treats inconsistently from their intended deletion state.
 
 **Execution protocol:**
 
@@ -204,7 +295,7 @@ NODE_ENV=production node scripts/backfill-playlist-status.js     2>&1 | tee back
 
 Retain all `.log` files as audit artifacts.
 
-**Strategy reminder (Option A — as documented in script headers):**
+**Strategy reminder (Option A — documented in script headers, confirmed S21-1 session):**
 - All `status='inactive'` retailers with no `deleted_at` → backfilled as ghost records.
 - All `status='suspended'` advertisers with no `deleted_at` → backfilled as ghost records.
 - If your dataset contains pre-S17 intentional deactivations that must NOT receive `deleted_at`, switch to Option B before running and update `DATABASE_SCHEMA.md`.
@@ -227,13 +318,15 @@ Retain all `.log` files as audit artifacts.
 | `client-app/src/…/CampaignWizard.jsx` (if separate component) | EDIT/CREATE | S22-1 |
 | `firestore.indexes.json` | EDIT — add retailers composite index entry | S22-2 |
 | `docs/DATABASE_SCHEMA.md` | EDIT — confirm index deployed, add backfill run dates | S22-2, S22-3 |
+| `ad-server/src/api/advertisers.js` | ✅ DONE S21-2 — field allowlist applied | — |
+| `ad-server/scripts/backfill-deleted-retailers.js` | ✅ DONE S21-1 — Option A header documented | — |
 | None (ops execution only) | RUN — backfill scripts | S22-3 |
 
 **Already confirmed DONE — no action required in S22:**
 - `RetailerRepository.js`, `AdvertiserRepository.js`, `BaseRepository.js` — all soft-delete logic correct (S17).
-- `retailers.js`, `advertisers.js` — list/detail filters, PATCH allowlist, role decision, `?for=campaign` branch (S21).
+- `retailers.js`, `advertisers.js` — list/detail filters, PATCH allowlist (S21-2), role decision, `?for=campaign` branch (S21).
 - `ApiService.getRetailersForCampaign()` — wired to `?for=campaign` (S21-5).
-- All backfill scripts — written, idempotent, documented (S21-1).
+- All backfill scripts — written, idempotent, strategy-documented (S21-1 session).
 - `DATABASE_SCHEMA.md` — S21 decisions documented (S21-7).
 
 ---
@@ -264,6 +357,11 @@ Retain all `.log` files as audit artifacts.
 
 ## 8. Definition of Done
 
+### Carry-in resolutions (from S21 session)
+- [x] `backfill-deleted-retailers.js` Option A strategy decision documented in header (S21-1).
+- [x] `PATCH /api/advertisers` — field allowlist applied; `deleted_at` blocked (S21-2 / SEC-S21-1 / GUARDRAIL-15).
+- [ ] `grep -rn "deleted_at" client-app/src` → zero matches (S21-2 pre-merge check — run locally).
+
 ### Infrastructure
 - [ ] `firestore.indexes.json` has composite index entry for `retailers: [deleted_at ASC, status ASC]`.
 - [ ] Index deployed to staging; status = "Enabled" in Firestore console.
@@ -292,5 +390,6 @@ Retain all `.log` files as audit artifacts.
 ---
 
 *Sprint 22 spec — authored 2026-06-16.*
+*Updated 2026-06-16 — post S21-1 / S21-2 operator session. S21-2 PATCH allowlist applied; S21-1 backfill header diff applied; SEC-S21-1 closed.*
 *Grounded against HEAD `f384e34`. Carry-forward items explicitly deferred from S21 (commits `e10e6e1`, `7cde389`, `3b2a732`).*
 *15 guardrails active — inherited from S21.*
