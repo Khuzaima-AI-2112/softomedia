@@ -1,21 +1,29 @@
 /**
- * S17-5: Backfill deleted_at for pre-sprint soft-deleted retailers.
+ * S17-5 / S21-1: Backfill deleted_at for pre-sprint soft-deleted retailers.
  *
  * Targets retailers with status: 'inactive' and no deleted_at field.
  * Sets deleted_at = updated_at (or current ISO timestamp if updated_at is absent).
  *
- * BEFORE RUNNING: review current_sprint/sprint17.md § S17-5 Resolution.
- * Admin must confirm whether all inactive retailers are intended deletions
- * (Option A — run this script) or whether some are legitimately deactivated
- * (Option B — manual review required).
+ * STRATEGY DECISION: OPTION A (Aggressive)
+ * All retailers with status='inactive' and no deleted_at are treated as
+ * soft-deleted records (ghost records) and will receive a deleted_at backfill.
+ * Rationale: the admin UI has a separate PATCH /api/retailers/:id updateStatus
+ * path (added in S17) that sets status='inactive' without writing deleted_at.
+ * However, prior to the S17 deploy, no such separate deactivate path existed —
+ * any "deactivation" in earlier sprints was implemented as a DELETE (softDelete
+ * call). Therefore, all pre-S17 inactive retailers are presumed deleted, not
+ * intentionally deactivated.
+ * If your data includes legitimate pre-S17 deactivations (retailers that were
+ * intentionally set inactive but never deleted), switch to Option B: filter
+ * candidates by has_stores / has_screens before writing deleted_at, and
+ * manually review the remainder.
  *
- * Usage:
- *   node ad-server/scripts/backfill-deleted-retailers.js
- *
+ * BEFORE RUNNING: review current_sprint/sprint21.md § S21-1.
  * Run in STAGING first. Confirm zero ghost records return from GET /api/retailers.
  * Then run in production.
  *
  * Idempotent: re-running on an already-backfilled collection produces zero writes.
+ * Exits non-zero on any Firestore write failure.
  */
 
 import { getFirestore } from '../src/utils/firestore.js';

@@ -114,13 +114,29 @@ router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
 /**
  * PATCH /api/advertisers/:id
  * Partial update — only overwrites supplied fields.
- * Used for status toggles and field-level edits to prevent wiping unrelated fields.
+ * Used for field-level edits (name, logo, industry, contactemail, budget).
  *
  * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added.
+ * S21-2 (SEC-S21-1): explicit field allowlist added. deleted_at is owned
+ * exclusively by softDelete() and cannot be overwritten via PATCH —
+ * GUARDRAIL-15. status is not patchable here; for advertisers, status
+ * transitions are handled by softDelete() (DELETE /:id) and create().
+ * A PATCH body containing only non-allowlisted fields returns 400.
  */
 router.patch('/:id', authenticate, requireRole('admin'), async (req, res) => {
     try {
-        const advertiser = await advertiserRepository.update(req.params.id, req.body);
+        // Allowlist: only non-sensitive business fields are patchable.
+        // deleted_at — owned exclusively by softDelete(); blocked per GUARDRAIL-15.
+        // status     — set by softDelete() or create(); not a PATCH concern here.
+        const ALLOWED_PATCH_FIELDS = ['name', 'logo', 'industry', 'contactemail', 'budget'];
+        const patch = {};
+        for (const field of ALLOWED_PATCH_FIELDS) {
+            if (req.body[field] !== undefined) patch[field] = req.body[field];
+        }
+        if (Object.keys(patch).length === 0) {
+            return res.status(400).json({ error: 'No patchable fields provided' });
+        }
+        const advertiser = await advertiserRepository.update(req.params.id, patch);
         res.json(advertiser);
     } catch (error) {
         logger.error('Failed to patch advertiser:', error);
