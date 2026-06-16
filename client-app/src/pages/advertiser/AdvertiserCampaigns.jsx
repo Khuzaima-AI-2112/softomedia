@@ -1,12 +1,16 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import apiService from '../../services/ApiService';
+import CampaignWizardModal from '../../components/CampaignWizardModal';
 
 /**
  * AdvertiserCampaigns — S14-3
  * Full campaign list for the advertiser persona.
  * Shows all campaigns scoped by the back end to the caller's linked_entity_id.
  * Supports client-side filter by status.
+ *
+ * S22-1: replaced /campaigns/new <Link> with CampaignWizardModal trigger.
+ * Modal sources retailers from getRetailersForCampaign() (S21-5, ?for=campaign).
  */
 
 const STATUS_CONFIG = [
@@ -29,10 +33,11 @@ const STATUS_COLOUR = {
 };
 
 export default function AdvertiserCampaigns() {
-    const [campaigns, setCampaigns] = useState([]);
-    const [loading, setLoading]     = useState(true);
-    const [error, setError]         = useState(null);
-    const [statusFilter, setFilter] = useState('');
+    const [campaigns, setCampaigns]     = useState([]);
+    const [loading, setLoading]         = useState(true);
+    const [error, setError]             = useState(null);
+    const [statusFilter, setFilter]     = useState('');
+    const [showWizard, setShowWizard]   = useState(false);
 
     const load = useCallback(() => {
         setLoading(true);
@@ -46,18 +51,24 @@ export default function AdvertiserCampaigns() {
 
     useEffect(() => { load(); }, [load]);
 
+    // Called by CampaignWizardModal on successful 201 — optimistic refetch.
+    const handleCampaignCreated = useCallback(() => {
+        setShowWizard(false);
+        load();
+    }, [load]);
+
     return (
         <div className="space-y-6">
             {/* Header */}
             <div className="flex flex-wrap items-center justify-between gap-4">
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My Campaigns</h1>
-                <Link
-                    to="/dashboard/advertiser/campaigns/new"
+                <button
+                    onClick={() => setShowWizard(true)}
                     className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
                 >
                     <span className="material-symbols-outlined text-[18px]" aria-hidden="true">add</span>
                     New Campaign
-                </Link>
+                </button>
             </div>
 
             {/* Status filter tabs */}
@@ -97,13 +108,13 @@ export default function AdvertiserCampaigns() {
                         {statusFilter ? `No ${statusFilter.replace('_', ' ')} campaigns` : 'No campaigns yet'}
                     </p>
                     {!statusFilter && (
-                        <Link
-                            to="/dashboard/advertiser/campaigns/new"
+                        <button
+                            onClick={() => setShowWizard(true)}
                             className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary/90 transition-colors"
                         >
                             <span className="material-symbols-outlined text-[14px]" aria-hidden="true">add</span>
                             Create Campaign
-                        </Link>
+                        </button>
                     )}
                 </div>
             ) : (
@@ -111,7 +122,7 @@ export default function AdvertiserCampaigns() {
                     <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-sm">
                         <thead className="bg-slate-50 dark:bg-slate-800">
                             <tr>
-                                {['Name', 'Status', 'Budget', 'Play Count', 'Last Played', 'Created'].map(h => (
+                                {['Name', 'Retailer', 'Status', 'Budget', 'Start', 'End', 'Created'].map(h => (
                                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{h}</th>
                                 ))}
                             </tr>
@@ -121,6 +132,9 @@ export default function AdvertiserCampaigns() {
                                 <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
                                     <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">
                                         {c.name ?? c.id}
+                                    </td>
+                                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
+                                        {c.retailer_name ?? c.retailer_id ?? '—'}
                                     </td>
                                     <td className="px-4 py-3">
                                         <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
@@ -133,10 +147,10 @@ export default function AdvertiserCampaigns() {
                                         {c.budget ? `$${Number(c.budget).toLocaleString()}` : '—'}
                                     </td>
                                     <td className="px-4 py-3 text-slate-500 dark:text-slate-400 tabular-nums">
-                                        {c.play_count ?? 0}
+                                        {c.start_date ?? '—'}
                                     </td>
                                     <td className="px-4 py-3 text-slate-500 dark:text-slate-400 tabular-nums">
-                                        {c.last_played_at ? new Date(c.last_played_at).toLocaleDateString() : '—'}
+                                        {c.end_date ?? '—'}
                                     </td>
                                     <td className="px-4 py-3 text-slate-500 dark:text-slate-400 tabular-nums">
                                         {c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'}
@@ -146,6 +160,14 @@ export default function AdvertiserCampaigns() {
                         </tbody>
                     </table>
                 </div>
+            )}
+
+            {/* CampaignWizard creation modal — S22-1 */}
+            {showWizard && (
+                <CampaignWizardModal
+                    onSuccess={handleCampaignCreated}
+                    onClose={() => setShowWizard(false)}
+                />
             )}
         </div>
     );
