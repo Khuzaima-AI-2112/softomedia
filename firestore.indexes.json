@@ -1,6 +1,10 @@
 {
   "_comment": [
     "Sprint 16 — S16-3: composite indexes for invoices and loops collections.",
+    "Sprint 22 — S22-2: composite index for retailers collection.",
+    "  deleted_at + status — required by GET /api/retailers?for=campaign (S21-4).",
+    "  Without this index, Firestore throws FAILED_PRECONDITION under load (RISK-S22-2).",
+    "  Field names confirmed from ad-server/src/api/retailers.js (?for=campaign branch).",
     "Field names confirmed from ad-server/src/api/invoices.js (Pre-check A):",
     "  advertiserId, generatedAt — camelCase (inline InvoiceRepository in invoices.js).",
     "Loop field names confirmed from ad-server/src/repositories/LoopRepository.js.",
@@ -56,6 +60,14 @@
       "fields": [
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "date",   "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "retailers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "deleted_at", "order": "ASCENDING" },
+        { "fieldPath": "status",     "order": "ASCENDING" }
       ]
     }
   ],
