@@ -4,6 +4,200 @@ A living document capturing post-incident analysis, root causes, and actionable 
 
 ---
 
+## 2026-06-17 — Demo Auth Middleware Did Not Stamp `linked_entity_id` on `req.user`
+
+**Severity:** Critical (silent data corruption) — All campaigns created by brand/advertiser users in demo mode were written to Firestore with `advertiser_id: null`, regardless of which advertiser was selected or which persona was active. No error was surfaced to the user.
+
+**Symptom:** Campaigns appeared to create successfully (200 response, wizard completed, campaign listed in admin view) but every record in Firestore had `advertiser_id: null`. Filtering or reporting by advertiser returned no results. The bug was invisible at the UI layer.
+
+### What Happened
+
+Two fixes were applied in the same sprint — R7 (replace `adv_001` hardcode in `BrandCampaignWizard.jsx` with `user.linked_entity_id`) and T5 (server-side role-tier stamping: non-admin roles get `advertiser_id` from `req.user.linked_entity_id`, ignoring the request body). Both fixes were correct in isolation, but they depended on a third component that was never fixed: the demo auth middleware.
+
+`auth.js`'s demo bypass (`Bearer demo-token`) built `req.user` as:
+```js
+req.user = { role: demoRole, email: `demo-${demoRole}@example.com`, id: `demo-${demoRole}` };
+```
+`linked_entity_id` was completely absent. The T5 server rule `advertiser_id: req.user.linked_entity_id ?? null` therefore always resolved to `null` — the same broken value as before both fixes were applied.
+
+Meanwhile, `AuthContext.setPersona()` on the client *did* set `linked_entity_id: entity-${type}` on the synthetic demo user object, so `user.linked_entity_id` was correctly populated in the browser. The client and server were out of sync: the client sent the right value, the server ignored it (T5), and then stamped `null` from its own incomplete `req.user`.
+
+### Root Causes
+
+1. **Demo `req.user` was structurally incomplete** — The mock user object built by the demo bypass did not mirror the real JWT payload structure. Any field that a route handler or middleware expected on `req.user` but was absent from the mock became a silent `undefined`.
+2. **Client and server demo user objects diverged** — `AuthContext.setPersona()` and `auth.js` authenticate() both synthesise a demo user, but from different codebases with no shared contract. A change to one did not propagate to the other.
+3. **T5 and R7 were treated as independent fixes** — Each was reviewed and merged individually without a combined end-to-end trace: wizard input → request body → `req.user` → Firestore write. The compound failure only appeared when all three components were running together.
+4. **No integration test for the brand campaign creation flow** — A test that created a campaign as a demo brand user and then asserted `advertiser_id !== null` on the resulting Firestore document would have caught this immediately.
+
+### Fix Applied
+
+| File | Change |
+|---|---|
+| `ad-server/src/middleware/auth.js` | Added `DEMO_LINKED_ENTITY_OVERRIDES` map (`advertiser → adv_001`, `brand → adv_002`); stamped `linked_entity_id` on demo `req.user` using seed ID or `entity-${role}` fallback |
+
+**Before:**
+```js
+req.user = { role: demoRole, email: `demo-${demoRole}@example.com`, id: `demo-${demoRole}` };
+```
+
+**After:**
+```js
+const linkedEntityId = DEMO_LINKED_ENTITY_OVERRIDES[demoRole] ?? `entity-${demoRole}`;
+req.user = { role: demoRole, email: `demo-${demoRole}@example.com`, id: `demo-${demoRole}`, linked_entity_id: linkedEntityId };
+```
+
+### Actionable Improvements Going Forward
+
+- **The demo `req.user` object must be structurally identical to a decoded real JWT payload.** Define a shared `DemoUser` type or interface and use it in both `auth.js` and `AuthContext.setPersona()`. Any field added to the real JWT must be added to the mock in the same PR.
+- **Treat multi-fix chains as a single integration unit.** When two or more fixes interact through the same data path (wizard → server → database), write a combined end-to-end trace before merging any of them. A single integration test covering the full path catches gaps that unit tests of individual components miss.
+- **`DEMO_LINKED_ENTITY_OVERRIDES` must be updated when seed data changes.** Document this in the seed data creation procedure: adding a new seed advertiser requires a corresponding entry in the overrides map.
+- **Add a Firestore post-write assertion in the campaign creation test.** After `POST /api/campaigns`, query the resulting document and assert `advertiser_id` is a non-null string matching the expected seed ID. This is the definitive check that the full chain worked.
+- **Audit other `req.user` fields.** Any handler that reads `req.user.X` where `X` is not `role`, `email`, or `id` is a potential silent `undefined` in demo mode. Enumerate all `req.user.*` field accesses across route handlers and confirm each is present in the demo mock.
+
+---
+
+## 2026-06-17 — `advertiser_id` Written as `null` via Missing POST Validation (T1)
+
+**Severity:** High — Admin and superadmin users creating campaigns via `POST /api/campaigns` without an `advertiser_id` in the request body caused Firestore documents to be written with `advertiser_id: null`. No validation error was returned; the silent null was stored.
+
+**Symptom:** Campaigns created by admin-tier users through the admin panel (or direct API calls) appeared to succeed but had no advertiser association. Filtering by advertiser, revenue reporting, and campaign attribution were all broken for these records.
+
+### What Happened
+
+`POST /api/campaigns` applied role-tier logic to determine the `advertiser_id` source: admin+ users were expected to supply it in the request body; lower roles had it stamped from `req.user.linked_entity_id`. However, for admin+ users there was **no validation** that the body value was actually present. If `req.body.advertiser_id` was missing or `undefined`, the expression `req.body.advertiser_id ?? req.user.linked_entity_id ?? null` silently resolved to `null` (because admin users typically do not have a personal `linked_entity_id`), and `null` was written directly to Firestore.
+
+### Root Causes
+
+1. **No required-field validation on `POST /api/campaigns`** — The route accepted any body and attempted to use whatever was present. Missing required fields produced silent nulls rather than validation errors.
+2. **`??` chain masked the missing value** — The fallback chain `body ?? user ?? null` was intended as a convenience, but it allowed a missing required field to propagate silently to the database.
+3. **No Firestore schema enforcement** — Firestore's schemaless nature means `null` values are stored without complaint. There is no database-level constraint to prevent an `advertiser_id: null` document from being written.
+
+### Fix Applied
+
+| File | Change |
+|---|---|
+| `ad-server/src/api/campaigns.js` | Added early `400` guard for admin-tier callers when `advertiser_id` is absent from the request body |
+
+```js
+// T1: admin-tier must supply advertiser_id in body
+if (isAdminTier && !req.body.advertiser_id) {
+    return res.status(400).json({ error: 'advertiser_id is required for admin-tier campaign creation' });
+}
+```
+
+### Actionable Improvements Going Forward
+
+- **Validate all required fields at the route boundary, before any business logic.** A request without a required field should return `400` immediately. Never allow business logic to operate on `undefined` required fields.
+- **Replace `??` fallback chains with explicit conditional branches.** `a ?? b ?? null` looks like defensive code but hides the case where `a` is intentionally required. Explicit `if (!a) return 400` is unambiguous.
+- **Consider a validation middleware layer** (e.g., Zod, Joi, or express-validator) that declares the required shape of each route's request body. Schema validation at the boundary eliminates entire classes of null-write bugs.
+- **Add Firestore write guards in `BaseRepository.create()`** for fields declared as required in the collection schema. A repository-level assertion (`if (!data.advertiser_id) throw new Error(...)`) provides a second line of defence behind route validation.
+
+---
+
+## 2026-06-17 — `advertiser_id` Spoofable via Request Body for Non-Admin Roles (T5)
+
+**Severity:** High (security) — Any authenticated user regardless of role could supply an arbitrary `advertiser_id` in the `POST /api/campaigns` body and have it written to Firestore. A brand user could create campaigns attributed to any advertiser in the system.
+
+**Symptom:** No user-visible symptom. The vulnerability was identified during code review: a brand-role user POSTing `{ advertiser_id: "adv_competitor", ... }` received a 200 and the campaign was stored with the spoofed value.
+
+### What Happened
+
+`POST /api/campaigns` used the expression `req.body.advertiser_id ?? req.user.linked_entity_id ?? null` to determine the `advertiser_id` to store. The `??` operator means: use the body value if present, otherwise fall back to the JWT value. For non-admin users, the body value was **never ignored** — any caller who included `advertiser_id` in their request body had it accepted verbatim, bypassing the JWT-derived identity entirely.
+
+### Root Causes
+
+1. **Body values were trusted for all roles** — The route did not distinguish between admin-tier callers (who legitimately supply an `advertiser_id` in the body) and lower-privilege callers (whose identity should come exclusively from the JWT).
+2. **`??` used where an explicit role check was needed** — The fallback chain was a shortcut that happened to work for the happy path but made no security assertion about which source was authoritative for which role.
+3. **No test asserting that non-admin body `advertiser_id` is ignored** — A test calling `POST /api/campaigns` as a brand user with a spoofed `advertiser_id` and asserting the stored value matches the JWT — not the body — would have caught this at the PR stage.
+
+### Fix Applied
+
+| File | Change |
+|---|---|
+| `ad-server/src/api/campaigns.js` | Replaced `??` chain with explicit role-tier fork: admin+ uses validated body value; all other roles use `req.user.linked_entity_id` exclusively, body value ignored |
+
+```js
+// T5: role-tier fork — body value only trusted for admin-tier
+const advertiser_id = isAdminTier
+    ? req.body.advertiser_id          // validated not-null above (T1)
+    : req.user.linked_entity_id;      // JWT-derived, body ignored for non-admin
+```
+
+### Actionable Improvements Going Forward
+
+- **Never trust client-supplied identity fields for non-admin roles.** Any field that identifies *who* owns a resource (user ID, entity ID, advertiser ID) must come from the verified JWT for non-admin callers. The request body is user-controlled and cannot be trusted for ownership attribution.
+- **Apply this pattern to all resource-creation endpoints.** Audit every `POST` route that writes an ownership field and verify the source is the JWT for non-admin callers, not the request body.
+- **Add a security test for each ownership field** that asserts a non-admin body value is rejected/ignored. This is a regression test class: once written, it protects the pattern permanently.
+- **Document the trust boundary in route comments.** A comment above the `advertiser_id` assignment explaining that body values are only trusted for admin-tier makes the security intent explicit for future contributors.
+
+---
+
+## 2026-06-17 — `adv_001` Hardcoded in `BrandCampaignWizard.jsx` (R7)
+
+**Severity:** High — Every campaign created through the brand campaign wizard was attributed to advertiser `adv_001` regardless of which brand user was logged in. Multi-advertiser deployments and any brand user whose entity was not `adv_001` would have all their campaigns mis-attributed.
+
+**Symptom:** All campaigns created via the wizard showed `advertiser_id: "adv_001"` in Firestore. Campaigns belonging to other advertisers did not appear in their respective dashboards.
+
+### What Happened
+
+During early single-tenant development, `adv_001` was hardcoded as a placeholder in `BrandCampaignWizard.jsx`:
+```js
+campaignData: { advertiser_id: 'adv_001', ... }
+```
+The hardcode was never replaced when multi-advertiser support was added. The `useAuth` hook was available and `user.linked_entity_id` was correctly populated on the client, but neither was used in the wizard.
+
+### Root Causes
+
+1. **Placeholder value committed and never revisited** — `adv_001` was a scaffold value from single-tenant development. No TODO comment, ticket, or test marked it as temporary.
+2. **No test asserting `advertiser_id` matches the authenticated user** — A wizard submission test that checked the POSTed `advertiser_id` against `user.linked_entity_id` would have flagged this immediately.
+3. **Auth context available but unused in the component** — `useAuth` was imported elsewhere in the codebase but not in the wizard. The pattern existed; it simply was not applied here.
+
+### Fix Applied
+
+| File | Change |
+|---|---|
+| `client-app/src/pages/brand/BrandCampaignWizard.jsx` | Imported `useAuth`; replaced `adv_001` with `user.linked_entity_id` in `campaignData` and `slotMappings`; added pre-flight guard that alerts and blocks submission if `linked_entity_id` is falsy |
+
+### Actionable Improvements Going Forward
+
+- **Never commit hardcoded entity IDs, user IDs, or seed data references in application logic.** Seed IDs belong in test fixtures and migration scripts only. In application code, all identity values must derive from auth context or API responses.
+- **Treat `adv_001`, `user_001`, `store_001` etc. as lint targets.** Add a lint rule or pre-commit hook that flags hardcoded ID patterns (`/[a-z]+_\d{3}/`) outside of test and seed files.
+- **Add a pre-flight guard on all multi-step form submissions** that validates required auth-derived fields before the first API call. Failing loudly at submit time is better than failing silently at the Firestore layer.
+- **Review all other wizard and form components** for similar hardcoded seed values. Search the client codebase for `adv_001`, `ret_001`, `store_001` and replace any found in application logic.
+
+---
+
+## 2026-06-17 — Admin Campaign Management Page Had No Create Campaign UI (T2)
+
+**Severity:** Medium — Admin users had no way to create campaigns from the admin panel. The page displayed existing campaigns and provided approve/reject/delete controls, but the "Create Campaign" entry point was entirely absent. Admins were forced to ask brand users to create campaigns on their behalf.
+
+**Symptom:** No "Create Campaign" button visible on `/dashboard/admin/campaigns` for admin or superadmin users. No workaround existed within the UI.
+
+### What Happened
+
+The `CampaignManagement.jsx` page was scaffolded with read and moderation controls (list, approve, reject, delete) but the create flow was never implemented. The backend `POST /api/campaigns` endpoint accepted admin-tier requests correctly; only the frontend entry point was missing.
+
+### Root Causes
+
+1. **Create flow deprioritised during scaffolding** — The admin campaign page was built to satisfy the moderation use case first. The create flow was deferred and never picked up.
+2. **No acceptance criterion for admin campaign creation** — The sprint ticket for the admin campaigns page did not explicitly require a create action, so it passed review without one.
+3. **No UI completeness check** — There was no review step that asked: "can an admin perform all CRUD operations from this page?"
+
+### Fix Applied
+
+| File | Change |
+|---|---|
+| `client-app/src/pages/admin/CampaignManagement.jsx` | Added `canCreate` gate (`userLevel >= admin`); added "Create Campaign" button to page header; implemented full modal with all required `data-testid` attributes; populated advertiser dropdown from existing `advertisers` state; inline empty-advertiser warning; success toast + `loadData()` refresh on submit |
+
+### Actionable Improvements Going Forward
+
+- **Every resource management page must support full CRUD for the roles that own that resource.** Before closing a ticket for a management page, verify: can the authorised role create, read, update, and delete? Missing any one of these is an incomplete feature.
+- **Write acceptance criteria that enumerate all required actions explicitly.** "Admin can manage campaigns" is ambiguous. "Admin can create, approve, reject, and delete campaigns from the admin panel" is not.
+- **Use `data-testid` attributes on all interactive elements from the first implementation**, not as a retrofit. This makes it straightforward to add automated UI tests later and surfaces missing interactions during code review.
+- **Audit other resource management pages for missing create/edit flows.** Apply the same CRUD completeness check to screens, retailers, stores, and users admin pages.
+
+---
+
 ## 2026-06-17 — Campaign Approve/Reject 403: Missing `authenticate` on `PATCH /campaigns/:id/status`
 
 **Severity:** High — No user, including SuperAdmin, could approve or reject campaigns. Every click of the Approve or Reject button on the Campaigns page returned `403 Forbidden`.
