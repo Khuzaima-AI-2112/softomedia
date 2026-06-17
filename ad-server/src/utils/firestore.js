@@ -1,4 +1,4 @@
-import { Firestore } from '@google-cloud/firestore';
+﻿import { Firestore } from '@google-cloud/firestore';
 import logger from './logger.js';
 
 let db = null;
@@ -8,15 +8,21 @@ export const getFirestore = () => {
     if (db) return db;
 
     try {
-        // Only force mock if we're not in production AND not even trying a project ID
-        // Note: softomedia-live-2026 is hardcoded here for safety
         const projectId = 'softomedia-live-2026';
 
-        db = new Firestore({
+        const firestoreOptions = {
             projectId: projectId,
-            keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS, // Can be undefined
             retry: { retries: 1 }
-        });
+        };
+        // Only set keyFilename if explicitly provided.
+        // On Cloud Run with Workload Identity, this env var is absent — passing
+        // undefined to keyFilename causes the constructor to throw, which triggers
+        // mock mode. Omitting it entirely lets the SDK use ADC via metadata server.
+        if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+            firestoreOptions.keyFilename = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+        }
+
+        db = new Firestore(firestoreOptions);
 
         logger.info('Firestore initialized', { projectId });
         return db;
