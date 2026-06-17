@@ -568,3 +568,135 @@ Phase 3 is the critical preparation step. It costs one sprint, produces no user-
 - [ ] Seed Firebase emulator with demo users carrying `isDemoUser: true`
 - [ ] Verify persona switcher works end-to-end against emulator with `VITE_USE_FIREBASE=true`
 - [ ] Remove `active_persona` key and all legacy migration guards
+
+---
+
+## Pre-Transition QA Gate
+
+> 🚦 **This gate must be fully signed off before `VITE_USE_FIREBASE=true` is set in any environment.**
+>
+> All five personas must pass every scenario below. A single failure blocks the Firebase cutover. Run this suite against `VITE_USE_FIREBASE=false` first to establish the baseline, then re-run against `VITE_USE_FIREBASE=true` (Firebase emulator) to confirm parity.
+
+---
+
+### Gate 1 — Persona Switching Correctness
+
+Verify that switching to each persona sends the correct `x-demo-role` header and loads the correct data scope. Open DevTools → Network tab and inspect request headers on each switch.
+
+| Persona | Switch action | Expected `x-demo-role` header | Expected landing view |
+|---|---|---|---|
+| SuperAdmin | Click SuperAdmin tab | `superadmin` | Full platform dashboard, all tenants visible |
+| Admin | Click Admin tab | `admin` | Admin dashboard, platform-level controls |
+| Retailer | Click Retailer tab | `retaileradmin` | Retailer dashboard, store management |
+| Brand | Click Brand tab | `brand` | Brand dashboard, campaign and screen tools |
+| Tech Ops | Click Tech Ops tab | `techop` | Tech ops dashboard, device/screen status |
+
+**Pass criteria:** Header matches expected value on the very first request after each switch. No stale role from a previous persona bleeds through.
+
+---
+
+### Gate 2 — Session Persistence After Refresh
+
+For each persona, switch to it, then hard-refresh (`Ctrl+Shift+R` / `Cmd+Shift+R`). The correct persona must be restored without requiring a re-switch.
+
+| Persona | After hard refresh | Expected behaviour |
+|---|---|---|
+| SuperAdmin | Refresh | Lands on SuperAdmin view, header still `superadmin` |
+| Admin | Refresh | Lands on Admin view, header still `admin` |
+| Retailer | Refresh | Lands on Retailer view, header still `retaileradmin` |
+| Brand | Refresh | Lands on Brand view, header still `brand` |
+| Tech Ops | Refresh | Lands on Tech Ops view, header still `techop` |
+
+**Pass criteria:** No persona reverts to `admin` default after refresh. This is the exact scenario the original bug broke.
+
+---
+
+### Gate 3 — Cross-Persona Switching (The Original Bug Scenario)
+
+This gate specifically re-tests the failure mode that triggered this ADR. Run in order without clearing localStorage between steps.
+
+1. Start a fresh session (clear localStorage first)
+2. Default loads as Admin → confirm `x-demo-role: admin`
+3. Switch to Brand → confirm `x-demo-role: brand` immediately
+4. Navigate to Brand Campaign Wizard → confirm screen list loads (not empty, not 403)
+5. Switch to Retailer → confirm `x-demo-role: retaileradmin`
+6. Switch back to Brand → confirm `x-demo-role: brand` again (not reverted to admin)
+7. Refresh → confirm Brand persona is still active
+
+**Pass criteria:** All seven steps pass in sequence. Step 4 (wizard loads) is the direct regression test for PR #46.
+
+---
+
+### Gate 4 — Role-Scoped Data Isolation
+
+Each persona must see only the data it is authorised to see. Switch between personas and verify that data from the previous persona does not bleed into the next.
+
+| Switch sequence | Data to verify |
+|---|---|
+| Admin → Brand | Brand view shows only brand-scoped screens, not the full admin screen list |
+| Brand → Retailer | Retailer view shows only retailer-scoped stores, not brand campaigns |
+| Retailer → Tech Ops | Tech Ops view shows device/screen status, not retailer store data |
+| Tech Ops → SuperAdmin | SuperAdmin sees all tenants, all data (broadest scope) |
+
+**Pass criteria:** No cross-persona data leakage. If a component shows data from the wrong role scope after a switch, the `onRoleChange` cache invalidation is not working correctly.
+
+---
+
+### Gate 5 — In-Flight Request Handling
+
+Switch persona while a data-loading operation is in progress (e.g., navigate to a page that triggers a slow API call, then immediately switch persona before it resolves).
+
+**Pass criteria:**
+- [ ] The in-flight request is aborted (network tab shows `cancelled`, not a completed response with stale role data)
+- [ ] The new persona's data loads correctly after the switch
+- [ ] No console errors about rendering stale data from the previous persona
+
+---
+
+### Gate 6 — E2E Test Suite Parity
+
+Run the full E2E test suite for all five persona suites in sequence **without** calling `localStorage.clear()` between suites (to simulate the worst-case real-world session state). All suites must pass.
+
+```bash
+# Run all persona suites in sequence
+npx playwright test --grep "@superadmin"
+npx playwright test --grep "@admin"
+npx playwright test --grep "@retailer"
+npx playwright test --grep "@brand"
+npx playwright test --grep "@techops"
+```
+
+**Pass criteria:** Zero failures across all suites when run sequentially. If brand tests fail after admin tests, the `beforeEach` `DemoAuth.clear()` hook is missing or the `onRoleChange` cache invalidation is incomplete.
+
+---
+
+### Gate 7 — Staging Environment Guard
+
+Confirm that staging does **not** accidentally activate the demo shim.
+
+```bash
+# On the staging deployment, open the browser console and run:
+console.log(localStorage.getItem('demo_role'));       // must be null
+console.log(localStorage.getItem('active_persona'));  // must be null
+console.log(localStorage.getItem('auth_token'));      // must be null (no demo-token)
+```
+
+**Pass criteria:** All three values are `null` on staging. If any are set, the staging build is running with `VITE_MODE=development` — a misconfiguration that must be corrected before the Firebase cutover proceeds.
+
+---
+
+### Sign-Off Record
+
+| Gate | Tester | Date | VITE_USE_FIREBASE=false | VITE_USE_FIREBASE=true (emulator) |
+|---|---|---|---|---|
+| Gate 1 — Persona Switching Correctness | | | ☐ Pass / ☐ Fail | ☐ Pass / ☐ Fail |
+| Gate 2 — Session Persistence After Refresh | | | ☐ Pass / ☐ Fail | ☐ Pass / ☐ Fail |
+| Gate 3 — Cross-Persona Switching | | | ☐ Pass / ☐ Fail | ☐ Pass / ☐ Fail |
+| Gate 4 — Role-Scoped Data Isolation | | | ☐ Pass / ☐ Fail | ☐ Pass / ☐ Fail |
+| Gate 5 — In-Flight Request Handling | | | ☐ Pass / ☐ Fail | ☐ Pass / ☐ Fail |
+| Gate 6 — E2E Test Suite Parity | | | ☐ Pass / ☐ Fail | ☐ Pass / ☐ Fail |
+| Gate 7 — Staging Environment Guard | | | ☐ Pass / ☐ Fail | N/A |
+
+**Cutover authorised by:** _________________ **Date:** _________________
+
+> All gates must show ✅ Pass in both columns before `VITE_USE_FIREBASE=true` is merged to `main`.
