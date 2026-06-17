@@ -7,6 +7,7 @@ import Step4CreativeUpload from './wizard/Step4CreativeUpload';
 import Step5ReviewConfirm from './wizard/Step5ReviewConfirm';
 import GlassCard from '../../components/GlassCard';
 import apiService from '../../services/ApiService';
+import { useAuth } from '../../contexts/AuthContext';
 
 const STEPS = [
     { id: 1, name: 'Location', icon: 'location_on', description: 'Select stores & screens' },
@@ -18,7 +19,7 @@ const STEPS = [
 
 const BrandCampaignWizard = () => {
     const navigate = useNavigate();
-    const [currentStep, setCurrentStep] = useState(1);
+    const { user } = useAuth();
     // Bug #27 fix: track in-flight submission to prevent double-fire
     const [submitting, setSubmitting] = useState(false);
     const [wizardData, setWizardData] = useState({
@@ -64,10 +65,22 @@ const BrandCampaignWizard = () => {
     const handleConfirm = async () => {
         // Bug #27 fix: prevent double-submission
         if (submitting) return;
+
+        // R7 fix: defence-in-depth guard — linked_entity_id must be present.
+        // For non-admin roles the server stamps from the JWT, but if the auth
+        // context is missing it we surface a clear UX error rather than
+        // submitting a broken payload.
+        const advertiserId = user?.linked_entity_id;
+        if (!advertiserId) {
+            alert('Your advertiser account could not be verified. Please log out and log back in.');
+            return;
+        }
+
         setSubmitting(true);
         try {
             const campaignData = {
-                advertiser_id: 'adv_001',
+                // R7 fix: use authenticated user's linked_entity_id, not a hardcoded seed value
+                advertiser_id: advertiserId,
                 name: wizardData.campaignName || 'New Campaign',
                 creative_url: wizardData.creativeUrl,
                 duration: wizardData.creativeDuration,
@@ -88,7 +101,8 @@ const BrandCampaignWizard = () => {
                     loopId: slot.loopId,
                     slotIndex: slot.slotIndex,
                     creativeUrl: wizardData.creativeUrl,
-                    advertiser_id: 'adv_001'
+                    // R7 fix: match campaign advertiser_id
+                    advertiser_id: advertiserId
                 }));
                 await apiService.bookSlots(campaign.id, slotMappings);
             }
@@ -103,6 +117,8 @@ const BrandCampaignWizard = () => {
             setSubmitting(false);
         }
     };
+
+    const [currentStep, setCurrentStep] = useState(1);
 
     const renderStep = () => {
         switch (currentStep) {
