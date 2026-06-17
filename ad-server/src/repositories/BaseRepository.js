@@ -17,8 +17,8 @@ export class BaseRepository {
         this.collectionName = collectionName;
         this.db = getFirestore();
         this.breaker = new CircuitBreaker(`Firestore:${collectionName}`, {
-            failureThreshold: 3,
-            resetTimeoutMs: 60000 // 1 minute
+            failureThreshold: 5,   // raised from 3 — cold-start jitter no longer trips the breaker
+            resetTimeoutMs: 30000  // lowered from 60 s — faster self-healing after transient failures
         });
 
         if (!MOCK_STORAGE[collectionName]) {
