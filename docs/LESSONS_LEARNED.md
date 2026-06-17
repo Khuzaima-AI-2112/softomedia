@@ -4,6 +4,91 @@ A living document capturing post-incident analysis, root causes, and actionable 
 
 ---
 
+## 2026-06-17 — Campaign Wizard 403: `brand` Role Missing from `ROLE_HIERARCHY`
+
+**Severity:** High — Brand users (and any user whose JWT carried the `brand` role) could not create campaigns. The campaign wizard's Location step failed immediately on load with `403 Forbidden` on `GET /api/screens`, showing "No stores found" and blocking progression through all subsequent steps.
+
+**Symptom:** Opening `/dashboard/brand/campaign/new` as a Brand user produced:
+```
+[Diagnostic] Wizard Step: 1 → { stores: 0, screens: 0, hasName: false }
+[Diagnostic] Failed to load wizard data: APIError: Forbidden
+GET https://ad-server-.../api/screens  403 (Forbidden)
+```
+The same behaviour was observed when logged in as SuperAdmin if the active JWT contained `role: brand`.
+
+### What Happened
+
+`requireRole.js` defines `ROLE_HIERARCHY` — a lookup table mapping role name strings to numeric access levels. The `GET /api/screens` handler in `screens.js` reads this table to determine visibility:
+- Level ≥ 2 (techoperator and above): full unfiltered screen list
+- Level 1 (retaileradmin): filtered to their linked `retailer_id`
+- Anything else: `403 Forbidden`
+
+The `brand` role was **never added** to `ROLE_HIERARCHY`. This meant `ROLE_HIERARCHY['brand']` resolved to `undefined`, which the nullish coalescing fallback (`?? -1`) converted to `-1`. A level of `-1` is lower than every defined role including `advertiser` (level 0), so brand users hit the final `403` branch on every protected route — not just `GET /api/screens`.
+
+This affected the entire platform for brand users: any endpoint using `requireRole()` middleware or manual `ROLE_HIERARCHY` level checks silently rejected them.
+
+### Root Causes
+
+1. **`brand` role never added to `ROLE_HIERARCHY`** — The role was implemented in the auth layer and assigned to users in Firestore, but the corresponding entry in `requireRole.js` was never created. Role strings that are absent from the hierarchy resolve to `-1` and are blocked everywhere.
+2. **No startup or test validation of role coverage** — There is no test or assertion that verifies every role issued by the auth system exists in `ROLE_HIERARCHY`. A new role can be added to the user model without triggering any warning that it is unregistered in the access control table.
+3. **403 message was generic** — The error returned `{ required: 'techoperator', actual: 'brand' }`. While technically correct, it did not hint that `brand` was an unrecognised/unregistered role — it looked like an intentional access restriction, making diagnosis slower.
+4. **No end-to-end test covering brand campaign creation** — The campaign wizard flow lacked a test that exercised `GET /api/screens` under a `brand` JWT. If it had existed, this would have been caught before deploy.
+
+### Fixes Applied
+
+| File | Change |
+|---|---|
+| `ad-server/src/middleware/requireRole.js` | Added `brand: 1` to `ROLE_HIERARCHY` (same tier as `retaileradmin`) |
+| `ad-server/src/api/screens.js` | Added explicit `brand` branch in `GET /api/screens` — brand users receive the full screen list so the campaign wizard can display available inventory |
+
+**`requireRole.js` before:**
+```js
+export const ROLE_HIERARCHY = {
+    superadmin:     5,
+    admin:          4,
+    contentmanager: 3,
+    techoperator:   2,
+    retaileradmin:  1,
+    advertiser:     0,
+    // brand was absent — resolved to -1
+};
+```
+
+**`requireRole.js` after:**
+```js
+export const ROLE_HIERARCHY = {
+    superadmin:     5,
+    admin:          4,
+    contentmanager: 3,
+    techoperator:   2,
+    retaileradmin:  1,
+    brand:          1,   // fix: brand was missing — level 1 (same tier as retaileradmin)
+    advertiser:     0,
+};
+```
+
+**`screens.js` addition inside `GET /api/screens`:**
+```js
+if (role === 'brand') {
+    // brand — sees all screens so campaign wizard can show available inventory
+    const storeId = req.query.store_id || req.query.storeId || req.query.storeid;
+    const screens = storeId
+        ? await screenRepository.findByLocation(storeId)
+        : await screenRepository.findAll();
+    return res.json(screens);
+}
+```
+
+### Actionable Improvements Going Forward
+
+- **`ROLE_HIERARCHY` is the single source of truth — every role string issued by auth must exist in it.** Treat any role absent from the hierarchy as a misconfiguration, not a silent fallback to `-1`. Consider adding an assertion at server startup that validates all known roles are registered.
+- **Add a test for every role × every protected endpoint.** At minimum, a smoke test that exercises each role against each route category (read, write, admin) will catch missing role registrations immediately.
+- **Make unregistered roles distinguishable from insufficient-privilege roles.** When `ROLE_HIERARCHY[role]` is `undefined`, return a different error or log message (e.g., `unregistered_role`) so that diagnosis is immediate rather than requiring a code search.
+- **When adding a new role anywhere in the system** (user model, JWT, UI role picker), open a corresponding PR that also adds it to `ROLE_HIERARCHY` with its level. Treat these as an atomic pair — one without the other is incomplete.
+- **Review all other route handlers for similar level-based checks.** Any handler that manually reads `ROLE_HIERARCHY[role]` (rather than using `requireRole()` middleware) is a potential site for the same bug — the brand fix in `screens.js` is one such case and should be the pattern to follow.
+
+---
+
 ## 2026-06-17 — Entity Persistence Loss: Firestore Silent Mock-Mode Fallback
 
 **Severity:** Critical — All entities created by users (stores, retailers, campaigns, screens, users, schedules) appeared to persist during a session but vanished hours later after any process restart or Cloud Run scale-to-zero event.
