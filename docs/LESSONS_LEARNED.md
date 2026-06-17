@@ -4,6 +4,77 @@ A living document capturing post-incident analysis, root causes, and actionable 
 
 ---
 
+## 2026-06-17 — Entity Persistence Loss: Firestore Silent Mock-Mode Fallback
+
+**Severity:** Critical — All entities created by users (stores, retailers, campaigns, screens, users, schedules) appeared to persist during a session but vanished hours later after any process restart or Cloud Run scale-to-zero event.
+
+**Symptom:** Users created entities successfully (API returned 200, UI reflected the new record). Upon revisiting the app hours later, all created entities were gone. No errors were shown to users at any point.
+
+### What Happened
+
+`firestore.js` passes `keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS` to the Firestore constructor. On Cloud Run with Workload Identity Federation (WIF), this env var is intentionally absent — authentication happens automatically via the attached service account. However, passing `keyFilename: undefined` to the `@google-cloud/firestore` constructor causes it to **throw an exception** rather than fall back gracefully.
+
+The `try/catch` block in `getFirestore()` caught this throw and silently set `useMock = true`, returning `null` instead of a real `db`. From that point forward, `BaseRepository` detected `this.collection === null` and routed **all reads and writes to `MOCK_STORAGE`** — a plain in-memory `Map()` scoped to the Node.js process lifetime.
+
+Everything appeared to work: creates returned 200, lists returned data, updates succeeded. But none of it ever touched Firestore. On the next Cloud Run instance restart, scale-to-zero, or deploy, the process memory was wiped and all data was lost.
+
+### Root Causes
+
+1. **`keyFilename: undefined` throws on `@google-cloud/firestore`** — The SDK does not treat `undefined` as "no key file"; it attempts to use it and fails. On Cloud Run with WIF, the correct behaviour is to omit `keyFilename` entirely, allowing the SDK to use Application Default Credentials via the metadata server.
+2. **Silent catch → mock mode with no production alarm** — The catch block logged an error but set `useMock = true` and returned `null`. The server continued serving requests as if nothing was wrong. There was no alert, no HTTP error, no crash — the failure was completely invisible to users and operators.
+3. **`MOCK_STORAGE` designed for dev but reachable in production** — The in-memory fallback was intended for local offline testing. There was no environment guard preventing it from activating in production, so a credential misconfiguration silently promoted the dev fallback into the production data layer.
+4. **No startup Firestore connectivity check** — The server started and began accepting traffic without verifying Firestore was reachable. A failed health check at startup would have prevented the mock fallback from ever serving real users.
+5. **GCP credential fix applied outside the codebase** — A previous attempt to fix the credential issue was recorded only in documentation (`LESSONS_LEARNED.md`), not in code. The actual `firestore.js` source file was never changed, so the bug persisted across all subsequent deploys.
+
+### Fixes Applied
+
+| File | Change |
+|---|---|
+| `ad-server/src/utils/firestore.js` | Only include `keyFilename` in the Firestore constructor options when `GOOGLE_APPLICATION_CREDENTIALS` is explicitly set; omit the key entirely when running under WIF |
+
+**Before:**
+```js
+db = new Firestore({
+    projectId: projectId,
+    keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS, // passes undefined on Cloud Run WIF
+    retry: { retries: 1 }
+});
+```
+
+**After:**
+```js
+const firestoreOptions = { projectId, retry: { retries: 1 } };
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    firestoreOptions.keyFilename = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+}
+db = new Firestore(firestoreOptions);
+```
+
+### GCP Infrastructure Verified
+
+During diagnosis the following was confirmed healthy — these were **not** the cause:
+
+| Check | Result |
+|---|---|
+| Cloud Run service (`ad-server`) | Ready, `us-central1` |
+| Service account | `524693967756-compute@developer.gserviceaccount.com` |
+| IAM role | `roles/editor` (includes `roles/datastore.user`) |
+| Firestore API | Enabled on `softomedia-live-2026` |
+| `GOOGLE_APPLICATION_CREDENTIALS` env var | Correctly absent (WIF used instead) |
+
+The infrastructure was correct. The bug was entirely in how the SDK was being called.
+
+### Actionable Improvements Going Forward
+
+- **Never pass `undefined` as an SDK option.** Conditional assignment (`if (value) { options.key = value; }`) is safer than always-present assignment (`options.key = value || undefined`). Treat all optional SDK constructor fields this way.
+- **Mock/fallback mode must be opt-in and production-blocked.** Add an explicit guard: if `process.env.NODE_ENV === 'production'` and Firestore init fails, **throw** and crash the process rather than silently serving from memory. A crashed Cloud Run instance is immediately visible; a silently broken one is not.
+- **Log and alert on Firestore init failure at `error` level.** The existing `logger.error(...)` call was present but the process continued. In production, a Firestore init failure should trigger an alert (Cloud Monitoring, PagerDuty, etc.) and refuse to serve traffic.
+- **Verify fixes in the source file, not just in documentation.** A fix that is described in docs but not committed to code is not a fix. After any bug resolution, confirm the SHA of the affected source file has changed in the repository before closing the incident.
+- **Add a Firestore connectivity probe to the `/health` or `/readiness` endpoint.** The Cloud Run service should return non-200 on `/readiness` if Firestore cannot be reached at startup. This prevents traffic from reaching an instance running in mock mode.
+- **Audit all `try/catch` blocks that return `null` or a fallback silently.** Any catch block that swallows an error and continues normal operation is a potential silent failure. Each one should at minimum: log at `error` level, expose a status flag queryable from health checks, and have a documented rationale for why degraded operation is acceptable.
+
+---
+
 ## 2026-06-17 — Circuit Breaker Tripping on Screen Registration (`POST /api/screens`)
 
 **Severity:** High — Screen registration was completely blocked for all users after the circuit breaker opened.
