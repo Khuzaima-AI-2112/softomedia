@@ -4,6 +4,56 @@ A living document capturing post-incident analysis, root causes, and actionable 
 
 ---
 
+## 2026-06-17 — Campaign Approve/Reject 403: Missing `authenticate` on `PATCH /campaigns/:id/status`
+
+**Severity:** High — No user, including SuperAdmin, could approve or reject campaigns. Every click of the Approve or Reject button on the Campaigns page returned `403 Forbidden`.
+
+**Symptom:** Console showed two identical errors on each button click:
+```
+PATCH https://ad-server-.../api/campaigns/cmp_1781649587645/status  403 (Forbidden)
+PATCH https://ad-server-.../api/campaigns/cmp_1781649587645/status  403 (Forbidden)
+```
+The UI displayed a red "Forbidden" banner. All other campaign operations (list, create, delete) worked normally.
+
+### What Happened
+
+`PATCH /:id/status` in `campaigns.js` had `requireRole('retaileradmin')` applied but was **missing the `authenticate` middleware** that precedes it on every other protected route in the same file. Without `authenticate` running first, `req.user` is never populated. `requireRole` reads `ROLE_HIERARCHY[req.user?.role]`, which evaluates to `ROLE_HIERARCHY[undefined]` → `undefined` → `-1` via the nullish coalescing fallback. A level of `-1` is below every defined role, so the middleware rejected every caller unconditionally.
+
+This meant the route was effectively locked to everyone — not just low-privilege users.
+
+### Root Causes
+
+1. **`authenticate` middleware omitted from `PATCH /:id/status`** — Every other write route in `campaigns.js` (`POST /`, `POST /:id/book`, `DELETE /:id`) correctly chains `authenticate, requireRole(...)`. The status patch route was added in Sprint 8 without following this pattern.
+2. **`requireRole` does not assert that `req.user` is populated** — If `requireRole` were to check for the presence of `req.user` first and return `401 Unauthorized` (rather than `403 Forbidden`) when it is absent, the error would have been immediately distinguishable from a privilege issue.
+3. **No integration test for the approve/reject flow under any role** — A single test calling `PATCH /api/campaigns/:id/status` with a valid SuperAdmin JWT would have caught this at the PR stage.
+4. **`403` surface message gave no hint of missing auth** — The response body `{ error: 'Forbidden' }` looks identical whether the user is authenticated-but-insufficient or unauthenticated-entirely. This slowed diagnosis.
+
+### Fix Applied
+
+| File | Change |
+|---|---|
+| `ad-server/src/api/campaigns.js` | Added `authenticate` middleware before `requireRole('retaileradmin')` on `PATCH /:id/status` |
+
+**Before:**
+```js
+router.patch('/:id/status', requireRole('retaileradmin'), async (req, res) => {
+```
+
+**After:**
+```js
+router.patch('/:id/status', authenticate, requireRole('retaileradmin'), async (req, res) => {
+```
+
+### Actionable Improvements Going Forward
+
+- **`authenticate` and `requireRole` are an inseparable pair.** `requireRole` is meaningless without `authenticate` — it will always resolve to `-1` and block everyone. Treat any route that has `requireRole` but not `authenticate` as a bug. Consider combining them into a single middleware factory (`requireAuth('retaileradmin')`) so they cannot be separated accidentally.
+- **`requireRole` should return `401` not `403` when `req.user` is absent.** `403 Forbidden` implies the caller is known but lacks permission. `401 Unauthorized` signals that authentication is required. Distinguishing these two cases in the middleware makes diagnosis immediate.
+- **Audit all routes for the `authenticate` + `requireRole` pairing.** Run a grep across all route files for `requireRole` without a preceding `authenticate` on the same `router.*` call. This is a mechanical check that can be added to CI.
+- **Add a smoke test for every status-transition action under each authorised role.** At minimum: SuperAdmin can approve, Admin can approve, retaileradmin can approve, advertiser cannot approve (403). This matrix would have caught this bug before deploy.
+- **When adding a new protected route, use an existing route in the same file as a template.** `DELETE /:id` in this file correctly uses `authenticate, requireRole('superadmin')` — copying that pattern for the new route would have avoided the omission.
+
+---
+
 ## 2026-06-17 — Campaign Wizard 403: `brand` Role Missing from `ROLE_HIERARCHY`
 
 **Severity:** High — Brand users (and any user whose JWT carried the `brand` role) could not create campaigns. The campaign wizard's Location step failed immediately on load with `403 Forbidden` on `GET /api/screens`, showing "No stores found" and blocking progression through all subsequent steps.
