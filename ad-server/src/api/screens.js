@@ -6,6 +6,21 @@ import { requireRole, ROLE_HIERARCHY, normalizeRole } from '../middleware/requir
 const router = express.Router();
 
 /**
+ * Helper: map a circuit-breaker-open error to a 503 response with Retry-After.
+ * Returns true if the error was handled, false otherwise.
+ */
+function handleCircuitBreakerError(err, res) {
+    if (err.code !== 'CIRCUIT_BREAKER_OPEN') return false;
+    const retryAfter = Math.ceil((err.retryAfterMs ?? 30000) / 1000);
+    res.set('Retry-After', retryAfter);
+    res.status(503).json({
+        error: 'Database temporarily unavailable. Please retry shortly.',
+        retryAfterSeconds: retryAfter
+    });
+    return true;
+}
+
+/**
  * POST /api/screens/register
  * Register a new screen in the network.
  * Stores store_id as location_id in Firestore (internal field name).
@@ -29,6 +44,7 @@ router.post('/register', authenticate, async (req, res) => {
         const screen = await screenRepository.create(screen_id, screenData);
         res.json(screen);
     } catch (error) {
+        if (handleCircuitBreakerError(error, res)) return;
         res.status(500).json({ error: error.message });
     }
 });
@@ -58,6 +74,7 @@ router.post('/', authenticate, async (req, res) => {
         res.status(201).json(screen);
     } catch (error) {
         console.error('POST /api/screens failed:', error);
+        if (handleCircuitBreakerError(error, res)) return;
         res.status(500).json({ error: error.message });
     }
 });
