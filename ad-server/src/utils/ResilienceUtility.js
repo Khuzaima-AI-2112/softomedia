@@ -62,7 +62,11 @@ export class CircuitBreaker {
                 this.state = 'HALF_OPEN';
                 logger.info(`Circuit Breaker [${this.name}] moving to HALF_OPEN`);
             } else {
-                throw new Error(`Circuit Breaker [${this.name}] is OPEN`);
+                const retryAfterMs = Math.max(0, this.resetTimeoutMs - (now - this.lastFailureTime));
+                const err = new Error(`Circuit Breaker [${this.name}] is OPEN`);
+                err.code = 'CIRCUIT_BREAKER_OPEN';
+                err.retryAfterMs = retryAfterMs;
+                throw err;
             }
         }
 
