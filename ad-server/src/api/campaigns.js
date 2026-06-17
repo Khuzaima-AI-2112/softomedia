@@ -29,6 +29,21 @@ const VALID_TRANSITIONS = {
 };
 
 /**
+ * ROLE_HIERARCHY — mirrors requireRole.js; used locally to determine
+ * whether the caller is admin-tier (level >= 4) for advertiser_id
+ * stamping logic in POST /api/campaigns.
+ *
+ * advertiser = 1, brand = 2, retaileradmin = 3, admin = 4, superadmin = 5
+ */
+const ROLE_HIERARCHY = {
+    advertiser:    1,
+    brand:         2,
+    retaileradmin: 3,
+    admin:         4,
+    superadmin:    5,
+};
+
+/**
  * GET /api/campaigns
  * List campaigns.
  *
@@ -104,9 +119,30 @@ router.get('/:id', async (req, res) => {
  * Sprint 14 — S14-1    : requireRole('advertiser') added.
  *   Hierarchical guard (DECISION-2): allows advertiser + all higher roles
  *   so admin oversight of campaign creation is preserved.
+ *
+ * T1 fix: Admin-tier callers (admin/superadmin) MUST supply advertiser_id
+ *   in the request body — returns 400 if missing. Prevents orphaned
+ *   campaigns with advertiser_id: null written to Firestore (Gap #1).
+ *
+ * T5 fix: Role-tier enforcement on advertiser_id stamping:
+ *   - Admin tier (level >= 4): advertiser_id taken from req.body (must
+ *     be present per T1 guard above).
+ *   - All other roles: advertiser_id stamped from req.user.linked_entity_id
+ *     exclusively; any value in req.body is ignored to prevent spoofing.
  */
 router.post('/', authenticate, requireRole('advertiser'), async (req, res) => {
     try {
+        // T1: Determine if the caller is admin-tier
+        const callerLevel = ROLE_HIERARCHY[req.user?.role] ?? -1;
+        const isAdminTier = callerLevel >= ROLE_HIERARCHY['admin']; // 4+
+
+        // T1: Admin-tier callers must explicitly supply advertiser_id
+        if (isAdminTier && !req.body.advertiser_id) {
+            return res.status(400).json({
+                error: 'advertiser_id is required when creating a campaign as admin or superadmin',
+            });
+        }
+
         // Task 2A: Full-Capacity Inventory Blocking
         // Only enforce check if target dates and location are explicitly provided
         if (req.body.start_date && req.body.end_date && req.body.location_id) {
@@ -136,8 +172,11 @@ router.post('/', authenticate, requireRole('advertiser'), async (req, res) => {
         const id = `cmp_${Date.now()}`;
         const campaignData = {
             ...req.body,
-            // Stamp advertiser_id from JWT so callers cannot spoof it
-            advertiser_id: req.body.advertiser_id ?? req.user.linked_entity_id ?? null,
+            // T5: Role-tier stamping — admin tier uses body value (validated
+            // above); all other roles get JWT-stamped value only (body ignored).
+            advertiser_id: isAdminTier
+                ? req.body.advertiser_id
+                : (req.user.linked_entity_id ?? null),
             status: req.body.status || 'pending_approval',
             created_at: new Date().toISOString()
         };
