@@ -178,26 +178,48 @@ const apiClient = new APIClient();
 // BEFORE: demo-token + role='superadmin' were seeded unconditionally in DEV,
 //         meaning any DEV page load silently gained super-admin API access.
 //
-// AFTER:
+// AFTER (Phase 2):
 //   • Token seeding is still DEV-only (import.meta.env.DEV guard kept).
 //   • The auto-seeded role is 'admin' (not 'superadmin').
 //   • Elevating to 'superadmin' requires the user to explicitly switch persona
-//     via the HamburgerMenu (which calls login() with the chosen role) — there
-//     is no longer a silent path to superadmin on page load.
+//     via the HamburgerMenu — there is no longer a silent path to superadmin.
+//
+// fix (brand-wizard-403): SINGLE CANONICAL KEY for demo role.
+//   • The request interceptor below now reads ONLY `demo_role` from localStorage.
+//   • The previous `|| localStorage.getItem('active_persona')` fallback was
+//     removed because it caused a key-race: Phase 2 seeds demo_role='admin'
+//     on first load; the Brand persona switcher wrote active_persona='brand'
+//     without overwriting demo_role, so the stale 'admin' value always won
+//     the || short-circuit and the wrong x-demo-role header was sent.
+//   • All persona-switching call sites (HamburgerMenu, persona switcher)
+//     MUST write to `demo_role` — NOT `active_persona`. If active_persona is
+//     being written anywhere, migrate it to demo_role and remove the old key.
 // ---------------------------------------------------------------------------
 if (import.meta.env.DEV) {
     if (!localStorage.getItem('auth_token')) {
         localStorage.setItem('auth_token', 'demo-token');
     }
-    // Phase 2: default demo role is 'admin', NOT 'superadmin'
+    // Phase 2: default demo role is 'admin', NOT 'superadmin'.
+    // Individual pages / persona switchers override this via demo_role.
     if (!localStorage.getItem('demo_role')) {
         localStorage.setItem('demo_role', 'admin');
+    }
+    // Migration guard: if the old active_persona key is present and demo_role
+    // is still at the generic 'admin' default, promote active_persona to
+    // demo_role so in-flight brand/retaileradmin sessions are not broken on
+    // first deploy of this fix. Remove this block once all sessions have
+    // cycled (safe to delete after one sprint).
+    const activePersona = localStorage.getItem('active_persona');
+    if (activePersona && localStorage.getItem('demo_role') === 'admin') {
+        localStorage.setItem('demo_role', activePersona);
     }
 }
 
 apiClient.addRequestInterceptor((url, options) => {
-    const token    = localStorage.getItem('auth_token');
-    const demoRole = localStorage.getItem('demo_role') || localStorage.getItem('active_persona');
+    const token = localStorage.getItem('auth_token');
+    // fix (brand-wizard-403): read ONLY demo_role — single canonical key.
+    // Do NOT re-add active_persona as a fallback here.
+    const demoRole = localStorage.getItem('demo_role');
 
     if (token) {
         options.headers = {

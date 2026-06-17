@@ -8,6 +8,7 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
     const [stores, setStores] = useState([]);
     const [screens, setScreens] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(null);
 
     useEffect(() => {
         loadData();
@@ -16,8 +17,27 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
     const loadData = async () => {
         try {
             setLoading(true);
+            setLoadError(null);
+
+            // fix (brand-wizard-403): self-correction guard.
+            // The campaign wizard is brand-only. If the stored demo_role is not
+            // 'brand', correct it now so the request interceptor sends the right
+            // x-demo-role header. This is a safety net — the persona switcher
+            // should already be writing 'brand' to demo_role, but this ensures
+            // wizard data loads even if the user navigated here directly or the
+            // switcher used the legacy active_persona key.
+            if (import.meta.env.DEV) {
+                const currentRole = localStorage.getItem('demo_role');
+                if (currentRole !== 'brand') {
+                    console.warn(
+                        `[BrandWizard] demo_role was '${currentRole}', correcting to 'brand' for wizard data fetch.`
+                    );
+                    localStorage.setItem('demo_role', 'brand');
+                }
+            }
+
             const [retailersData, storesData, screensData] = await Promise.all([
-                apiService.getRetailers(),
+                apiService.getRetailersForCampaign(),
                 apiService.getStores(),
                 apiService.getScreens()
             ]);
@@ -27,6 +47,9 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
             console.log(`[Diagnostic] Loaded ${retailersData.length} retailers, ${storesData.length} stores, ${screensData.length} screens`);
         } catch (error) {
             console.error('[Diagnostic] Failed to load wizard data:', error);
+            // Surface the error so the user sees actionable feedback instead of
+            // an empty "No stores found" state that looks like a data problem.
+            setLoadError(error?.message || 'Failed to load locations. Please refresh.');
         } finally {
             setLoading(false);
         }
@@ -42,9 +65,14 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
         });
     }, [stores, searchQuery, selectedRetailer]);
 
-    // Get screens for selected stores
+    // Get screens for selected stores.
+    // fix (brand-wizard-403): normalise status comparison to uppercase to match
+    // the backend schema (screenRepository stores status as 'ONLINE'/'OFFLINE').
+    // Some seed records use lowercase 'online' — handle both variants.
     const getStoreScreens = (storeId) => {
-        return screens.filter(s => s.store_id === storeId && s.status === 'online');
+        return screens.filter(
+            s => s.store_id === storeId && (s.status || '').toUpperCase() === 'ONLINE'
+        );
     };
 
     const handleStoreSelect = (storeId) => {
@@ -84,7 +112,10 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
     // Get all screens for selected stores
     const activeScreens = useMemo(() => {
         const selectedStoreIds = data.selectedStores || [];
-        return screens.filter(s => selectedStoreIds.includes(s.store_id) && s.status === 'online');
+        return screens.filter(
+            s => selectedStoreIds.includes(s.store_id) &&
+                 (s.status || '').toUpperCase() === 'ONLINE'
+        );
     }, [screens, data.selectedStores]);
 
     const selectedScreenCount = (data.selectedScreens || []).length;
@@ -94,6 +125,22 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
             <div className="flex flex-col items-center justify-center py-24 text-slate-400">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
                 <p>Loading screens and locations...</p>
+            </div>
+        );
+    }
+
+    if (loadError) {
+        return (
+            <div className="flex flex-col items-center justify-center py-24 text-slate-400">
+                <span className="material-symbols-outlined text-[48px] text-red-400 mb-4">error</span>
+                <p className="text-red-500 font-semibold mb-2">Failed to load locations</p>
+                <p className="text-sm text-slate-500 mb-6">{loadError}</p>
+                <button
+                    onClick={loadData}
+                    className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
+                >
+                    Retry
+                </button>
             </div>
         );
     }
@@ -279,4 +326,3 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
 };
 
 export default Step1LocationScreen;
-
