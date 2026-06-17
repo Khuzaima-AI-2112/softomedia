@@ -24,7 +24,8 @@ function handleCircuitBreakerError(error, res) {
 
 /**
  * POST /api/screens/register
- * Register a new screen in the network.
+ * Device self-registration — authenticate only, no role guard.
+ * Physical screens have no user role; any authenticated caller may register.
  * Stores store_id as location_id in Firestore (internal field name).
  */
 router.post('/register', authenticate, async (req, res) => {
@@ -53,10 +54,15 @@ router.post('/register', authenticate, async (req, res) => {
 
 /**
  * POST /api/screens
- * Admin registration of a new screen from the UI.
- * Mirrors POST /register — accessible without the /register suffix.
+ * Admin UI registration of a new screen.
+ * Requires admin (level 4) or above — intentionally stricter than /register
+ * because this path is called from the management UI, not from a device.
+ *
+ * fix: authenticate-only guard was insufficient — any authenticated user
+ *   including advertiser (level 0) could create screens. requireRole('admin')
+ *   added to match the admin-only UI that calls this endpoint.
  */
-router.post('/', authenticate, async (req, res) => {
+router.post('/', authenticate, requireRole('admin'), async (req, res) => {
     try {
         const { screen_id, resolution, user_agent, retailer_id, store_id } = req.body;
         if (!screen_id) return res.status(400).json({ error: 'screen_id required' });
@@ -190,8 +196,12 @@ router.get('/:id/logs', authenticate, requireRole('techoperator'), async (req, r
 /**
  * DELETE /api/screens/:id
  * Remove a screen from the network.
+ *
+ * fix: authenticate-only guard was insufficient — any authenticated user
+ *   could delete any screen. requireRole('techoperator') added as the
+ *   minimum sensible level for destructive network operations.
  */
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', authenticate, requireRole('techoperator'), async (req, res) => {
     try {
         await screenRepository.delete(req.params.id);
         res.status(204).send();
@@ -255,6 +265,7 @@ router.patch('/:id/status', authenticate,
  * GET /api/screens/:id/playback-loop
  * Brand Safety Filter Endpoint (Task 3A)
  * Devices poll this endpoint to download their playback loop for the current hour.
+ * Intentionally public — no authenticate required. Physical screens have no JWT.
  * CRITICAL RULE: Under NO circumstances can a PENDING_APPROVAL or REJECTED loop be sent to a physical screen.
  */
 import { loopRepository, LOOP_STATUS } from '../repositories/LoopRepository.js';
@@ -281,7 +292,7 @@ router.get('/:id/playback-loop', async (req, res) => {
         const activeLoop = loops[0];
 
         // 2. The Absolute Brand Safety Filter:
-        // If the loop does not exist, or if its status is NOT explicitly 'APPROVED' (e.g. pending, rejected), 
+        // If the loop does not exist, or if its status is NOT explicitly 'APPROVED' (e.g. pending, rejected),
         // the screen is blocked from downloading it and fed an explicit offline-fallback loop.
         if (!activeLoop || activeLoop.status !== LOOP_STATUS.APPROVED) {
             console.warn(`[Brand Safety Filter] Screen ${screenId} requested loop for ${targetDate}@${currentHour}. Loop was undefined, pending, or rejected. Executing fallback protocols.`);
