@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">20% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>1/5</span>
+                <span class='fraction'>5/5</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">88.88% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/9</span>
+                <span class='fraction'>8/9</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/1</span>
+                <span class='fraction'>1/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">20% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>1/5</span>
+                <span class='fraction'>5/5</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -109,9 +109,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -122,12 +123,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -137,7 +136,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import logger from '../utils/logger.js';
 &nbsp;
@@ -147,9 +147,9 @@
  * and returns a safe JSON response to the client.
  */
 // eslint-disable-next-line no-unused-vars
-export const errorHandler = <span class="fstat-no" title="function not covered" >(e</span>rr, req, res, next) =&gt; {
+export const errorHandler = (err, req, res, next) =&gt; {
     // 1. Log the error with full context
-<span class="cstat-no" title="statement not covered" >    logger.error('Unhandled Exception', {</span>
+    logger.error('Unhandled Exception', {
         message: err.message,
         stack: err.stack,
         method: req.method,
@@ -161,12 +161,12 @@ export const errorHandler = <span class="fstat-no" title="function not covered" 
     });
 &nbsp;
     // 2. Determine status code (default to 500)
-    const statusCode = <span class="cstat-no" title="statement not covered" >err.status || err.statusCode || 500;</span>
+    const statusCode = err.status || err.statusCode || 500;
 &nbsp;
     // 3. Construct safe error response
-    const response = <span class="cstat-no" title="statement not covered" >{</span>
+    const response = {
         error: {
-            message: statusCode === 500 ? 'Internal Server Error' : err.message,
+            message: statusCode === 500 ? 'Internal Server Error' : <span class="branch-1 cbranch-no" title="branch not covered" >err.message,</span>
             status: statusCode,
             // Only show detailed errors in non-production environments
             ...(process.env.NODE_ENV !== 'production' &amp;&amp; { stack: err.stack })
@@ -175,7 +175,7 @@ export const errorHandler = <span class="fstat-no" title="function not covered" 
     };
 &nbsp;
     // 4. Send JSON response
-<span class="cstat-no" title="statement not covered" >    res.status(statusCode).json(response);</span>
+    res.status(statusCode).json(response);
 };
 &nbsp;</pre></td></tr></table></pre>
 
@@ -184,7 +184,7 @@ export const errorHandler = <span class="fstat-no" title="function not covered" 
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-06-16T22:43:06.921Z
+                at 2026-06-17T03:30:33.264Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

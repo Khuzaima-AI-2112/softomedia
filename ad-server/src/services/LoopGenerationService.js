@@ -107,16 +107,16 @@ export class LoopGenerationService {
         // Sort campaigns by priority
         const sorted = this.prioritizeCampaigns(campaigns);
 
-        // Fill 12 slots
+        // Fill 12 slots with fallback logic if no campaigns exist
         let campaignIndex = 0;
         for (let position = 0; position < SLOT_CONFIG.SLOTS_PER_LOOP; position++) {
             // Cycle through campaigns if we have fewer than 12
-            const campaign = sorted[campaignIndex % sorted.length] || null;
+            const campaign = sorted.length > 0 ? sorted[campaignIndex % sorted.length] : null;
 
             slots.push({
                 position,
-                asset_id: campaign?.asset_id || null,
-                campaign_id: campaign?.id || null,
+                asset_id: campaign?.asset_id || 'fallback_softomedia_filler_asset_id',
+                campaign_id: campaign?.id || 'sys_fallback_campaign',
                 duration: SLOT_CONFIG.SLOT_DURATION_SECONDS,
                 status: 'PENDING'
             });
@@ -179,8 +179,15 @@ export class LoopGenerationService {
 
         for (let hour = BUSINESS_HOURS.START; hour < BUSINESS_HOURS.END; hour++) {
             const loopId = `${targetDate}_${hour}_${locationId}`;
+            const mockImages = [
+                'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1920&q=80',
+                'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1920&q=80',
+                'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1920&q=80',
+                'https://images.unsplash.com/photo-1491553895911-0055eca6402d?auto=format&fit=crop&w=1920&q=80'
+            ];
             const slots = Array.from({ length: SLOT_CONFIG.SLOTS_PER_LOOP }, (_, i) => ({
                 position: i,
+                url: mockImages[i % mockImages.length],
                 asset_id: `mock_asset_${i}`,
                 campaign_id: `mock_campaign_${i % 3}`,
                 duration: SLOT_CONFIG.SLOT_DURATION_SECONDS,

@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">30% </span>
+                <span class="strong">90% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>3/10</span>
+                <span class='fraction'>9/10</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">66.66% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/6</span>
+                <span class='fraction'>4/6</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">33.33% </span>
+                <span class="strong">88.88% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>3/9</span>
+                <span class='fraction'>8/9</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -113,27 +113,27 @@
 <a name='L48'></a><a href='#L48'>48</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -168,19 +168,19 @@ const START_TIME = new Date();
  * GET /api/health/v2
  * Advanced diagnostics for observability
  */
-router.get('/v2', <span class="fstat-no" title="function not covered" >as</span>ync (req, res) =&gt; {
-<span class="cstat-no" title="statement not covered" >    try {</span>
-        const uptime = <span class="cstat-no" title="statement not covered" >Math.floor((new Date() - START_TIME) / 1000);</span>
+router.get('/v2', async (req, res) =&gt; {
+    try {
+        const uptime = Math.floor((new Date() - START_TIME) / 1000);
 &nbsp;
         // Gather breaker stats from primary repositories
-        const breakers = <span class="cstat-no" title="statement not covered" >[</span>
+        const breakers = [
             screenRepository.breaker.getHealth(),
             adRepository.breaker.getHealth()
         ];
 &nbsp;
-        const isAnyBreakerOpen = <span class="cstat-no" title="statement not covered" >breakers.some(<span class="fstat-no" title="function not covered" >b </span>=&gt; <span class="cstat-no" title="statement not covered" >b.state === 'OPEN')</span>;</span>
+        const isAnyBreakerOpen = breakers.some(b =&gt; b.state === 'OPEN');
 &nbsp;
-<span class="cstat-no" title="statement not covered" >        res.json({</span>
+        res.json({
             status: isAnyBreakerOpen ? 'degraded' : 'healthy',
             version: '1.2.0-resilient',
             uptime: `${uptime}s`,
@@ -188,11 +188,11 @@ router.get('/v2', <span class="fstat-no" title="function not covered" >as</span>
             diagnostics: {
                 memory: process.memoryUsage(),
                 persistence: {
-                    mode: screenRepository.db ? 'firestore' : 'mock',
+                    mode: screenRepository.db ? 'firestore' : <span class="branch-1 cbranch-no" title="branch not covered" >'mock',</span>
                     breakers
                 }
             },
-            environment: process.env.NODE_ENV || 'development'
+            environment: process.env.NODE_ENV || <span class="branch-1 cbranch-no" title="branch not covered" >'development'</span>
         });
     } catch (error) {
 <span class="cstat-no" title="statement not covered" >        res.status(503).json({</span>
@@ -211,7 +211,7 @@ export default router;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-06-16T22:43:06.921Z
+                at 2026-06-17T03:30:33.264Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

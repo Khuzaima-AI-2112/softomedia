@@ -28,6 +28,7 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
     const [selections, setSelections] = useState(data.selectedSlots || []);
     const [loading, setLoading] = useState(true);
     const [loops, setLoops] = useState([]);
+    const [hasRealInventory, setHasRealInventory] = useState(true);
     const [businessHoursRange, setBusinessHoursRange] = useState({ start: 8, end: 22, is_closed: false });
 
     const businessHours = useMemo(() => {
@@ -69,6 +70,8 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
 
             const activeLoops = Array.isArray(response) ? response : (response.loops || []);
             const newRange = response.business_hours || FALLBACK_HOURS;
+
+            setHasRealInventory(activeLoops.length > 0);
 
             setBusinessHoursRange(newRange);
 
@@ -260,6 +263,16 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
                 ))}
             </div>
 
+            {!hasRealInventory && !businessHoursRange.is_closed && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 p-4 rounded-xl border border-amber-200 dark:border-amber-800 flex items-center gap-3">
+                    <span className="material-symbols-outlined text-2xl">warning</span>
+                    <div>
+                        <p className="font-bold">Inventory Validation Failed</p>
+                        <p className="text-sm">No hourly loops have been generated for {selectedDate} by the network operator yet. You cannot book active slots until inventory is generated.</p>
+                    </div>
+                </div>
+            )}
+
             {businessHoursRange.is_closed ? (
                 <GlassCard className="py-16 text-center">
                     <h3 className="text-xl font-bold mb-2 text-red-500">Store is Closed</h3>
@@ -321,7 +334,7 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
                         <button onClick={onPrev} className="px-6 py-3 rounded-xl border">Back</button>
                         <button
                             onClick={handleContinue}
-                            disabled={selections.length === 0}
+                            disabled={selections.length === 0 || !hasRealInventory}
                             data-testid="step-3-next-btn"
                             className="px-8 py-3 rounded-xl bg-primary text-white font-bold disabled:opacity-50"
                         >

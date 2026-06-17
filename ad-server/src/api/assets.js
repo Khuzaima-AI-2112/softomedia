@@ -25,12 +25,12 @@ const storage = multer.diskStorage({
 const upload = multer({
     storage: storage,
     fileFilter: (req, file, cb) => {
-        const allowed = ['.png', '.jpg', '.jpeg', '.gif', '.mp4'];
+        const allowed = ['.png', '.jpg', '.jpeg', '.mp4'];
         const ext = path.extname(file.originalname).toLowerCase();
         if (allowed.includes(ext)) {
             cb(null, true);
         } else {
-            cb(new Error('Invalid file type. Allowed: .png, .jpg, .jpeg, .gif, .mp4'));
+            cb(new Error('Invalid file type. Allowed: .png, .jpg, .jpeg, .mp4'));
         }
     }
 });
@@ -61,6 +61,15 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
         if (!file) {
             return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        const isVideo = file.originalname.toLowerCase().endsWith('.mp4');
+        const parsedDuration = parseInt(duration);
+
+        if (isVideo) {
+            if (!duration || parsedDuration !== 5) {
+                return res.status(400).json({ error: 'Asset duration must be exactly 5 seconds for video files.' });
+            }
         }
 
         // Upload to Cloud Storage (GCS)

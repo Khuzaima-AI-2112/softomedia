@@ -224,6 +224,14 @@ class ApiService {
         return apiClient.post('/api/loops/generate', data);
     }
 
+    async replaceLoopSlot(loopId, position, assetId) {
+        return apiClient.patch(`/api/loops/${loopId}/slots/${position}/replace`, { assetId });
+    }
+
+    async approveLoop(loopId) {
+        return apiClient.post(`/api/loops/${loopId}/approve`);
+    }
+
     // ============================================
     // CAMPAIGNS
     // ============================================
@@ -272,6 +280,14 @@ class ApiService {
      */
     async bookSlots(campaignId, slots) {
         return apiClient.post(`/api/campaigns/${campaignId}/book`, { slots });
+    }
+
+    // ============================================
+    // ASSETS
+    // ============================================
+
+    async getAssets() {
+        return apiClient.get('/api/assets');
     }
 
     // ============================================
@@ -338,10 +354,10 @@ class ApiService {
     async request(method, path, body) {
         const url = `/api${path}`;
         switch (method.toUpperCase()) {
-            case 'GET':    return apiClient.get(url);
-            case 'POST':   return apiClient.post(url, body);
-            case 'PUT':    return apiClient.put(url, body);
-            case 'PATCH':  return apiClient.patch(url, body);
+            case 'GET': return apiClient.get(url);
+            case 'POST': return apiClient.post(url, body);
+            case 'PUT': return apiClient.put(url, body);
+            case 'PATCH': return apiClient.patch(url, body);
             case 'DELETE': return apiClient.delete(url);
             default: throw new Error(`Unsupported method: ${method}`);
         }
@@ -364,11 +380,11 @@ class ApiService {
     async reportError(error, componentStack) {
         try {
             const payload = {
-                message:        error?.message  || String(error),
-                stack:          error?.stack    || null,
-                componentStack: componentStack  || null,
-                href:           window.location.href,
-                timestamp:      new Date().toISOString(),
+                message: error?.message || String(error),
+                stack: error?.stack || null,
+                componentStack: componentStack || null,
+                href: window.location.href,
+                timestamp: new Date().toISOString(),
             };
             console.error('[ErrorBoundary] Reporting UI error:', payload);
             await apiClient.post('/api/logs/error', payload);

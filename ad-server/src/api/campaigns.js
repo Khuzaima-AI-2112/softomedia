@@ -21,11 +21,11 @@ const router = express.Router();
  */
 const VALID_TRANSITIONS = {
     pending_approval: ['approved', 'rejected'],
-    approved:         ['live'],
-    live:             ['completed', 'paused'],
-    paused:           ['live'],
-    completed:        [],
-    rejected:         [],
+    approved: ['live'],
+    live: ['completed', 'paused'],
+    paused: ['live'],
+    completed: [],
+    rejected: [],
 };
 
 /**
@@ -107,6 +107,32 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/', authenticate, requireRole('advertiser'), async (req, res) => {
     try {
+        // Task 2A: Full-Capacity Inventory Blocking
+        // Only enforce check if target dates and location are explicitly provided
+        if (req.body.start_date && req.body.end_date && req.body.location_id) {
+            // Find all active/approved campaigns for this location
+            const existingCampaigns = await campaignRepository.findAll({
+                where: [
+                    ['status', 'in', ['approved', 'live', 'pending_approval']],
+                    ['location_id', '==', req.body.location_id]
+                ]
+            });
+            // Measure overlap
+            const overlapping = existingCampaigns.filter(c => {
+                const overlapsStart = req.body.start_date <= c.end_date;
+                const overlapsEnd = req.body.end_date >= c.start_date;
+                return overlapsStart && overlapsEnd;
+            });
+
+            // Loop maximum is 12 ads per slot
+            if (overlapping.length >= 12) {
+                return res.status(409).json({
+                    error: 'INVENTORY_SOLD_OUT',
+                    message: `Location ${req.body.location_id} is completely sold out for the requested date range. Maximum 12 concurrent campaigns reached.`
+                });
+            }
+        }
+
         const id = `cmp_${Date.now()}`;
         const campaignData = {
             ...req.body,
@@ -145,12 +171,54 @@ router.post('/:id/book', authenticate, async (req, res) => {
             return res.status(404).json({ error: 'Campaign not found' });
         }
 
+        // --- Task 2.1: Strict Payload Validation (Pre-flight check) ---
+        const loopMap = new Map();
+        const orphanedLoopIds = [];
+        const conflictSlots = [];
+
+        // 1. Fetch all requested loops and check for existence
+        for (const slot of slots) {
+            if (!loopMap.has(slot.loopId)) {
+                const loop = await loopRepository.findById(slot.loopId);
+                if (!loop) {
+                    orphanedLoopIds.push(slot.loopId);
+                } else {
+                    loopMap.set(slot.loopId, loop);
+                }
+            }
+
+            // 2. Check for double-booking conflicts (Task 2.2)
+            const loop = loopMap.get(slot.loopId);
+            if (loop) {
+                const targetSlot = loop.slots?.[slot.slotIndex];
+                if (targetSlot && ['booked', 'BOOKED'].includes(targetSlot.status)) {
+                    conflictSlots.push({ loopId: slot.loopId, slotIndex: slot.slotIndex });
+                }
+            }
+        }
+
+        // --- Task 2.1: Loud Failure on Missing Inventory ---
+        if (orphanedLoopIds.length > 0) {
+            return res.status(400).json({
+                error: 'VALIDATION_FAILED',
+                message: 'One or more requested loops do not exist. Generated inventory is required.',
+                orphaned_ids: orphanedLoopIds
+            });
+        }
+
+        // --- Task 2.2: Loud Failure on Double Booking ---
+        if (conflictSlots.length > 0) {
+            return res.status(409).json({
+                error: 'CONFLICT',
+                message: 'One or more requested slots have already been booked by another campaign.',
+                conflicts: conflictSlots
+            });
+        }
+
+        // 3. Execution (Atomic-like commit)
         const bookedSlots = [];
         for (const slot of slots) {
             const { loopId, slotIndex, creativeUrl } = slot;
-
-            const loop = await loopRepository.findById(loopId);
-            if (!loop) continue;
 
             await loopRepository.bookSlot(loopId, slotIndex, {
                 campaign_id: id,
@@ -205,8 +273,8 @@ router.patch('/:id/status', requireRole('retaileradmin'), async (req, res) => {
         if (!allowed.includes(requestedStatus)) {
             return res.status(400).json({
                 error: 'Invalid status transition',
-                from:    currentStatus,
-                to:      requestedStatus,
+                from: currentStatus,
+                to: requestedStatus,
                 allowed,
             });
         }

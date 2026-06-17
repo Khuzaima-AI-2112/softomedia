@@ -163,7 +163,7 @@ function LoopDemoPlayer() {
         setPlaybackLoading(true);
         try {
             const data = await apiService.getLoops({
-                screenid: selectedScreenId,
+                location_id: selectedStoreId,
                 date: selectedDate,
             });
 
@@ -172,8 +172,8 @@ function LoopDemoPlayer() {
             const loops = Array.isArray(data)
                 ? data
                 : Array.isArray(data?.loops)
-                ? data.loops
-                : [];
+                    ? data.loops
+                    : [];
 
             if (loops.length === 0) {
                 setError('No loops scheduled for this screen and date.');
@@ -391,10 +391,10 @@ function LoopDemoPlayer() {
                                 {!selectedRetailerId
                                     ? 'Select a Retailer first'
                                     : storesLoading
-                                    ? 'Loading\u2026'
-                                    : stores.length === 0
-                                    ? 'No stores found'
-                                    : '\u2014 Select Store \u2014'}
+                                        ? 'Loading\u2026'
+                                        : stores.length === 0
+                                            ? 'No stores found'
+                                            : '\u2014 Select Store \u2014'}
                             </option>
                             {stores.map(s => (
                                 <option key={s.id || s.storeid} value={s.id || s.storeid}>
@@ -419,10 +419,10 @@ function LoopDemoPlayer() {
                                 {!selectedStoreId
                                     ? 'Select a Store first'
                                     : screensLoading
-                                    ? 'Loading\u2026'
-                                    : screens.length === 0
-                                    ? 'No screens found'
-                                    : '\u2014 Select Screen \u2014'}
+                                        ? 'Loading\u2026'
+                                        : screens.length === 0
+                                            ? 'No screens found'
+                                            : '\u2014 Select Screen \u2014'}
                             </option>
                             {screens.map(s => (
                                 <option

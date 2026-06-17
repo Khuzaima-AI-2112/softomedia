@@ -21,11 +21,11 @@ const formatHour = (hour) => {
 
 const getStatusColor = (status) => {
     switch (status) {
-        case 'APPROVED':         return 'bg-emerald-500';
+        case 'APPROVED': return 'bg-emerald-500';
         case 'PENDING_APPROVAL': return 'bg-amber-500';
-        case 'REJECTED':         return 'bg-red-500';
-        case 'LIVE':             return 'bg-blue-500';
-        default:                 return 'bg-slate-400';
+        case 'REJECTED': return 'bg-red-500';
+        case 'LIVE': return 'bg-blue-500';
+        default: return 'bg-slate-400';
     }
 };
 
@@ -63,14 +63,27 @@ function LoopManagement() {
     const handleGenerate = async () => {
         setGenerating(true);
         try {
-            await apiService.generateLoops({
-                targetDate,
-                retailerId: 'ret_demo',
-                locationId: 'store_downtown',
-                mock: true
-            });
+            const stores = await apiService.getStores();
+            if (!stores || stores.length === 0) {
+                addToast('No stores found in the system to generate loops for.', 'error');
+                setGenerating(false);
+                return;
+            }
+
+            // Fire loop generation for all stores simultaneously
+            await Promise.all(stores.map(store =>
+                apiService.generateLoops({
+                    targetDate,
+                    retailerId: store.retailer_id || 'ret_demo',
+                    locationId: store.id,
+                    mock: true
+                }).catch(err => {
+                    console.error(`Failed generating for store ${store.id}:`, err);
+                })
+            ));
+
             await fetchLoops();
-            addToast(`Loops generated for ${targetDate}.`, 'success');
+            addToast(`Loops generated for ${targetDate} across all stores.`, 'success');
         } catch (error) {
             console.error('Failed to generate loops:', error);
             const message = error?.response?.data?.error || error?.message || 'Failed to generate loops.';
@@ -220,11 +233,10 @@ function LoopManagement() {
                             return (
                                 <div
                                     key={hour}
-                                    className={`p-4 rounded-xl border transition-all text-left ${
-                                        loop
+                                    className={`p-4 rounded-xl border transition-all text-left ${loop
                                             ? 'border-slate-200 dark:border-slate-700'
                                             : 'border-dashed border-slate-300 dark:border-slate-700 opacity-50'
-                                    }`}
+                                        }`}
                                     data-testid={`loop-hour-${hour}`}
                                 >
                                     <div className="flex items-center justify-between mb-2">
@@ -249,13 +261,12 @@ function LoopManagement() {
                                                 {Array.from({ length: 12 }).map((_, i) => (
                                                     <div
                                                         key={i}
-                                                        className={`h-1.5 flex-1 rounded-full ${
-                                                            loop.slots?.[i]?.asset_id
+                                                        className={`h-1.5 flex-1 rounded-full ${loop.slots?.[i]?.asset_id
                                                                 ? loop.slots[i].status === 'REJECTED'
                                                                     ? 'bg-red-400'
                                                                     : 'bg-primary'
                                                                 : 'bg-slate-200 dark:bg-slate-700'
-                                                        }`}
+                                                            }`}
                                                     />
                                                 ))}
                                             </div>

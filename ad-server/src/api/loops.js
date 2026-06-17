@@ -38,14 +38,14 @@ router.get('/', async (req, res) => {
         let loops;
         if (date) {
             loops = await loopRepository.findByDate(date);
-            if (location_id)       loops = loops.filter(l => l.location_id === location_id);
-            if (effectiveScreenId) loops = loops.filter(l => l.screen_id  === effectiveScreenId);
+            if (location_id) loops = loops.filter(l => l.location_id === location_id);
+            if (effectiveScreenId) loops = loops.filter(l => l.screen_id === effectiveScreenId);
         } else {
             const where = [];
-            if (retailer_id)      where.push(['retailer_id', '==', retailer_id]);
-            if (location_id)      where.push(['location_id', '==', location_id]);
-            if (effectiveScreenId) where.push(['screen_id',  '==', effectiveScreenId]);
-            if (status)           where.push(['status',      '==', status]);
+            if (retailer_id) where.push(['retailer_id', '==', retailer_id]);
+            if (location_id) where.push(['location_id', '==', location_id]);
+            if (effectiveScreenId) where.push(['screen_id', '==', effectiveScreenId]);
+            if (status) where.push(['status', '==', status]);
             loops = await loopRepository.findAll({ where });
         }
 
@@ -125,6 +125,18 @@ router.post('/generate', authenticate, async (req, res) => {
             loops = await loopGenerationService.generateDailyLoops(targetDate, retailerId, locationId);
         }
 
+        // Strict 12-Ad Loop Capacity & 60s Limit Validation (MVP Rule 4.1)
+        for (const loop of loops) {
+            if (!loop.slots || loop.slots.length !== 12) {
+                // If any loop violated the exact capacity rule, reject the entire process.
+                return res.status(400).json({ error: `Invariant Violation: Loop ${loop.id} does not contain exactly 12 ads.` });
+            }
+            const totalDuration = loop.slots.reduce((acc, slot) => acc + (slot.duration || 5), 0);
+            if (totalDuration !== 60) {
+                return res.status(400).json({ error: `Invariant Violation: Loop ${loop.id} duration is ${totalDuration}s instead of the strict 60s.` });
+            }
+        }
+
         res.status(201).json({
             message: `Generated ${loops.length} loops for ${targetDate}`,
             loops,
@@ -147,7 +159,7 @@ router.post('/generate', authenticate, async (req, res) => {
  */
 router.patch('/:id/approve', authenticate, async (req, res) => {
     try {
-        const userId = req.user?.uid;
+        const userId = req.user?.uid || req.user?.id;
         if (!userId) {
             return res.status(401).json({ error: 'Authenticated user required' });
         }

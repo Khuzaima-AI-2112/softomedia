@@ -3,8 +3,11 @@ import {
     locationRepository,
     adRepository,
     retailerRepository,
-    screenRepository
+    screenRepository,
+    loopRepository
 } from '../repositories/index.js';
+import { loopGenerationService } from './LoopGenerationService.js';
+import { LOOP_STATUS } from '../repositories/LoopRepository.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -22,10 +25,10 @@ export async function seedDatabase() {
 
         // 1. Seed Users — Phase 1: role strings normalised
         const users = [
-            { id: 'usr_admin_001',  email: 'admin@softomedia.com',  role: 'superadmin',    name: 'Super Admin'    },
-            { id: 'usr_brand_001',  email: 'brand@nike.com',         role: 'advertiser',    name: 'Brand Manager',  linked_entity_id: 'ent_nike'   },
-            { id: 'usr_retail_001', email: 'manager@costco.com',     role: 'retaileradmin', name: 'Retailer Admin', linked_entity_id: 'ent_costco' },
-            { id: 'usr_tech_001',   email: 'tech@softomedia.com',    role: 'techoperator',  name: 'Field Tech'     }
+            { id: 'usr_admin_001', email: 'admin@softomedia.com', role: 'superadmin', name: 'Super Admin' },
+            { id: 'usr_brand_001', email: 'brand@nike.com', role: 'advertiser', name: 'Brand Manager', linked_entity_id: 'ent_nike' },
+            { id: 'usr_retail_001', email: 'manager@costco.com', role: 'retaileradmin', name: 'Retailer Admin', linked_entity_id: 'ent_costco' },
+            { id: 'usr_tech_001', email: 'tech@softomedia.com', role: 'techoperator', name: 'Field Tech' }
         ];
 
         for (const user of users) {
@@ -43,7 +46,7 @@ export async function seedDatabase() {
 
         // 2b. Seed Screens
         await screenRepository.create('demo-screen-01', { name: 'Main Entrance Kiosk A', location_id: 'loc_downtown_01', status: 'online' });
-        await screenRepository.create('demo-screen-02', { name: 'Checkout Screen 05',    location_id: 'loc_downtown_01', status: 'online' });
+        await screenRepository.create('demo-screen-02', { name: 'Checkout Screen 05', location_id: 'loc_downtown_01', status: 'online' });
 
         // 4. Seed Mock Ads
         await adRepository.create('ad_nike_001', {
@@ -109,6 +112,26 @@ export async function seedDatabase() {
             screens: 2,
             ads: 8
         });
+
+        // 5. Task: Auto-Generate Loops for the current date to fix "Waiting for Scheduled Slot"
+        const currentTargetDate = new Date().toISOString().split('T')[0];
+        const currentTargetHour = new Date().getHours();
+
+        logger.info(`Generating loops for ${currentTargetDate} to support Demo Player...`);
+        const generatedLoops = await loopGenerationService.generateDailyLoops(currentTargetDate, 'ent_costco', 'loc_downtown_01');
+
+        // Approve the loop for the current hour so the Demo Player and Screen Player function immediately
+        const currentHourLoops = generatedLoops.filter(l => l.hour === currentTargetHour);
+        for (const loop of currentHourLoops) {
+            await loopRepository.update(loop.id, {
+                status: LOOP_STATUS.APPROVED,
+                approved_at: new Date().toISOString(),
+                approved_by: 'usr_admin_001',
+            });
+            logger.info(`Auto-approved current hour loop: ${loop.id}`);
+        }
+
+        logger.info('Demo Loops Seeded successfully.');
 
     } catch (error) {
         logger.error('Seeding failed', { error: error.message });

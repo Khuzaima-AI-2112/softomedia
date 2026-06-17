@@ -3,7 +3,7 @@
 Sprint operator guardrails for the `softomedia-live2026` repo.
 Maintained by the SRE/QA lead. Updated each sprint retrospective (Step 8).
 
-> **Last updated:** Sprint 16 — 2026-06-08
+> **Last updated:** MVP Demo Remediation
 > Append new entries at the bottom of each section. Never delete existing rules — mark superseded rules `[SUPERSEDED by S{N}]` and add the replacement inline.
 
 ---
@@ -114,6 +114,14 @@ All acceptance criteria must be **falsifiable**. Accepted forms:
 
 ---
 
+## State Validation
+
+- **No Ghost UI Components:** Never generate fake IDs or ephemeral UI components (e.g., `loop_screen01_fake`) when the backend returns empty or missing inventory. A lack of inventory must visibly block the UI flow (e.g., disable calendar dates, disable checkout button, display a warning banner) instead of hiding the absence.
+- **Fail Loudly on Mutation:** Any API route that commits a booking, payment, or schedule change must perform an all-or-nothing check *before* writing to the database. If any required dependency returns `null/undefined` (e.g., `loopRepository.findById(id)`), the transaction must instantly abort and throw a `400 Bad Request`. Never `continue` or ignore the failure silently.
+- **Descriptive Fallbacks:** Always return the explicit reason for engaging a generic fallback mode if the optimal state is missing. (e.g., A physical Player failing to an offline banner must be able to log or return `{ fallback_mode: true, reason: "UNAPPROVED_INVENTORY" }` instead of quietly failing).
+
+---
+
 ## Changelog
 
 | Sprint | Section Updated | Rule Added |
@@ -123,3 +131,4 @@ All acceptance criteria must be **falsifiable**. Accepted forms:
 | S16 | Deploy & Environment Gates | `firebase.json` absence → `ENVIRONMENT-GATED` label |
 | S16 | Deploy & Environment Gates | Three-path Firestore index deploy options |
 | S16 | Anti-Hallucination | "Class may be inlined" rule |
+| MVP | State Validation | Establish Loud API mutations and disable Ghost UI |

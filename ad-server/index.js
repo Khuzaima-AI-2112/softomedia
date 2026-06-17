@@ -95,11 +95,15 @@ console.log('[Server] Using Firestore for data persistence');
 import { cacheControl } from './src/middleware/performance.js';
 import apiRouter from './src/api/index.js';
 import { seedDatabase } from './src/services/SeedService.js';
+import { initCronJobs } from './src/utils/cron.js';
 
 // Auto-seed for development/test
 if (process.env.NODE_ENV !== 'production') {
     seedDatabase();
 }
+
+// Boot up automated Cron tasks (e.g., MVP D-1 Loop Generators)
+initCronJobs();
 
 // Domain API Routes
 app.use('/api', apiRouter);

@@ -24,7 +24,7 @@ router.post('/register', authenticate, async (req, res) => {
         };
 
         if (retailer_id) screenData.retailer_id = retailer_id;
-        if (store_id)    screenData.location_id  = store_id;   // canonical internal field
+        if (store_id) screenData.location_id = store_id;   // canonical internal field
 
         const screen = await screenRepository.create(screen_id, screenData);
         res.json(screen);
@@ -52,7 +52,7 @@ router.post('/', authenticate, async (req, res) => {
         };
 
         if (retailer_id) screenData.retailer_id = retailer_id;
-        if (store_id)    screenData.location_id  = store_id;
+        if (store_id) screenData.location_id = store_id;
 
         const screen = await screenRepository.create(screen_id, screenData);
         res.status(201).json(screen);
@@ -220,5 +220,98 @@ router.patch('/:id/status', authenticate,
         }
     }
 );
+
+/**
+ * GET /api/screens/:id/playback-loop
+ * Brand Safety Filter Endpoint (Task 3A)
+ * Devices poll this endpoint to download their playback loop for the current hour.
+ * CRITICAL RULE: Under NO circumstances can a PENDING_APPROVAL or REJECTED loop be sent to a physical screen.
+ */
+import { loopRepository, LOOP_STATUS } from '../repositories/LoopRepository.js';
+
+router.get('/:id/playback-loop', async (req, res) => {
+    try {
+        const screenId = req.params.id;
+        const screen = await screenRepository.findById(screenId);
+        if (!screen) return res.status(404).json({ error: 'Screen not found' });
+
+        const locationId = screen.location_id;
+        const targetDate = new Date().toISOString().split('T')[0];
+        const currentHour = new Date().getHours();
+
+        // 1. Fetch the corresponding loop for this location, date, and hour
+        const loops = await loopRepository.findAll({
+            where: [
+                ['location_id', '==', locationId],
+                ['date', '==', targetDate],
+                ['hour', '==', currentHour]
+            ]
+        });
+
+        const activeLoop = loops[0];
+
+        // 2. The Absolute Brand Safety Filter:
+        // If the loop does not exist, or if its status is NOT explicitly 'APPROVED' (e.g. pending, rejected), 
+        // the screen is blocked from downloading it and fed an explicit offline-fallback loop.
+        if (!activeLoop || activeLoop.status !== LOOP_STATUS.APPROVED) {
+            console.warn(`[Brand Safety Filter] Screen ${screenId} requested loop for ${targetDate}@${currentHour}. Loop was undefined, pending, or rejected. Executing fallback protocols.`);
+
+            // Task 3.1: Descriptive Telemetry & Error Contexts
+            const fallbackReason = !activeLoop ? "UNGENERATED_INVENTORY" :
+                activeLoop.status === LOOP_STATUS.PENDING_APPROVAL ? "PENDING_APPROVAL" :
+                    activeLoop.status === LOOP_STATUS.REJECTED ? "REJECTED_INVENTORY" : "UNKNOWN_STATE";
+
+            // Task 3.2: Graceful Degradation (Temporal Sliding)
+            // Expand the search radius if current hour is unapproved. Slide backward to previous hour.
+            if (currentHour > 0) {
+                const previousLoops = await loopRepository.findAll({
+                    where: [
+                        ['location_id', '==', locationId],
+                        ['date', '==', targetDate],
+                        ['hour', '==', currentHour - 1],
+                        ['status', '==', LOOP_STATUS.APPROVED]
+                    ]
+                });
+
+                if (previousLoops.length > 0) {
+                    console.info(`[Graceful Degradation] Screen ${screenId} automatically sliding fallback to hour ${currentHour - 1} loop.`);
+                    return res.status(200).json({
+                        fallback_mode: true,
+                        playback_mode: 'TEMPORAL_SLIDE',
+                        reason: fallbackReason,
+                        loop_id: previousLoops[0].id,
+                        slots: previousLoops[0].slots
+                    });
+                }
+            }
+
+            // Exhausted fallback radius, serve strict offline emergency fallback
+            return res.status(200).json({
+                fallback_mode: true,
+                playback_mode: 'OFFLINE_EMERGENCY',
+                reason: fallbackReason,
+                slots: [
+                    {
+                        position: 0,
+                        asset_id: 'offline_emergency_fallback_mp4',
+                        duration: 60,
+                        status: 'APPROVED'
+                    }
+                ]
+            });
+        }
+
+        // 3. Otherwise, serve the successfully vetted and approved 12-ad sequence
+        return res.status(200).json({
+            fallback_mode: false,
+            loop_id: activeLoop.id,
+            slots: activeLoop.slots
+        });
+
+    } catch (error) {
+        console.error('GET /api/screens/:id/playback-loop failed:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 export default router;
