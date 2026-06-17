@@ -1,7 +1,21 @@
-﻿import jwt from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import logger from '../utils/logger.js';
 
 const JWT_SECRET = process.env.JWT_SECRET;
+
+/**
+ * DEMO_LINKED_ENTITY_OVERRIDES
+ *
+ * Maps demo role names to the seed advertiser/entity IDs that exist in
+ * Firestore. Keeps the demo server in sync with AuthContext.setPersona()
+ * on the client, which uses `entity-${type}` as a fallback.
+ *
+ * Add entries here when new seed advertisers are added to the database.
+ */
+const DEMO_LINKED_ENTITY_OVERRIDES = {
+    advertiser: 'adv_001',
+    brand:      'adv_002',
+};
 
 /**
  * Authentication Middleware
@@ -13,14 +27,22 @@ export const authenticate = (req, res, next) => {
     // Development/Test Bypass for QA Audit
     const isDemoAllowed = process.env.ALLOW_DEMO_MODE === 'true' || process.env.NODE_ENV !== 'production';
     if (isDemoAllowed && authHeader === 'Bearer demo-token') {
-        // Extract role from the request or use a default
-        // In a real bypass we might want to decode a mock payload, 
-        // but for now we'll just let it through and rely on the frontend 
-        // to have set the correct persona in its mockUser object if we were doing RBAC here.
-        // Actually, the frontend sends a mockUser but the backend needs req.user for authorize middleware.
-        // Let's make it smarter: if demo-token, check for a X-Demo-Role header or similar.
         const demoRole = req.headers['x-demo-role'] || 'admin';
-        req.user = { role: demoRole, email: `demo-${demoRole}@example.com`, id: `demo-${demoRole}` };
+
+        // linked_entity_id: use known seed ID override if available, otherwise
+        // fall back to `entity-${role}` — mirrors AuthContext.setPersona() so
+        // the T5 JWT-stamping in campaigns.js resolves to a real advertiser ID
+        // for brand/advertiser roles in demo mode.
+        const linkedEntityId =
+            DEMO_LINKED_ENTITY_OVERRIDES[demoRole] ??
+            `entity-${demoRole}`;
+
+        req.user = {
+            role:             demoRole,
+            email:            `demo-${demoRole}@example.com`,
+            id:               `demo-${demoRole}`,
+            linked_entity_id: linkedEntityId,
+        };
         return next();
     }
 
@@ -41,7 +63,7 @@ export const authenticate = (req, res, next) => {
 
 /**
  * Authorization Middleware (RBAC)
- * @param {Array} allowedRoles 
+ * @param {Array} allowedRoles
  */
 export const authorize = (allowedRoles) => {
     return (req, res, next) => {
