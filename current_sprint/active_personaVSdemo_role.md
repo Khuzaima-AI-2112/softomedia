@@ -1,9 +1,9 @@
 # `active_persona` vs `demo_role`: The Competing Keys Problem
 
-**Document type:** Architecture Decision Record / QA Reference  
-**Sprint:** current_sprint  
-**Status:** 🔴 Partially Mitigated — root cause requires full cleanup  
-**Author:** SRE / Architecture Review  
+**Document type:** Architecture Decision Record / QA Reference
+**Sprint:** current_sprint
+**Status:** 🔴 Partially Mitigated — root cause requires full cleanup
+**Author:** SRE / Architecture Review
 **Related PR:** fix/brand-wizard-403-persona-key-race
 
 ---
@@ -61,8 +61,8 @@ Over time, two distinct responsibilities were collapsed into what should have be
 
 ```
 localStorage after first load:
-  auth_token    = 'demo-token'
-  demo_role     = 'admin'         ← seeded by api.js bootstrap
+  auth_token     = 'demo-token'
+  demo_role      = 'admin'         ← seeded by api.js bootstrap
   active_persona = (not set)
 ```
 
@@ -74,9 +74,9 @@ If the persona switcher writes `active_persona` instead of `demo_role`:
 
 ```
 localStorage after persona switch:
-  auth_token    = 'demo-token'
-  demo_role     = 'admin'         ← STALE, never cleared
-  active_persona = 'brand'        ← written by switcher
+  auth_token     = 'demo-token'
+  demo_role      = 'admin'         ← STALE, never cleared
+  active_persona = 'brand'         ← written by switcher
 ```
 
 Interceptor evaluates: `'admin' || 'brand'` → sends `x-demo-role: admin`. ❌ **Wrong role sent.**
@@ -249,3 +249,322 @@ it('sends x-demo-role matching the active persona after a persona switch', async
 ## Summary
 
 The `active_persona` vs `demo_role` conflict is a textbook example of **implicit shared mutable state without a contract**. Two keys, one logical concern, zero enforcement. The `||` fallback in the interceptor was intended as a safety net but inverted write-time priority, silently breaking every persona that wasn't the boot-time default. The immediate fix eliminates the fallback and adds a migration guard and wizard safety net. The full fix requires consolidating all reads and writes behind a single `DemoAuthContext` module, removing the legacy key, and adding test coverage at the interceptor level.
+
+---
+
+---
+
+## Phase 3: Firebase Transition Strategy
+
+**Status:** 📋 Planned — not yet started
+**Dependency:** Phase 2 cleanup (DemoAuthContext module) must be complete first
+
+### The Core Insight: DemoAuthContext Is the Swap Point
+
+The `DemoAuthContext` module recommended in the cleanup steps above is not just a bug fix — it is deliberately designed as a **Firebase drop-in swap point**. Every component in the app will call `DemoAuth.set(role)` and `DemoAuth.get()` rather than touching localStorage directly. When Firebase is ready, `DemoAuthContext.js` is replaced with `FirebaseAuthContext.js` that exposes the identical interface. The persona switcher UI, the interceptor, and every wizard and screen component are completely untouched.
+
+This is the intermediate architecture goal: **one file to swap, zero component changes**.
+
+---
+
+### The Intermediate Architecture
+
+The intermediate state keeps the demo persona switcher fully functional for sales demos and development testing, while making the auth layer Firebase-ready underneath it.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                  Persona Switcher UI                    │
+│  [SuperAdmin] [Admin] [Retailer] [Brand] [Tech Ops]     │
+│                                                         │
+│  onClick → AuthProvider.setRole(role)                   │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────┐
+│              AuthProvider (the swap point)              │
+│                                                         │
+│  Phase 2/3 (now):    DemoAuthContext                    │
+│    get()  → reads localStorage('demo_role')             │
+│    set()  → writes localStorage('demo_role')            │
+│    token() → returns 'demo-token'                       │
+│                                                         │
+│  Phase 4 (Firebase): FirebaseAuthContext                │
+│    get()  → reads firebaseUser.customClaims.role        │
+│    set()  → calls Cloud Function setDemoPersona(role)   │
+│    token() → returns await firebaseUser.getIdToken()    │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────┐
+│              api.js Request Interceptor                 │
+│                                                         │
+│  import { AuthProvider } from './AuthProvider';         │
+│                                                         │
+│  config.headers['x-demo-role'] = AuthProvider.get();   │
+│  config.headers['Authorization'] = `Bearer             │
+│      ${await AuthProvider.token()}`;                    │
+└─────────────────────────────────────────────────────────┘
+```
+
+The key change from today: the interceptor imports `AuthProvider` rather than calling `localStorage` directly. `AuthProvider` is the stable public contract. Its implementation is swapped per environment.
+
+---
+
+### The AuthProvider Contract
+
+Define a strict interface that both `DemoAuthContext` and `FirebaseAuthContext` must satisfy. This contract is the only thing the interceptor and all components depend on.
+
+```js
+// src/auth/AuthProvider.contract.js
+// This file defines the shape. Never imported at runtime — used for documentation
+// and as the basis for TypeScript types if/when TS is adopted.
+
+/**
+ * @typedef {Object} AuthProviderContract
+ * @property {() => string}          get       — Returns the current active role string.
+ * @property {(role: string) => void} set      — Sets the active role. Validates against VALID_ROLES.
+ * @property {() => Promise<string>}  token    — Returns the auth token for the current session.
+ * @property {() => void}             clear    — Clears auth state (used by logout and test teardown).
+ * @property {(cb: Function) => Function} onRoleChange — Subscribes to role change events.
+ *                                                        Returns an unsubscribe function.
+ */
+```
+
+The `onRoleChange` subscriber is the reactive connection that replaces the current fire-and-forget localStorage write. The interceptor and any cached-data layer subscribe to role changes and invalidate accordingly.
+
+---
+
+### DemoAuthContext — Phase 2/3 Implementation (localStorage-backed)
+
+This is the implementation to build during the cleanup sprint. It satisfies the full `AuthProvider` contract using localStorage — no Firebase dependency.
+
+```js
+// src/auth/DemoAuthContext.js
+
+const VALID_ROLES = ['superadmin', 'admin', 'techop', 'retaileradmin', 'brand', 'advertiser'];
+const CANONICAL_KEY = 'demo_role';
+const LEGACY_KEY = 'active_persona';
+
+// In-memory subscriber list — replaces the missing reactive contract
+const subscribers = new Set();
+
+export const DemoAuthContext = {
+    get: () => {
+        const role = localStorage.getItem(CANONICAL_KEY) || localStorage.getItem(LEGACY_KEY);
+        return VALID_ROLES.includes(role) ? role : 'admin';
+    },
+
+    set: (role) => {
+        if (!VALID_ROLES.includes(role)) throw new Error(`Invalid demo role: ${role}`);
+        localStorage.setItem(CANONICAL_KEY, role);
+        localStorage.removeItem(LEGACY_KEY);
+        // Notify all subscribers (interceptor, cache layer, UI)
+        subscribers.forEach(cb => cb(role));
+    },
+
+    token: async () => {
+        // Returns the demo token. Same shape as FirebaseAuthContext.token()
+        // so the interceptor can await this call identically in both implementations.
+        return localStorage.getItem('auth_token') || 'demo-token';
+    },
+
+    clear: () => {
+        localStorage.removeItem(CANONICAL_KEY);
+        localStorage.removeItem(LEGACY_KEY);
+        localStorage.removeItem('auth_token');
+        subscribers.forEach(cb => cb(null));
+    },
+
+    onRoleChange: (cb) => {
+        subscribers.add(cb);
+        return () => subscribers.delete(cb); // unsubscribe function
+    }
+};
+```
+
+---
+
+### FirebaseAuthContext — Phase 4 Implementation (Firebase-backed)
+
+This is the file that replaces `DemoAuthContext.js` on Firebase day. It exposes an **identical interface**. The persona switcher calls `set()` — which in this implementation calls a Firebase Cloud Function that stamps a custom claim on the user's token. The token is a real Firebase ID token.
+
+```js
+// src/auth/FirebaseAuthContext.js  (written now, activated on Firebase day)
+
+import { getAuth, onIdTokenChanged } from 'firebase/auth';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+
+const auth = getAuth();
+const functions = getFunctions();
+const setDemoPersonaFn = httpsCallable(functions, 'setDemoPersona');
+
+const VALID_ROLES = ['superadmin', 'admin', 'techop', 'retaileradmin', 'brand', 'advertiser'];
+const subscribers = new Set();
+
+// Mirror the demo token refresh via Firebase ID token listener
+onIdTokenChanged(auth, async (user) => {
+    if (user) {
+        const claims = (await user.getIdTokenResult()).claims;
+        if (claims.role) subscribers.forEach(cb => cb(claims.role));
+    }
+});
+
+export const FirebaseAuthContext = {
+    get: () => {
+        // Reads from the cached ID token claims — synchronous for interceptor use
+        const user = auth.currentUser;
+        return user?._tokenResponse?.customAttributes
+            ? JSON.parse(user._tokenResponse.customAttributes).role
+            : 'admin';
+    },
+
+    set: async (role) => {
+        if (!VALID_ROLES.includes(role)) throw new Error(`Invalid demo role: ${role}`);
+        // Calls a Cloud Function that sets a custom claim on the Firebase user
+        await setDemoPersonaFn({ role });
+        // Force token refresh so get() immediately reflects the new claim
+        await auth.currentUser?.getIdToken(true);
+        subscribers.forEach(cb => cb(role));
+    },
+
+    token: async () => {
+        return auth.currentUser?.getIdToken() ?? null;
+    },
+
+    clear: async () => {
+        await auth.signOut();
+        subscribers.forEach(cb => cb(null));
+    },
+
+    onRoleChange: (cb) => {
+        subscribers.add(cb);
+        return () => subscribers.delete(cb);
+    }
+};
+```
+
+---
+
+### The Single Swap — AuthProvider.js
+
+A one-line environment switch is all that changes when Firebase is enabled. The rest of the codebase never knows which implementation is active.
+
+```js
+// src/auth/AuthProvider.js — the only file components import
+
+import { DemoAuthContext }     from './DemoAuthContext';
+import { FirebaseAuthContext } from './FirebaseAuthContext';
+
+// Toggle: flip to true when Firebase is live
+const USE_FIREBASE = import.meta.env.VITE_USE_FIREBASE === 'true';
+
+export const AuthProvider = USE_FIREBASE ? FirebaseAuthContext : DemoAuthContext;
+```
+
+Components, the interceptor, and the persona switcher all import from `AuthProvider` only:
+
+```js
+// PersonaSwitcher.jsx
+import { AuthProvider } from '../auth/AuthProvider';
+
+const handlePersonaSwitch = (role) => {
+    AuthProvider.set(role);   // same call in demo mode and Firebase mode
+};
+
+// api.js interceptor
+import { AuthProvider } from './auth/AuthProvider';
+
+axiosInstance.interceptors.request.use(async (config) => {
+    const role  = AuthProvider.get();
+    const token = await AuthProvider.token();
+    if (role)  config.headers['x-demo-role']   = role;
+    if (token) config.headers['Authorization'] = `Bearer ${token}`;
+    return config;
+});
+```
+
+---
+
+### Persona Switcher: What Stays, What Changes
+
+The five-persona switcher UI (SuperAdmin, Admin, Retailer, Brand, Tech Ops) is a **demo and development asset** that should be preserved indefinitely. Even in Firebase production, internal teams need to quickly impersonate any persona for QA, sales demos, and support walkthroughs. The switcher does not go away — its backing implementation does.
+
+| Layer | Phase 2/3 (now) | Phase 4 (Firebase) |
+|---|---|---|
+| Switcher UI component | ✅ Unchanged | ✅ Unchanged |
+| `AuthProvider.set(role)` call | ✅ Unchanged | ✅ Unchanged |
+| Backing store | `localStorage('demo_role')` | Firebase custom claim via Cloud Function |
+| Token sent to backend | `'demo-token'` (static) | Firebase ID token (signed, expiring) |
+| Backend validates role via | `x-demo-role` header (trust-on-header) | ID token custom claim (cryptographically verified) |
+| Who can use the switcher | Any DEV session | Firebase users with `isDemoUser: true` claim |
+
+The backend `auth.js` middleware will need a parallel update: in Phase 4 it verifies the Firebase ID token and reads `req.user.role` from the decoded claims rather than from the `x-demo-role` header. The header-based approach is removed entirely in production. In DEV the header fallback can remain as a convenience.
+
+---
+
+### Firebase Cloud Function: `setDemoPersona`
+
+This function is the gatekeeper that prevents arbitrary role escalation. Only users with the `isDemoUser` claim can call it, and the role must be in the valid set.
+
+```js
+// functions/src/setDemoPersona.js
+
+const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const admin = require('firebase-admin');
+
+const VALID_ROLES = ['superadmin', 'admin', 'techop', 'retaileradmin', 'brand', 'advertiser'];
+
+exports.setDemoPersona = onCall(async (request) => {
+    const { uid, token: { isDemoUser } } = request.auth ?? {};
+
+    if (!uid)         throw new HttpsError('unauthenticated', 'Must be signed in.');
+    if (!isDemoUser)  throw new HttpsError('permission-denied', 'Not a demo user.');
+
+    const { role } = request.data;
+    if (!VALID_ROLES.includes(role)) {
+        throw new HttpsError('invalid-argument', `Invalid role: ${role}`);
+    }
+
+    await admin.auth().setCustomUserClaims(uid, { role, isDemoUser: true });
+    return { success: true, role };
+});
+```
+
+Demo users are seeded in Firebase with `isDemoUser: true` during onboarding. All other Firebase users receive `isDemoUser: false` (the default) and the persona switcher is hidden from their UI by a guard:
+
+```jsx
+// PersonaSwitcher.jsx
+{currentUser?.claims?.isDemoUser && <PersonaSwitcherPanel />}
+```
+
+---
+
+### Migration Path Summary
+
+| Phase | What ships | Auth mechanism | Persona switcher |
+|---|---|---|---|
+| **Phase 2** (current) | `DemoAuthContext` (localStorage) | `x-demo-role` header, `demo-token` | ✅ Works |
+| **Phase 3** (next sprint) | `AuthProvider` wrapper + full cleanup | Same as Phase 2 | ✅ Works, now calls `AuthProvider.set()` |
+| **Phase 4** (Firebase) | `FirebaseAuthContext`, Cloud Function, Firebase user seeding | Firebase ID token + custom claims | ✅ Works, unchanged UI |
+| **Phase 5** (hardening) | Remove `x-demo-role` header support from backend middleware | ID token claims only | ✅ Works |
+
+Phase 3 is the critical preparation step. It costs one sprint, produces no user-visible change, and makes Phase 4 a single `VITE_USE_FIREBASE=true` environment variable flip.
+
+---
+
+### Phase 3 Checklist (Pre-Firebase Preparation)
+
+- [ ] Create `src/auth/AuthProvider.contract.js` — document the interface
+- [ ] Create `src/auth/DemoAuthContext.js` — localStorage implementation with `onRoleChange` subscribers
+- [ ] Create `src/auth/FirebaseAuthContext.js` — Firebase implementation (written now, not yet activated)
+- [ ] Create `src/auth/AuthProvider.js` — environment toggle (`VITE_USE_FIREBASE`)
+- [ ] Migrate interceptor (`api.js`) to `import { AuthProvider } from './auth/AuthProvider'`
+- [ ] Migrate persona switcher components to call `AuthProvider.set(role)`
+- [ ] Migrate all remaining `active_persona` write sites (from grep audit)
+- [ ] Subscribe cache-invalidation logic to `AuthProvider.onRoleChange()`
+- [ ] Add ESLint rule forbidding direct `localStorage` access for auth keys
+- [ ] Add `VITE_USE_FIREBASE=false` to `.env.development`, `VITE_USE_FIREBASE=true` to `.env.firebase` (future)
+- [ ] Write `setDemoPersona` Cloud Function (deployed to Firebase emulator for testing)
+- [ ] Seed Firebase emulator with demo users carrying `isDemoUser: true`
+- [ ] Verify persona switcher works end-to-end against emulator with `VITE_USE_FIREBASE=true`
+- [ ] Remove `active_persona` key and all legacy migration guards
