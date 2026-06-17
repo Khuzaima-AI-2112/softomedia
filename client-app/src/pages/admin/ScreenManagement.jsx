@@ -165,7 +165,17 @@ function ScreenManagement() {
             addToast('Screen registered successfully.', 'success');
         } catch (error) {
             console.error('Failed to create screen:', error);
-            setPageError(error?.data?.message || error?.message || 'Failed to register screen.');
+
+            // 503: circuit breaker is OPEN — show a friendly retry message
+            const status = error?.status ?? error?.response?.status;
+            if (status === 503) {
+                const retryAfter = error?.data?.retryAfterSeconds ?? error?.response?.headers?.get?.('Retry-After') ?? 30;
+                setPageError(
+                    `The database is temporarily unavailable. Please try again in ${retryAfter} seconds.`
+                );
+            } else {
+                setPageError(error?.data?.message || error?.message || 'Failed to register screen.');
+            }
         }
     }, [newScreen, loadData, addToast]);
 
