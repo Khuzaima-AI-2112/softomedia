@@ -251,8 +251,11 @@ router.post('/:id/book', authenticate, async (req, res) => {
  *   state machine. Transition is validated against the campaign's CURRENT
  *   status — callers that skip a state (e.g. pending_approval → live) receive
  *   400 with from/to/allowed fields for clear debugging.
+ *
+ * fix: authenticate middleware was missing — req.user was never populated so
+ *   requireRole resolved every caller (including superadmin) to level -1 → 403.
  */
-router.patch('/:id/status', requireRole('retaileradmin'), async (req, res) => {
+router.patch('/:id/status', authenticate, requireRole('retaileradmin'), async (req, res) => {
     try {
         const { id } = req.params;
         const rawStatus = req.body.status;
