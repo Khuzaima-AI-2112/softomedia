@@ -16,6 +16,7 @@ export const ROLE_HIERARCHY = {
     contentmanager: 3,
     techoperator:   2,
     retaileradmin:  1,
+    brand:          1,   // fix: brand was missing — level 1 (same tier as retaileradmin)
     advertiser:     0,
 };
 

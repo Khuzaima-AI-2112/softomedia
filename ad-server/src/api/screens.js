@@ -88,17 +88,19 @@ router.post('/', authenticate, async (req, res) => {
  * Sprint 11 — S11-8:
  *   - techoperator (level 2) and above: full unfiltered list.
  *   - retaileradmin (level 1): list filtered to their own retailer_id from JWT.
+ *   - brand (level 1): full list (needed for campaign wizard store/screen selection).
  *   - Unauthenticated or insufficient role: 403.
  *
- * The authenticate middleware is called inline so that unauthenticated requests
- * are rejected before any Firestore query is attempted.
+ * fix: brand role was missing from ROLE_HIERARCHY entirely, causing 403 on
+ *      GET /api/screens during campaign wizard load for all brand users.
  */
 router.get('/', authenticate, async (req, res) => {
     try {
         const role = normalizeRole(req.user?.role);
         const userLevel = ROLE_HIERARCHY[role] ?? -1;
-        const techopLevel = ROLE_HIERARCHY['techoperator'];   // 2
+        const techopLevel = ROLE_HIERARCHY['techoperator'];    // 2
         const retailerLevel = ROLE_HIERARCHY['retaileradmin']; // 1
+        const brandLevel = ROLE_HIERARCHY['brand'];            // 1
 
         if (userLevel >= techopLevel) {
             // techoperator, contentmanager, admin, superadmin — see everything
@@ -110,6 +112,15 @@ router.get('/', authenticate, async (req, res) => {
         }
 
         if (userLevel === retailerLevel) {
+            if (role === 'brand') {
+                // brand — sees all screens so campaign wizard can show available inventory
+                const storeId = req.query.store_id || req.query.storeId || req.query.storeid;
+                const screens = storeId
+                    ? await screenRepository.findByLocation(storeId)
+                    : await screenRepository.findAll();
+                return res.json(screens);
+            }
+
             // retaileradmin — scoped to their own retailer_id from the auth token
             const retailerId = req.user.linkedentityid || req.user.retailer_id;
             if (!retailerId) {
