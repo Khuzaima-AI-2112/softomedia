@@ -1,4 +1,4 @@
-﻿import { Firestore } from '@google-cloud/firestore';
+import { Firestore } from '@google-cloud/firestore';
 import logger from './logger.js';
 
 let db = null;
