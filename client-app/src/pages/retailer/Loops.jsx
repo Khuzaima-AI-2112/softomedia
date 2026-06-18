@@ -12,19 +12,23 @@ import apiService from '../../services/ApiService';
  *
  * Shows all loops belonging to the retailer's locations with:
  *   - Loop name, date, hour slot, slot count
- *   - Status badge (APPROVED / PENDING / DRAFT)
+ *   - Status badge (approved / pending / draft / locked)
  *   - Link to the admin LoopBuilder for each loop
  *   - Quick-filter by status
  *
- * This page has no shared state; it reads loops via apiService.getLoops()
- * (GET /api/loops) which is already used by ScheduleCalendar and does not
- * mutate any shared context.
+ * Sprint 11 — S11-5 fixes:
+ *   - data-testid attributes added: loops-list, loop-row-{id}, loop-status-badge-{id}
+ *   - Status filter values changed to lowercase to match schema enum
+ *     (approved | draft | locked — per #42 guardrail G4)
+ *   - Added 'locked' filter tab (was missing)
+ *   - Comparison now uses l.status?.toLowerCase() for case-insensitive safety
  */
 export default function RetailerLoops() {
     const [loops, setLoops]       = useState([]);
     const [loading, setLoading]   = useState(true);
     const [error, setError]       = useState(null);
-    const [filter, setFilter]     = useState('all'); // 'all' | 'APPROVED' | 'PENDING' | 'DRAFT'
+    // filter values match schema enum exactly: approved | draft | locked
+    const [filter, setFilter]     = useState('all');
 
     useEffect(() => {
         apiService.getLoops()
@@ -35,7 +39,7 @@ export default function RetailerLoops() {
 
     const filtered = filter === 'all'
         ? loops
-        : loops.filter(l => (l.status || '').toUpperCase() === filter);
+        : loops.filter(l => (l.status || '').toLowerCase() === filter);
 
     return (
         <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-500">
@@ -57,9 +61,9 @@ export default function RetailerLoops() {
                 </Link>
             </div>
 
-            {/* Status filter tabs */}
+            {/* Status filter tabs — values match schema enum (lowercase) */}
             <div className="flex gap-2 flex-wrap">
-                {['all', 'APPROVED', 'PENDING', 'DRAFT'].map(f => (
+                {['all', 'approved', 'pending', 'draft', 'locked'].map(f => (
                     <button
                         key={f}
                         onClick={() => setFilter(f)}
@@ -70,7 +74,7 @@ export default function RetailerLoops() {
                                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                             }`}
                     >
-                        {f === 'all' ? 'All' : f.charAt(0) + f.slice(1).toLowerCase()}
+                        {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
                     </button>
                 ))}
             </div>
@@ -89,16 +93,17 @@ export default function RetailerLoops() {
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                     <span className="material-symbols-outlined text-5xl text-slate-300 mb-4">loop</span>
                     <p className="text-slate-500">
-                        {filter === 'all' ? 'No loops found for your locations.' : `No ${filter.toLowerCase()} loops.`}
+                        {filter === 'all' ? 'No loops found for your locations.' : `No ${filter} loops.`}
                     </p>
                 </div>
             )}
 
-            <div className="space-y-3">
+            <div className="space-y-3" data-testid="loops-list">
                 {filtered.map(loop => (
                     <GlassCard
                         key={loop.id}
                         className="flex items-center justify-between gap-4 p-4"
+                        data-testid={`loop-row-${loop.id}`}
                     >
                         <div className="flex-1 min-w-0">
                             <p className="font-medium truncate">
@@ -113,7 +118,9 @@ export default function RetailerLoops() {
                             </p>
                         </div>
 
-                        <StatusBadge status={loop.status} />
+                        <span data-testid={`loop-status-badge-${loop.id}`}>
+                            <StatusBadge status={loop.status} />
+                        </span>
 
                         <Link
                             to={`/dashboard/admin/loops/${loop.id}`}

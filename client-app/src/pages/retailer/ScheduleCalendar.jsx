@@ -2,6 +2,8 @@
  * Schedule Calendar Page
  * Retailer interface for previewing and approving tomorrow's broadcast schedule
  * Business Hours: 8am - 10pm (14 loops per day)
+ *
+ * Sprint 11 — S11-5: data-testid="schedule-calendar-container" added to root div.
  */
 
 import { useState, useEffect } from 'react';
@@ -117,7 +119,7 @@ function ScheduleCalendar() {
     const rejectedCount = loops.filter(l => l.status === 'REJECTED').length;
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="space-y-8 animate-in fade-in duration-500" data-testid="schedule-calendar-container">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>

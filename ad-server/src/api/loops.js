@@ -11,6 +11,10 @@
  * POST /locations/:id/loops/approve-all routes.
  * Both require requireRole('retaileradmin').
  * Existing routes are unchanged.
+ *
+ * S11-5 (2026-06-17): Added GET /locations/:id/loops.
+ * Returns all loops for a specific location scoped to the authenticated
+ * retaileradmin. Satisfies #42 guardrail G2 + G3.
  */
 
 import express from 'express';
@@ -77,6 +81,34 @@ router.get('/', async (req, res) => {
     } catch (error) {
         logger.error('[Loops API] GET / failed', { error: error.message });
         res.status(500).json({ error: 'Failed to fetch loops' });
+    }
+});
+
+/**
+ * GET /api/locations/:locationId/loops
+ * List all loops for a specific location.
+ * Optional query params: date, status
+ * Auth: requireRole('retaileradmin')
+ *
+ * S11-5 — #42 guardrail G2 (route exists) + G3 (requireRole retaileradmin).
+ * Returns { loops, count } consistent with other collection endpoints.
+ */
+router.get('/locations/:locationId/loops', authenticate, requireRole('retaileradmin'), async (req, res) => {
+    try {
+        const { locationId } = req.params;
+        const { date, status } = req.query;
+
+        const where = [['location_id', '==', locationId]];
+        if (date)   where.push(['date',   '==', date]);
+        if (status) where.push(['status', '==', status]);
+
+        const loops = await loopRepository.findAll({ where });
+
+        logger.info('[Loops API] GET /locations/:locationId/loops', { locationId, date, status, count: loops.length });
+        res.json({ loops, count: loops.length });
+    } catch (error) {
+        logger.error('[Loops API] GET /locations/:locationId/loops failed', { locationId: req.params.locationId, error: error.message });
+        res.status(500).json({ error: 'Failed to fetch loops for location' });
     }
 });
 
