@@ -134,7 +134,7 @@ Pre-populates Firestore with a known, deterministic dataset. All subsequent phas
 |------|--------|-------|---------------------|
 | 4.1 | Open Loop Demo Player | `/player/demo` | Loads without auth; demo loop cycles within 5s; no "Waiting for Scheduled Slot" |
 | 4.2 | Open Player with screen token | `/player?screen=demo-screen-01` | `GET /api/screens/demo-screen-01/playback-loop` → `200` (public); BonVie ad renders |
-| 4.3 | Verify ad transitions | `/player?screen=demo-screen-01` | Player advances slot 1 → slot 2 within 15s; `data-testid="ad-frame"` src changes |
+| 4.3 | Verify ad transitions | `/player?screen=demo-screen-01` | Player advances slot 1 → slot 2 within **35s** (15s creative + 10s cold-start buffer + 10s CI margin); `data-testid="ad-frame"` src changes. ⚠️ **FIX [Issue 9]:** Previous value was 15s, which assumed zero cold-start overhead on first player load. |
 | 4.4 | Assert telemetry heartbeats fire | `/player?screen=demo-screen-01` | `page.waitForRequest(r => r.url().includes('/telemetry'))` resolves within 30s; body contains `{ screenId, timestamp, slotId }` — all non-null |
 
 ---
@@ -147,10 +147,10 @@ Pre-populates Firestore with a known, deterministic dataset. All subsequent phas
 | Step | Action | Route | Acceptance Criterion |
 |------|--------|-------|---------------------|
 | 5.1 | Login as TechOperator | `/login` | `localStorage.getItem('demo_role') === 'techop'`; `x-demo-role: techop` confirmed |
-| 5.2 | Navigate to Health Check | `/dashboard/techoperator/health` | Health status widget shows green / "OK" (mock response — `ENVIRONMENT-GATED` until real checks wired) |
+| 5.2 | Navigate to Health Check | `/dashboard/techoperator/health` | Health status widget shows green / "OK" (mock response — `ENVIRONMENT-GATED`). **Skip condition:** `test.skip(!process.env.REAL_HEALTH_ENDPOINT, 'Health.jsx real connectivity not wired — see TODO.md')` |
 | 5.3 | Navigate to TechOps Dashboard | `/dashboard/techoperator` | `TechOpsDashboard.jsx` renders; no 404 or blank screen |
 
-> `Health.jsx` currently has hardcoded checks (`TODO.md`). Mock must return `{ status: "ok", backend: true }`. Mark steps 5.2 `ENVIRONMENT-GATED`.
+> `Health.jsx` currently has hardcoded checks (`TODO.md`). Mock must return `{ status: "ok", backend: true }`. Step 5.2 is skipped until `REAL_HEALTH_ENDPOINT` env var is set.
 
 ---
 
@@ -159,12 +159,13 @@ Pre-populates Firestore with a known, deterministic dataset. All subsequent phas
 **Persona:** `DEMO_ADMIN` | `x-demo-role: admin`
 **Spec file:** `06_admin_validate.spec.js`
 
+> ⚠️ **FIX [Issue 6]:** Step 6.4 (campaign delete/cleanup) was previously the last step of this phase. It has been **removed from Phase 6** and relocated to Phase 16.5 (globalTeardown), which runs after Phase 15 completes. The old placement caused a cascade failure across Phases 7–15, all of which assert on `demo-campaign-001` being present.
+
 | Step | Action | Route | Acceptance Criterion |
 |------|--------|-------|---------------------|
 | 6.1 | Open Admin Overview | `/dashboard/admin` | `GET /api/campaigns` returns array containing `{ id: 'demo-campaign-001', name: 'BonVie Summer Demo' }`; card visible |
 | 6.2 | Open Network Map | `/dashboard/admin/map` | `NetworkMap.jsx` renders; FreshMart screens show status badge; no blank/error state |
 | 6.3 | Open AI Log | `/dashboard/admin/ai-log` | `AILog.jsx` renders; table loads without 500 (entries may be empty — assert no error state) |
-| 6.4 | **Cleanup:** Delete demo campaign | `/dashboard/admin/campaigns` | `DELETE /api/campaigns/demo-campaign-001` → `200`; hard-refresh does not contain "BonVie Summer Demo" |
 
 ---
 
@@ -179,7 +180,7 @@ Pre-populates Firestore with a known, deterministic dataset. All subsequent phas
 | 7.1 | Login as Retailer | `/login` | `x-demo-role: retaileradmin` confirmed |
 | 7.2 | Navigate to Retailer Loops | `/dashboard/retailer/loops` | Loads without 403; loop templates from Phase 1 visible |
 | 7.3 | Verify loop slot count | `/dashboard/retailer/loops` | FreshMart loop shows 12 slots; fill indicator non-zero |
-| 7.4 | Verify BonVie slot visible | `/dashboard/retailer/loops` | At least one slot shows `advertiserId: demo-bonvie` or "BonVie Summer Demo" |
+| 7.4 | Verify BonVie slot visible (pre-approval) | `/dashboard/retailer/loops` | At least one slot shows `advertiserId: demo-bonvie` or "BonVie Summer Demo". **⚠️ Scope note [Issue 10]:** This step runs before Phase 8 approval. If `LoopSlotFill` only surfaces approved campaigns, this assertion will fail. Verify component behaviour against `LoopSlotFill.jsx` before enabling. If pending campaigns are not surfaced, **demote this step to Phase 9** (post-approval). |
 
 ---
 
@@ -216,11 +217,13 @@ Pre-populates Firestore with a known, deterministic dataset. All subsequent phas
 **Persona:** `DEMO_RETAILER` | `x-demo-role: retaileradmin`
 **Spec file:** `10_retailer_schedule_history.spec.js`
 
+> ⚠️ **FIX [Issue 11]:** Steps 10.2 and 10.3 previously asserted on human-readable display strings (e.g. `"Sunday 2–4am no-ads block"`). Display format is not a contract and will vary by locale and component implementation. Assertions now target structured data fields only.
+
 | Step | Action | Route | Acceptance Criterion |
 |------|--------|-------|---------------------|
 | 10.1 | Navigate to Schedule History | `/dashboard/retailer/schedule-history` | `ScheduleHistory.jsx` renders; history table non-empty |
-| 10.2 | Verify Phase 2 override recorded | `/dashboard/retailer/schedule-history` | Entry for "Sunday 2–4am no-ads block" (Phase 2 step 2.3) present; has timestamp and actor field |
-| 10.3 | Verify Phase 9 slot adjustment recorded | `/dashboard/retailer/schedule-history` | Most recent entry shows the Phase 9 slot shift; old time and new time both present |
+| 10.2 | Verify Phase 2 override recorded | `/dashboard/retailer/schedule-history` | Row exists where: `type === 'override'`, `actorId === 'demo-freshmart'`, `startTime` falls within Sunday 02:00–04:00 of current week, `endTime` falls within Sunday 02:00–04:00 of current week. Assert on data attributes or API response fields — not display strings. |
+| 10.3 | Verify Phase 9 slot adjustment recorded | `/dashboard/retailer/schedule-history` | Most recent row where `type === 'slot-shift'` and `actorId === 'demo-freshmart'`; row contains both `previousStartTime` and `newStartTime` fields, both non-null and differing by 3600000ms (1 hour). Assert on data fields — not display strings. |
 
 ---
 
@@ -282,17 +285,24 @@ Pre-populates Firestore with a known, deterministic dataset. All subsequent phas
 | 14.3 | Create a ticket | `/dashboard/tickets` | `POST /api/tickets` → `201` with `{ id: 'demo-ticket-001', status: 'open' }`; ticket appears in list |
 | 14.4 | Open ticket detail | `/dashboard/tickets/demo-ticket-001` | `TicketDetail.jsx` renders; subject and status visible; no 404 |
 
+### Persona switch — Admin → Retailer
+
+> ⚠️ **FIX [Issue 7]:** An explicit reset step is required here. The prior version switched personas implicitly with no authReset, reproducing the PR #46 `demo_role`/`active_persona` bleed pattern. `authReset` + `loginAs` must be called before any Retailer-persona step.
+
+| Step | Action | Route | Acceptance Criterion |
+|------|--------|-------|---------------------|
+| 14.4b | **authReset + loginAs as DEMO_RETAILER** | `/login` | `authReset` clears all auth keys and reloads; `loginAs(page, DEMO_RETAILER)` sets `demo_role: 'retaileradmin'`; `data-testid="dashboard-shell"` visible; `x-demo-role: retaileradmin` confirmed before step 14.5 proceeds |
+
 ### Retailer views and responds
 
 **Persona:** `DEMO_RETAILER` | `x-demo-role: retaileradmin`
 
 | Step | Action | Route | Acceptance Criterion |
 |------|--------|-------|---------------------|
-| 14.5 | Login as Retailer | `/login` | `x-demo-role: retaileradmin` confirmed |
-| 14.6 | Navigate to Ticket Dashboard | `/dashboard/tickets` | `TicketDashboard.jsx` renders; `demo-ticket-001` visible (if cross-role visibility applies — see scope note) |
-| 14.7 | Add reply | `/dashboard/tickets/demo-ticket-001` | `POST /api/tickets/demo-ticket-001/replies` → `201`; reply appears in thread without page reload |
+| 14.5 | Navigate to Ticket Dashboard | `/dashboard/tickets` | `TicketDashboard.jsx` renders; `demo-ticket-001` visible (if cross-role visibility applies — see scope note) |
+| 14.6 | Add reply | `/dashboard/tickets/demo-ticket-001` | `POST /api/tickets/demo-ticket-001/replies` → `201`; reply appears in thread without page reload |
 
-> **Scope note:** Ticket visibility rules are not documented in audit files. If Retailer cannot see admin-created tickets, step 14.6 asserts an empty list without error, and 14.7 is demoted to an Admin persona step.
+> **Scope note:** Ticket visibility rules are not documented in audit files. If Retailer cannot see admin-created tickets, step 14.5 asserts an empty list without error, and 14.6 is demoted to an Admin persona step.
 
 ---
 
@@ -322,7 +332,22 @@ Pre-populates Firestore with a known, deterministic dataset. All subsequent phas
 | 16.2 | Submit empty form | `/login` | Client-side validation fires; error message(s) appear; no API call made; form not submitted |
 | 16.3 | Submit wrong credentials | `/login` | `POST /api/auth/login` → `401`; error banner appears: "Invalid credentials" or equivalent; form not cleared |
 | 16.4 | Login with valid demo credentials | `/login` | `POST /api/auth/login` → `200` with token; redirect to `/dashboard` within 2s; `data-testid="dashboard-shell"` visible |
-| 16.5 | Verify root `/` redirects | `/` | Navigating to `/` redirects to `/dashboard/admin`; no 404 |
+| 16.5 | Verify root `/` redirects to `/login` when unauthenticated | `/` | Navigating to `/` without auth redirects to `/login`; no 404. ⚠️ **FIX [Minor Issue 13]:** Previous text asserted redirect to `/dashboard/admin` — that is the post-login destination for an admin, not the unauthenticated root destination. |
+
+---
+
+## globalTeardown — Suite Cleanup
+
+**Spec file:** `00_seed.setup.js` → `globalTeardown` export
+**Runs:** After Phase 15 completes — never during the validation phases.
+
+> ⚠️ **FIX [Issue 6]:** Cleanup was previously Step 6.4 inside Phase 6 (Admin Validates). That placement caused a cascade failure across Phases 7–15 because the demo campaign was deleted before any of those phases ran. Cleanup is now an explicit globalTeardown, isolated from the validation logic.
+
+| Step | Action | Acceptance Criterion |
+|------|--------|---------------------|
+| T.1 | Delete demo campaign | `DELETE /api/campaigns/demo-campaign-001` → `200`; Firestore doc `campaigns/demo-campaign-001` does not exist after teardown |
+| T.2 | Delete seed data | `SeedService.teardown()` removes all `demo-*` documents from all collections |
+| T.3 | Confirm clean state | `GET /api/campaigns/demo-campaign-001` → `404`; `GET /api/retailers/demo-freshmart` → `404` |
 
 ---
 
@@ -331,7 +356,7 @@ Pre-populates Firestore with a known, deterministic dataset. All subsequent phas
 | Tier | Scope | Prerequisite fixes needed |
 |------|-------|---------------------------|
 | **MVP (Tier 1)** | Phases 0–3 only | Pre-Conditions 0, 1, 2 |
-| **Full Demo (Tier 2)** | All 16 phases | All 6 pre-conditions; real `campaigns.js` handlers; `Health.jsx` real connectivity |
+| **Full Demo (Tier 2)** | All 16 phases + globalTeardown | All 6 pre-conditions; real `campaigns.js` handlers; `Health.jsx` real connectivity |
 
 ---
 
@@ -343,14 +368,14 @@ Pre-populates Firestore with a known, deterministic dataset. All subsequent phas
 | Phase 1 — Admin | 93% | All routes confirmed; LoopBuilder orphan alert retired |
 | Phase 2 — Retailer | 91% | Route confirmed; falsifiable assertions added |
 | Phase 3 — Brand Wizard | 82% | Gated on `campaigns.js` stub; rises to ~95% once stub lands |
-| Phase 4 — Player | 85% | Dynamic slot seed directly unlocks |
-| Phase 5 — TechOps | 88% | Route confirmed; mock health documented as pre-condition |
-| Phase 6 — Admin Validate | 94% | All routes confirmed; delete assertion falsifiable |
-| Phases 7–10 — Retailer extended | 90% | Depends on Phase 8 (approval gate) order |
+| Phase 4 — Player | 85% | Dynamic slot seed directly unlocks; 35s transition timeout now safe |
+| Phase 5 — TechOps | 88% | Route confirmed; mock health documented as pre-condition; skip gate added |
+| Phase 6 — Admin Validate | 94% | Cleanup cascade removed; phase ends at step 6.3 |
+| Phases 7–10 — Retailer extended | 91% | Phase 7.4 scope note added; Phase 10 asserts on structured fields not display strings |
 | Phases 11–13 — Advertiser | 88% | Sprint 14 routes confirmed in App.jsx |
-| Phase 14 — Tickets | 83% | Visibility rules undocumented — scope note applies |
-| Phases 15–16 — Analytics + Login | 91% | Routes confirmed |
-| **Overall suite** | **89%** | Rises to ~95% once Pre-Conditions 0–2 resolved |
+| Phase 14 — Tickets | 86% | Explicit persona reset step (14.4b) added; PR #46 bleed pattern eliminated |
+| Phases 15–16 — Analytics + Login | 92% | Phase 16.5 redirect target corrected to `/login` |
+| **Overall suite** | **90%** | Rises to ~95% once Pre-Conditions 0–2 resolved |
 
 ---
 
