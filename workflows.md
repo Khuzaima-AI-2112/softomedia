@@ -29,6 +29,7 @@
 | `/auth-audit` | `.agent/workflows/auth-audit.md` | Verify authenticate + authorize middleware on every route | Active |
 | `/starttesting` | `.agent/workflows/starttesting.md` | Spin up dev servers and Playwright in watch mode | Active |
 | `/pricing-visibility` | `.agent/workflows/pricing-visibility.md` | Full CPM pricing visibility and override audit | Active |
+| `/demo` | `.agent/workflows/demo.md` | 33-step E2E demo wizard — all input surfaces, 5 personas, real Firestore seed | Active |
 
 ---
 
@@ -69,4 +70,4 @@ Agent: reads .agent/workflows/hygiene.md → executes every step in order → re
 
 ---
 
-*Last updated: 2026-05-27 — BUG_FIX_LAN20260527 marked ✅ Done after source verification*
+*Last updated: 2026-06-17 — /demo workflow added (33-step E2E demo wizard)*
