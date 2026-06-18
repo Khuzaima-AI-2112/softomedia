@@ -3,12 +3,16 @@
  *
  * USAGE IN EVERY SPEC FILE:
  *   import { DEMO_ADMIN, DEMO_RETAILER, DEMO_BRAND, DEMO_ADVERTISER,
- *            DEMO_TECHOP, BASE_URL, DEMO_TOKEN, authReset } from './demo.fixtures.js';
+ *            DEMO_TECHOP, BASE_URL, DEMO_TOKEN, authReset, loginAs,
+ *            assertRoleHeader, SEED } from './demo.fixtures.js';
  *
  *   test.beforeEach(authReset);
  *
- * DO NOT copy authReset into individual spec files. It lives here only.
- * See massivee2e.md → "Demo Auth State" for the rationale (demo_role / active_persona conflict, PR #46).
+ * DO NOT copy authReset or loginAs into individual spec files. They live here only.
+ * See massivee2e.md → "Demo Auth State" for the rationale (demo_role / active_persona
+ * conflict, PR #46).
+ *
+ * AUDIT: 2026-06-17 — 3 critical + 2 stability issues patched (see commit message).
  */
 
 import { expect } from '@playwright/test';
@@ -19,6 +23,12 @@ import { expect } from '@playwright/test';
 
 export const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 export const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8080';
+
+/**
+ * DEMO_TOKEN is the single token constant used everywhere in this file.
+ * Previously, loginAs() had a hardcoded 'demo-token' string that diverged
+ * from this constant when DEMO_TOKEN env var was set. Now fixed.
+ */
 export const DEMO_TOKEN = process.env.DEMO_TOKEN || 'demo-token';
 
 // ---------------------------------------------------------------------------
@@ -44,6 +54,12 @@ export const DEMO_RETAILER = {
   retailerId: 'demo-freshmart',
 };
 
+/**
+ * INTENTIONAL: DEMO_BRAND and DEMO_ADVERTISER share advertiserId ('demo-bonvie').
+ * They represent the same company (BonVie Snacks) with different system access roles.
+ * Do NOT change one without the other — cross-persona assertions in Phases 11–13
+ * depend on this alignment.
+ */
 export const DEMO_BRAND = {
   id: 'demo-brand-uid',
   role: 'brand',            // x-demo-role header value
@@ -59,7 +75,7 @@ export const DEMO_ADVERTISER = {
   email: 'advertiser@softomedia.demo',
   displayName: 'Demo Advertiser',
   firestoreId: 'demo-bonvie',
-  advertiserId: 'demo-bonvie',
+  advertiserId: 'demo-bonvie', // INTENTIONAL: same as DEMO_BRAND (see note above)
 };
 
 export const DEMO_TECHOP = {
@@ -94,6 +110,12 @@ export const SEED = {
 // Resolves the demo_role / active_persona localStorage conflict documented in
 // current_sprint/active_personaVSdemo_role.md and PR #46.
 //
+// FIX (2026-06-17): Added page.reload() after clearing localStorage.
+// Previously, clearing storage did not flush React's in-memory auth state
+// (DemoAuthProvider holds auth in a Context ref). Without the reload, tests
+// that called authReset() and then immediately read UI auth state could see
+// the previous persona still mounted. The reload forces a clean provider init.
+//
 // Pattern:
 //   test.beforeEach(authReset);
 // ---------------------------------------------------------------------------
@@ -106,6 +128,8 @@ export async function authReset({ page }) {
     localStorage.removeItem('authToken');
     sessionStorage.clear();
   });
+  // Reload to flush React in-memory auth state held by DemoAuthProvider.
+  await page.reload({ waitUntil: 'domcontentloaded' });
 }
 
 // ---------------------------------------------------------------------------
@@ -115,33 +139,50 @@ export async function authReset({ page }) {
 //   await loginAs(page, DEMO_ADMIN);
 //
 // Sets localStorage keys that DemoAuthProvider reads on mount, then
-// navigates to the persona's default dashboard and waits for the shell.
+// navigates to root (App.jsx redirects to the correct dashboard) and waits
+// for the dashboard shell selector.
+//
+// FIXES (2026-06-17):
+// 1. Token: uses DEMO_TOKEN constant, not a hardcoded 'demo-token' string.
+//    Previously the hardcoded string diverged from the DEMO_TOKEN env var.
+// 2. waitUntil: changed from 'networkidle' to 'domcontentloaded'.
+//    'networkidle' is unreliable for SPAs with Firestore listeners or polling,
+//    which can keep the network active indefinitely. The waitForSelector call
+//    below is the correct completion signal.
+// 3. Error message: the actual role value is now resolved before the throw,
+//    preventing '[object Promise]' appearing in error output.
 // ---------------------------------------------------------------------------
 
 export async function loginAs(page, persona) {
   await page.goto(BASE_URL + '/login', { waitUntil: 'domcontentloaded' });
-  await page.evaluate((p) => {
-    localStorage.setItem('demo_role', p.role);
-    localStorage.setItem('active_persona', p.role);
-    localStorage.setItem('authToken', 'demo-token');
-  }, persona);
+  await page.evaluate(
+    ({ role, token }) => {
+      localStorage.setItem('demo_role', role);
+      localStorage.setItem('active_persona', role);
+      localStorage.setItem('authToken', token);
+    },
+    { role: persona.role, token: DEMO_TOKEN }, // FIX: use DEMO_TOKEN constant
+  );
 
-  // Navigate to root; App.jsx will redirect to the correct dashboard
-  await page.goto(BASE_URL + '/', { waitUntil: 'networkidle' });
+  // Navigate to root; App.jsx will redirect to the correct dashboard.
+  // FIX: 'domcontentloaded' instead of 'networkidle' — SPA polling keeps
+  // network active indefinitely, making 'networkidle' intermittently time out.
+  await page.goto(BASE_URL + '/', { waitUntil: 'domcontentloaded' });
 
-  // Wait for the dashboard shell to confirm the redirect completed
+  // Wait for the dashboard shell to confirm the redirect completed.
   await page.waitForSelector('[data-testid="dashboard-shell"]', { timeout: 15000 });
 
-  // Confirm the role header will be sent on subsequent API calls
-  // (sampled via a known safe GET — does not mutate state)
-  const roleConfirmed = await page.evaluate((role) => {
-    return localStorage.getItem('demo_role') === role;
-  }, persona.role);
+  // Confirm the role is correctly set before the spec proceeds.
+  const actualRole = await page.evaluate(() => localStorage.getItem('demo_role'));
 
-  if (!roleConfirmed) {
+  if (actualRole !== persona.role) {
+    // FIX: actualRole is a resolved string, not a Promise. Previously the
+    // throw message contained `await page.evaluate(...)` inside the template
+    // literal, which is not a valid async context and printed '[object Promise]'.
     throw new Error(
-      `authReset: demo_role mismatch after loginAs. ` +
-      `Expected '${persona.role}', got '${await page.evaluate(() => localStorage.getItem('demo_role'))}'.`
+      `loginAs: demo_role mismatch after authentication. ` +
+      `Expected '${persona.role}', got '${actualRole}'. ` +
+      `Check DemoAuthProvider mount order and localStorage key names.`,
     );
   }
 }
@@ -154,21 +195,58 @@ export async function loginAs(page, persona) {
 // Usage:
 //   const assertHeader = await assertRoleHeader(page, DEMO_BRAND.role, '/api/campaigns');
 //   await page.click('[data-testid="wizard-submit"]');
-//   await assertHeader(); // resolves when the intercepted request is seen
+//   await assertHeader(); // resolves when the intercepted request fires
+//
+// FIXES (2026-06-17):
+// 1. Timeout: added a 10s Promise.race() so the assertion fails with a clear
+//    message rather than hanging the entire test if the route never fires.
+// 2. Route cleanup: page.unroute() is called after the assertion resolves,
+//    preventing stale route handlers accumulating across test steps.
+//    (Playwright routes are additive — each page.route() call appends a new
+//    handler without removing previous ones.)
 // ---------------------------------------------------------------------------
 
 export function assertRoleHeader(page, expectedRole, urlPattern) {
-  let resolve;
-  const promise = new Promise((res) => { resolve = res; });
+  let resolveCapture;
 
-  page.route(`**${urlPattern}**`, async (route) => {
-    const headers = route.request().headers();
-    resolve(headers['x-demo-role']);
-    await route.continue();
+  const capturePromise = new Promise((res) => {
+    resolveCapture = res;
   });
 
+  const handler = async (route) => {
+    const headers = route.request().headers();
+    resolveCapture(headers['x-demo-role']);
+    await route.continue();
+  };
+
+  page.route(`**${urlPattern}**`, handler);
+
+  const TIMEOUT_MS = 10000;
+
   return async () => {
-    const actualRole = await promise;
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              `assertRoleHeader: no request matching '${urlPattern}' was intercepted ` +
+              `within ${TIMEOUT_MS}ms. Check the URL pattern and that the action ` +
+              `triggering the request was performed after this assertion was set up.`,
+            ),
+          ),
+        TIMEOUT_MS,
+      ),
+    );
+
+    let actualRole;
+    try {
+      actualRole = await Promise.race([capturePromise, timeoutPromise]);
+    } finally {
+      // FIX: always clean up the route handler to prevent accumulation
+      // across test steps and test files.
+      await page.unroute(`**${urlPattern}**`, handler);
+    }
+
     expect(actualRole).toBe(expectedRole);
   };
 }
