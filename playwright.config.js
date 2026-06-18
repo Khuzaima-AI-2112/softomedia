@@ -5,10 +5,12 @@ import { defineConfig, devices } from '@playwright/test';
  *
  * Changes from original:
  *
- * 1. globalTeardown added — points to demoSeedTeardown export from
- *    00_seed.setup.js. Deletes all demo seed documents after the full suite.
- *    Without this, re-runs 409-conflict on the inventory-full check in
- *    campaigns.js POST because the demo campaign doc still exists in Firestore.
+ * 1. globalTeardown updated — now points to the dedicated wrapper file
+ *    tests/demo_wizard/00_seed.teardown.js which re-exports demoSeedTeardown
+ *    as a default export. Playwright globalTeardown does not support the
+ *    `file#namedExport` fragment syntax; the previous value
+ *    './tests/demo_wizard/00_seed.setup.js#demoSeedTeardown' caused a
+ *    MODULE_NOT_FOUND crash before any test ran.
  *
  * 2. 'demo-wizard' project — isolated serial project for the 16-phase E2E
  *    demo suite. Chromium only, 90s timeout, single worker, testMatch scoped
@@ -22,7 +24,7 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
     globalSetup:    './tests/global.setup.js',
-    globalTeardown: './tests/demo_wizard/00_seed.setup.js#demoSeedTeardown',
+    globalTeardown: './tests/demo_wizard/00_seed.teardown.js',
 
     testDir: './tests',
 
