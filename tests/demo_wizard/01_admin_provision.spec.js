@@ -19,12 +19,19 @@
  * Every POST is verified via assertRoleHeader to confirm admin auth header
  * is sent. Each step asserts the created entity appears in the UI list before
  * the next step runs — early failure = maximum signal, no silent drift.
+ *
+ * Gap 2 closure (N-1.1):
+ *   Wrong-role write: POST /api/retailers as 'brand' → must return 403.
+ *   Firestore must NOT contain a new retailer doc from this call.
  */
 
 import { test, expect } from '@playwright/test';
 import {
   DEMO_ADMIN,
+  DEMO_BRAND,
   BASE_URL,
+  API_BASE_URL,
+  DEMO_TOKEN,
   SEED,
   authReset,
   loginAs,
@@ -121,9 +128,6 @@ test.describe.serial('Phase 1 — Admin Provision', () => {
 
   // ─────────────────────────────────────────────────────────────────────────
   // Step 1.5 — Add Screens (2 per store, 4 total)
-  // Adds screens to demo-screen-01 through demo-screen-04 via the Admin
-  // Screen Management panel. The seed already pre-created these IDs; this
-  // step exercises the UI creation path to confirm the form + list work.
   // ─────────────────────────────────────────────────────────────────────────
   test('1.5 add 4 screens (2 per store)', async ({ page }) => {
     await loginAs(page, DEMO_ADMIN);
@@ -162,7 +166,6 @@ test.describe.serial('Phase 1 — Admin Provision', () => {
 
     const assertHeader = await assertRoleHeader(page, DEMO_ADMIN.role, '/api/business-hours');
 
-    // Set Mon–Fri 08:00–22:00 for all stores
     await page.fill('[data-testid="input-hours-open"]', '08:00');
     await page.fill('[data-testid="input-hours-close"]', '22:00');
     await page.click('[data-testid="btn-hours-apply-all"]');
@@ -228,7 +231,6 @@ test.describe.serial('Phase 1 — Admin Provision', () => {
 
     const assertHeader = await assertRoleHeader(page, DEMO_ADMIN.role, '/api/pricing');
 
-    // Select the current week's Monday cell and set a CPM rate
     await page.click('[data-testid="pricing-calendar-today"]');
     await page.waitForSelector('[data-testid="modal-pricing-form"]');
     await page.fill('[data-testid="input-cpm-rate"]', '12.50');
@@ -249,16 +251,16 @@ test.describe.serial('Phase 1 — Admin Provision', () => {
 
     const usersToCreate = [
       {
-        email: 'brand@softomedia.demo',
-        role: 'brand',
+        email:         'brand@softomedia.demo',
+        role:          'brand',
         linkedEntityId: SEED.advertiserId,
-        displayName: 'Demo Brand',
+        displayName:   'Demo Brand',
       },
       {
-        email: 'retailer@softomedia.demo',
-        role: 'retaileradmin',
+        email:         'retailer@softomedia.demo',
+        role:          'retaileradmin',
         linkedEntityId: SEED.retailerId,
-        displayName: 'Demo Retailer',
+        displayName:   'Demo Retailer',
       },
     ];
 
@@ -277,6 +279,33 @@ test.describe.serial('Phase 1 — Admin Provision', () => {
       await expect(
         page.locator('[data-testid="users-list"]').getByText(user.email),
       ).toBeVisible({ timeout: 10000 });
+    }
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // N-1.1 — Gap 2: wrong-role write → 403
+  // A 'brand' user must not be able to create a retailer.
+  // Uses request fixture (no UI) — fastest way to assert the auth guard.
+  // ─────────────────────────────────────────────────────────────────────────
+  test('N-1.1 wrong-role POST /api/retailers as brand → 403 Forbidden', async ({ playwright }) => {
+    const brandCtx = await playwright.request.newContext({
+      baseURL:          API_BASE_URL,
+      extraHTTPHeaders: {
+        Authorization:  `Bearer ${DEMO_TOKEN}`,
+        'x-demo-role':  DEMO_BRAND.role, // brand — must be rejected
+        'Content-Type': 'application/json',
+      },
+    });
+    try {
+      const res = await brandCtx.post('/api/retailers', {
+        data: { name: 'Forbidden Retailer Inc.', contact: 'nope@forbidden.ca' },
+      });
+      expect(
+        res.status(),
+        'POST /api/retailers as brand must return 403 — requireRole guard failed',
+      ).toBe(403);
+    } finally {
+      await brandCtx.dispose();
     }
   });
 
