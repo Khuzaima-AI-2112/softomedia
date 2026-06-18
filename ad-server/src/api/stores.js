@@ -176,9 +176,11 @@ router.get('/:id/weekly-hours', async (req, res) => {
  * PUT /api/stores/:id/weekly-hours
  * Update default weekly schedule.
  *
- * Sprint 11 — S11-4: requireRole('admin') added alongside existing authenticate.
+ * fix(#28): requireRole('retaileradmin') — retaileradmin (level 1) can now save;
+ * admin (level 4) and superadmin (level 5) still pass via hierarchy.
+ * Previously requireRole('admin') which blocked all retaileradmin saves with 403.
  */
-router.put('/:id/weekly-hours', authenticate, requireRole('admin'), async (req, res) => {
+router.put('/:id/weekly-hours', authenticate, requireRole('retaileradmin'), async (req, res) => {
     try {
         const hours = await BusinessHoursService.updateWeeklyHours(req.params.id, req.body.weekly_hours);
         res.json(hours);
@@ -192,9 +194,10 @@ router.put('/:id/weekly-hours', authenticate, requireRole('admin'), async (req, 
  * PUT /api/stores/:id/special-hours
  * Update special hours for a date.
  *
- * Sprint 11 — S11-4: requireRole('admin') added alongside existing authenticate.
+ * fix(#28): requireRole('retaileradmin') — same reasoning as weekly-hours above.
+ * Previously requireRole('admin') which blocked all retaileradmin saves with 403.
  */
-router.put('/:id/special-hours', authenticate, requireRole('admin'), async (req, res) => {
+router.put('/:id/special-hours', authenticate, requireRole('retaileradmin'), async (req, res) => {
     try {
         const { date, ...hoursData } = req.body;
         if (!date) {

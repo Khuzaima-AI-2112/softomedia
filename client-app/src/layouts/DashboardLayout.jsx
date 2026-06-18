@@ -29,11 +29,14 @@ const BRAND_NAV = [
     { to: '/dashboard/advertiser/invoices', icon: 'receipt_long', label: 'Invoices' },
 ];
 
+// fix(#26b): add Loops and Campaign Approvals — previously missing from retailer sidebar
 const RETAILER_NAV = [
-    { to: '/dashboard/retailer',                        icon: 'dashboard',       label: 'Dashboard',       end: true },
+    { to: '/dashboard/retailer',                        icon: 'dashboard',       label: 'Dashboard',          end: true },
     { to: '/dashboard/retailer/schedule',               icon: 'calendar_month',  label: 'Schedule' },
     { to: '/dashboard/retailer/schedule-history',       icon: 'history',         label: 'Schedule History' },
     { to: '/dashboard/retailer/schedule-manager',       icon: 'event_available', label: 'D-1 Preview' },
+    { to: '/dashboard/retailer/loops',                  icon: 'subscriptions',   label: 'Loops' },
+    { to: '/dashboard/retailer/campaign-approvals',     icon: 'approval',        label: 'Campaign Approvals' },
 ];
 
 // Task 4.6 — TechOpsDashboard is now the landing page entry; Health remains accessible
