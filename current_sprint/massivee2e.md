@@ -1,224 +1,359 @@
-# Massive E2E Demo Wizard — Canonical Plan
-**Date:** 2026-06-17 (revised 2026-06-17)
+# Massive E2E Demo Wizard — Canonical Workflow
+**Date:** 2026-06-17
 **Status:** Draft — awaiting pre-condition sign-off
 **Author:** Architecture Review / SRE
+**Scope:** All 16 phases covering every confirmed route in `App.jsx` (Sprint 22 — 2026-06-16) across all 5 user personas.
 
-This document defines the canonical end-to-end demo workflow for `softomedia-live2026`. Every step depends on the one before it — that ordering constraint is also what makes it a reliable regression detector.
+Routes confirmed from `App.jsx` (Sprint 22). Auth behaviour confirmed from `routebyroute.md` and `manual_testing.md`.
 
-All routes confirmed from `App.jsx` (Sprint 22 — 2026-06-16). All auth behaviour confirmed from `routebyroute.md` and `manual_testing.md`.
+For gap-closure (API surface smoke, error paths, Firestore Rules), see `massivee2e_gaps.md`.
+For the complete 18-file spec register, see `massivee2e_gaps.md` → Spec File Register.
 
 ---
 
 ## Critical Pre-Conditions (Blockers — Resolve Before Running Any Phase)
 
-These must be signed off before the demo workflow can be declared passing. **Pre-Condition 0 is a hard gate — without it every API call returns 401 regardless of persona.**
+Pre-Condition 0 is a hard gate — without it every API call returns 401 regardless of persona.
 
 | # | Blocker | Resolution | Status |
 |---|---------|------------|--------|
-| **0** | `ALLOW_DEMO_MODE` not set on staging | Set `ALLOW_DEMO_MODE=true` in staging env vars, OR confirm `NODE_ENV !== 'production'` locally. Verify: `process.env.ALLOW_DEMO_MODE === 'true'` before Phase 0. Without this, every persona switch returns `401`. | ☐ |
-| **1** | `campaigns.js` and `schedules.js` POST handlers return 404 | At minimum implement a stub: `res.status(200).json({ id: 'demo-campaign-001', status: 'active' })`. Without this Phase 3 fails at step 3.7. | ☐ |
-| **2** | Dynamic slot seeding missing | `SeedService.js` must write slots with `startTime = Date.now()` (current hour), not a hardcoded time. One-line fix. Unlocks all of Phase 4. | ☐ |
-| **3** | `PlaylistManagement.jsx` unrouted | Explicitly excluded from this demo with `// NOT YET ROUTED`. Do not reference it in any wizard step. | ☐ |
+| **0** | `ALLOW_DEMO_MODE` not set on staging | Set `ALLOW_DEMO_MODE=true` in staging env vars, OR confirm `NODE_ENV !== 'production'` locally. Verify `process.env.ALLOW_DEMO_MODE === 'true'` before Phase 0. | ☐ |
+| **1** | `campaigns.js` POST handler returns 404 | Implement stub: `res.status(200).json({ id: 'demo-campaign-001', status: 'active' })`. Without this Phase 3 fails at step 3.7. | ☐ |
+| **2** | Dynamic slot seeding missing | `SeedService.js` must write slots with `startTime = Date.now()` (current hour), not a hardcoded time. Unlocks all of Phase 4. | ☐ |
+| **3** | `PlaylistManagement.jsx` unrouted | Explicitly excluded from this demo. Do not reference it in any wizard step. | ☐ |
 | **4** | XSS / Open Redirect vulnerability | Run `npm audit fix` before demo runs on any shared environment. | ☐ |
-| **5** | Playwright global timeout | Set `timeout: 60000` in `playwright.config.js` for the demo suite. Add `await page.waitForSelector('.main-content-loaded')` guards on all `React.lazy` routes. | ☐ |
+| **5** | Playwright global timeout | Set `timeout: 60000` in `playwright.config.js`. Add `await page.waitForSelector('.main-content-loaded')` guards on all `React.lazy` routes. | ☐ |
 
 ---
 
-## Demo Auth State — Mandatory Reset Between Phases
+## Demo Auth State — Single Source of Truth
 
-The `demo_role` / `active_persona` localStorage conflict (documented in `active_personaVSdemo_role.md`, PR #46) will cause Phase 3 (Brand) to silently send `x-demo-role: admin` if run after Phase 1 (Admin) without clearing state. **Every spec file must include this `beforeEach` hook:**
+The `demo_role` / `active_persona` localStorage conflict (documented in `active_personaVSdemo_role.md`, PR #46) causes role bleed between phases. The `beforeEach` reset **lives in `demo.fixtures.js` only** — do not copy it into individual spec files.
 
+Every spec file imports and uses it:
 ```js
-// 00_seed.setup.js — and every spec file in demo_wizard/
-test.beforeEach(async ({ page }) => {
-  await page.evaluate(() => {
-    localStorage.removeItem('demo_role');
-    localStorage.removeItem('active_persona');
-  });
-});
+// In each spec file:
+import { authReset } from './demo.fixtures.js';
+test.beforeEach(authReset);
 ```
 
-Without this, the brand wizard loads with the wrong role header and shows an empty screen list with no error — the exact regression from PR #46.
+See `tests/demo_wizard/demo.fixtures.js` for the implementation.
 
 ---
 
-## Phase 0 — Seed & Bootstrap (Programmatic, no UI)
+## Lessons Learned (From This Repo)
 
-Before the wizard starts, `DemoSeedService` pre-populates Firestore with a known, deterministic dataset.
+1. **Silent catch = invisible failures** — `BaseRepository.update()` swallowed Firestore errors until Sprint 11. Every step asserts on the *response body and status code*, not just the absence of an error modal.
+2. **Duplicate filenames broke CI** — `TicketDashboard` and `CampaignApprovalList` previously had two diverging implementations. Run `/hygiene` and `/validate-testids` before executing the demo suite.
+3. **Clock-sensitive logic needs clock control** — The player slot timing bug (10 timeouts in `loop_playback.spec.js`) is a clock problem. The seed owns the clock: write `startTime = Date.now()` at seed-time, not test-time.
+4. **Public endpoints don't prove correct auth** — `GET /api/campaigns` returns 200 with no auth (confirmed `routebyroute.md`). Always assert request headers explicitly on POST/mutation steps via Playwright `page.route()` intercept.
+
+---
+
+## Phase 0 — Seed & Bootstrap
+
+**Type:** Programmatic — no UI
+**Spec file:** `00_seed.setup.js` (Playwright `globalSetup`)
+
+Pre-populates Firestore with a known, deterministic dataset. All subsequent phases depend on this state.
 
 **Acceptance criteria (all must pass before Phase 1 starts):**
-- Firestore contains `retailers/demo-freshmart` with `name: "FreshMart Montréal"`
-- Firestore contains `advertisers/demo-bonvie` with `status: "approved"`
-- Firestore contains `users/demo-admin`, `users/demo-retailer`, `users/demo-brand`, `users/demo-techop`
-- Loop template exists with 2 paid slots where `startTime >= Date.now()` and `startTime <= Date.now() + 3600000` (current hour window)
+- `retailers/demo-freshmart` exists with `name: "FreshMart Montréal"`, 2 stores, 4 screens, business hours for current week
+- `advertisers/demo-bonvie` exists with `status: "approved"`
+- Users exist: `demo-admin`, `demo-retailer`, `demo-brand`, `demo-advertiser`, `demo-techop`
+- Loop template exists with 2 paid slots where `startTime >= Date.now()` AND `startTime <= Date.now() + 3600000`
 
-**Seed data:**
-- `DEMO_RETAILER`: "FreshMart Montréal" — 2 stores, 4 screens, business hours seeded for the current week
-- `DEMO_ADVERTISER`: "BonVie Snacks" — pre-approved brand account
-- `DEMO_ADMIN`: superuser with full access
-- `DEMO_TECHOP`: health-check operator
-- Loop template with 2 seeded paid slots at `now()` + offset
-
-> **Root cause fix:** `ad_player.spec.js` and `loop_playback.spec.js` failures (10 timeouts) occur because seeded slot `startTime` values don't fall within the current hour. The seed **must** write `startTime = Date.now()` — not a hardcoded ISO string. This is the architectural key that unlocks Phase 4.
+> **Root cause fix for `loop_playback.spec.js` (10 timeouts):** Slot `startTime` must equal `Date.now()` — not a hardcoded ISO string. This is the architectural key that unlocks Phase 4.
 
 ---
 
 ## Phase 1 — Admin Provisions the Network
 
 **Persona:** `DEMO_ADMIN` | `x-demo-role: admin`
-**Auth reset:** Run `localStorage.clear()` before login (see Demo Auth State above)
+**Spec file:** `01_admin_provision.spec.js`
 
 | Step | Action | Route | Acceptance Criterion |
 |------|--------|-------|---------------------|
-| 1.1 | Login as Admin | `/login` | `localStorage.getItem('demo_role') === 'admin'`; network tab shows `x-demo-role: admin` on first API call |
-| 1.2 | Create Retailer: "FreshMart Montréal" | `/dashboard/admin/retailers` | `POST /api/retailers` returns `201` with `{ id, name: "FreshMart Montréal" }`; hard-refresh shows retailer in list |
-| 1.3 | Add 2 Stores to that Retailer | `/dashboard/admin/retailers` | `POST /api/retailers/:id/stores` ×2 returns `201`; store count = 2 on retailer detail hard-refresh |
-| 1.4 | Add 4 Screens (2 per store) | `/dashboard/admin/screens` | `POST /api/screens` ×4 returns `201`; each screen has `storeId` set; screen count = 4 in list |
-| 1.5 | Set Business Hours for all stores | `/dashboard/admin/hours` | `POST /api/retailers/:id/business-hours` returns `200`; hard-refresh shows hours populated |
-| 1.6 | Create Advertiser: "BonVie Snacks" | `/dashboard/admin/advertisers` | `POST /api/advertisers` returns `201` with `{ id, name: "BonVie Snacks", status: "approved" }` |
-| 1.7 | Create Loop Template for FreshMart | `/dashboard/admin/loops` → `/dashboard/admin/loops/:id` | `POST /api/loops` returns `201`; navigating to `/dashboard/admin/loops/:id` renders `LoopBuilder` with 12 empty slots |
-| 1.8 | Set CPM pricing on calendar | `/dashboard/admin/pricing` | `POST /api/pricing` returns `200`; calendar cell for target date shows updated CPM value after hard-refresh |
-| 1.9 | Create Brand User for BonVie | `/dashboard/admin/users` | `POST /api/users` returns `201` with `{ role: "brand" }`; user appears in user list |
-| 1.10 | Create Retailer User for FreshMart | `/dashboard/admin/users` | `POST /api/users` returns `201` with `{ role: "retailer" }`; user appears in user list |
+| 1.1 | Login as Admin | `/login` | `localStorage.getItem('demo_role') === 'admin'`; `x-demo-role: admin` on first API call |
+| 1.2 | Create Retailer: "FreshMart Montréal" | `/dashboard/admin/retailers` | `POST /api/retailers` → `201` with `{ id, name: "FreshMart Montréal" }`; hard-refresh shows retailer |
+| 1.3 | Add 2 Stores | `/dashboard/admin/retailers` | `POST /api/retailers/:id/stores` ×2 → `201`; store count = 2 on hard-refresh |
+| 1.4 | Add 4 Screens (2 per store) | `/dashboard/admin/screens` | `POST /api/screens` ×4 → `201`; each has `storeId` set; count = 4 |
+| 1.5 | Set Business Hours | `/dashboard/admin/hours` | `POST /api/retailers/:id/business-hours` → `200`; hours populated on hard-refresh |
+| 1.6 | Create Advertiser: "BonVie Snacks" | `/dashboard/admin/advertisers` | `POST /api/advertisers` → `201` with `{ id, name: "BonVie Snacks", status: "approved" }` |
+| 1.7 | Create Loop Template for FreshMart | `/dashboard/admin/loops` → `/dashboard/admin/loops/:id` | `POST /api/loops` → `201`; `/dashboard/admin/loops/:id` renders `LoopBuilder` with 12 empty slots |
+| 1.8 | Set CPM pricing on calendar | `/dashboard/admin/pricing` | `POST /api/pricing` → `200`; calendar cell shows updated CPM on hard-refresh |
+| 1.9 | Create Brand User for BonVie | `/dashboard/admin/users` | `POST /api/users` → `201` with `{ role: "brand" }`; user in list |
+| 1.10 | Create Retailer User for FreshMart | `/dashboard/admin/users` | `POST /api/users` → `201` with `{ role: "retailer" }`; user in list |
 
-> **Note — LoopBuilder is routed:** `LoopBuilder.jsx` is confirmed routed at `/dashboard/admin/loops/:id` in `App.jsx` (Sprint 22). The prior "orphan alert" is retired. Step 1.7 uses this confirmed path.
->
-> **Note — `campaigns.js` auth model:** `GET /api/campaigns` is intentionally public (no auth at mount point per `routebyroute.md`). Step 1 does not assert campaign visibility — that is reserved for Phase 6 where auth context is explicitly verified.
+> `LoopBuilder.jsx` is confirmed routed at `/dashboard/admin/loops/:id` in `App.jsx` (Sprint 22). Prior "orphan alert" is retired.
 
 ---
 
 ## Phase 2 — Retailer Configures Their Schedule
 
 **Persona:** `DEMO_RETAILER` | `x-demo-role: retaileradmin`
-**Auth reset:** Clear `demo_role` + `active_persona` before switching (see Demo Auth State above)
+**Spec file:** `02_retailer_schedule.spec.js`
 
 | Step | Action | Route | Acceptance Criterion |
 |------|--------|-------|---------------------|
-| 2.1 | Login as Retailer | `/login` | `localStorage.getItem('demo_role') === 'retaileradmin'`; `x-demo-role: retaileradmin` confirmed in network tab |
-| 2.2 | Open Schedule Calendar | `/dashboard/retailer/schedule` | Page loads without 403; stores and screens seeded in Phase 1 are visible in the location picker |
-| 2.3 | Block out "no-ads" window (Sunday 2–4am) | `/dashboard/retailer/schedule` | `POST /api/schedules/override` returns `200`; hard-refresh of `/dashboard/retailer/schedule` shows greyed-out Sunday 2–4am block |
-| 2.4 | Verify Dashboard KPIs reflect loop config | `/dashboard/retailer` | `GET /api/retailers/:id/stats` returns `200`; KPI widgets are non-zero and non-loading |
+| 2.1 | Login as Retailer | `/login` | `localStorage.getItem('demo_role') === 'retaileradmin'`; `x-demo-role: retaileradmin` confirmed |
+| 2.2 | Open Schedule Calendar | `/dashboard/retailer/schedule` | Loads without 403; stores/screens from Phase 1 visible |
+| 2.3 | Block "no-ads" window (Sunday 2–4am) | `/dashboard/retailer/schedule` | `POST /api/schedules/override` → `200`; hard-refresh shows greyed-out block |
+| 2.4 | Verify Dashboard KPIs | `/dashboard/retailer` | `GET /api/retailers/:id/stats` → `200`; KPI widgets non-zero and non-loading |
 
 ---
 
-## Phase 3 — Brand Books a Campaign (The 5-Step Wizard)
+## Phase 3 — Brand Books a Campaign (5-Step Wizard)
 
 **Persona:** `DEMO_BRAND` | `x-demo-role: brand`
-**Auth reset:** Clear `demo_role` + `active_persona` before switching — **this is the highest-risk auth transition in the demo**
-**Blocker dependency:** Pre-Condition #1 (`campaigns.js` POST stub) must be resolved before step 3.7 can pass.
+**Spec file:** `03_brand_campaign_wizard.spec.js`
+**Blocker dependency:** Pre-Condition #1 (`campaigns.js` POST stub) must be resolved before step 3.7.
+
+> **Highest-risk auth transition in the demo.** Auth reset is mandatory before this phase.
 
 | Step | Action | Route | Acceptance Criterion |
 |------|--------|-------|---------------------|
-| 3.1 | Login as Brand | `/login` | `localStorage.getItem('demo_role') === 'brand'`; `x-demo-role: brand` confirmed in network tab |
-| 3.2 | Open Campaign Wizard | `/dashboard/brand/campaign/new` | Page loads; Step 1 (Location) renders with retailer picker visible; no 403 or empty state |
-| 3.3 | **Step 1 — Location:** Select FreshMart, both stores, all 4 screens | `/dashboard/brand/campaign/new` | `wizardData.selectedRetailers` contains `demo-freshmart`; all 4 screen checkboxes selected; "Next" button enabled |
-| 3.4 | **Step 2 — Schedule:** Name="BonVie Summer Demo", date range = next 7 days, budget=$2,000 | `/dashboard/brand/campaign/new` | `wizardData.campaignName === "BonVie Summer Demo"`; date range spans 7 days from today; budget field = `2000`; "Next" enabled |
-| 3.5 | **Step 3 — Slots:** Select peak hourly slots (12–1pm, 5–7pm) | `/dashboard/brand/campaign/new` | `wizardData.selectedSlots` is non-empty array; slot time labels match selected hours; "Next" enabled |
-| 3.6 | **Step 4 — Creative:** Upload `test-ad.png` (from `/tests/test-ad.png`), duration=15s | `/dashboard/brand/campaign/new` | File upload returns `200`; `wizardData.creativeUrl` is a non-null string; duration = `15`; "Next" enabled |
-| 3.7 | **Step 5 — Review:** Confirm summary, click Submit | `/dashboard/brand/campaign/new` | `POST /api/campaigns` called with `Authorization: Bearer demo-token` **and** `x-demo-role: brand` (assert both headers — public endpoint does not guarantee correct role was used); response `200` with `{ id: 'demo-campaign-001', status: 'active' }`; `POST /api/slots` called for each selected slot |
-| 3.8 | Verify redirect to Brand Dashboard with campaign visible | `/dashboard/brand` | Redirect completes within 3s; `data-testid="campaign-card"` is visible in the DOM; campaign name "BonVie Summer Demo" rendered |
-
-> **Auth model note:** `GET /api/campaigns` is intentionally public (no `authenticate` at mount point). Step 3.8's campaign visibility assertion does **not** prove the correct role was used. Step 3.7 must explicitly assert both `Authorization` and `x-demo-role` headers via Playwright `page.route()` intercept or `request.headers()`.
+| 3.1 | Login as Brand | `/login` | `localStorage.getItem('demo_role') === 'brand'`; `x-demo-role: brand` confirmed |
+| 3.2 | Open Campaign Wizard | `/dashboard/brand/campaign/new` | Step 1 (Location) renders; retailer picker visible; no 403 |
+| 3.3 | **Step 1 — Location:** Select FreshMart, both stores, all 4 screens | `/dashboard/brand/campaign/new` | `wizardData.selectedRetailers` contains `demo-freshmart`; all 4 screens checked; "Next" enabled |
+| 3.4 | **Step 2 — Schedule:** Name="BonVie Summer Demo", 7-day range, budget=$2,000 | `/dashboard/brand/campaign/new` | `wizardData.campaignName === "BonVie Summer Demo"`; 7-day range; budget = `2000`; "Next" enabled |
+| 3.5 | **Step 3 — Slots:** Select 12–1pm, 5–7pm | `/dashboard/brand/campaign/new` | `wizardData.selectedSlots` non-empty; slot labels match; "Next" enabled |
+| 3.6 | **Step 4 — Creative:** Upload `tests/test-ad.png`, duration=15s | `/dashboard/brand/campaign/new` | Upload → `200`; `wizardData.creativeUrl` non-null; duration = `15`; "Next" enabled |
+| 3.7 | **Step 5 — Review:** Confirm and Submit | `/dashboard/brand/campaign/new` | `POST /api/campaigns` asserts **both** `Authorization: Bearer demo-token` AND `x-demo-role: brand` via `page.route()` intercept; response `{ id: 'demo-campaign-001', status: 'active' }`; `POST /api/slots` called per slot |
+| 3.8 | Verify redirect to Brand Dashboard | `/dashboard/brand` | Redirect within 3s; `data-testid="campaign-card"` visible; "BonVie Summer Demo" in DOM |
 
 ---
 
 ## Phase 4 — Player Broadcasts the Campaign
 
-**Persona:** Public (no auth required)
-**Blocker dependency:** Pre-Condition #2 (dynamic slot seeding) must be resolved — slots must cover current hour.
+**Persona:** Public (no auth)
+**Spec file:** `04_player_broadcast.spec.js`
+**Blocker dependency:** Pre-Condition #2 (dynamic slot seeding).
 
 | Step | Action | Route | Acceptance Criterion |
 |------|--------|-------|---------------------|
-| 4.1 | Open Loop Demo Player | `/player/demo` | Page loads without auth; demo loop begins cycling within 5s; no "Waiting for Scheduled Slot" message |
-| 4.2 | Open Player with screen token | `/player?screen=demo-screen-01` | `GET /api/screens/demo-screen-01/playback-loop` returns `200` (intentionally public per `routebyroute.md`); BonVie ad creative renders in current slot |
-| 4.3 | Verify ad transitions | `/player?screen=demo-screen-01` | Player state machine advances from slot 1 → slot 2 within 15s (creative duration); `data-testid="ad-frame"` src changes |
-| 4.4 | Assert telemetry heartbeats fire | `/player?screen=demo-screen-01` | `page.waitForRequest(r => r.url().includes('/telemetry'))` resolves within 30s; request body contains `{ screenId, timestamp, slotId }` — all three fields non-null |
+| 4.1 | Open Loop Demo Player | `/player/demo` | Loads without auth; demo loop cycles within 5s; no "Waiting for Scheduled Slot" |
+| 4.2 | Open Player with screen token | `/player?screen=demo-screen-01` | `GET /api/screens/demo-screen-01/playback-loop` → `200` (public); BonVie ad renders |
+| 4.3 | Verify ad transitions | `/player?screen=demo-screen-01` | Player advances slot 1 → slot 2 within 15s; `data-testid="ad-frame"` src changes |
+| 4.4 | Assert telemetry heartbeats fire | `/player?screen=demo-screen-01` | `page.waitForRequest(r => r.url().includes('/telemetry'))` resolves within 30s; body contains `{ screenId, timestamp, slotId }` — all non-null |
 
 ---
 
 ## Phase 5 — TechOps Verifies Health
 
 **Persona:** `DEMO_TECHOP` | `x-demo-role: techop`
-**Auth reset:** Clear `demo_role` + `active_persona` before switching
+**Spec file:** `05_techops_health.spec.js`
 
 | Step | Action | Route | Acceptance Criterion |
 |------|--------|-------|---------------------|
-| 5.1 | Login as TechOperator | `/login` | `localStorage.getItem('demo_role') === 'techop'`; `x-demo-role: techop` confirmed in network tab |
-| 5.2 | Navigate to Health Check | `/dashboard/techoperator/health` | Page loads; health status widget shows green / "OK" (mock response acceptable — see note) |
+| 5.1 | Login as TechOperator | `/login` | `localStorage.getItem('demo_role') === 'techop'`; `x-demo-role: techop` confirmed |
+| 5.2 | Navigate to Health Check | `/dashboard/techoperator/health` | Health status widget shows green / "OK" (mock response — `ENVIRONMENT-GATED` until real checks wired) |
 | 5.3 | Navigate to TechOps Dashboard | `/dashboard/techoperator` | `TechOpsDashboard.jsx` renders; no 404 or blank screen |
 
-> **Known gap — mock health response:** `Health.jsx` currently contains hardcoded/fake connectivity checks (`TODO.md`: "Add real backend connectivity checks to Health.jsx"). For the demo, the health endpoint mock must return `{ status: "ok", backend: true }`. Do not assert real backend connectivity in this phase — mark it `ENVIRONMENT-GATED` until the real checks are wired.
+> `Health.jsx` currently has hardcoded checks (`TODO.md`). Mock must return `{ status: "ok", backend: true }`. Mark steps 5.2 `ENVIRONMENT-GATED`.
 
 ---
 
 ## Phase 6 — Admin Validates the Full Circle
 
 **Persona:** `DEMO_ADMIN` | `x-demo-role: admin`
-**Auth reset:** Clear `demo_role` + `active_persona` before switching
+**Spec file:** `06_admin_validate.spec.js`
 
 | Step | Action | Route | Acceptance Criterion |
 |------|--------|-------|---------------------|
-| 6.1 | Open Admin Overview | `/dashboard/admin` | `GET /api/campaigns` returns array containing `{ id: 'demo-campaign-001', name: 'BonVie Summer Demo' }`; campaign card visible on overview page |
-| 6.2 | Open Network Map | `/dashboard/admin/map` | `NetworkMap.jsx` renders; FreshMart screens show status badge (active or broadcasting); no blank/error state |
-| 6.3 | Open AI Log | `/dashboard/admin/ai-log` | `AILog.jsx` renders; log table loads without 500 error (entries may be empty — assert no error state, not entry count) |
-| 6.4 | **Cleanup:** Delete demo campaign | `/dashboard/admin/campaigns` | `DELETE /api/campaigns/demo-campaign-001` returns `200`; hard-refresh of `/dashboard/admin/campaigns` does not contain "BonVie Summer Demo" in the DOM |
+| 6.1 | Open Admin Overview | `/dashboard/admin` | `GET /api/campaigns` returns array containing `{ id: 'demo-campaign-001', name: 'BonVie Summer Demo' }`; card visible |
+| 6.2 | Open Network Map | `/dashboard/admin/map` | `NetworkMap.jsx` renders; FreshMart screens show status badge; no blank/error state |
+| 6.3 | Open AI Log | `/dashboard/admin/ai-log` | `AILog.jsx` renders; table loads without 500 (entries may be empty — assert no error state) |
+| 6.4 | **Cleanup:** Delete demo campaign | `/dashboard/admin/campaigns` | `DELETE /api/campaigns/demo-campaign-001` → `200`; hard-refresh does not contain "BonVie Summer Demo" |
+
+---
+
+## Phase 7 — Retailer Reviews Loop Inventory
+
+**Persona:** `DEMO_RETAILER` | `x-demo-role: retaileradmin`
+**Spec file:** `07_retailer_loops.spec.js`
+**Pre-flight:** See `massivee2e_gaps.md` Gap 3 for the `/api/playlist` vs `/api/playlists` disambiguation `beforeAll` required in this spec.
+
+| Step | Action | Route | Acceptance Criterion |
+|------|--------|-------|---------------------|
+| 7.1 | Login as Retailer | `/login` | `x-demo-role: retaileradmin` confirmed |
+| 7.2 | Navigate to Retailer Loops | `/dashboard/retailer/loops` | Loads without 403; loop templates from Phase 1 visible |
+| 7.3 | Verify loop slot count | `/dashboard/retailer/loops` | FreshMart loop shows 12 slots; fill indicator non-zero |
+| 7.4 | Verify BonVie slot visible | `/dashboard/retailer/loops` | At least one slot shows `advertiserId: demo-bonvie` or "BonVie Summer Demo" |
+
+---
+
+## Phase 8 — Retailer Campaign Approval Gate ← Critical
+
+**Persona:** `DEMO_RETAILER` | `x-demo-role: retaileradmin`
+**Spec file:** `08_retailer_approval.spec.js`
+**Why critical:** This is the mandatory brand-safety gate. A campaign submitted in Phase 3 cannot be scheduled into a loop slot until the retailer approves it. Completes the business loop: Brand submits → **Retailer approves** → Admin validates → Player broadcasts.
+
+| Step | Action | Route | Acceptance Criterion |
+|------|--------|-------|---------------------|
+| 8.1 | Navigate to Campaign Approvals | `/dashboard/retailer/campaign-approvals` | `CampaignApprovalList.jsx` renders; "BonVie Summer Demo" in pending queue |
+| 8.2 | Open campaign detail | `/dashboard/retailer/campaign-approvals` | Clicking row expands/navigates to detail; creative thumbnail and metadata visible |
+| 8.3 | Click Approve | `/dashboard/retailer/campaign-approvals` | `POST /api/campaigns/demo-campaign-001/approve` → `200`; status changes "Pending" → "Approved" without reload; assert `x-demo-role: retaileradmin` header via `page.route()` |
+| 8.4 | Hard-refresh and verify persistence | `/dashboard/retailer/campaign-approvals` | After hard-refresh, "BonVie Summer Demo" shows "Approved"; not in pending queue |
+
+---
+
+## Phase 9 — Retailer Schedule Manager
+
+**Persona:** `DEMO_RETAILER` | `x-demo-role: retaileradmin`
+**Spec file:** `09_retailer_schedule_manager.spec.js`
+
+| Step | Action | Route | Acceptance Criterion |
+|------|--------|-------|---------------------|
+| 9.1 | Navigate to Schedule Manager | `/dashboard/retailer/schedule-manager` | Loads without 403; `ScheduleManager.jsx` renders; FreshMart stores/screens visible |
+| 9.2 | Verify approved BonVie campaign in schedule | `/dashboard/retailer/schedule-manager` | After Phase 8 approval, BonVie slots visible; no "pending approval" badge |
+| 9.3 | Shift a slot by 1 hour | `/dashboard/retailer/schedule-manager` | `PATCH /api/schedules/:slotId` → `200`; slot time updates in UI within 2s |
+
+---
+
+## Phase 10 — Retailer Schedule History
+
+**Persona:** `DEMO_RETAILER` | `x-demo-role: retaileradmin`
+**Spec file:** `10_retailer_schedule_history.spec.js`
+
+| Step | Action | Route | Acceptance Criterion |
+|------|--------|-------|---------------------|
+| 10.1 | Navigate to Schedule History | `/dashboard/retailer/schedule-history` | `ScheduleHistory.jsx` renders; history table non-empty |
+| 10.2 | Verify Phase 2 override recorded | `/dashboard/retailer/schedule-history` | Entry for "Sunday 2–4am no-ads block" (Phase 2 step 2.3) present; has timestamp and actor field |
+| 10.3 | Verify Phase 9 slot adjustment recorded | `/dashboard/retailer/schedule-history` | Most recent entry shows the Phase 9 slot shift; old time and new time both present |
+
+---
+
+## Phase 11 — Advertiser Dashboard
+
+**Persona:** `DEMO_ADVERTISER` | `x-demo-role: advertiser`
+**Spec file:** `11_advertiser_dashboard.spec.js`
+**Note:** `advertiser` role at `/dashboard/advertiser/*` is distinct from `brand` role at `/dashboard/brand/*`. Both exist as separate route trees in `App.jsx` (Sprint 14).
+
+| Step | Action | Route | Acceptance Criterion |
+|------|--------|-------|---------------------|
+| 11.1 | Login as Advertiser | `/login` | `localStorage.getItem('demo_role') === 'advertiser'`; `x-demo-role: advertiser` confirmed |
+| 11.2 | Open Advertiser Dashboard | `/dashboard/advertiser` | `AdvertiserDashboard.jsx` renders; KPI widgets load; no 403 or blank screen |
+| 11.3 | Verify demo campaign visible | `/dashboard/advertiser` | "BonVie Summer Demo" in active/recent campaigns; status = "Approved" (from Phase 8) |
+
+---
+
+## Phase 12 — Advertiser Campaign Management
+
+**Persona:** `DEMO_ADVERTISER` | `x-demo-role: advertiser`
+**Spec file:** `12_advertiser_campaigns.spec.js`
+
+| Step | Action | Route | Acceptance Criterion |
+|------|--------|-------|---------------------|
+| 12.1 | Navigate to Advertiser Campaigns | `/dashboard/advertiser/campaigns` | `AdvertiserCampaigns.jsx` renders; "BonVie Summer Demo" in campaign list |
+| 12.2 | Verify retired redirect | `/dashboard/advertiser/campaigns/new` | Navigating to `campaigns/new` redirects to `/dashboard/advertiser/campaigns` (S22-1 retirement); no 404 |
+| 12.3 | Open Campaign Wizard Modal | `/dashboard/advertiser/campaigns` | Clicking "New Campaign" opens `CampaignWizardModal` inline (not a route navigation); Step 1 renders |
+| 12.4 | Dismiss without submitting | `/dashboard/advertiser/campaigns` | Modal closes; campaign list unchanged; no orphaned wizard state |
+
+> `AdvertiserNewCampaign.jsx` was retired in S22-1. Campaign creation is now via `CampaignWizardModal`. Step 12.2 validates the redirect is live.
+
+---
+
+## Phase 13 — Advertiser Invoices
+
+**Persona:** `DEMO_ADVERTISER` | `x-demo-role: advertiser`
+**Spec file:** `13_advertiser_invoices.spec.js`
+
+| Step | Action | Route | Acceptance Criterion |
+|------|--------|-------|---------------------|
+| 13.1 | Navigate to Invoices | `/dashboard/advertiser/invoices` | `Invoices.jsx` renders without 403 or blank screen |
+| 13.2 | Verify invoice for demo campaign | `/dashboard/advertiser/invoices` | At least one invoice row references "BonVie Summer Demo" or `demo-campaign-001`; amount non-zero |
+| 13.3 | Verify invoice download | `/dashboard/advertiser/invoices` | If download button exists: `page.waitForEvent('download')` resolves on click; if not, invoice detail view renders |
+
+---
+
+## Phase 14 — Ticket System (All Personas)
+
+**Spec file:** `14_ticket_system.spec.js`
+
+### Admin creates a ticket
+
+**Persona:** `DEMO_ADMIN` | `x-demo-role: admin`
+
+| Step | Action | Route | Acceptance Criterion |
+|------|--------|-------|---------------------|
+| 14.1 | Login as Admin | `/login` | `x-demo-role: admin` confirmed |
+| 14.2 | Navigate to Ticket Dashboard | `/dashboard/tickets` | `TicketDashboard.jsx` renders; list loads (may be empty — assert no error state) |
+| 14.3 | Create a ticket | `/dashboard/tickets` | `POST /api/tickets` → `201` with `{ id: 'demo-ticket-001', status: 'open' }`; ticket appears in list |
+| 14.4 | Open ticket detail | `/dashboard/tickets/demo-ticket-001` | `TicketDetail.jsx` renders; subject and status visible; no 404 |
+
+### Retailer views and responds
+
+**Persona:** `DEMO_RETAILER` | `x-demo-role: retaileradmin`
+
+| Step | Action | Route | Acceptance Criterion |
+|------|--------|-------|---------------------|
+| 14.5 | Login as Retailer | `/login` | `x-demo-role: retaileradmin` confirmed |
+| 14.6 | Navigate to Ticket Dashboard | `/dashboard/tickets` | `TicketDashboard.jsx` renders; `demo-ticket-001` visible (if cross-role visibility applies — see scope note) |
+| 14.7 | Add reply | `/dashboard/tickets/demo-ticket-001` | `POST /api/tickets/demo-ticket-001/replies` → `201`; reply appears in thread without page reload |
+
+> **Scope note:** Ticket visibility rules are not documented in audit files. If Retailer cannot see admin-created tickets, step 14.6 asserts an empty list without error, and 14.7 is demoted to an Admin persona step.
+
+---
+
+## Phase 15 — Admin Campaign Analytics Read-Back
+
+**Persona:** `DEMO_ADMIN` | `x-demo-role: admin`
+**Spec file:** `15_admin_campaign_analytics.spec.js`
+
+| Step | Action | Route | Acceptance Criterion |
+|------|--------|-------|---------------------|
+| 15.1 | Login as Admin | `/login` | `x-demo-role: admin` confirmed |
+| 15.2 | Open Admin Campaign Management | `/dashboard/admin/campaigns` | `CampaignManagement.jsx` renders; "BonVie Summer Demo" visible with status "Approved" |
+| 15.3 | Verify campaign detail | `/dashboard/admin/campaigns` | Clicking the campaign row shows metadata; admin action button present — **do not click** |
+| 15.4 | Open Loop Analytics | `/dashboard/admin/loop-analytics` | `LoopAnalytics.jsx` renders; telemetry from Phase 4 reflected (play counts > 0); no blank or error state |
+| 15.5 | Open Pricing Config | `/dashboard/admin/pricing-config` | `PricingConfig.jsx` renders without 403; pricing tier configuration visible (Sprint 15) |
+
+---
+
+## Phase 16 — Login Page as a Tested Feature
+
+**Persona:** Unauthenticated
+**Spec file:** `16_login_feature.spec.js`
+
+| Step | Action | Route | Acceptance Criterion |
+|------|--------|-------|---------------------|
+| 16.1 | Navigate to `/login` unauthenticated | `/login` | Login form renders; email and password fields visible; submit button present |
+| 16.2 | Submit empty form | `/login` | Client-side validation fires; error message(s) appear; no API call made; form not submitted |
+| 16.3 | Submit wrong credentials | `/login` | `POST /api/auth/login` → `401`; error banner appears: "Invalid credentials" or equivalent; form not cleared |
+| 16.4 | Login with valid demo credentials | `/login` | `POST /api/auth/login` → `200` with token; redirect to `/dashboard` within 2s; `data-testid="dashboard-shell"` visible |
+| 16.5 | Verify root `/` redirects | `/` | Navigating to `/` redirects to `/dashboard/admin`; no 404 |
 
 ---
 
 ## MVP vs. Full Demo
 
 | Tier | Scope | Prerequisite fixes needed |
-|------|-------|-----------------------------|
-| **MVP (Tier 1)** | Phases 0–3 only — seed + Admin provision + Brand wizard submission | Pre-Conditions 0, 1, 2 |
-| **Full Demo (Tier 2)** | All 6 phases | All 6 pre-conditions; real `campaigns.js`/`schedules.js` handlers; `Health.jsx` real connectivity checks |
-
-The MVP proves the UI layer works for all input surfaces in ~30 minutes of test time. The full demo proves the backend-to-player chain is live.
+|------|-------|---------------------------|
+| **MVP (Tier 1)** | Phases 0–3 only | Pre-Conditions 0, 1, 2 |
+| **Full Demo (Tier 2)** | All 16 phases | All 6 pre-conditions; real `campaigns.js` handlers; `Health.jsx` real connectivity |
 
 ---
 
-## Spec File Architecture
-
-```
-tests/
-  demo_wizard/
-    00_seed.setup.js            ← DemoSeedService, dynamic slot timing (startTime = Date.now())
-    01_admin_provision.spec.js
-    02_retailer_schedule.spec.js
-    03_brand_campaign_wizard.spec.js
-    04_player_broadcast.spec.js
-    05_techops_health.spec.js
-    06_admin_validate.spec.js
-    demo.fixtures.js            ← shared personas, sample data constants, beforeEach auth reset
-```
-
-Each spec uses Playwright's `test.describe.serial()` to enforce ordering within the phase. The `globalSetup` in `00_seed.setup.js` guarantees Firestore state before Phase 1 starts. Every spec imports `beforeEach` auth reset from `demo.fixtures.js`.
-
----
-
-## Lessons Learned (From This Repo)
-
-1. **Silent catch = invisible failures** — `BaseRepository.update()` swallowed Firestore errors until Sprint 11. Every step in this demo asserts on the *response body and status code*, not just the absence of an error modal.
-2. **Duplicate filenames broke CI** — `TicketDashboard` and `CampaignApprovalList` previously had two diverging implementations. Run `/hygiene` and `/validate-testids` before executing the demo suite to guarantee a clean baseline.
-3. **Clock-sensitive logic needs clock control** — The player slot timing bug is a test environment/clock problem. The demo seed owns the clock by writing `startTime = Date.now()` at seed-time, not at test-time.
-4. **Public endpoints don't prove correct auth** — `GET /api/campaigns` returns 200 with no auth (confirmed `routebyroute.md`). Asserting campaign visibility is not sufficient proof that the correct `x-demo-role` was sent. Always assert request headers explicitly on POST/mutation steps.
-
----
-
-## Probability Summary
+## Pass Probability
 
 | Phase | Probability | Ceiling removed by |
 |-------|-------------|-------------------|
-| Phase 0 — Seed | 92% | Dynamic slot timing fix (Pre-Condition 2) |
-| Phase 1 — Admin | 93% | All routes confirmed from `App.jsx`; LoopBuilder orphan alert retired |
+| Phase 0 — Seed | 92% | Dynamic slot timing (Pre-Condition 2) |
+| Phase 1 — Admin | 93% | All routes confirmed; LoopBuilder orphan alert retired |
 | Phase 2 — Retailer | 91% | Route confirmed; falsifiable assertions added |
-| Phase 3 — Brand Wizard | 82% | Gated on `campaigns.js` stub (Pre-Condition 1); rises to ~95% once stub lands |
-| Phase 4 — Player | 85% | Dynamic slot seed directly unlocks; telemetry assertion falsifiable |
-| Phase 5 — TechOps | 88% | Route confirmed; mock health response documented as explicit pre-condition |
-| Phase 6 — Admin Validate | 94% | All routes confirmed; delete assertion falsifiable with hard-refresh |
-| **Overall suite** | **89%** | Rises to ~95% once Pre-Conditions 0–2 are resolved |
+| Phase 3 — Brand Wizard | 82% | Gated on `campaigns.js` stub; rises to ~95% once stub lands |
+| Phase 4 — Player | 85% | Dynamic slot seed directly unlocks |
+| Phase 5 — TechOps | 88% | Route confirmed; mock health documented as pre-condition |
+| Phase 6 — Admin Validate | 94% | All routes confirmed; delete assertion falsifiable |
+| Phases 7–10 — Retailer extended | 90% | Depends on Phase 8 (approval gate) order |
+| Phases 11–13 — Advertiser | 88% | Sprint 14 routes confirmed in App.jsx |
+| Phase 14 — Tickets | 83% | Visibility rules undocumented — scope note applies |
+| Phases 15–16 — Analytics + Login | 91% | Routes confirmed |
+| **Overall suite** | **89%** | Rises to ~95% once Pre-Conditions 0–2 resolved |
 
 ---
 
 ## Registration
 
-Register as `/demo` in `workflows.md` and back with `.agent/workflows/demo.md` following the same step-by-step format as `bigtest.md`.
+Register as `/demo` in `workflows.md`. Back with `.agent/workflows/demo.md` following the same step-by-step format as `bigtest.md`.
