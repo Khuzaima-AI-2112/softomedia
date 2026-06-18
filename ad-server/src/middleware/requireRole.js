@@ -40,6 +40,17 @@ export function normalizeRole(raw) {
  */
 export function requireRole(minRole) {
     return (req, res, next) => {
+        // Guard: req.user must be populated by authenticate() before this middleware runs.
+        // If it is absent, the route is misconfigured — authenticate is missing from the chain.
+        // Return 500 (not 403) so the misconfiguration is immediately distinguishable from
+        // a legitimate access-denied response.
+        if (!req.user) {
+            console.error(
+                `[requireRole] FATAL: req.user undefined on ${req.method} ${req.path} — authenticate middleware is missing.`
+            );
+            return res.status(500).json({ error: 'Misconfigured route: authentication middleware missing' });
+        }
+
         const rawRole = req.user?.role;
         const role = normalizeRole(rawRole);
         const userLevel  = ROLE_HIERARCHY[role]  ?? -1;
