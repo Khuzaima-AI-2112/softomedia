@@ -6,15 +6,24 @@ const JWT_SECRET = process.env.JWT_SECRET;
 /**
  * DEMO_LINKED_ENTITY_OVERRIDES
  *
- * Maps demo role names to the seed advertiser/entity IDs that exist in
- * Firestore. Keeps the demo server in sync with AuthContext.setPersona()
- * on the client, which uses `entity-${type}` as a fallback.
+ * Maps demo role names to the seed entity IDs written by
+ * tests/demo_wizard/00_seed.setup.js (single source of truth).
  *
- * Add entries here when new seed advertisers are added to the database.
+ * IMPORTANT: these values must stay in sync with the DEMO_* constants
+ * exported from 00_seed.setup.js. When seed IDs change, update both files.
+ *
+ *   DEMO_ADVERTISER_ID = 'demo-advertiser-bonvie'
+ *   DEMO_RETAILER_ID   = 'demo-retailer-freshmart'
+ *
+ * Previously used adv_001 / adv_002 — those are legacy SeedService IDs
+ * that no longer exist in the Firestore seed written by 00_seed.setup.js,
+ * causing T5 advertiser_id stamping to resolve to a non-existent entity.
  */
 const DEMO_LINKED_ENTITY_OVERRIDES = {
-    advertiser: 'adv_001',
-    brand:      'adv_002',
+    brand:         'demo-advertiser-bonvie',   // DEMO_ADVERTISER_ID
+    advertiser:    'demo-advertiser-bonvie',   // DEMO_ADVERTISER_ID
+    retailer:      'demo-retailer-freshmart',  // DEMO_RETAILER_ID
+    retaileradmin: 'demo-retailer-freshmart',  // DEMO_RETAILER_ID (alias)
 };
 
 /**
