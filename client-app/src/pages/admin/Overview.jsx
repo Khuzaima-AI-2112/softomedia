@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link} from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
@@ -53,22 +53,22 @@ function AdminOverview() {
                 isSuperAdmin ? apiService.getUsers().catch(() => []) : Promise.resolve([])
             ]);
 
-            const safeRetailers   = Array.isArray(allRetailers)   ? allRetailers   : [];
+            const safeRetailers = Array.isArray(allRetailers) ? allRetailers : [];
             const safeAdvertisers = Array.isArray(allAdvertisers) ? allAdvertisers : [];
-            const safeScreens     = Array.isArray(allScreens)     ? allScreens     : [];
-            const safeLoops       = Array.isArray(allLoops)       ? allLoops       : [];
-            const safeUsers       = Array.isArray(allUsers)       ? allUsers       : [];
+            const safeScreens = Array.isArray(allScreens) ? allScreens : [];
+            const safeLoops = Array.isArray(allLoops) ? allLoops : [];
+            const safeUsers = Array.isArray(allUsers) ? allUsers : [];
 
             setRetailers(safeRetailers.slice(0, 4));
             setAdvertisers(safeAdvertisers.slice(0, 4));
 
             setStats({
-                retailers:     safeRetailers.length,
-                advertisers:   safeAdvertisers.length,
+                retailers: safeRetailers.length,
+                advertisers: safeAdvertisers.length,
                 activeScreens: safeScreens.filter(s => s.status === 'online').length,
-                totalScreens:  safeScreens.length,
-                pendingLoops:  safeLoops.filter(l => l.status === 'PENDING_APPROVAL').length,
-                totalUsers:    safeUsers.length
+                totalScreens: safeScreens.length,
+                pendingLoops: safeLoops.filter(l => l.status === 'PENDING_APPROVAL').length,
+                totalUsers: safeUsers.length
             });
         } catch (error) {
             console.error('Failed to load admin overview data:', error);
@@ -98,17 +98,17 @@ function AdminOverview() {
 
     // Phase 3: Users quick-action tile only shown to superadmin
     const baseActions = [
-        { label: 'CPM Pricing',  icon: 'attach_money',  path: '/dashboard/admin/pricing',     color: 'emerald' },
-        { label: 'Retailers',    icon: 'storefront',    path: '/dashboard/admin/retailers',    color: 'amber'   },
-        { label: 'Advertisers',  icon: 'campaign',      path: '/dashboard/admin/advertisers',  color: 'rose'    },
-        { label: 'Demo Player',  icon: 'slideshow',     path: '/player/demo',                  color: 'purple'  },
-        { label: 'Store Hours',  icon: 'schedule',      path: '/dashboard/admin/hours',        color: 'indigo'  },
-        { label: 'Network Map',  icon: 'map',           path: '/dashboard/admin/map',          color: 'cyan'    },
+        { label: 'CPM Pricing', icon: 'attach_money', path: '/dashboard/admin/pricing', color: 'emerald' },
+        { label: 'Retailers', icon: 'storefront', path: '/dashboard/admin/retailers', color: 'amber' },
+        { label: 'Advertisers', icon: 'campaign', path: '/dashboard/admin/advertisers', color: 'rose' },
+        { label: 'Demo Player', icon: 'slideshow', path: '/player/demo', color: 'purple' },
+        { label: 'Store Hours', icon: 'schedule', path: '/dashboard/admin/hours', color: 'indigo' },
+        { label: 'Network Map', icon: 'map', path: '/dashboard/admin/map', color: 'cyan' },
     ];
 
     const superAdminOnlyActions = [
         { label: 'Screens', icon: 'monitor', path: '/dashboard/admin/screens', color: 'slate' },
-        { label: 'Users',   icon: 'people',  path: '/dashboard/admin/users',   color: 'blue'  },
+        { label: 'Users', icon: 'people', path: '/dashboard/admin/users', color: 'blue' },
     ];
 
     const activeActions = isSuperAdmin
@@ -116,7 +116,7 @@ function AdminOverview() {
         : baseActions;
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div data-testid="admin-overview" className="space-y-8 animate-in fade-in duration-500">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Platform Governance</h1>
@@ -124,6 +124,7 @@ function AdminOverview() {
                 </div>
                 <div className="flex items-center gap-3">
                     <button
+                        data-testid="btn-add-retailer"
                         onClick={() => setShowRetailerModal(true)}
                         className="px-4 py-2 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover transition-colors flex items-center gap-2"
                     >
@@ -182,7 +183,7 @@ function AdminOverview() {
 
             {stats.pendingLoops > 0 && (
                 <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                    <span className="material-symbols-outlined text-amber-500">pending_actions</span>
+                    <span data-testid="pending-approval-badge" className="material-symbols-outlined text-amber-500">pending_actions</span>
                     <div className="flex-1">
                         <p className="font-medium text-amber-800 dark:text-amber-200">
                             {stats.pendingLoops} loops awaiting retailer approval
@@ -257,13 +258,14 @@ function AdminOverview() {
 
             {showRetailerModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <GlassCard className="w-full max-w-md">
+                    <GlassCard data-testid="modal-retailer-form" className="w-full max-w-md">
                         <h2 className="text-xl font-bold mb-4">Register New Retailer</h2>
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium mb-1">Company Name</label>
                                 <input
                                     type="text"
+                                    data-testid="input-retailer-name"
                                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
                                     placeholder="e.g. Acme Retail Corp"
                                     value={newRetailerName}
@@ -274,6 +276,7 @@ function AdminOverview() {
                                 <label className="block text-sm font-medium mb-1">Contact Email</label>
                                 <input
                                     type="email"
+                                    data-testid="input-retailer-contact"
                                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
                                     placeholder="admin@retailer.com"
                                     value={newRetailerEmail}
@@ -281,8 +284,8 @@ function AdminOverview() {
                                 />
                             </div>
                             <div className="flex justify-end gap-3 mt-6">
-                                <button onClick={() => setShowRetailerModal(false)} className="px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 font-medium">Cancel</button>
-                                <button onClick={handleCreateRetailer} className="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover shadow-lg shadow-primary/20">Create Account</button>
+                                <button data-testid="btn-modal-close" onClick={() => setShowRetailerModal(false)} className="px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 font-medium">Cancel</button>
+                                <button data-testid="btn-retailer-form-submit" onClick={handleCreateRetailer} className="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover shadow-lg shadow-primary/20">Create Account</button>
                             </div>
                         </div>
                     </GlassCard>

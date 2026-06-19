@@ -1,0 +1,6 @@
+{
+    "terminal.integrated.env.windows": {
+        "CLOUDSDK_ACTIVE_CONFIG_NAME": "softomedia-live-2026",
+        "CLOUDSDK_CORE_PROJECT": "softomedia-live-2026"
+    }
+}

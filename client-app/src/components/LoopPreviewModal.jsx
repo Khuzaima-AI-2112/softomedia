@@ -137,7 +137,7 @@ function LoopPreviewModal({ loop, onClose, onRefresh }) {
                         } />
                         <button
                             onClick={onClose}
-                            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                            data-testid="btn-modal-close" className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
                         >
                             <span className="material-symbols-outlined">close</span>
                         </button>

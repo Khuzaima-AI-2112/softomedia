@@ -154,7 +154,7 @@ function LoopBuilder() {
 
     if (!loop) {
         return (
-            <div className="text-center py-12">
+            <div data-testid="no-data-state" className="text-center py-12">
                 <h2 className="text-xl font-bold text-slate-600">Loop not found</h2>
                 <button
                     onClick={() => navigate('/dashboard/admin/loops')}

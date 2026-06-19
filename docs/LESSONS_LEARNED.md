@@ -448,3 +448,61 @@ All `BaseRepository` write operations (`create`, `update`, `upsert`) share the s
 ---
 
 *Add new entries above this line, most recent first. Format: `YYYY-MM-DD — Short title`.*
+
+
+---
+
+## 2026-06-18 — Flaky E2E Tests Resolved via Page Object Model (POM) Locators
+
+**Severity:** Medium — Playwright tests were brittle, resulting in timeout hallucinations and false negatives whenever React components were refactored or class names changed.
+
+**Symptom:** The E2E suite would randomly hang on `page.locator('[data-testid="btn-next"]')` because the developer accidentally removed the `data-testid` during a UI polish, rendering the 16-phase massive E2E playbook unstable.
+
+### Root Causes
+1. **Hardcoded Magic Strings:** Test specifications (`.spec.js`) were tightly coupled to raw HTML attributes across 60+ files. Changing a single button ID required a massive Find/Replace operation.
+2. **DOM Chaining:** Tests used brittle structural paths (like `div > span > button`) which instantly broke when new layout wrappers (like `<Box>`) were introduced.
+3. **Loop Duplication (Strict Mode):** `data-testid`s inside `.map()` loops were identical, causing Playwright's Strict Mode to crash due to multiple element matches.
+
+### Fix Applied
+
+| File | Change |
+|---|---|
+| `tests/demo_wizard/*_locators.js` | Created centralized dictionary files (`admin_locators.js`, `retailer_locators.js`, etc.) to map component IDs to abstracted variable names. |
+| `tests/demo_wizard/*.spec.js` | Refactored Playwright tests to import the POM dictionaries and use `getLocator(page, WL.BtnNext)`, entirely decoupling the logic from the raw strings. |
+| `playwright_db_setup.md` | Established strict DevSecOps guardrails: `data-testid` must ONLY be attached to native interactive HTML tags (`<button>`, `<input>`) and never to wrappers (`<div>`). |
+
+### Actionable Improvements Going Forward
+- **Never hardcode CSS/HTML locators in test logic.** Always abstract them into a central Page Object Model (POM) reference file so updates apply globally.
+- **Use Dynamic Screen Generation for Lists.** Enforce functions like `DynamicScreen(id)` inside the locator maps to guarantee `data-testid` uniqueness inside React `.map()` loops, avoiding Strict Mode violations.
+- **Ban Magic Timeouts.** Banned the use of `waitForTimeout()` to avoid CPU-dependent flakiness. All waits must be deterministic (e.g. `locator.waitFor()` or `page.waitForResponse()`).
+
+---
+
+## 2026-06-18 � Playwright Phase 03 UI/Test Orchestration Mismatch
+**Severity:** Moderate � Playwright suite structurally broken.
+
+**Symptom:**
+During Phase 1c of the massive E2E Playwright stabilization, we discovered that  3_brand_campaign_wizard.spec.js attempts to click through multiple Wizard steps (wizard-step-1, wizard-btn-next), but the frontend UI component (\CampaignWizardModal.jsx\) was refactored into a flattened single-page scrollable form.
+
+### Fix
+* **The test logic needs to be rewritten** to reflect the new DOM structure (a single continuous form without \Next\ buttons for sections).
+
+
+---
+
+## 2026-06-18 — Playwright Phase 03 UI/Test Orchestration Mismatch
+**Severity:** Moderate — Playwright suite structurally broken.
+
+**Symptom:**
+During Phase 1c of the massive E2E Playwright stabilization, we discovered that `03_brand_campaign_wizard.spec.js` attempts to click through multiple Wizard steps (`wizard-step-1`, `wizard-btn-next`), but the frontend UI component (`CampaignWizardModal.jsx`) was refactored into a flattened single-page scrollable form.
+
+### Fix
+* **The test logic needs to be rewritten** to reflect the new DOM structure (a single continuous form without `Next` buttons for sections).
+
+---
+
+## 2026-06-18 - API Smoke Test & Backend Truth Alignment
+
+**Issue:** The `17_api_surface_smoke.spec.js` was drafted blindly against assumptions of simple GET interfaces (e.g. `GET /api/impressions`), completely bypassing our custom guardrails which strictly demand `date` and `campaign_id` query parameters to prevent mass data scraping, leading to consistent 400 Bad Requests. Similarly, endpoints like `GET /api/monitoring` resulted in 404s because the router exclusively supports POST signals for telemetry.
+
+**Resolution:** Smoke tests must strictly reflect the *actual* mounted API schema, honoring mandatory validation guardrails and exact HTTP methods. Tests should be treated as living documentation of the real API surface rather than theoretical interface lists.

@@ -11,6 +11,7 @@
 
 import { test, expect } from '@playwright/test';
 import { authReset, BASE_URL } from './demo.fixtures.js';
+import { getLocator, AdminLocators as AL } from './admin_locators.js';
 
 test.beforeEach(authReset);
 
@@ -78,7 +79,7 @@ test.describe.serial('Phase 16 — Login Feature', () => {
     expect(loginResponse.status()).toBe(200);
     // Redirect to dashboard within 2s
     await page.waitForURL(/\/dashboard/, { timeout: 2000 });
-    await expect(page.locator('[data-testid="dashboard-shell"]')).toBeVisible();
+    await expect(getLocator(page, AL.Shell)).toBeVisible();
   });
 
   test('16.5 — Root / unauthenticated redirects to /login (not /dashboard/admin)', async ({ page }) => {

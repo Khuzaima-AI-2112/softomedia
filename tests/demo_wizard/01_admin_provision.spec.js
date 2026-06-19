@@ -38,6 +38,8 @@ import {
   assertRoleHeader,
 } from './demo.fixtures.js';
 
+import { AdminLocators as AL, getLocator } from './admin_locators.js';
+
 test.describe.serial('Phase 1 — Admin Provision', () => {
 
   test.beforeEach(async ({ page }) => {
@@ -49,8 +51,8 @@ test.describe.serial('Phase 1 — Admin Provision', () => {
   // ─────────────────────────────────────────────────────────────────────────
   test('1.1 login as Admin', async ({ page }) => {
     await loginAs(page, DEMO_ADMIN);
-    await expect(page.locator('[data-testid="dashboard-shell"]')).toBeVisible();
-    await expect(page.locator('[data-testid="nav-admin"]')).toBeVisible();
+    await expect(getLocator(page, AL.Shell)).toBeVisible();
+    await expect(getLocator(page, AL.NavAdmin)).toBeVisible();
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -59,20 +61,20 @@ test.describe.serial('Phase 1 — Admin Provision', () => {
   test('1.2 create Retailer — FreshMart Montréal', async ({ page }) => {
     await loginAs(page, DEMO_ADMIN);
     await page.goto(BASE_URL + '/dashboard/admin/retailers', { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('[data-testid="retailers-list"]');
+    await getLocator(page, AL.Retailers.List).waitFor();
 
     const assertHeader = await assertRoleHeader(page, DEMO_ADMIN.role, '/api/retailers');
 
-    await page.click('[data-testid="btn-add-retailer"]');
-    await page.waitForSelector('[data-testid="modal-retailer-form"]');
-    await page.fill('[data-testid="input-retailer-name"]', 'FreshMart Montréal');
-    await page.fill('[data-testid="input-retailer-contact"]', 'demo@freshmart.ca');
-    await page.click('[data-testid="btn-retailer-form-submit"]');
+    await getLocator(page, AL.Retailers.BtnAdd).click();
+    await getLocator(page, AL.Retailers.ModalForm).waitFor();
+    await getLocator(page, AL.Retailers.InputName).fill('FreshMart Montréal');
+    await getLocator(page, AL.Retailers.InputContact).fill('demo@freshmart.ca');
+    await getLocator(page, AL.Retailers.BtnSubmit).click();
     await assertHeader();
 
     // Assert the new retailer appears in the list
     await expect(
-      page.locator('[data-testid="retailers-list"]').getByText('FreshMart Montréal'),
+      getLocator(page, AL.Retailers.List).getByText('FreshMart Montréal'),
     ).toBeVisible({ timeout: 10000 });
   });
 
@@ -137,8 +139,8 @@ test.describe.serial('Phase 1 — Admin Provision', () => {
     const screenDefs = [
       { name: 'Downtown Entrance', storeId: 'demo-store-downtown' },
       { name: 'Downtown Checkout', storeId: 'demo-store-downtown' },
-      { name: 'Plateau Entrance',  storeId: 'demo-store-plateau'  },
-      { name: 'Plateau Checkout',  storeId: 'demo-store-plateau'  },
+      { name: 'Plateau Entrance', storeId: 'demo-store-plateau' },
+      { name: 'Plateau Checkout', storeId: 'demo-store-plateau' },
     ];
 
     for (const screen of screenDefs) {
@@ -251,16 +253,16 @@ test.describe.serial('Phase 1 — Admin Provision', () => {
 
     const usersToCreate = [
       {
-        email:         'brand@softomedia.demo',
-        role:          'brand',
+        email: 'brand@softomedia.demo',
+        role: 'brand',
         linkedEntityId: SEED.advertiserId,
-        displayName:   'Demo Brand',
+        displayName: 'Demo Brand',
       },
       {
-        email:         'retailer@softomedia.demo',
-        role:          'retaileradmin',
+        email: 'retailer@softomedia.demo',
+        role: 'retaileradmin',
         linkedEntityId: SEED.retailerId,
-        displayName:   'Demo Retailer',
+        displayName: 'Demo Retailer',
       },
     ];
 
@@ -289,10 +291,10 @@ test.describe.serial('Phase 1 — Admin Provision', () => {
   // ─────────────────────────────────────────────────────────────────────────
   test('N-1.1 wrong-role POST /api/retailers as brand → 403 Forbidden', async ({ playwright }) => {
     const brandCtx = await playwright.request.newContext({
-      baseURL:          API_BASE_URL,
+      baseURL: API_BASE_URL,
       extraHTTPHeaders: {
-        Authorization:  `Bearer ${DEMO_TOKEN}`,
-        'x-demo-role':  DEMO_BRAND.role, // brand — must be rejected
+        Authorization: `Bearer ${DEMO_TOKEN}`,
+        'x-demo-role': DEMO_BRAND.role, // brand — must be rejected
         'Content-Type': 'application/json',
       },
     });

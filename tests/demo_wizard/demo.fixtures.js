@@ -23,7 +23,7 @@ import { expect } from '@playwright/test';
 // Environment
 // ---------------------------------------------------------------------------
 
-export const BASE_URL     = process.env.BASE_URL     || 'http://localhost:3000';
+export const BASE_URL = process.env.BASE_URL || 'http://localhost:5173';
 export const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3001'; // FIX: was 8080
 
 /**
@@ -40,20 +40,20 @@ export const DEMO_TOKEN = process.env.DEMO_TOKEN || 'demo-token';
 // ---------------------------------------------------------------------------
 
 export const DEMO_ADMIN = {
-  id:          'demo-admin-uid',
-  role:        'admin',            // x-demo-role header value
-  email:       'admin@softomedia.demo',
+  id: 'demo-admin-uid',
+  role: 'admin',            // x-demo-role header value
+  email: 'admin@softomedia.demo',
   displayName: 'Demo Admin',
   firestoreId: 'demo-admin',
 };
 
 export const DEMO_RETAILER = {
-  id:          'demo-retailer-uid',
-  role:        'retaileradmin',    // x-demo-role header value
-  email:       'retailer@softomedia.demo',
+  id: 'demo-retailer-uid',
+  role: 'retaileradmin',    // x-demo-role header value
+  email: 'retailer@softomedia.demo',
   displayName: 'Demo Retailer',
   firestoreId: 'demo-retailer-freshmart',
-  retailerId:  'demo-retailer-freshmart', // FIX: was 'demo-freshmart'
+  retailerId: 'demo-retailer-freshmart', // FIX: was 'demo-freshmart'
 };
 
 /**
@@ -63,27 +63,27 @@ export const DEMO_RETAILER = {
  * depend on this alignment.
  */
 export const DEMO_BRAND = {
-  id:           'demo-brand-uid',
-  role:         'brand',            // x-demo-role header value
-  email:        'brand@softomedia.demo',
-  displayName:  'Demo Brand',
-  firestoreId:  'demo-brand',
+  id: 'demo-brand-uid',
+  role: 'brand',            // x-demo-role header value
+  email: 'brand@softomedia.demo',
+  displayName: 'Demo Brand',
+  firestoreId: 'demo-brand',
   advertiserId: 'demo-advertiser-bonvie', // FIX: was 'demo-bonvie'
 };
 
 export const DEMO_ADVERTISER = {
-  id:           'demo-advertiser-uid',
-  role:         'advertiser',       // x-demo-role header value
-  email:        'advertiser@softomedia.demo',
-  displayName:  'Demo Advertiser',
-  firestoreId:  'demo-advertiser-bonvie',  // FIX: was 'demo-bonvie'
+  id: 'demo-advertiser-uid',
+  role: 'advertiser',       // x-demo-role header value
+  email: 'advertiser@softomedia.demo',
+  displayName: 'Demo Advertiser',
+  firestoreId: 'demo-advertiser-bonvie',  // FIX: was 'demo-bonvie'
   advertiserId: 'demo-advertiser-bonvie',  // INTENTIONAL: same as DEMO_BRAND (see note above)
 };
 
 export const DEMO_TECHOP = {
-  id:          'demo-techop-uid',
-  role:        'techop',           // x-demo-role header value
-  email:       'techop@softomedia.demo',
+  id: 'demo-techop-uid',
+  role: 'techop',           // x-demo-role header value
+  email: 'techop@softomedia.demo',
   displayName: 'Demo TechOp',
   firestoreId: 'demo-techop',
 };
@@ -105,11 +105,11 @@ export const DEMO_TECHOP = {
 // ---------------------------------------------------------------------------
 
 export const SEED = {
-  retailerId:   'demo-retailer-freshmart',    // FIX: was 'demo-freshmart'
+  retailerId: 'demo-retailer-freshmart',    // FIX: was 'demo-freshmart'
   advertiserId: 'demo-advertiser-bonvie',     // FIX: was 'demo-bonvie'
-  campaignId:   'demo-campaign-001',          // unchanged
-  ticketId:     'demo-ticket-001',            // unchanged
-  loopId:       'demo-loop-freshmart-main',   // FIX: was 'demo-loop-001'
+  campaignId: 'demo-campaign-001',          // unchanged
+  ticketId: 'demo-ticket-001',            // unchanged
+  loopId: 'demo-loop-freshmart-main',   // FIX: was 'demo-loop-001'
 
   // FIX: was ['demo-screen-01'..'04']
   screenIds: [
@@ -174,9 +174,9 @@ export async function loginAs(page, persona) {
   await page.goto(BASE_URL + '/login', { waitUntil: 'domcontentloaded' });
   await page.evaluate(
     ({ role, token }) => {
-      localStorage.setItem('demo_role',      role);
+      localStorage.setItem('demo_role', role);
       localStorage.setItem('active_persona', role);
-      localStorage.setItem('authToken',      token);
+      localStorage.setItem('authToken', token);
     },
     { role: persona.role, token: DEMO_TOKEN },
   );

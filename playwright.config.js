@@ -23,7 +23,7 @@ import { defineConfig, devices } from '@playwright/test';
  *    used throughout the codebase and in 00_seed.setup.js seedViaApi calls.
  */
 export default defineConfig({
-    globalSetup:    './tests/global.setup.js',
+    globalSetup: './tests/global.setup.js',
     globalTeardown: './tests/demo_wizard/00_seed.teardown.js',
 
     testDir: './tests',
@@ -96,10 +96,10 @@ export default defineConfig({
             timeout: 90_000,
             use: {
                 ...devices['Desktop Chrome'],
-                baseURL:       'http://localhost:5173',
+                baseURL: 'http://localhost:5173',
                 actionTimeout: 30_000,
-                trace:         'on',
-                screenshot:    'only-on-failure',
+                trace: 'on',
+                screenshot: 'only-on-failure',
                 // Viewport matches the target deployment screens (1920×1080
                 // primary; 1280×800 for the player iframe assertions).
                 viewport: { width: 1280, height: 800 },
@@ -117,16 +117,17 @@ export default defineConfig({
     webServer: [
         {
             /* Port corrected: 8080 → 3001 to match API_BASE_URL convention. */
-            command:              'npx kill-port 3001 && npm start --prefix ad-server',
-            url:                  'http://localhost:3001/health',
-            reuseExistingServer:  true,
-            timeout:              180_000,
+            command: 'npx kill-port 3001 && npm start --prefix ad-server',
+            url: 'http://localhost:3001/health',
+            reuseExistingServer: true,
+            timeout: 180_000,
+            env: { PORT: '3001' }
         },
         {
-            command:              'npx kill-port 5173 && npm run dev --prefix client-app',
-            url:                  'http://localhost:5173',
-            reuseExistingServer:  true,
-            timeout:              180_000,
+            command: 'npx kill-port 5173 && npm run dev --prefix client-app',
+            url: 'http://localhost:5173',
+            reuseExistingServer: true,
+            timeout: 180_000,
         },
     ],
 });

@@ -18,25 +18,25 @@ import apiService from '../services/ApiService';
 const today = () => new Date().toISOString().slice(0, 10);
 
 const INITIAL = {
-    name:         '',
-    description:  '',
-    retailer_id:  '',
-    budget:       '',
-    start_date:   '',
-    end_date:     '',
+    name: '',
+    description: '',
+    retailer_id: '',
+    budget: '',
+    start_date: '',
+    end_date: '',
     creative_url: '',
 };
 
 export default function CampaignWizardModal({ onSuccess, onClose }) {
-    const [form, setForm]         = useState(INITIAL);
-    const [errors, setErrors]     = useState({});
-    const [submitting, setSub]    = useState(false);
-    const [serverErr, setSrvErr]  = useState(null);
+    const [form, setForm] = useState(INITIAL);
+    const [errors, setErrors] = useState({});
+    const [submitting, setSub] = useState(false);
+    const [serverErr, setSrvErr] = useState(null);
 
     // Retailer dropdown state
-    const [retailers, setRetailers]         = useState([]);
-    const [retailersLoading, setRetLoad]    = useState(true);
-    const [retailersError, setRetErr]       = useState(null);
+    const [retailers, setRetailers] = useState([]);
+    const [retailersLoading, setRetLoad] = useState(true);
+    const [retailersError, setRetErr] = useState(null);
 
     // Load active retailers on mount — getRetailersForCampaign() only (S21-5)
     useEffect(() => {
@@ -60,10 +60,10 @@ export default function CampaignWizardModal({ onSuccess, onClose }) {
 
     const validate = () => {
         const e = {};
-        if (!form.name.trim())       e.name = 'Campaign name is required.';
-        if (!form.retailer_id)       e.retailer_id = 'Please select a retailer.';
-        if (!form.start_date)        e.start_date = 'Start date is required.';
-        if (!form.end_date)          e.end_date = 'End date is required.';
+        if (!form.name.trim()) e.name = 'Campaign name is required.';
+        if (!form.retailer_id) e.retailer_id = 'Please select a retailer.';
+        if (!form.start_date) e.start_date = 'Start date is required.';
+        if (!form.end_date) e.end_date = 'End date is required.';
         if (form.start_date && form.start_date < today())
             e.start_date = 'Start date must be today or in the future.';
         if (form.start_date && form.end_date && form.end_date <= form.start_date)
@@ -80,12 +80,12 @@ export default function CampaignWizardModal({ onSuccess, onClose }) {
         setSrvErr(null);
         try {
             const payload = {
-                name:         form.name.trim(),
-                description:  form.description.trim() || undefined,
-                retailer_id:  form.retailer_id,
-                budget:       form.budget ? Number(form.budget) : undefined,
-                start_date:   form.start_date,
-                end_date:     form.end_date,
+                name: form.name.trim(),
+                description: form.description.trim() || undefined,
+                retailer_id: form.retailer_id,
+                budget: form.budget ? Number(form.budget) : undefined,
+                start_date: form.start_date,
+                end_date: form.end_date,
                 creative_url: form.creative_url.trim() || undefined,
             };
             // Strip undefined keys — don't persist nulls for omitted optional fields
@@ -113,7 +113,7 @@ export default function CampaignWizardModal({ onSuccess, onClose }) {
             aria-labelledby="wizard-title"
             onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
         >
-            <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-slate-900 shadow-2xl flex flex-col max-h-[90vh]">
+            <div data-testid="campaign-wizard-modal" className="w-full max-w-lg rounded-2xl bg-white dark:bg-slate-900 shadow-2xl flex flex-col max-h-[90vh]">
 
                 {/* Modal header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
@@ -123,7 +123,7 @@ export default function CampaignWizardModal({ onSuccess, onClose }) {
                     <button
                         onClick={onClose}
                         aria-label="Close"
-                        className="rounded-lg p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                        data-testid="btn-modal-close" className="rounded-lg p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                     >
                         <span className="material-symbols-outlined text-[20px]" aria-hidden="true">close</span>
                     </button>
@@ -148,14 +148,14 @@ export default function CampaignWizardModal({ onSuccess, onClose }) {
                             id="wiz-name"
                             type="text"
                             required
+                            data-testid="wizard-input-name"
                             value={form.name}
                             onChange={e => handleChange('name', e.target.value)}
                             placeholder="Summer Sale 2026"
                             aria-invalid={!!errors.name}
                             aria-describedby={errors.name ? 'err-name' : undefined}
-                            className={`rounded-lg border px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors ${
-                                errors.name ? 'border-red-400 dark:border-red-600' : 'border-slate-300 dark:border-slate-600'
-                            }`}
+                            className={`rounded-lg border px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors ${errors.name ? 'border-red-400 dark:border-red-600' : 'border-slate-300 dark:border-slate-600'
+                                }`}
                         />
                         {errors.name && (
                             <p id="err-name" role="alert" className="text-xs text-red-600 dark:text-red-400">{errors.name}</p>
@@ -177,13 +177,13 @@ export default function CampaignWizardModal({ onSuccess, onClose }) {
                             <select
                                 id="wiz-retailer"
                                 required
+                                data-testid="wizard-select-retailer"
                                 value={form.retailer_id}
                                 onChange={e => handleChange('retailer_id', e.target.value)}
                                 aria-invalid={!!errors.retailer_id}
                                 aria-describedby={errors.retailer_id ? 'err-retailer' : undefined}
-                                className={`rounded-lg border px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors ${
-                                    errors.retailer_id ? 'border-red-400 dark:border-red-600' : 'border-slate-300 dark:border-slate-600'
-                                }`}
+                                className={`rounded-lg border px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors ${errors.retailer_id ? 'border-red-400 dark:border-red-600' : 'border-slate-300 dark:border-slate-600'
+                                    }`}
                             >
                                 <option value="">
                                     {retailers.length === 0
@@ -206,6 +206,7 @@ export default function CampaignWizardModal({ onSuccess, onClose }) {
                         <textarea
                             id="wiz-desc"
                             rows={2}
+                            data-testid="wizard-input-desc"
                             value={form.description}
                             onChange={e => handleChange('description', e.target.value)}
                             placeholder="Brief description of the campaign…"
@@ -223,14 +224,14 @@ export default function CampaignWizardModal({ onSuccess, onClose }) {
                                 id="wiz-start"
                                 type="date"
                                 required
+                                data-testid="wizard-input-start-date"
                                 min={today()}
                                 value={form.start_date}
                                 onChange={e => handleChange('start_date', e.target.value)}
                                 aria-invalid={!!errors.start_date}
                                 aria-describedby={errors.start_date ? 'err-start' : undefined}
-                                className={`rounded-lg border px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors ${
-                                    errors.start_date ? 'border-red-400 dark:border-red-600' : 'border-slate-300 dark:border-slate-600'
-                                }`}
+                                className={`rounded-lg border px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors ${errors.start_date ? 'border-red-400 dark:border-red-600' : 'border-slate-300 dark:border-slate-600'
+                                    }`}
                             />
                             {errors.start_date && (
                                 <p id="err-start" role="alert" className="text-xs text-red-600 dark:text-red-400">{errors.start_date}</p>
@@ -244,14 +245,14 @@ export default function CampaignWizardModal({ onSuccess, onClose }) {
                                 id="wiz-end"
                                 type="date"
                                 required
+                                data-testid="wizard-input-end-date"
                                 min={form.start_date || today()}
                                 value={form.end_date}
                                 onChange={e => handleChange('end_date', e.target.value)}
                                 aria-invalid={!!errors.end_date}
                                 aria-describedby={errors.end_date ? 'err-end' : undefined}
-                                className={`rounded-lg border px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors ${
-                                    errors.end_date ? 'border-red-400 dark:border-red-600' : 'border-slate-300 dark:border-slate-600'
-                                }`}
+                                className={`rounded-lg border px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors ${errors.end_date ? 'border-red-400 dark:border-red-600' : 'border-slate-300 dark:border-slate-600'
+                                    }`}
                             />
                             {errors.end_date && (
                                 <p id="err-end" role="alert" className="text-xs text-red-600 dark:text-red-400">{errors.end_date}</p>
@@ -266,6 +267,7 @@ export default function CampaignWizardModal({ onSuccess, onClose }) {
                             id="wiz-budget"
                             type="number"
                             min="0"
+                            data-testid="wizard-input-budget"
                             value={form.budget}
                             onChange={e => handleChange('budget', e.target.value)}
                             placeholder="5000"
@@ -279,6 +281,7 @@ export default function CampaignWizardModal({ onSuccess, onClose }) {
                         <input
                             id="wiz-creative"
                             type="url"
+                            data-testid="wizard-input-creative"
                             value={form.creative_url}
                             onChange={e => handleChange('creative_url', e.target.value)}
                             placeholder="https://cdn.example.com/ad.mp4"
@@ -300,6 +303,7 @@ export default function CampaignWizardModal({ onSuccess, onClose }) {
                     <button
                         type="submit"
                         form="campaign-wizard-form"
+                        data-testid="wizard-btn-submit"
                         disabled={submitting || retailersLoading}
                         onClick={handleSubmit}
                         className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"

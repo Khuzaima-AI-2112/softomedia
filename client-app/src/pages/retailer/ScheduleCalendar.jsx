@@ -279,7 +279,7 @@ function ScheduleCalendar() {
 
             {/* Empty State */}
             {!loading && loops.length === 0 && (
-                <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
+                <div data-testid="no-data-state" className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
                     <span className="material-symbols-outlined text-6xl text-slate-300 mb-4">event_busy</span>
                     <h3 className="text-lg font-bold text-slate-600 dark:text-slate-400 mb-2">
                         No Schedule Available

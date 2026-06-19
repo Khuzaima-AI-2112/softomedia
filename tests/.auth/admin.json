@@ -17,8 +17,12 @@
           "value": "admin"
         },
         {
+          "name": "authToken",
+          "value": "demo-token"
+        },
+        {
           "name": "auth_user",
-          "value": "{\"id\":\"user-admin\",\"email\":\"admin@softomedia.com\",\"name\":\"Test Admin\",\"role\":\"admin\"}"
+          "value": "{\"id\":\"user-admin\",\"email\":\"admin@softomedia.com\",\"name\":\"Test Admin\",\"role\":\"admin\",\"linked_entity_id\":\"entity-admin-001\"}"
         }
       ]
     }

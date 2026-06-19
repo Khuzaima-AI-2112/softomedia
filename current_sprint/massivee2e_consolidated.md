@@ -1,22 +1,27 @@
 # Massive E2E — Consolidated Gap Closure Plan
-**Date:** 2026-06-17
-**Status:** Draft — pre-implementation
+**Date:** 2026-06-18
+**Status:** Implementation
 **Author:** Architecture Review / SRE
-**Depends on:** `massivee2e.md` + `massivee2e_addons.md` passing first
+**Depends on:** `massivee2e.md` passing first
 
-This document answers the question: **"If all steps in `massivee2e.md` and `massivee2e_addons.md` pass, does the whole app work?"**
+> **Playwright UI Architecture Notice:**
+> The Source of Truth for frontend locator methodology is defined in `playwright_db_setup.md`. 
+> The specific manifest of required Playwright test-ids is available at `playwright_testids_checklist.md`.
+> **Never** hardcode magic strings inside the Playwright scripts listed below. Always use the POM `*_locators.js` dictionaries.
+
+This document answers the question: **"If all steps in `massivee2e.md` pass, does the whole app work?"**
 
 The answer is: **not yet, but it can be made true.** Four structural gaps remain. Close all four and the following strong statement becomes true:
 
-> *If all steps in `massivee2e.md`, `massivee2e_addons.md`, Phase K (API surface smoke), and the Firestore Rules suite pass — then every user-facing flow, every API endpoint, and every data access rule in the application has been exercised at least once with a falsifiable assertion.*
+> *If all steps in `massivee2e.md`, Phase K (API surface smoke), and the Firestore Rules suite pass — then every user-facing flow, every API endpoint, and every data access rule in the application has been exercised at least once with a falsifiable assertion.*
 
 All router mount points confirmed from `ad-server/src/api/index.js` (commit `444577d`).
 
 ---
 
-## What the Two Existing Docs Already Prove
+## What the Existing Playbook Already Proves
 
-When every step in `massivee2e.md` + `massivee2e_addons.md` passes, the following is verified:
+When every step in `massivee2e.md` passes, the following is verified:
 
 - Every UI route in `App.jsx` (Sprint 22, 34 routes) renders without crashing
 - Every user persona (`admin`, `retaileradmin`, `brand`, `advertiser`, `techop`) authenticates and receives the correct role header

@@ -10,6 +10,7 @@
 
 import { test, expect } from '@playwright/test';
 import { authReset, loginAs, DEMO_ADVERTISER, BASE_URL } from './demo.fixtures.js';
+import { BrandLocators as BL, getLocator } from './brand_locators.js';
 
 test.beforeEach(authReset);
 
@@ -34,7 +35,7 @@ test.describe.serial('Phase 11 — Advertiser Dashboard', () => {
     await loginAs(page, DEMO_ADVERTISER);
     await page.goto(`${BASE_URL}/dashboard/advertiser`);
     await expect(page).not.toHaveURL(/\/login/);
-    await expect(page.locator('[data-testid="advertiser-dashboard"]')).toBeVisible();
+    await expect(getLocator(page, BL.AdvertiserDashboard)).toBeVisible();
     // KPI widgets must load (not stuck in loading state)
     const loadingSpinners = page.locator('[data-testid="kpi-loading"]');
     await expect(loadingSpinners).toHaveCount(0);

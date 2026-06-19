@@ -132,3 +132,9 @@ All acceptance criteria must be **falsifiable**. Accepted forms:
 | S16 | Deploy & Environment Gates | Three-path Firestore index deploy options |
 | S16 | Anti-Hallucination | "Class may be inlined" rule |
 | MVP | State Validation | Establish Loud API mutations and disable Ghost UI |
+
+---
+
+## Strict API Smoke Testing Alignment
+- **Mandatory Variable Enforcement:** Test automation frameworks and smoke tests must respect backend input validation layers. Attempting to hit `/api/impressions` without a scope (e.g., `date` and `campaign_id`) will accurately fail. Test payloads must mirror actual production security and efficiency guardrails.
+- **Method Specificity:** Endpoints restricted to ingestion (e.g. Telemetry/Monitoring) use POST inherently. Automated verification tests must use the correct HTTP methods and provide structural mock payloads to truly verify "liveness".

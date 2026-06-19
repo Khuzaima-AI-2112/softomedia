@@ -8,8 +8,8 @@ import apiService from '../../services/ApiService';
 const SCREEN_STATUS = Object.freeze({ ACTIVE: 'active', INACTIVE: 'inactive' });
 
 // Error codes returned by the backend for campaign-aware rejections.
-const ERR_STATUS_ACTIVE_CAMPAIGNS  = 'SCREEN_STATUS_CHANGE_REJECTED_ACTIVE_CAMPAIGNS';
-const ERR_DELETE_ACTIVE_CAMPAIGNS  = 'SCREEN_DELETE_REJECTED_ACTIVE_CAMPAIGNS';
+const ERR_STATUS_ACTIVE_CAMPAIGNS = 'SCREEN_STATUS_CHANGE_REJECTED_ACTIVE_CAMPAIGNS';
+const ERR_DELETE_ACTIVE_CAMPAIGNS = 'SCREEN_DELETE_REJECTED_ACTIVE_CAMPAIGNS';
 
 function ScreenManagement() {
     const [screens, setScreens] = useState([]);
@@ -199,6 +199,7 @@ function ScreenManagement() {
                         </p>
                     </div>
                     <button
+                        data-testid="btn-add-screen"
                         onClick={() => setShowAddModal(true)}
                         className="px-4 py-2 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover transition-colors flex items-center gap-2"
                     >
@@ -313,7 +314,7 @@ function ScreenManagement() {
                         aria-labelledby="add-screen-title"
                         className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200"
                     >
-                        <GlassCard className="w-full max-w-md relative">
+                        <GlassCard data-testid="modal-screen-form" className="w-full max-w-md relative">
                             <h2 id="add-screen-title" className="text-xl font-bold mb-4">Register New Screen</h2>
                             <form onSubmit={handleCreateScreen} className="space-y-4">
                                 <div>
@@ -386,6 +387,7 @@ function ScreenManagement() {
                                     </button>
                                     <button
                                         type="submit"
+                                        data-testid="btn-screen-form-submit"
                                         className="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover shadow-lg shadow-primary/20"
                                     >
                                         Register Device

@@ -233,7 +233,7 @@ function AdvertiserManagement() {
             render: (advertiser) => (
                 <StatusBadge status={
                     advertiser.status === 'active' ? 'Active' :
-                    advertiser.status === 'suspended' ? 'Suspended' : 'Inactive'
+                        advertiser.status === 'suspended' ? 'Suspended' : 'Inactive'
                 } />
             )
         },
@@ -253,11 +253,10 @@ function AdvertiserManagement() {
                     <button
                         onClick={() => toggleStatus(advertiser.id)}
                         disabled={togglingIds.has(advertiser.id)}
-                        className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                            advertiser.status === 'active'
+                        className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${advertiser.status === 'active'
                                 ? 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
                                 : 'text-slate-400 bg-slate-100 dark:bg-slate-800 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
-                        }`}
+                            }`}
                         title={advertiser.status === 'active' ? 'Deactivate' : 'Activate'}
                         aria-label={`${advertiser.status === 'active' ? 'Deactivate' : 'Activate'} ${advertiser.name}`}
                     >
@@ -299,6 +298,7 @@ function AdvertiserManagement() {
                     </p>
                 </div>
                 <button
+                    data-testid="btn-add-advertiser"
                     onClick={() => openModal()}
                     className="px-4 py-2 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover transition-colors flex items-center gap-2"
                 >
@@ -378,13 +378,13 @@ function AdvertiserManagement() {
             {/* Add / Edit Modal */}
             {showModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <GlassCard className="w-full max-w-lg relative">
+                    <GlassCard data-testid="modal-advertiser-form" className="w-full max-w-lg relative">
                         <div className="absolute top-0 left-0 w-full h-1.5 bg-primary rounded-t-xl"></div>
                         <div className="flex items-center justify-between mb-6">
                             <h2 className="text-xl font-bold">
                                 {editingAdvertiser ? 'Edit Advertiser' : 'Add Advertiser'}
                             </h2>
-                            <button onClick={closeModal} className="p-1 text-slate-400 hover:text-slate-600" aria-label="Close modal">
+                            <button onClick={closeModal} data-testid="btn-modal-close" className="p-1 text-slate-400 hover:text-slate-600" aria-label="Close modal">
                                 <span className="material-symbols-outlined">close</span>
                             </button>
                         </div>
@@ -418,6 +418,7 @@ function AdvertiserManagement() {
                                 <label className="block text-sm font-medium mb-1">Name *</label>
                                 <input
                                     type="text"
+                                    data-testid="input-advertiser-name"
                                     value={formData.name}
                                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                     required
@@ -443,6 +444,7 @@ function AdvertiserManagement() {
                                 <label className="block text-sm font-medium mb-1">Contact Email *</label>
                                 <input
                                     type="email"
+                                    data-testid="input-advertiser-contact"
                                     value={formData.contact_email}
                                     onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
                                     required
@@ -472,6 +474,7 @@ function AdvertiserManagement() {
                                 </button>
                                 <button
                                     type="submit"
+                                    data-testid="btn-advertiser-form-submit"
                                     className="px-6 py-2 bg-primary text-white rounded-lg font-bold hover:bg-primary-hover shadow-lg shadow-primary/20 transition-colors"
                                 >
                                     {editingAdvertiser ? 'Save Changes' : 'Add Advertiser'}

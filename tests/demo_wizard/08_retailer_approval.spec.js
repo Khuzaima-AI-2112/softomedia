@@ -12,6 +12,7 @@
 
 import { test, expect } from '@playwright/test';
 import { authReset, loginAs, DEMO_RETAILER, BASE_URL } from './demo.fixtures.js';
+import { getLocator, RetailerLocators as RL } from './retailer_locators.js';
 
 test.beforeEach(authReset);
 
@@ -20,7 +21,7 @@ test.describe.serial('Phase 8 — Retailer Campaign Approval Gate', () => {
   test('8.1 — Navigate to Campaign Approvals', async ({ page }) => {
     await loginAs(page, DEMO_RETAILER);
     await page.goto(`${BASE_URL}/dashboard/retailer/campaign-approvals`);
-    await expect(page.locator('[data-testid="campaign-approval-list"]')).toBeVisible();
+    await expect(getLocator(page, RL.CampaignApprovalList)).toBeVisible();
     // BonVie Summer Demo must be in pending queue from Phase 3
     await expect(page.getByText('BonVie Summer Demo')).toBeVisible();
   });
@@ -47,7 +48,7 @@ test.describe.serial('Phase 8 — Retailer Campaign Approval Gate', () => {
     });
 
     await page.getByText('BonVie Summer Demo').click();
-    await page.locator('[data-testid="btn-approve"]').click();
+    await getLocator(page, RL.BtnApprove).click();
 
     // POST must return 200
     const response = await page.waitForResponse(
@@ -70,7 +71,7 @@ test.describe.serial('Phase 8 — Retailer Campaign Approval Gate', () => {
     const approvedCampaign = page.locator('[data-testid="campaign-status"]').filter({ hasText: 'Approved' });
     await expect(approvedCampaign).toBeVisible();
     // Must NOT appear in the pending queue section
-    const pendingSection = page.locator('[data-testid="pending-approvals"]');
+    const pendingSection = getLocator(page, RL.PendingApprovals);
     if (await pendingSection.isVisible()) {
       await expect(pendingSection).not.toContainText('BonVie Summer Demo');
     }
@@ -88,7 +89,7 @@ test.describe.serial('Phase 8 — Retailer Campaign Approval Gate', () => {
         (res) => res.url().includes('/api/campaigns/demo-campaign-001/reject') && res.request().method() === 'POST'
       ),
       page.getByText('BonVie Summer Demo').click().then(() =>
-        page.locator('[data-testid="btn-reject"]').click()
+        getLocator(page, RL.BtnReject).click()
       ),
     ]);
 

@@ -205,9 +205,8 @@ function BusinessHoursManagement() {
 
             {/* T5: Page-level error shown outside the store selector so it's always visible */}
             {message && !selectedStore && (
-                <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${
-                    message.type === 'error' ? 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400' : 'bg-blue-50 text-blue-700'
-                }`}>
+                <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${message.type === 'error' ? 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400' : 'bg-blue-50 text-blue-700'
+                    }`}>
                     <span className="material-symbols-outlined text-lg">
                         {message.type === 'error' ? 'error' : 'info'}
                     </span>
@@ -279,7 +278,7 @@ function BusinessHoursManagement() {
                             )}
 
                             {activeTab === 'weekly' && (
-                                <GlassCard className="relative overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                <GlassCard data-testid="business-hours-form" className="relative overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
                                     <div className="absolute top-0 left-0 w-1 h-full bg-primary"></div>
                                     <div className="flex items-center justify-between mb-6">
                                         <div className="flex items-center gap-3">
@@ -293,6 +292,7 @@ function BusinessHoursManagement() {
                                         </div>
                                         <button
                                             onClick={saveWeeklyHours}
+                                            data-testid="btn-hours-save"
                                             disabled={saving}
                                             className="px-4 py-2 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover disabled:opacity-50 transition-all flex items-center gap-2"
                                         >
@@ -474,7 +474,7 @@ function BusinessHoursManagement() {
                             {/* Special Hours Modal */}
                             {showSpecialModal && (
                                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                                    <GlassCard className="w-full max-w-md relative">
+                                    <GlassCard data-testid="modal-schedule-override-form" className="w-full max-w-md relative">
                                         <div className="absolute top-0 left-0 w-full h-1.5 bg-amber-500"></div>
                                         <h2 className="text-xl font-bold mb-1">Set Special Hours</h2>
                                         <p className="text-sm text-slate-500 mb-6">
@@ -539,6 +539,7 @@ function BusinessHoursManagement() {
                                                 </button>
                                                 <button
                                                     onClick={saveSpecialHours}
+                                                    data-testid="btn-hours-apply-all"
                                                     disabled={saving}
                                                     className="px-6 py-2 bg-amber-500 text-white rounded-lg font-bold hover:bg-amber-600 shadow-lg shadow-amber-500/20 disabled:opacity-50 flex items-center gap-2"
                                                 >

@@ -161,7 +161,7 @@ function LoopAnalytics() {
     };
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div data-testid="loop-analytics" className="space-y-8 animate-in fade-in duration-500">
 
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -216,7 +216,7 @@ function LoopAnalytics() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <GlassCard>
                     <p className="text-sm font-medium text-slate-500 mb-1">Loop Completions</p>
-                    <p className="text-3xl font-bold text-slate-900 dark:text-white tabular-nums" data-testid="total-loops">
+                    <p data-testid="play-count" className="text-3xl font-bold text-slate-900 dark:text-white tabular-nums" data-testid="total-loops">
                         {loading ? '—' : totalLoops.toLocaleString()}
                     </p>
                     <p className="text-xs text-slate-400 mt-1">Full cycles verified</p>
@@ -390,7 +390,7 @@ function LoopAnalytics() {
 
             {/* Empty State */}
             {!loading && !apiUnavailable && activeRows.length === 0 && (
-                <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
+                <div data-testid="no-data-state" className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
                     <span className="material-symbols-outlined text-6xl text-slate-300 mb-4 block">analytics</span>
                     <h3 className="text-lg font-bold text-slate-600 dark:text-slate-400 mb-2">No Analytics Data</h3>
                     <p className="text-slate-500">No delivery data available for {targetDate}.</p>

@@ -203,7 +203,7 @@ function TechOpsDashboard() {
                                 )}
                                 <button
                                     onClick={closeTerminal}
-                                    className="text-slate-400 hover:text-white transition-colors"
+                                    data-testid="btn-modal-close" className="text-slate-400 hover:text-white transition-colors"
                                     aria-label="Close log viewer"
                                 >
                                     <span className="material-symbols-outlined">close</span>

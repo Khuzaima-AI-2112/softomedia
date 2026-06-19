@@ -23,6 +23,9 @@ import {
   assertRoleHeader,
 } from './demo.fixtures.js';
 
+import { AdminLocators as AL } from './admin_locators.js';
+import { RetailerLocators as RL, getLocator } from './retailer_locators.js';
+
 test.describe.serial('Phase 2 — Retailer Schedule', () => {
 
   test.beforeEach(async ({ page }) => {
@@ -31,8 +34,8 @@ test.describe.serial('Phase 2 — Retailer Schedule', () => {
 
   test('2.1 login as Retailer', async ({ page }) => {
     await loginAs(page, DEMO_RETAILER);
-    await expect(page.locator('[data-testid="dashboard-shell"]')).toBeVisible();
-    await expect(page.locator('[data-testid="nav-retailer"]')).toBeVisible();
+    await expect(page.locator(`[data-testid="${AL.Shell}"]`)).toBeVisible();
+    await expect(getLocator(page, RL.NavRetailer)).toBeVisible();
   });
 
   test('2.2 open Schedule Calendar — stores and screens visible', async ({ page }) => {
@@ -41,13 +44,13 @@ test.describe.serial('Phase 2 — Retailer Schedule', () => {
       BASE_URL + `/dashboard/retailer/${SEED.retailerId}/schedule`,
       { waitUntil: 'domcontentloaded' },
     );
-    await page.waitForSelector('[data-testid="schedule-calendar"]');
+    await getLocator(page, RL.ScheduleCalendar).waitFor();
 
     await expect(
-      page.locator('[data-testid="schedule-store-filter"]').getByText('FreshMart Downtown'),
+      getLocator(page, RL.ScheduleStoreFilter).getByText('FreshMart Downtown'),
     ).toBeVisible({ timeout: 10000 });
     await expect(
-      page.locator('[data-testid="schedule-store-filter"]').getByText('FreshMart Plateau'),
+      getLocator(page, RL.ScheduleStoreFilter).getByText('FreshMart Plateau'),
     ).toBeVisible({ timeout: 10000 });
 
     for (const screenId of SEED.screenIds) {
@@ -77,16 +80,16 @@ test.describe.serial('Phase 2 — Retailer Schedule', () => {
       }
     });
 
-    await page.click('[data-testid="btn-add-schedule-override"]');
-    await page.waitForSelector('[data-testid="modal-schedule-override-form"]');
-    await page.selectOption('[data-testid="select-override-day"]', 'sunday');
-    await page.fill('[data-testid="input-override-start"]', '02:00');
-    await page.fill('[data-testid="input-override-end"]',   '04:00');
-    await page.selectOption('[data-testid="select-override-type"]', 'blocked');
-    await page.click('[data-testid="btn-override-form-submit"]');
+    await getLocator(page, RL.BtnAddScheduleOverride).click();
+    await getLocator(page, RL.ModalScheduleOverrideForm).waitFor();
+    await getLocator(page, RL.SelectOverrideDay).selectOption('sunday');
+    await getLocator(page, RL.InputOverrideStart).fill('02:00');
+    await getLocator(page, RL.InputOverrideEnd).fill('04:00');
+    await getLocator(page, RL.SelectOverrideType).selectOption('blocked');
+    await getLocator(page, RL.BtnOverrideFormSubmit).click();
 
     await expect(
-      page.locator('[data-testid="schedule-override-blocked"]'),
+      getLocator(page, RL.ScheduleOverrideBlocked),
     ).toBeVisible({ timeout: 10000 });
 
     expect(overrideId).toBeTruthy();
@@ -99,7 +102,7 @@ test.describe.serial('Phase 2 — Retailer Schedule', () => {
       BASE_URL + `/dashboard/retailer/${SEED.retailerId}`,
       { waitUntil: 'domcontentloaded' },
     );
-    await page.waitForSelector('[data-testid="retailer-dashboard-kpis"]');
+    await getLocator(page, RL.DashboardKpis).waitFor();
 
     const kpiChip = page.locator('[data-testid="kpi-available-hours"]');
     await expect(kpiChip).toBeVisible({ timeout: 10000 });
@@ -127,14 +130,14 @@ test.describe.serial('Phase 2 — Retailer Schedule', () => {
       await route.continue();
     });
 
-    await page.click('[data-testid="btn-add-schedule-override"]');
-    await page.waitForSelector('[data-testid="modal-schedule-override-form"]');
+    await getLocator(page, RL.BtnAddScheduleOverride).click();
+    await getLocator(page, RL.ModalScheduleOverrideForm).waitFor();
 
     // Select a day but intentionally leave start/end times EMPTY
-    await page.selectOption('[data-testid="select-override-day"]', 'monday');
+    await getLocator(page, RL.SelectOverrideDay).selectOption('monday');
     // Do NOT fill input-override-start or input-override-end
 
-    await page.click('[data-testid="btn-override-form-submit"]');
+    await getLocator(page, RL.BtnOverrideFormSubmit).click();
 
     // Validation error must be visible
     const validationError = page.locator(

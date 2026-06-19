@@ -36,18 +36,18 @@ test.describe.serial('Phase 6 — Admin Full-Circle Validation', () => {
 
   test('6.1 login as Admin', async ({ page }) => {
     await loginAs(page, DEMO_ADMIN);
-    await expect(page.locator('[data-testid="dashboard-shell"]')).toBeVisible();
-    await expect(page.locator('[data-testid="nav-admin"]')).toBeVisible();
+    await expect(getLocator(page, AL.Shell)).toBeVisible();
+    await expect(getLocator(page, AL.NavAdmin)).toBeVisible();
   });
 
   test('6.2 BonVie campaign visible in Admin Overview', async ({ page }) => {
     await loginAs(page, DEMO_ADMIN);
     await page.goto(BASE_URL + '/dashboard/admin', { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('[data-testid="admin-overview"]', { timeout: 15000 });
+    await getLocator(page, AL.AdminOverview).waitFor({ timeout: 15000 );
 
     // Campaign created in Phase 3 must appear in the admin campaign list
     await expect(
-      page.locator('[data-testid="admin-overview"]').getByText('BonVie'),
+      getLocator(page, AL.AdminOverview).getByText('BonVie'),
     ).toBeVisible({ timeout: 10000 });
   });
 

@@ -92,8 +92,8 @@ test.describe.serial('Phase A — Retailer Loops', () => {
   // ─────────────────────────────────────────────────────────────────────────
   test('7.1 login as Retailer', async ({ page }) => {
     await loginAs(page, DEMO_RETAILER);
-    await expect(page.locator('[data-testid="dashboard-shell"]')).toBeVisible();
-    await expect(page.locator('[data-testid="nav-retailer"]')).toBeVisible();
+    await expect(getLocator(page, AL.Shell)).toBeVisible();
+    await expect(getLocator(page, RL.NavRetailer)).toBeVisible();
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -108,8 +108,8 @@ test.describe.serial('Phase A — Retailer Loops', () => {
     // Must NOT show a 404 error element
     await expect(page.locator('[data-testid="error-404"]')).not.toBeVisible();
     // Must render the loops list container
-    await page.waitForSelector('[data-testid="loops-list"]', { timeout: 15000 });
-    await expect(page.locator('[data-testid="loops-list"]')).toBeVisible();
+    await getLocator(page, RL.LoopsList).waitFor({ timeout: 15000 );
+    await expect(getLocator(page, RL.LoopsList)).toBeVisible();
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -142,7 +142,7 @@ test.describe.serial('Phase A — Retailer Loops', () => {
       BASE_URL + '/dashboard/retailer/loops',
       { waitUntil: 'domcontentloaded' },
     );
-    await page.waitForSelector('[data-testid="loops-list"]', { timeout: 15000 });
+    await getLocator(page, RL.LoopsList).waitFor({ timeout: 15000 );
 
     // At least one loop row must exist (seeded in Phase 1)
     const firstRow = page.locator('[data-testid^="loop-row-"]').first();
@@ -162,7 +162,7 @@ test.describe.serial('Phase A — Retailer Loops', () => {
       BASE_URL + '/dashboard/retailer/loops',
       { waitUntil: 'domcontentloaded' },
     );
-    await page.waitForSelector('[data-testid="loops-list"]', { timeout: 15000 });
+    await getLocator(page, RL.LoopsList).waitFor({ timeout: 15000 );
 
     const VALID_STATUSES = new Set(['draft', 'approved', 'locked']);
     const badges = await page.locator('[data-testid^="loop-status-badge-"]').all();

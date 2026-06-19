@@ -13,6 +13,7 @@
 
 import { test, expect } from '@playwright/test';
 import { authReset, loginAs, DEMO_ADMIN, DEMO_RETAILER, BASE_URL } from './demo.fixtures.js';
+import { getLocator, AdminLocators as AL } from './admin_locators.js';
 
 test.beforeEach(authReset);
 
@@ -78,7 +79,7 @@ test.describe.serial('Phase 14 — Ticket System', () => {
     await loginAs(page, DEMO_RETAILER);
     const role = await page.evaluate(() => localStorage.getItem('demo_role'));
     expect(role).toBe('retaileradmin');
-    await expect(page.locator('[data-testid="dashboard-shell"]')).toBeVisible();
+    await expect(getLocator(page, AL.Shell)).toBeVisible();
     // Confirm x-demo-role is set correctly before Retailer steps proceed
     let capturedRole = '';
     await page.route('**/api/**', async (route) => {

@@ -33,7 +33,7 @@ function SupportTicketModal({ onClose }) {
                                 </button>
                             ))}
                         </div>
-                        <button onClick={onClose} style={{ marginTop: '2rem', width: '100%', padding: '0.75rem', color: '#6b7280', border: 'none', background: 'none', cursor: 'pointer' }}>Cancel</button>
+                        <button onClick={onClose} style={{ marginTop: '2rem', width: '100%', padding: '0.75rem', color: '#6b7280', border: 'none', background: 'none', cursor: 'pointer' }} data-testid="btn-modal-close">Cancel</button>
                     </>
                 )}
 

@@ -85,7 +85,7 @@ function Login() {
                             type="email"
                             placeholder="admin@demo.softomedia.com"
                             value={email}
-                            onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                            onChange={(e) = data-testid="input-email"> { setEmail(e.target.value); setError(''); }}
                             className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                         />
                         {error && (

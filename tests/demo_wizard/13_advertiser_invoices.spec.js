@@ -5,6 +5,7 @@
 
 import { test, expect } from '@playwright/test';
 import { authReset, loginAs, DEMO_ADVERTISER, BASE_URL } from './demo.fixtures.js';
+import { getLocator, BrandLocators as BL } from './brand_locators.js';
 
 test.beforeEach(authReset);
 
@@ -14,7 +15,7 @@ test.describe.serial('Phase 13 — Advertiser Invoices', () => {
     await loginAs(page, DEMO_ADVERTISER);
     await page.goto(`${BASE_URL}/dashboard/advertiser/invoices`);
     await expect(page).not.toHaveURL(/\/login/);
-    await expect(page.locator('[data-testid="invoices"]')).toBeVisible();
+    await expect(getLocator(page, BL.Invoices)).toBeVisible();
     // Must not show an error state or blank white screen
     await expect(page.locator('[data-testid="error-state"]')).toHaveCount(0);
   });
@@ -23,7 +24,7 @@ test.describe.serial('Phase 13 — Advertiser Invoices', () => {
     await loginAs(page, DEMO_ADVERTISER);
     await page.goto(`${BASE_URL}/dashboard/advertiser/invoices`);
     // At least one invoice row must reference BonVie Summer Demo or demo-campaign-001
-    const campaignRef = page.locator('[data-testid="invoice-row"]').filter({
+    const campaignRef = getLocator(page, BL.InvoiceRow).filter({
       hasText: /BonVie Summer Demo|demo-campaign-001/,
     });
     await expect(campaignRef.first()).toBeVisible();
@@ -37,8 +38,8 @@ test.describe.serial('Phase 13 — Advertiser Invoices', () => {
   test('13.3 — Invoice download or detail view accessible', async ({ page }) => {
     await loginAs(page, DEMO_ADVERTISER);
     await page.goto(`${BASE_URL}/dashboard/advertiser/invoices`);
-    const downloadBtn = page.locator('[data-testid="btn-invoice-download"]').first();
-    const detailLink = page.locator('[data-testid="invoice-row"]').first();
+    const downloadBtn = getLocator(page, BL.BtnInvoiceDownload).first();
+    const detailLink = getLocator(page, BL.InvoiceRow).first();
 
     if (await downloadBtn.isVisible()) {
       // If a download button exists, assert the download event fires

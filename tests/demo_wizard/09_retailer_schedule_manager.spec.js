@@ -8,6 +8,7 @@
 
 import { test, expect } from '@playwright/test';
 import { authReset, loginAs, DEMO_RETAILER, BASE_URL } from './demo.fixtures.js';
+import { getLocator, RetailerLocators as RL } from './retailer_locators.js';
 
 test.beforeEach(authReset);
 
@@ -18,7 +19,7 @@ test.describe.serial('Phase 9 — Retailer Schedule Manager', () => {
     await page.goto(`${BASE_URL}/dashboard/retailer/schedule-manager`);
     // Must load without 403
     await expect(page).not.toHaveURL(/\/login/);
-    await expect(page.locator('[data-testid="schedule-manager"]')).toBeVisible();
+    await expect(getLocator(page, RL.ScheduleManager)).toBeVisible();
     // FreshMart stores/screens must be visible
     await expect(page.getByText('FreshMart').first()).toBeVisible();
   });
@@ -29,7 +30,7 @@ test.describe.serial('Phase 9 — Retailer Schedule Manager', () => {
     // Post-Phase 8 approval: BonVie slots must be present
     await expect(page.getByText('BonVie').first()).toBeVisible();
     // Must NOT show a 'pending approval' badge on any BonVie slot
-    const pendingBadge = page.locator('[data-testid="pending-approval-badge"]');
+    const pendingBadge = getLocator(page, RL.PendingApprovalBadge);
     await expect(pendingBadge).toHaveCount(0);
   });
 
@@ -47,7 +48,7 @@ test.describe.serial('Phase 9 — Retailer Schedule Manager', () => {
     });
 
     // Click the first available slot and trigger a +1 hour shift
-    const firstSlot = page.locator('[data-testid="schedule-slot"]').first();
+    const firstSlot = getLocator(page, RL.ScheduleSlot).first();
     await firstSlot.click();
     const shiftBtn = page.locator('[data-testid="btn-shift-slot"], [data-testid="btn-slot-later"]').first();
     if (await shiftBtn.isVisible()) {

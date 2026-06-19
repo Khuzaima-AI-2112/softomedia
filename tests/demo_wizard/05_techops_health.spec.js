@@ -49,8 +49,8 @@ test.describe.serial('Phase 5 — TechOps Health Check', () => {
   // ─────────────────────────────────────────────────────────────────────────
   test('5.1 login as TechOperator', async ({ page }) => {
     await loginAs(page, DEMO_TECHOP);
-    await expect(page.locator('[data-testid="dashboard-shell"]')).toBeVisible();
-    await expect(page.locator('[data-testid="nav-techop"]')).toBeVisible();
+    await expect(getLocator(page, AL.Shell)).toBeVisible();
+    await expect(getLocator(page, AL.NavTechOp)).toBeVisible();
   });
 
   // ─────────────────────────────────────────────────────────────────────────

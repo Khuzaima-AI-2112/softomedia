@@ -11,8 +11,8 @@ import apiService from '../../services/ApiService';
 export default function AdvertiserDashboard() {
     const { user } = useAuth();
     const [campaigns, setCampaigns] = useState([]);
-    const [loading, setLoading]     = useState(true);
-    const [error, setError]         = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         apiService.getCampaigns()
@@ -28,16 +28,16 @@ export default function AdvertiserDashboard() {
     }, {});
 
     const STATUS_CONFIG = [
-        { key: 'pending_approval', label: 'Pending',   colour: 'bg-yellow-100 text-yellow-800  dark:bg-yellow-900/30 dark:text-yellow-300'  },
-        { key: 'approved',         label: 'Approved',  colour: 'bg-blue-100   text-blue-800    dark:bg-blue-900/30   dark:text-blue-300'    },
-        { key: 'live',             label: 'Live',      colour: 'bg-green-100  text-green-800   dark:bg-green-900/30  dark:text-green-300'   },
-        { key: 'paused',           label: 'Paused',    colour: 'bg-slate-100  text-slate-700   dark:bg-slate-800     dark:text-slate-300'   },
-        { key: 'completed',        label: 'Completed', colour: 'bg-purple-100 text-purple-800  dark:bg-purple-900/30 dark:text-purple-300'  },
-        { key: 'rejected',         label: 'Rejected',  colour: 'bg-red-100    text-red-800     dark:bg-red-900/30    dark:text-red-300'     },
+        { key: 'pending_approval', label: 'Pending', colour: 'bg-yellow-100 text-yellow-800  dark:bg-yellow-900/30 dark:text-yellow-300' },
+        { key: 'approved', label: 'Approved', colour: 'bg-blue-100   text-blue-800    dark:bg-blue-900/30   dark:text-blue-300' },
+        { key: 'live', label: 'Live', colour: 'bg-green-100  text-green-800   dark:bg-green-900/30  dark:text-green-300' },
+        { key: 'paused', label: 'Paused', colour: 'bg-slate-100  text-slate-700   dark:bg-slate-800     dark:text-slate-300' },
+        { key: 'completed', label: 'Completed', colour: 'bg-purple-100 text-purple-800  dark:bg-purple-900/30 dark:text-purple-300' },
+        { key: 'rejected', label: 'Rejected', colour: 'bg-red-100    text-red-800     dark:bg-red-900/30    dark:text-red-300' },
     ];
 
     return (
-        <div className="space-y-8">
+        <div data-testid="advertiser-dashboard" className="space-y-8">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
@@ -50,6 +50,7 @@ export default function AdvertiserDashboard() {
                 </div>
                 <Link
                     to="/dashboard/advertiser/campaigns/new"
+                    data-testid="btn-new-campaign"
                     className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
                 >
                     <span className="material-symbols-outlined text-[18px]" aria-hidden="true">add</span>
@@ -98,7 +99,7 @@ export default function AdvertiserDashboard() {
 
                 {loading ? (
                     <div className="space-y-2">
-                        {[1,2,3].map(i => <div key={i} className="h-12 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />)}
+                        {[1, 2, 3].map(i => <div key={i} className="h-12 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />)}
                     </div>
                 ) : campaigns.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 p-10 flex flex-col items-center text-center gap-3">
@@ -132,10 +133,9 @@ export default function AdvertiserDashboard() {
                                             </Link>
                                         </td>
                                         <td className="px-4 py-3">
-                                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
-                                                STATUS_CONFIG.find(s => s.key === c.status)?.colour ??
+                                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_CONFIG.find(s => s.key === c.status)?.colour ??
                                                 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                                            }`}>
+                                                }`}>
                                                 {c.status ?? 'unknown'}
                                             </span>
                                         </td>

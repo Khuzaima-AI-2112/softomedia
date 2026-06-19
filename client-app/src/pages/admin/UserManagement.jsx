@@ -8,35 +8,35 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Trash2, Pencil } from 'lucide-react';
 
 const ROLES = [
-    { value: 'superadmin',      label: 'Super Admin',      color: 'text-purple-500', icon: 'shield_person' },
-    { value: 'contentmanager',  label: 'Content Manager',  color: 'text-blue-500',   icon: 'edit_note'     },
-    { value: 'techoperator',    label: 'Tech Operator',    color: 'text-amber-500',  icon: 'engineering'   },
-    { value: 'retaileradmin',   label: 'Retailer Admin',   color: 'text-emerald-500',icon: 'storefront'    },
-    { value: 'advertiser',      label: 'Advertiser',       color: 'text-rose-500',   icon: 'campaign'      }
+    { value: 'superadmin', label: 'Super Admin', color: 'text-purple-500', icon: 'shield_person' },
+    { value: 'contentmanager', label: 'Content Manager', color: 'text-blue-500', icon: 'edit_note' },
+    { value: 'techoperator', label: 'Tech Operator', color: 'text-amber-500', icon: 'engineering' },
+    { value: 'retaileradmin', label: 'Retailer Admin', color: 'text-emerald-500', icon: 'storefront' },
+    { value: 'advertiser', label: 'Advertiser', color: 'text-rose-500', icon: 'campaign' }
 ];
 
 function UserManagement() {
-    const navigate  = useNavigate();
-    const { user, loading }  = useAuth();
+    const navigate = useNavigate();
+    const { user, loading } = useAuth();
 
     // Phase 3: gate entire page behind superadmin.
     // Guard behind loading so we never redirect during the auth hydration
     // window when user is still null and isSuperAdmin would be a false negative.
     const isSuperAdmin = user?.role === 'superadmin';
 
-    const [users,       setUsers]       = useState([]);
-    const [retailers,   setRetailers]   = useState([]);
+    const [users, setUsers] = useState([]);
+    const [retailers, setRetailers] = useState([]);
     const [advertisers, setAdvertisers] = useState([]);
     const [dataLoading, setDataLoading] = useState(true);
-    const [showModal,   setShowModal]   = useState(false);
-    const [formData,    setFormData]    = useState({
+    const [showModal, setShowModal] = useState(false);
+    const [formData, setFormData] = useState({
         name: '', email: '', role: 'advertiser', linkedentityid: ''
     });
     const [editingUserId, setEditingUserId] = useState(null);
-    const [filterRole,    setFilterRole]    = useState('all');
-    const [modalError,    setModalError]    = useState('');
-    const [pageError,     setPageError]     = useState('');
-    const [successMessage,setSuccessMessage]= useState('');
+    const [filterRole, setFilterRole] = useState('all');
+    const [modalError, setModalError] = useState('');
+    const [pageError, setPageError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
 
     useEffect(() => {
         // Wait for auth to finish hydrating before making access decisions
@@ -77,9 +77,9 @@ function UserManagement() {
     const openEditModal = (u) => {
         setEditingUserId(u.id);
         setFormData({
-            name:           u.name           || '',
-            email:          u.email          || '',
-            role:           u.role           || 'advertiser',
+            name: u.name || '',
+            email: u.email || '',
+            role: u.role || 'advertiser',
             linkedentityid: u.linkedentityid || ''
         });
         setModalError('');
@@ -126,7 +126,7 @@ function UserManagement() {
 
     const linkedEntityOptions = () => {
         if (formData.role === 'retaileradmin') return retailers;
-        if (formData.role === 'advertiser')    return advertisers;
+        if (formData.role === 'advertiser') return advertisers;
         return [];
     };
 
@@ -137,7 +137,7 @@ function UserManagement() {
     // always the SECOND argument. Use (_value, row) for columns that need
     // the whole row, or (value) for columns that only need the cell value.
     const columns = [
-        { key: 'name',  label: 'Name'  },
+        { key: 'name', label: 'Name' },
         { key: 'email', label: 'Email' },
         {
             key: 'role',
@@ -196,6 +196,7 @@ function UserManagement() {
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold text-white">User Management</h1>
                 <button
+                    data-testid="btn-add-user"
                     onClick={openCreateModal}
                     className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
                 >
@@ -218,11 +219,10 @@ function UserManagement() {
             <div className="flex gap-2 flex-wrap">
                 <button
                     onClick={() => setFilterRole('all')}
-                    className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                        filterRole === 'all'
+                    className={`px-3 py-1 rounded-full text-sm transition-colors ${filterRole === 'all'
                             ? 'bg-purple-600 text-white'
                             : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                    }`}
+                        }`}
                 >
                     All
                 </button>
@@ -230,11 +230,10 @@ function UserManagement() {
                     <button
                         key={r.value}
                         onClick={() => setFilterRole(r.value)}
-                        className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                            filterRole === r.value
+                        className={`px-3 py-1 rounded-full text-sm transition-colors ${filterRole === r.value
                                 ? 'bg-purple-600 text-white'
                                 : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                        }`}
+                            }`}
                     >
                         {r.label}
                     </button>
@@ -248,7 +247,7 @@ function UserManagement() {
             {/* Create / Edit Modal */}
             {showModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-                    <div className="bg-gray-900 border border-white/10 rounded-xl p-6 w-full max-w-md shadow-xl">
+                    <div data-testid="modal-user-form" className="bg-gray-900 border border-white/10 rounded-xl p-6 w-full max-w-md shadow-xl">
                         <h2 className="text-lg font-semibold text-white mb-4">
                             {editingUserId ? 'Edit User' : 'Create User'}
                         </h2>
@@ -264,6 +263,7 @@ function UserManagement() {
                                 <label className="block text-sm text-gray-400 mb-1">Name</label>
                                 <input
                                     name="name"
+                                    data-testid="input-user-displayname"
                                     value={formData.name}
                                     onChange={handleFormChange}
                                     required
@@ -274,6 +274,7 @@ function UserManagement() {
                                 <label className="block text-sm text-gray-400 mb-1">Email</label>
                                 <input
                                     name="email"
+                                    data-testid="input-user-email"
                                     type="email"
                                     value={formData.email}
                                     onChange={handleFormChange}
@@ -285,6 +286,7 @@ function UserManagement() {
                                 <label className="block text-sm text-gray-400 mb-1">Role</label>
                                 <select
                                     name="role"
+                                    data-testid="select-user-role"
                                     value={formData.role}
                                     onChange={handleFormChange}
                                     className="w-full bg-gray-800 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
@@ -302,6 +304,7 @@ function UserManagement() {
                                     </label>
                                     <select
                                         name="linkedentityid"
+                                        data-testid="input-user-entity-id"
                                         value={formData.linkedentityid}
                                         onChange={handleFormChange}
                                         className="w-full bg-gray-800 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
@@ -317,6 +320,7 @@ function UserManagement() {
                             <div className="flex gap-3 pt-2">
                                 <button
                                     type="submit"
+                                    data-testid="btn-user-form-submit"
                                     className="flex-1 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
                                 >
                                     {editingUserId ? 'Save Changes' : 'Create User'}

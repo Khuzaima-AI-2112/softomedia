@@ -12,6 +12,7 @@
 
 import { test, expect } from '@playwright/test';
 import { authReset, loginAs, DEMO_RETAILER, BASE_URL } from './demo.fixtures.js';
+import { getLocator, RetailerLocators as RL } from './retailer_locators.js';
 
 test.beforeEach(authReset);
 
@@ -21,9 +22,9 @@ test.describe.serial('Phase 10 — Retailer Schedule History', () => {
     await loginAs(page, DEMO_RETAILER);
     await page.goto(`${BASE_URL}/dashboard/retailer/schedule-history`);
     await expect(page).not.toHaveURL(/\/login/);
-    await expect(page.locator('[data-testid="schedule-history"]')).toBeVisible();
+    await expect(getLocator(page, RL.ScheduleHistory)).toBeVisible();
     // History table must contain at least one row
-    const rows = page.locator('[data-testid="schedule-history-row"]');
+    const rows = getLocator(page, RL.ScheduleHistoryRow);
     await expect(rows.first()).toBeVisible();
   });
 

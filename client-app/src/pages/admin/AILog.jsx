@@ -384,7 +384,7 @@ function AILog() {
                         <span className="material-symbols-outlined text-4xl text-primary animate-spin">progress_activity</span>
                     </div>
                 ) : logs.length === 0 ? (
-                    <div className="text-center py-12 text-slate-500">
+                    <div data-testid="no-data-state" className="text-center py-12 text-slate-500">
                         <span className="material-symbols-outlined text-4xl mb-2">inbox</span>
                         <p>No AI logs found</p>
                     </div>

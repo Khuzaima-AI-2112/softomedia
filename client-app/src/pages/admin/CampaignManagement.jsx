@@ -337,7 +337,7 @@ function CampaignManagement() {
                             <button
                                 onClick={closeCreateModal}
                                 disabled={createSubmitting}
-                                className="p-1 text-slate-400 hover:text-white transition-colors disabled:opacity-40"
+                                data-testid="btn-modal-close" className="p-1 text-slate-400 hover:text-white transition-colors disabled:opacity-40"
                                 aria-label="Close modal"
                             >
                                 <X size={20} />

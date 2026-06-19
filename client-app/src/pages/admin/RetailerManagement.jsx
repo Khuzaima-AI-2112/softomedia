@@ -480,11 +480,10 @@ function RetailerManagement() {
                     <button
                         onClick={() => toggleStatus(retailer)}
                         disabled={togglingIds.has(retailer.id)}
-                        className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                            retailer.status === 'active'
-                                ? 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
-                                : 'text-slate-400 bg-slate-100 dark:bg-slate-800 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
-                        }`}
+                        className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${retailer.status === 'active'
+                            ? 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                            : 'text-slate-400 bg-slate-100 dark:bg-slate-800 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                            }`}
                         aria-label={retailer.status === 'active' ? `Deactivate ${retailer.name}` : `Activate ${retailer.name}`}
                         title={retailer.status === 'active' ? 'Deactivate' : 'Activate'}
                     >
@@ -507,17 +506,15 @@ function RetailerManagement() {
 
     // helper: input border class
     const inputClass = (fieldError) =>
-        `w-full px-3 py-2 rounded-lg border ${
-            fieldError
-                ? 'border-red-400 dark:border-red-500 focus:ring-red-400'
-                : 'border-slate-300 dark:border-slate-600 focus:ring-primary'
+        `w-full px-3 py-2 rounded-lg border ${fieldError
+            ? 'border-red-400 dark:border-red-500 focus:ring-red-400'
+            : 'border-slate-300 dark:border-slate-600 focus:ring-primary'
         } bg-white dark:bg-slate-800 focus:ring-2 outline-none transition-colors`;
 
     const sortButtonClass = (key) =>
-        `inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full border ${
-            sortBy === key
-                ? 'border-primary text-primary bg-primary/5'
-                : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'
+        `inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full border ${sortBy === key
+            ? 'border-primary text-primary bg-primary/5'
+            : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'
         }`;
 
     const sortIcon = (key) => {
@@ -537,7 +534,7 @@ function RetailerManagement() {
     // ── Render ────────────────────────────────────────────────────────
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div data-testid="admin-retailers" className="space-y-8 animate-in fade-in duration-500">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -579,6 +576,7 @@ function RetailerManagement() {
                             Deactivate empty
                         </button>
                         <button
+                            data-testid="btn-add-retailer"
                             onClick={() => openModal()}
                             className="px-4 py-2 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover transition-colors flex items-center gap-2 text-sm"
                         >
@@ -668,6 +666,7 @@ function RetailerManagement() {
                         </div>
                         <div className="flex items-center gap-2">
                             <button
+                                data-testid="btn-add-store"
                                 onClick={() => openStoreModal(selectedRetailer)}
                                 className="px-3 py-1.5 text-sm bg-primary text-white rounded-lg font-medium hover:bg-primary-hover transition-colors flex items-center gap-1.5"
                             >
@@ -709,13 +708,12 @@ function RetailerManagement() {
                                                 <p className="font-semibold text-sm truncate">{store.name}</p>
                                                 <p className="text-xs text-slate-500 truncate">{store.address}</p>
                                             </div>
-                                            <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${
-                                                store.traffic_level === 'high'
-                                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                                    : store.traffic_level === 'low'
-                                                        ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                                                        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                                            }`}>
+                                            <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${store.traffic_level === 'high'
+                                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                                : store.traffic_level === 'low'
+                                                    ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                                                }`}>
                                                 {store.traffic_level} traffic
                                             </span>
                                         </div>
@@ -761,7 +759,7 @@ function RetailerManagement() {
             {/* Retailer Add/Edit Modal */}
             {showModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <GlassCard className="w-full max-w-md">
+                    <GlassCard data-testid="modal-retailer-form" className="w-full max-w-md">
                         <h2 className="text-xl font-bold mb-4">{editingRetailer ? 'Edit Retailer' : 'Add New Retailer'}</h2>
                         {modalError && (
                             <div className="mb-4 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">{modalError}</div>
@@ -801,7 +799,7 @@ function RetailerManagement() {
                                     id="retailer-email"
                                     type="email"
                                     value={formData.contact_email}
-                                    onChange={(e) => updateRetailerField('contact_email', e.target.value)}
+                                    onChange={(e) = data-testid="input-email"> updateRetailerField('contact_email', e.target.value)}
                                     className={inputClass(retailerFieldErrors.contact_email)}
                                     placeholder="admin@retailer.com"
                                     aria-invalid={!!retailerFieldErrors.contact_email}
@@ -825,12 +823,13 @@ function RetailerManagement() {
                                     type="button"
                                     onClick={closeModal}
                                     disabled={retailerSubmitting}
-                                    className="px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 font-medium disabled:opacity-50"
+                                    data-testid="btn-modal-close" className="px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 font-medium disabled:opacity-50"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
+                                    data-testid="btn-retailer-form-submit"
                                     disabled={retailerSubmitting || retailerFormHasErrors}
                                     className="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover shadow-lg shadow-primary/20 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
@@ -848,7 +847,7 @@ function RetailerManagement() {
             {/* Store Add/Edit Modal */}
             {showStoreModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <GlassCard className="w-full max-w-md">
+                    <GlassCard data-testid="modal-store-form" className="w-full max-w-md">
                         <h2 className="text-xl font-bold mb-1">{editingStore ? 'Edit Store' : 'Add New Store'}</h2>
                         {storeParentRetailer && (
                             <p className="text-sm text-slate-500 mb-4 flex items-center gap-1">
@@ -926,6 +925,7 @@ function RetailerManagement() {
                                 </button>
                                 <button
                                     type="submit"
+                                    data-testid="btn-store-form-submit"
                                     disabled={storeSubmitting || storeFormHasErrors}
                                     className="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover shadow-lg shadow-primary/20 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
                                 >

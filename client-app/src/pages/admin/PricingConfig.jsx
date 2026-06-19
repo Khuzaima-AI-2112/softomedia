@@ -16,21 +16,21 @@ export default function PricingConfig() {
         return <Navigate to="/dashboard" replace />;
     }
 
-    const [config, setConfig]     = useState(null);
-    const [form, setForm]         = useState(null);
-    const [loading, setLoading]   = useState(true);
-    const [saving, setSaving]     = useState(false);
-    const [success, setSuccess]   = useState(false);
-    const [error, setError]       = useState(null);
+    const [config, setConfig] = useState(null);
+    const [form, setForm] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [success, setSuccess] = useState(false);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         apiService.getPricingConfig()
             .then(data => {
                 setConfig(data);
                 setForm({
-                    cpm_rates:  { ...(data.cpm_rates  ?? {}) },
+                    cpm_rates: { ...(data.cpm_rates ?? {}) },
                     allocation: {
-                        paid:     data.allocation?.paid     ?? 100,
+                        paid: data.allocation?.paid ?? 100,
                         retailer: data.allocation?.retailer ?? 0,
                         internal: data.allocation?.internal ?? 0,
                     },
@@ -86,7 +86,7 @@ export default function PricingConfig() {
     const cpmKeys = form?.cpm_rates ? Object.keys(form.cpm_rates) : [];
 
     return (
-        <div className="space-y-8">
+        <div data-testid="pricing-config" className="space-y-8">
             {/* Header */}
             <div>
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Pricing Configuration</h1>
@@ -95,10 +95,10 @@ export default function PricingConfig() {
                 </p>
             </div>
 
-            <form data-testid="pricing-config-form" onSubmit={handleSubmit} className="space-y-8">
+            <form data-testid="modal-pricing-form" onSubmit={handleSubmit} className="space-y-8">
 
                 {/* CPM Rates */}
-                <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6">
+                <div data-testid="pricing-tier" className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6">
                     <h2 className="text-base font-semibold text-slate-800 dark:text-slate-200 mb-4">
                         CPM Rates by Screen Type
                     </h2>
@@ -118,6 +118,7 @@ export default function PricingConfig() {
                                         <span className="text-slate-400 text-sm">$</span>
                                         <input
                                             id={`cpm-${key}`}
+                                            data-testid="input-cpm-rate"
                                             type="number"
                                             step="0.01"
                                             min="0"
@@ -140,11 +141,10 @@ export default function PricingConfig() {
                             Slot Allocation
                         </h2>
                         <span
-                            className={`text-xs font-bold px-2 py-1 rounded-full ${
-                                allocationValid
+                            className={`text-xs font-bold px-2 py-1 rounded-full ${allocationValid
                                     ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
                                     : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-                            }`}
+                                }`}
                         >
                             Sum: {allocationSum} / 100
                         </span>
@@ -187,7 +187,7 @@ export default function PricingConfig() {
                 <div className="flex justify-end">
                     <button
                         type="submit"
-                        data-testid="pricing-save-btn"
+                        data-testid="btn-pricing-form-submit"
                         disabled={!allocationValid || saving}
                         className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >

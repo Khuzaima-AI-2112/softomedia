@@ -4,9 +4,9 @@ import apiService from '../../services/ApiService';
 
 function NetworkMap() {
     const [selectedRegion, setSelectedRegion] = useState('downtown');
-    const [screens,        setScreens]        = useState([]);
+    const [screens, setScreens] = useState([]);
     const [loadingScreens, setLoadingScreens] = useState(true);
-    const [screenError,    setScreenError]    = useState('');
+    const [screenError, setScreenError] = useState('');
 
     useEffect(() => {
         let cancelled = false;
@@ -68,7 +68,7 @@ function NetworkMap() {
                 </div>
             )}
 
-            <GlassCard className="h-[600px] relative overflow-hidden flex items-center justify-center bg-slate-100 dark:bg-slate-800">
+            <GlassCard data-testid="network-map" className="h-[600px] relative overflow-hidden flex items-center justify-center bg-slate-100 dark:bg-slate-800">
                 {/* Placeholder for actual Map implementation (e.g. Google Maps or Leaflet) */}
                 <div className="text-center p-8 opacity-60">
                     <span className="material-symbols-outlined text-6xl mb-4 text-slate-400">map</span>
