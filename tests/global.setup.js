@@ -25,6 +25,7 @@
 import { chromium } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
+import demoSeedSetup from './demo_wizard/00_seed.setup.js';
 
 // linked_entity_id values mirror 00_seed.setup.js constants.
 // Keep in sync if entity IDs change.
@@ -72,6 +73,10 @@ async function globalSetup(config) {
     }
 
     await browser.close();
+
+    if (process.env.ALLOW_DEMO_MODE === 'true') {
+        await demoSeedSetup(config);
+    }
 }
 
 export default globalSetup;

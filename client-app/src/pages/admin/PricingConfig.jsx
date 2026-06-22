@@ -11,11 +11,6 @@ import apiService from '../../services/ApiService';
 export default function PricingConfig() {
     const { user } = useAuth();
 
-    // Role guard — non-admin sees nothing
-    if (user && user.role !== 'admin' && user.role !== 'superadmin') {
-        return <Navigate to="/dashboard" replace />;
-    }
-
     const [config, setConfig] = useState(null);
     const [form, setForm] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -24,6 +19,7 @@ export default function PricingConfig() {
     const [error, setError] = useState(null);
 
     useEffect(() => {
+        if (user && user.role !== 'admin' && user.role !== 'superadmin') return;
         apiService.getPricingConfig()
             .then(data => {
                 setConfig(data);
@@ -38,7 +34,12 @@ export default function PricingConfig() {
             })
             .catch(err => setError(err?.response?.data?.error ?? err.message))
             .finally(() => setLoading(false));
-    }, []);
+    }, [user]);
+
+    // Role guard — non-admin sees nothing
+    if (user && user.role !== 'admin' && user.role !== 'superadmin') {
+        return <Navigate to="/dashboard" replace />;
+    }
 
     const allocationSum = form
         ? (form.allocation.paid + form.allocation.retailer + form.allocation.internal)

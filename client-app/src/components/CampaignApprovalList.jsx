@@ -83,6 +83,7 @@ export default function CampaignApprovalList() {
         )}
       </h2>
 
+      <div data-testid="pending-approvals" className="space-y-3">
       {campaigns.length === 0 ? (
         <p data-testid="no-campaigns-msg" className="text-muted text-sm">
           No campaigns pending approval.
@@ -114,7 +115,7 @@ export default function CampaignApprovalList() {
             {campaign.status === 'pending_approval' && (
               <div className="flex gap-2 shrink-0">
                 <button
-                  data-testid={`approve-btn-${campaign.id}`}
+                  data-testid="btn-approve"
                   disabled={updating[campaign.id]}
                   onClick={() => handleStatus(campaign.id, 'approved')}
                   className="px-3 py-1.5 rounded bg-green-600 text-white text-sm
@@ -123,7 +124,7 @@ export default function CampaignApprovalList() {
                   Approve
                 </button>
                 <button
-                  data-testid={`reject-btn-${campaign.id}`}
+                  data-testid="btn-reject"
                   disabled={updating[campaign.id]}
                   onClick={() => handleStatus(campaign.id, 'rejected')}
                   className="px-3 py-1.5 rounded bg-red-600 text-white text-sm
@@ -136,6 +137,7 @@ export default function CampaignApprovalList() {
           </GlassCard>
         ))
       )}
+      </div>
     </div>
   );
 }

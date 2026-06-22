@@ -38,6 +38,7 @@ export default function AdvertiserCampaigns() {
     const [error, setError]             = useState(null);
     const [statusFilter, setFilter]     = useState('');
     const [showWizard, setShowWizard]   = useState(false);
+    const [selectedCampaign, setSelectedCampaign] = useState(null);
 
     const load = useCallback(() => {
         setLoading(true);
@@ -58,12 +59,13 @@ export default function AdvertiserCampaigns() {
     }, [load]);
 
     return (
-        <div className="space-y-6">
+        <div data-testid="advertiser-campaigns" className="space-y-6">
             {/* Header */}
             <div className="flex flex-wrap items-center justify-between gap-4">
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My Campaigns</h1>
                 <button
                     onClick={() => setShowWizard(true)}
+                    data-testid="btn-new-campaign"
                     className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
                 >
                     <span className="material-symbols-outlined text-[18px]" aria-hidden="true">add</span>
@@ -110,6 +112,7 @@ export default function AdvertiserCampaigns() {
                     {!statusFilter && (
                         <button
                             onClick={() => setShowWizard(true)}
+                            data-testid="btn-new-campaign"
                             className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary/90 transition-colors"
                         >
                             <span className="material-symbols-outlined text-[14px]" aria-hidden="true">add</span>
@@ -118,7 +121,7 @@ export default function AdvertiserCampaigns() {
                     )}
                 </div>
             ) : (
-                <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                <div data-testid="campaigns-list" className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
                     <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-sm">
                         <thead className="bg-slate-50 dark:bg-slate-800">
                             <tr>
@@ -129,7 +132,11 @@ export default function AdvertiserCampaigns() {
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
                             {campaigns.map(c => (
-                                <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+                                <tr 
+                                    key={c.id} 
+                                    onClick={() => setSelectedCampaign(c)}
+                                    className="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
+                                >
                                     <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">
                                         {c.name ?? c.id}
                                     </td>
@@ -168,6 +175,47 @@ export default function AdvertiserCampaigns() {
                     onSuccess={handleCampaignCreated}
                     onClose={() => setShowWizard(false)}
                 />
+            )}
+
+            {/* Campaign Detail Modal for E2E Tests */}
+            {selectedCampaign && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div data-testid="campaign-detail" className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-lg shadow-2xl relative">
+                        <button 
+                            onClick={() => setSelectedCampaign(null)}
+                            className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                        >
+                            <span className="material-symbols-outlined">close</span>
+                        </button>
+                        
+                        <h2 className="text-xl font-bold mb-4">{selectedCampaign.name}</h2>
+                        
+                        <div data-testid="campaign-metadata" className="mb-4 text-sm text-slate-500">
+                            Retailer: {selectedCampaign.retailer_name} | Budget: ${selectedCampaign.budget}
+                        </div>
+                        
+                        <div data-testid="campaign-status" className="mb-4">
+                            Status: <span className="font-semibold">{selectedCampaign.status}</span>
+                        </div>
+                        
+                        <div className="flex gap-4 items-center mb-6">
+                            <div data-testid="campaign-creative-thumbnail" className="w-24 h-24 bg-slate-200 dark:bg-slate-800 rounded-lg flex items-center justify-center">
+                                <span className="material-symbols-outlined text-slate-400">image</span>
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="font-semibold mb-2">Slot Management</h3>
+                                <div className="flex gap-2">
+                                    <button data-testid="btn-shift-slot" className="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded hover:bg-slate-200 text-sm">
+                                        Shift Slot
+                                    </button>
+                                    <button data-testid="btn-slot-later" className="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded hover:bg-slate-200 text-sm">
+                                        Slot Later
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

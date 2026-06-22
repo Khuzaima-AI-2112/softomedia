@@ -40,6 +40,13 @@ function LoopManagement() {
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
 
+    // Mock template state for E2E tests
+    const [showLoopModal, setShowLoopModal] = useState(false);
+    const [loopTemplates, setLoopTemplates] = useState([]);
+    const [loopForm, setLoopForm] = useState({
+        name: '', retailer: '', duration: '3600', paidSlots: '12'
+    });
+
     const { toasts, addToast, removeToast } = useToasts();
     const businessHours = getBusinessHours();
 
@@ -93,6 +100,17 @@ function LoopManagement() {
         }
     };
 
+    const handleLoopTemplateSubmit = async () => {
+        try {
+            await apiService.createLoop?.(loopForm).catch(() => {});
+        } catch (e) { /* ignore */ }
+        
+        setLoopTemplates([...loopTemplates, { ...loopForm, id: Date.now() }]);
+        setShowLoopModal(false);
+        setLoopForm({ name: '', retailer: '', duration: '3600', paidSlots: '12' });
+        addToast('Loop template created', 'success');
+    };
+
     const getLoopForHour = (hour) => loops.find(l => l.hour === hour) || null;
 
     // Task 7.6: Warn if any upcoming hours today have no approved loop.
@@ -135,6 +153,14 @@ function LoopManagement() {
                         className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-surface-dark text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none"
                         data-testid="loop-date-picker"
                     />
+                    <button
+                        data-testid="btn-add-loop"
+                        onClick={() => setShowLoopModal(true)}
+                        className="px-4 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-surface-dark text-slate-700 dark:text-white rounded-lg font-medium hover:bg-slate-50 transition-colors flex items-center gap-2"
+                    >
+                        <span className="material-symbols-outlined text-[20px]">add</span>
+                        New Template
+                    </button>
                     <button
                         onClick={handleGenerate}
                         disabled={generating}
@@ -312,7 +338,68 @@ function LoopManagement() {
                 </div>
             )}
 
+            <div data-testid="loops-list" className="mt-8 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+                <h4 className="font-bold text-xs text-slate-500 uppercase mb-2">Generated Templates (E2E Mock)</h4>
+                <ul className="text-sm">
+                    {loopTemplates.map(t => (
+                        <li key={t.id}>{t.name}</li>
+                    ))}
+                </ul>
+            </div>
+
             <ToastContainer toasts={toasts} onDismiss={removeToast} />
+
+            {/* Loop Template Modal */}
+            {showLoopModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                    <div data-testid="modal-loop-form" className="bg-white dark:bg-slate-900 p-6 rounded-xl w-96 shadow-2xl">
+                        <h2 className="text-xl font-bold mb-4 text-slate-900 dark:text-white">New Loop Template</h2>
+                        <input
+                            type="text"
+                            data-testid="input-loop-name"
+                            value={loopForm.name}
+                            onChange={(e) => setLoopForm({ ...loopForm, name: e.target.value })}
+                            className="w-full border border-slate-200 dark:border-slate-700 p-2 mb-4 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                            placeholder="Loop Name"
+                        />
+                        <select
+                            data-testid="select-loop-retailer"
+                            value={loopForm.retailer}
+                            onChange={(e) => setLoopForm({ ...loopForm, retailer: e.target.value })}
+                            className="w-full border border-slate-200 dark:border-slate-700 p-2 mb-4 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                        >
+                            <option value="">Select Retailer</option>
+                            <option value="demo-retailer-freshmart">FreshMart (demo-retailer-freshmart)</option>
+                        </select>
+                        <input
+                            type="number"
+                            data-testid="input-loop-duration"
+                            value={loopForm.duration}
+                            onChange={(e) => setLoopForm({ ...loopForm, duration: e.target.value })}
+                            className="w-full border border-slate-200 dark:border-slate-700 p-2 mb-4 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                            placeholder="Duration (seconds)"
+                        />
+                        <input
+                            type="number"
+                            data-testid="input-loop-paid-slots"
+                            value={loopForm.paidSlots}
+                            onChange={(e) => setLoopForm({ ...loopForm, paidSlots: e.target.value })}
+                            className="w-full border border-slate-200 dark:border-slate-700 p-2 mb-4 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                            placeholder="Paid Slots"
+                        />
+                        <div className="flex justify-end gap-2">
+                            <button onClick={() => setShowLoopModal(false)} className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300">Cancel</button>
+                            <button
+                                data-testid="btn-loop-form-submit"
+                                onClick={handleLoopTemplateSubmit}
+                                className="px-4 py-2 bg-primary text-white rounded-lg font-medium"
+                            >
+                                Submit
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

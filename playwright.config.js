@@ -19,14 +19,14 @@ import { defineConfig, devices } from '@playwright/test';
  * 3. timeout: 60000 added at root — Playwright default is 30s which is too
  *    tight for React.lazy cold loads on CI. 60s root; 90s in demo project.
  *
- * 4. ad-server port corrected: 8080 → 3001 to match API_BASE_URL convention
- *    used throughout the codebase and in 00_seed.setup.js seedViaApi calls.
+ * 4. ad-server port reverted back to 8080 because .env.development hardcodes it to 8080.
  */
 export default defineConfig({
     globalSetup: './tests/global.setup.js',
     globalTeardown: './tests/demo_wizard/00_seed.teardown.js',
 
     testDir: './tests',
+    testIgnore: '**/firestore-rules/**',
 
     /* Default timeout for each individual test. */
     timeout: 60_000,
@@ -65,14 +65,6 @@ export default defineConfig({
         {
             name: 'chromium',
             use: { ...devices['Desktop Chrome'] },
-        },
-        {
-            name: 'firefox',
-            use: { ...devices['Desktop Firefox'] },
-        },
-        {
-            name: 'webkit',
-            use: { ...devices['Desktop Safari'] },
         },
 
         /**
@@ -116,12 +108,11 @@ export default defineConfig({
 
     webServer: [
         {
-            /* Port corrected: 8080 → 3001 to match API_BASE_URL convention. */
-            command: 'npx kill-port 3001 && npm start --prefix ad-server',
-            url: 'http://localhost:3001/health',
-            reuseExistingServer: true,
-            timeout: 180_000,
-            env: { PORT: '3001' }
+            command: 'npm run dev',
+            cwd: './ad-server',
+            url: 'http://localhost:8080/health',
+            reuseExistingServer: !process.env.CI,
+            timeout: 120_000,
         },
         {
             command: 'npx kill-port 5173 && npm run dev --prefix client-app',

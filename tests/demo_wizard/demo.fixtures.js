@@ -24,7 +24,7 @@ import { expect } from '@playwright/test';
 // ---------------------------------------------------------------------------
 
 export const BASE_URL = process.env.BASE_URL || 'http://localhost:5173';
-export const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3001'; // FIX: was 8080
+export const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8080';
 
 /**
  * DEMO_TOKEN is the single token constant used everywhere in this file.
@@ -38,6 +38,13 @@ export const DEMO_TOKEN = process.env.DEMO_TOKEN || 'demo-token';
 // Each persona maps to the x-demo-role header value and the localStorage key
 // written by the DemoLogin component.
 // ---------------------------------------------------------------------------
+
+export const DEMO_SUPERADMIN = {
+  id: 'demo-superadmin-uid',
+  role: 'superadmin',
+  email: 'superadmin@softomedia.demo',
+  displayName: 'Demo Super Admin',
+};
 
 export const DEMO_ADMIN = {
   id: 'demo-admin-uid',
@@ -82,9 +89,9 @@ export const DEMO_ADVERTISER = {
 
 export const DEMO_TECHOP = {
   id: 'demo-techop-uid',
-  role: 'techop',           // x-demo-role header value
+  role: 'techoperator',           // x-demo-role header value
   email: 'techop@softomedia.demo',
-  displayName: 'Demo TechOp',
+  displayName: 'Demo TechOps',
   firestoreId: 'demo-techop',
 };
 
@@ -173,12 +180,19 @@ export async function authReset({ page }) {
 export async function loginAs(page, persona) {
   await page.goto(BASE_URL + '/login', { waitUntil: 'domcontentloaded' });
   await page.evaluate(
-    ({ role, token }) => {
+    ({ role, token, personaObj }) => {
       localStorage.setItem('demo_role', role);
       localStorage.setItem('active_persona', role);
       localStorage.setItem('authToken', token);
+      localStorage.setItem('auth_user', JSON.stringify({
+          id: personaObj.id,
+          name: personaObj.displayName,
+          email: personaObj.email,
+          role: personaObj.role,
+          linked_entity_id: personaObj.linkedEntityId || `entity-${role}`
+      }));
     },
-    { role: persona.role, token: DEMO_TOKEN },
+    { role: persona.role, token: DEMO_TOKEN, personaObj: persona },
   );
 
   await page.goto(BASE_URL + '/', { waitUntil: 'domcontentloaded' });

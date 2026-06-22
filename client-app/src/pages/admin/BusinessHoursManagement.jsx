@@ -266,7 +266,7 @@ function BusinessHoursManagement() {
 
                             {/* Success/Error Toast (Global) */}
                             {message && (
-                                <div className={`p-3 rounded-lg text-sm flex items-center gap-2 animate-in slide-in-from-top-2 duration-200 ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' :
+                                <div data-testid="hours-save-confirmation" className={`p-3 rounded-lg text-sm flex items-center gap-2 animate-in slide-in-from-top-2 duration-200 ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' :
                                     message.type === 'error' ? 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400' :
                                         'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
                                     }`}>
@@ -329,6 +329,7 @@ function BusinessHoursManagement() {
                                                                     <label className="text-[10px] uppercase font-bold text-slate-400 tracking-widest block">Open</label>
                                                                     <input
                                                                         type="time"
+                                                                        data-testid="input-hours-open"
                                                                         value={hours.open_time}
                                                                         onChange={(e) => handleWeeklyUpdate(idx, 'open_time', e.target.value)}
                                                                         className="bg-transparent border-none p-0 text-sm font-semibold focus:ring-0 outline-none"
@@ -339,6 +340,7 @@ function BusinessHoursManagement() {
                                                                     <label className="text-[10px] uppercase font-bold text-slate-400 tracking-widest block">Close</label>
                                                                     <input
                                                                         type="time"
+                                                                        data-testid="input-hours-close"
                                                                         value={hours.close_time}
                                                                         onChange={(e) => handleWeeklyUpdate(idx, 'close_time', e.target.value)}
                                                                         className="bg-transparent border-none p-0 text-sm font-semibold focus:ring-0 outline-none"

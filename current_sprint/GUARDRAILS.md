@@ -138,3 +138,9 @@ All acceptance criteria must be **falsifiable**. Accepted forms:
 ## Strict API Smoke Testing Alignment
 - **Mandatory Variable Enforcement:** Test automation frameworks and smoke tests must respect backend input validation layers. Attempting to hit `/api/impressions` without a scope (e.g., `date` and `campaign_id`) will accurately fail. Test payloads must mirror actual production security and efficiency guardrails.
 - **Method Specificity:** Endpoints restricted to ingestion (e.g. Telemetry/Monitoring) use POST inherently. Automated verification tests must use the correct HTTP methods and provide structural mock payloads to truly verify "liveness".
+
+## Rules for Playwright POM Intregation
+**Rule 11: Anti-Ghosting Checklist Enforcement**
+Implementation checklists (e.g., mapping data-testid properties) must **never** be manually checked off based on "eyes-on-code" confidence. If you inject a test property, you must guarantee it functions by explicitly compiling the project (
+pm run build) and confirming the test suite executes successfully (
+px playwright test). Trusting visual confirmation leads to broken syntax hooks and mismatched strings (e.g. calendar vs calendar-container).

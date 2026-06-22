@@ -216,8 +216,8 @@ function LoopAnalytics() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <GlassCard>
                     <p className="text-sm font-medium text-slate-500 mb-1">Loop Completions</p>
-                    <p data-testid="play-count" className="text-3xl font-bold text-slate-900 dark:text-white tabular-nums" data-testid="total-loops">
-                        {loading ? '—' : totalLoops.toLocaleString()}
+                    <p data-testid="total-loops" className="text-3xl font-bold text-slate-900 dark:text-white tabular-nums">
+                        <span data-testid="play-count">{loading ? '—' : totalLoops.toLocaleString()}</span>
                     </p>
                     <p className="text-xs text-slate-400 mt-1">Full cycles verified</p>
                 </GlassCard>

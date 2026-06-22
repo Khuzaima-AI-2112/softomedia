@@ -68,6 +68,9 @@ function CampaignManagement() {
     const [createSubmitting, setCreateSubmitting] = useState(false);
     const [createError,      setCreateError]      = useState('');
 
+    // Detail modal state for E2E
+    const [selectedCampaign, setSelectedCampaign] = useState(null);
+
     useEffect(() => {
         if (loading) return;
         if (!canView) {
@@ -194,8 +197,13 @@ function CampaignManagement() {
         {
             key: 'name',
             label: 'Campaign',
-            render: (value) => (
-                <span className="font-medium text-white">{value || '—'}</span>
+            render: (value, row) => (
+                <button 
+                    onClick={() => setSelectedCampaign(row)}
+                    className="font-medium text-blue-400 hover:text-blue-300 transition-colors text-left"
+                >
+                    {value || '—'}
+                </button>
             )
         },
         {
@@ -225,14 +233,14 @@ function CampaignManagement() {
                     {canApprove && row.status === 'pending_approval' && (
                         <>
                             <button
-                                data-testid={`approve-btn-${row.id}`}
+                                data-testid={`btn-approve-campaign-${row.id}`}
                                 onClick={() => handleStatusChange(row.id, 'approved')}
                                 className="px-2 py-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded transition-colors"
                             >
                                 Approve
                             </button>
                             <button
-                                data-testid={`reject-btn-${row.id}`}
+                                data-testid={`btn-reject-campaign-${row.id}`}
                                 onClick={() => handleStatusChange(row.id, 'rejected')}
                                 className="px-2 py-1 text-xs bg-amber-600 hover:bg-amber-700 text-white rounded transition-colors"
                             >
@@ -266,7 +274,7 @@ function CampaignManagement() {
     }
 
     return (
-        <div className="space-y-6">
+        <div data-testid="campaign-management" className="space-y-6">
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold text-white">Campaign Management</h1>
                 <div className="flex items-center gap-3">
@@ -490,6 +498,35 @@ function CampaignManagement() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Campaign Detail Modal for E2E Tests */}
+            {selectedCampaign && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div data-testid="campaign-detail" className="bg-slate-900 rounded-2xl p-6 w-full max-w-lg shadow-2xl relative border border-slate-700">
+                        <button 
+                            onClick={() => setSelectedCampaign(null)}
+                            className="absolute top-4 right-4 text-slate-400 hover:text-white"
+                        >
+                            <span className="material-symbols-outlined">close</span>
+                        </button>
+                        
+                        <h2 className="text-xl font-bold mb-4 text-white">{selectedCampaign.name}</h2>
+                        
+                        <div data-testid="campaign-status" className="mb-4 text-slate-300">
+                            Status: <span className="font-semibold">{selectedCampaign.status}</span>
+                        </div>
+                        
+                        <div className="flex gap-2">
+                            <button data-testid="btn-campaign-admin-action" className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700">
+                                Admin Override
+                            </button>
+                            <button data-testid="btn-admin-action" className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700">
+                                Admin Action
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

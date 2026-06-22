@@ -71,8 +71,8 @@ test.describe('Phase K — API Surface Smoke', () => {
   // K.3 — /api/impressions  (protected)
   // ─────────────────────────────────────────────────────────────────────────
   test('K.3 GET /api/impressions — 200, array or paginated, no 500', async () => {
-    // Requires a date query param to avoid 400 Bad Request
-    const res = await request.get('/api/impressions?date=2026-06-18&campaign_id=smoke-test');
+    // Requires a recognized query param like campaign_id, location_id, or screen_id
+    const res = await request.get('/api/impressions?campaign_id=smoke-test');
     expect(res.status(), `GET /api/impressions returned ${res.status()} ${await res.text()}`).toBe(200);
     const body = await res.json();
     // Accept either a plain array or a paginated { data: [], total: N } shape

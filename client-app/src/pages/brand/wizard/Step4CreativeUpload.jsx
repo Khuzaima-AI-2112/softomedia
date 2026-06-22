@@ -148,6 +148,7 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
                         className="flex-1 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
                     />
                     <button
+                        data-testid="btn-upload-creative"
                         onClick={handleCustomUrl}
                         className="px-6 py-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium transition-colors flex items-center gap-2"
                     >

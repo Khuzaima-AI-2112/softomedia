@@ -43,6 +43,14 @@ function SupportTicketModal({ onClose }) {
                         <p style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '1.5rem' }}>Type: {issueType}</p>
 
                         <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem' }}>Subject</label>
+                            <input
+                                data-testid="ticket-subject-input"
+                                type="text"
+                                required
+                                placeholder="E.g., Screen 4 Offline"
+                                style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #d1d5db', marginBottom: '1rem', outline: 'none' }}
+                            />
                             <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem' }}>Observation Notes</label>
                             <textarea
                                 required
@@ -53,7 +61,7 @@ function SupportTicketModal({ onClose }) {
 
                         <div style={{ display: 'flex', gap: '1rem' }}>
                             <button type="button" onClick={() => setStep('selection')} style={{ flex: 1, padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #d1d5db', background: 'white', cursor: 'pointer' }}>Back</button>
-                            <button type="submit" style={{ flex: 1, padding: '0.75rem', borderRadius: '0.5rem', backgroundColor: '#6366f1', color: 'white', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}>Submit Ticket</button>
+                            <button data-testid="btn-submit-ticket" type="submit" style={{ flex: 1, padding: '0.75rem', borderRadius: '0.5rem', backgroundColor: '#6366f1', color: 'white', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}>Submit Ticket</button>
                         </div>
                     </form>
                 )}

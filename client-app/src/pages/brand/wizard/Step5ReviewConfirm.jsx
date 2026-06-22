@@ -255,7 +255,7 @@ function Step5ReviewConfirm({ data, onConfirm, submitting, onPrev }) {
                                     onConfirm();
                                 }}
                                 disabled={confirmDisabled}
-                                data-testid="confirm-booking-btn"
+                                data-testid="btn-submit-campaign"
                                 className="w-full py-4 rounded-xl bg-gradient-to-r from-primary to-primary-hover text-white font-bold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                                 {submitting ? (

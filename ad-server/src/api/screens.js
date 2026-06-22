@@ -81,9 +81,19 @@ router.post('/', authenticate, requireRole('admin'), async (req, res) => {
         const screen = await screenRepository.create(screen_id, screenData);
         res.status(201).json(screen);
     } catch (error) {
+        if (error.code === 6 || (error.message && error.message.includes('ALREADY_EXISTS'))) {
+            try {
+                const docId = req.body.screen_id || req.body.id || req.body.name;
+                const existingScreen = await screenRepository.findById(docId);
+                return res.status(200).json(existingScreen);
+            } catch (findErr) {
+                // If it fails to fetch, fall through to error logging
+                console.error('Failed to fetch existing screen during idempotent creation:', findErr);
+            }
+        }
         console.error('POST /api/screens failed:', error);
         if (handleCircuitBreakerError(error, res)) return;
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Failed to register screen' });
     }
 });
 

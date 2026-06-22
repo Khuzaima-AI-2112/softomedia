@@ -27,6 +27,8 @@ import {
   loginAs,
 } from './demo.fixtures.js';
 
+import { AdminLocators as AL, getLocator } from './admin_locators.js';
+
 const MOCK_HEALTH_RESPONSE = {
   status: 'ok',
   services: {

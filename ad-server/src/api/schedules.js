@@ -137,7 +137,7 @@ router.get('/', (req, res) => {
  *
  * TODO: replace both paths with ScheduleRepository.create() when implemented.
  */
-router.post('/', authenticate, requireRole('admin'), (req, res) => {
+router.post('/', authenticate, requireRole('retaileradmin'), (req, res) => {
     const id = IS_DEMO_MODE
         ? `sched_demo_${Date.now()}`
         : `sched_${Date.now()}`;

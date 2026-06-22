@@ -36,6 +36,7 @@ function NotFound() {
 
     return (
         <div
+            data-testid="error-404"
             style={{
                 minHeight: '100vh',
                 display: 'flex',
@@ -67,7 +68,7 @@ function NotFound() {
             </h1>
 
             <p style={{ color: '#64748b', maxWidth: '36ch', marginBottom: '0.25rem' }}>
-                The URL <code style={{ fontFamily: 'monospace', fontSize: '0.875rem', backgroundColor: '#f1f5f9', padding: '0.125rem 0.375rem', borderRadius: '0.25rem' }}>{location.pathname}</code> doesn't match any known route.
+                The URL <code style={{ fontFamily: 'monospace', fontSize: '0.875rem', backgroundColor: '#f1f5f9', padding: '0.125rem 0.375rem', borderRadius: '0.25rem' }}>{location.pathname}</code> doesn&apos;t match any known route.
             </p>
 
             <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '2rem' }}>

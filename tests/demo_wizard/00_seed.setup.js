@@ -98,7 +98,7 @@ async function seedViaApi(baseURL, token, payload) {
 // ---------------------------------------------------------------------------
 async function demoSeedSetup(config) {
     const baseURL = config.projects[0].use.baseURL;
-    const apiBase = process.env.API_BASE_URL || 'http://localhost:3001';
+    const apiBase = process.env.API_BASE_URL || 'http://localhost:8080';
 
     if (!process.env.ALLOW_DEMO_MODE) {
         throw new Error(
@@ -170,11 +170,13 @@ async function demoSeedSetup(config) {
                 id: DEMO_RETAILER_ID,
                 name: 'FreshMart Montréal',
                 status: 'active',
+                contact_email: 'admin@freshmart.demo',
+                contract_start: '2026-01-01',
             },
         },
         // Stores
         ...DEMO_STORE_IDS.map((storeId, i) => ({
-            endpoint: `/api/retailers/${DEMO_RETAILER_ID}/stores`,
+            endpoint: `/api/stores`,
             body: {
                 id: storeId,
                 name: `FreshMart ${i === 0 ? 'North' : 'South'} — Demo`,
@@ -188,12 +190,13 @@ async function demoSeedSetup(config) {
         ...DEMO_SCREEN_IDS.map((screenId, i) => ({
             endpoint: '/api/screens',
             body: {
-                id: screenId,
+                screen_id: screenId,
                 name: `Screen ${i + 1} — Demo`,
                 store_id: DEMO_STORE_IDS[Math.floor(i / 2)],
                 retailer_id: DEMO_RETAILER_ID,
                 status: 'active',
                 resolution: '1920x1080',
+                user_agent: 'Playwright Demo Seed',
             },
         })),
         // Advertiser
@@ -204,6 +207,10 @@ async function demoSeedSetup(config) {
                 name: 'BonVie Snacks',
                 status: 'active',
                 linked_user_id: `user-${DEMO_BRAND}`,
+                logo: 'logo.png',
+                industry: 'Food & Beverage',
+                contactemail: 'brand@bonvie.demo',
+                budget: 10000,
             },
         },
         // Loop with dynamic slots — THE slot timing fix.
@@ -216,6 +223,8 @@ async function demoSeedSetup(config) {
                 screen_ids: DEMO_SCREEN_IDS,
                 duration: 60,
                 status: 'active',
+                hour: 12,
+                date: new Date().toISOString().split('T')[0],
                 slots,          // startTime = Date.now() — kills timeout failures
             },
         },
@@ -225,9 +234,9 @@ async function demoSeedSetup(config) {
         try {
             await seedViaApi(apiBase, adminToken, payload);
         } catch (err) {
-            // Seed is idempotent — 409 Conflict means the doc already exists
-            // from a previous run. Treat as success; any other error is fatal.
-            if (!err.message.includes('409')) {
+            // Seed is idempotent — 409 Conflict or 500 ALREADY_EXISTS means 
+            // the doc already exists from a previous run. Treat as success; any other error is fatal.
+            if (!err.message.includes('409') && !err.message.includes('ALREADY_EXISTS')) {
                 throw err;
             }
         }
@@ -244,14 +253,14 @@ export default demoSeedSetup;
 // Phase 6 ends at step 6.3 (validate) — cleanup is here, not in a spec.
 // ---------------------------------------------------------------------------
 export async function demoSeedTeardown() {
-    const apiBase = process.env.API_BASE_URL || 'http://localhost:3001';
+    const apiBase = process.env.API_BASE_URL || 'http://localhost:8080';
     const adminToken = 'demo-token';
 
     const teardownTargets = [
         { method: 'DELETE', endpoint: `/api/campaigns/${DEMO_CAMPAIGN_ID}` },
         { method: 'DELETE', endpoint: `/api/loops/${DEMO_LOOP_ID}` },
         ...DEMO_SCREEN_IDS.map(id => ({ method: 'DELETE', endpoint: `/api/screens/${id}` })),
-        ...DEMO_STORE_IDS.map(id => ({ method: 'DELETE', endpoint: `/api/retailers/${DEMO_RETAILER_ID}/stores/${id}` })),
+        ...DEMO_STORE_IDS.map(id => ({ method: 'DELETE', endpoint: `/api/stores/${id}` })),
         { method: 'DELETE', endpoint: `/api/advertisers/${DEMO_ADVERTISER_ID}` },
         { method: 'DELETE', endpoint: `/api/retailers/${DEMO_RETAILER_ID}` },
     ];
@@ -265,13 +274,10 @@ export async function demoSeedTeardown() {
                     'x-demo-role': 'superadmin',
                 },
             });
-            // 404 = already gone from a prior partial teardown — acceptable.
             if (!res.ok && res.status !== 404) {
                 console.warn(`[teardown] ${target.method} ${target.endpoint} → ${res.status}`);
             }
         } catch (err) {
-            // Network errors during teardown are logged but not thrown —
-            // a failed teardown must not mask a genuine spec failure.
             console.warn(`[teardown] fetch error for ${target.endpoint}:`, err.message);
         }
     }

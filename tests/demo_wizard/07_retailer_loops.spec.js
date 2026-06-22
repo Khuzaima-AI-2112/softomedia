@@ -28,6 +28,9 @@ import {
   loginAs,
 } from './demo.fixtures.js';
 
+import { AdminLocators as AL } from './admin_locators.js';
+import { RetailerLocators as RL, getLocator } from './retailer_locators.js';
+
 test.describe.serial('Phase A — Retailer Loops', () => {
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -36,10 +39,10 @@ test.describe.serial('Phase A — Retailer Loops', () => {
   // ─────────────────────────────────────────────────────────────────────────
   test.beforeAll('playlist/playlists disambiguation pre-flight', async ({ playwright }) => {
     const adminCtx = await playwright.request.newContext({
-      baseURL:          API_BASE_URL,
+      baseURL: API_BASE_URL,
       extraHTTPHeaders: {
-        Authorization:  `Bearer ${DEMO_TOKEN}`,
-        'x-demo-role':  DEMO_ADMIN.role,
+        Authorization: `Bearer ${DEMO_TOKEN}`,
+        'x-demo-role': DEMO_ADMIN.role,
       },
     });
 
@@ -73,7 +76,7 @@ test.describe.serial('Phase A — Retailer Loops', () => {
       //    Admin CRUD always returns an array.
       //    They must not return identical JSON.
       const playerBodyRaw = await playerRes.text().catch(() => '');
-      const adminBodyRaw  = JSON.stringify(adminBody);
+      const adminBodyRaw = JSON.stringify(adminBody);
       expect(
         playerBodyRaw === adminBodyRaw,
         '/api/playlist and /api/playlists must not return identical responses — they are different routes',
@@ -108,7 +111,7 @@ test.describe.serial('Phase A — Retailer Loops', () => {
     // Must NOT show a 404 error element
     await expect(page.locator('[data-testid="error-404"]')).not.toBeVisible();
     // Must render the loops list container
-    await getLocator(page, RL.LoopsList).waitFor({ timeout: 15000 );
+    await getLocator(page, RL.LoopsList).waitFor({ timeout: 15000 });
     await expect(getLocator(page, RL.LoopsList)).toBeVisible();
   });
 
@@ -117,10 +120,10 @@ test.describe.serial('Phase A — Retailer Loops', () => {
   // ─────────────────────────────────────────────────────────────────────────
   test('7.3 GET /api/locations/:id/loops — 200, array returned', async ({ playwright }) => {
     const ctx = await playwright.request.newContext({
-      baseURL:          API_BASE_URL,
+      baseURL: API_BASE_URL,
       extraHTTPHeaders: {
-        Authorization:  `Bearer ${DEMO_TOKEN}`,
-        'x-demo-role':  DEMO_RETAILER.role,
+        Authorization: `Bearer ${DEMO_TOKEN}`,
+        'x-demo-role': DEMO_RETAILER.role,
       },
     });
     try {
@@ -142,7 +145,7 @@ test.describe.serial('Phase A — Retailer Loops', () => {
       BASE_URL + '/dashboard/retailer/loops',
       { waitUntil: 'domcontentloaded' },
     );
-    await getLocator(page, RL.LoopsList).waitFor({ timeout: 15000 );
+    await getLocator(page, RL.LoopsList).waitFor({ timeout: 15000 });
 
     // At least one loop row must exist (seeded in Phase 1)
     const firstRow = page.locator('[data-testid^="loop-row-"]').first();
@@ -162,7 +165,7 @@ test.describe.serial('Phase A — Retailer Loops', () => {
       BASE_URL + '/dashboard/retailer/loops',
       { waitUntil: 'domcontentloaded' },
     );
-    await getLocator(page, RL.LoopsList).waitFor({ timeout: 15000 );
+    await getLocator(page, RL.LoopsList).waitFor({ timeout: 15000 });
 
     const VALID_STATUSES = new Set(['draft', 'approved', 'locked']);
     const badges = await page.locator('[data-testid^="loop-status-badge-"]').all();

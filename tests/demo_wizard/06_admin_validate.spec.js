@@ -28,6 +28,8 @@ import {
   loginAs,
 } from './demo.fixtures.js';
 
+import { AdminLocators as AL, getLocator } from './admin_locators.js';
+
 test.describe.serial('Phase 6 — Admin Full-Circle Validation', () => {
 
   test.beforeEach(async ({ page }) => {
@@ -43,11 +45,11 @@ test.describe.serial('Phase 6 — Admin Full-Circle Validation', () => {
   test('6.2 BonVie campaign visible in Admin Overview', async ({ page }) => {
     await loginAs(page, DEMO_ADMIN);
     await page.goto(BASE_URL + '/dashboard/admin', { waitUntil: 'domcontentloaded' });
-    await getLocator(page, AL.AdminOverview).waitFor({ timeout: 15000 );
+    await getLocator(page, AL.AdminOverview).waitFor({ timeout: 15000 });
 
     // Campaign created in Phase 3 must appear in the admin campaign list
     await expect(
-      getLocator(page, AL.AdminOverview).getByText('BonVie'),
+      getLocator(page, AL.AdminOverview).getByText('BonVie').first(),
     ).toBeVisible({ timeout: 10000 });
   });
 

@@ -53,7 +53,7 @@ const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
                     </h3>
                     <input
                         type="text"
-                        data-testid="campaign-name-input"
+                        data-testid="input-campaign-name"
                         value={data.campaignName || ''}
                         onChange={(e) => updateData({ campaignName: e.target.value })}
                         placeholder="e.g., Summer Sale 2026"
@@ -74,7 +74,7 @@ const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-slate-400">$</span>
                         <input
                             type="number"
-                            data-testid="campaign-budget-input"
+                            data-testid="select-campaign-budget"
                             value={data.budget || 1000}
                             onChange={(e) => updateData({ budget: parseInt(e.target.value) || 0 })}
                             min="100"

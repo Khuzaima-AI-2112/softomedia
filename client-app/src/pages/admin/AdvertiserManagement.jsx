@@ -254,8 +254,8 @@ function AdvertiserManagement() {
                         onClick={() => toggleStatus(advertiser.id)}
                         disabled={togglingIds.has(advertiser.id)}
                         className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${advertiser.status === 'active'
-                                ? 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
-                                : 'text-slate-400 bg-slate-100 dark:bg-slate-800 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                            ? 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                            : 'text-slate-400 bg-slate-100 dark:bg-slate-800 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
                             }`}
                         title={advertiser.status === 'active' ? 'Deactivate' : 'Activate'}
                         aria-label={`${advertiser.status === 'active' ? 'Deactivate' : 'Activate'} ${advertiser.name}`}
@@ -336,7 +336,9 @@ function AdvertiserManagement() {
             </div>
 
             {/* Advertisers Table */}
-            <DataTable columns={columns} data={advertisers} loading={loading} emptyMessage="No advertisers found" />
+            <div data-testid="advertisers-list">
+                <DataTable columns={columns} data={advertisers} loading={loading} emptyMessage="No advertisers found" />
+            </div>
 
             {/* Selected Advertiser Campaigns */}
             {selectedAdvertiser && (

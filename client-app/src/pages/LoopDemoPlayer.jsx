@@ -288,7 +288,7 @@ function LoopDemoPlayer() {
 
     // ── Render ──────────────────────────────────────────────────────────────
     return (
-        <div className="min-h-screen bg-slate-950 text-white flex flex-col">
+        <div data-testid="player-container" className="min-h-screen bg-slate-950 text-white flex flex-col">
 
             {/* ── HEADER / COMMAND CENTER ───────────────────────────────── */}
             <div className="border-b border-white/10 bg-slate-900/80 backdrop-blur-md px-6 py-4">

@@ -218,7 +218,7 @@ function ScreenManagement() {
                 )}
 
                 <GlassCard>
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto" data-testid="screens-list">
                         <table className="w-full text-left" aria-label="Screens">
                             <thead>
                                 <tr className="border-b border-slate-200 dark:border-slate-700">
@@ -325,6 +325,7 @@ function ScreenManagement() {
                                         id="screen-hw-id"
                                         type="text"
                                         required
+                                        data-testid="input-screen-name"
                                         className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
                                         placeholder="e.g. lobby-disp-01"
                                         value={newScreen.screen_id}
@@ -336,6 +337,7 @@ function ScreenManagement() {
                                         <label htmlFor="screen-retailer" className="block text-sm font-medium mb-1">Retailer</label>
                                         <select
                                             id="screen-retailer"
+                                            data-testid="select-screen-retailer"
                                             className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
                                             value={newScreen.retailer_id}
                                             onChange={e => setNewScreen({ ...newScreen, retailer_id: e.target.value, store_id: '' })}
@@ -350,6 +352,7 @@ function ScreenManagement() {
                                         <label htmlFor="screen-store" className="block text-sm font-medium mb-1">Store</label>
                                         <select
                                             id="screen-store"
+                                            data-testid="select-screen-store"
                                             className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
                                             value={newScreen.store_id}
                                             onChange={e => setNewScreen({ ...newScreen, store_id: e.target.value })}

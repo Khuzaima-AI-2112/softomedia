@@ -312,7 +312,7 @@ function CPMCalendar() {
     const currentMonth = new Date(selY, selM - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500 relative group/main">
+        <div data-testid="pricing-calendar" className="space-y-8 animate-in fade-in duration-500 relative group/main">
             <LayoutTag name="main-section" position="top-left" />
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -326,6 +326,7 @@ function CPMCalendar() {
                 </div>
                 <div className="flex items-center gap-3">
                     <select
+                        data-testid="select-pricing-retailer"
                         value={selectedRetailer}
                         onChange={(e) => {
                             setSelectedRetailer(e.target.value);
@@ -366,11 +367,13 @@ function CPMCalendar() {
                                     type="number"
                                     step="0.01"
                                     min="0"
+                                    data-testid="input-cpm-rate"
                                     value={editedBaseCPM}
                                     onChange={(e) => setEditedBaseCPM(parseFloat(e.target.value) || 0)}
                                     className="w-24 px-2 py-1 rounded border border-primary bg-white dark:bg-slate-800 text-lg font-bold"
                                 />
                                 <button
+                                    data-testid="btn-save-base-cpm"
                                     onClick={handleSaveBaseCPM}
                                     className="p-1 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded"
                                 >
@@ -387,6 +390,7 @@ function CPMCalendar() {
                             <>
                                 <PriceDisplay price={pricingConfig.baseCPM || pricingConfig.base_cpm || 15.00} showCPM size="large" />
                                 <button
+                                    data-testid="btn-edit-base-cpm"
                                     onClick={() => setEditMode(true)}
                                     className="p-1 text-slate-400 hover:text-primary hover:bg-primary/10 rounded transition-colors"
                                 >
@@ -453,6 +457,7 @@ function CPMCalendar() {
                             <span className="material-symbols-outlined">chevron_left</span>
                         </button>
                         <button
+                            data-testid="pricing-calendar-today"
                             onClick={() => setSelectedDate(new Date().toLocaleDateString('en-CA'))}
                             className="text-sm text-primary hover:underline"
                         >
@@ -678,7 +683,7 @@ aspect - square flex items - center justify - center text - sm rounded - lg rela
             </GlassCard>
 
             {/* Traffic Tier Configuration */}
-            <GlassCard className="relative group/tiers">
+            <GlassCard data-testid="pricing-tiers" className="relative group/tiers">
                 <LayoutTag name="traffic-tiers-config" position="bottom-right" />
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold text-lg">Traffic Tier Configuration</h3>
@@ -692,6 +697,7 @@ aspect - square flex items - center justify - center text - sm rounded - lg rela
                     ) : (
                         <div className="flex items-center gap-2">
                             <button
+                                data-testid="pricing-save-confirmation"
                                 onClick={handleSaveTiers}
                                 className="px-3 py-1 text-xs bg-emerald-500 text-white rounded-lg font-bold"
                             >

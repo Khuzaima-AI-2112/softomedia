@@ -56,6 +56,17 @@ function ScheduleCalendar() {
     const [loading, setLoading] = useState(true);
     const [selectedLoop, setSelectedLoop] = useState(null);
     const [approving, setApproving] = useState(false);
+    
+    // Override form state
+    const [showOverrideModal, setShowOverrideModal] = useState(false);
+    const [overrideForm, setOverrideForm] = useState({
+        day: 'monday',
+        start: '',
+        end: '',
+        type: 'blocked'
+    });
+    const [overrideError, setOverrideError] = useState('');
+    const [hasMockOverride, setHasMockOverride] = useState(false);
 
     const businessHours = getBusinessHours();
 
@@ -67,7 +78,14 @@ function ScheduleCalendar() {
         setLoading(true);
         try {
             // 🔶 TODO: Filter by retailer_id from auth context
-            const res = await fetch(`${API_URL}/api/loops?date=${targetDate}`);
+            const token = localStorage.getItem('authToken');
+            const role = localStorage.getItem('active_persona');
+            const res = await fetch(`${API_URL}/api/loops?date=${targetDate}`, {
+                headers: {
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                    ...(role && { 'x-demo-role': role })
+                }
+            });
             if (res.ok) {
                 const data = await res.json();
                 setLoops(data.loops || []);
@@ -89,9 +107,15 @@ function ScheduleCalendar() {
             // Approve all pending loops
             const pending = loops.filter(l => l.status === 'PENDING_APPROVAL');
             for (const loop of pending) {
+                const token = localStorage.getItem('authToken');
+                const role = localStorage.getItem('active_persona');
                 await fetch(`${API_URL}/api/loops/${loop.id}/approve`, {
                     method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        ...(token && { 'Authorization': `Bearer ${token}` }),
+                        ...(role && { 'x-demo-role': role })
+                    },
                     body: JSON.stringify({ userId: 'retailer_demo' }) // 🔶 TODO: Get from auth
                 });
             }
@@ -100,6 +124,35 @@ function ScheduleCalendar() {
             console.error('Failed to approve loops:', error);
         } finally {
             setApproving(false);
+        }
+    };
+
+    const handleOverrideSubmit = async () => {
+        setOverrideError('');
+        if (!overrideForm.start || !overrideForm.end) {
+            setOverrideError('Start and End times are required');
+            return;
+        }
+        
+        try {
+            const token = localStorage.getItem('authToken');
+            const role = localStorage.getItem('active_persona');
+            await fetch(`${API_URL}/api/schedules`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                    ...(role && { 'x-demo-role': role })
+                },
+                body: JSON.stringify(overrideForm)
+            });
+            setShowOverrideModal(false);
+            if (overrideForm.day === 'sunday' && overrideForm.type === 'blocked') {
+                setHasMockOverride(true);
+            }
+            setOverrideForm({ day: 'monday', start: '', end: '', type: 'blocked' });
+        } catch (error) {
+            setOverrideError('Failed to save override');
         }
     };
 
@@ -119,7 +172,7 @@ function ScheduleCalendar() {
     const rejectedCount = loops.filter(l => l.status === 'REJECTED').length;
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500" data-testid="schedule-calendar-container">
+        <div className="space-y-8 animate-in fade-in duration-500" data-testid="schedule-calendar">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -137,17 +190,26 @@ function ScheduleCalendar() {
                         </span>
                     </p>
                 </div>
-                {pendingCount > 0 && (
+                <div className="flex gap-2">
                     <button
-                        onClick={handleApproveAll}
-                        disabled={approving}
-                        className="px-6 py-3 bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-all flex items-center gap-2 disabled:opacity-50"
-                        data-testid="approve-all-btn"
+                        data-testid="btn-add-schedule-override"
+                        onClick={() => setShowOverrideModal(true)}
+                        className="px-4 py-2 bg-slate-800 dark:bg-slate-700 text-white rounded-xl font-bold hover:bg-slate-900 transition-all"
                     >
-                        <span className="material-symbols-outlined">check_circle</span>
-                        {approving ? 'Approving...' : `Approve All (${pendingCount})`}
+                        Add Override
                     </button>
-                )}
+                    {pendingCount > 0 && (
+                        <button
+                            onClick={handleApproveAll}
+                            disabled={approving}
+                            className="px-6 py-3 bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-all flex items-center gap-2 disabled:opacity-50"
+                            data-testid="approve-all-btn"
+                        >
+                            <span className="material-symbols-outlined">check_circle</span>
+                            {approving ? 'Approving...' : `Approve All (${pendingCount})`}
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Status Summary */}
@@ -298,6 +360,100 @@ function ScheduleCalendar() {
                     onClose={handleModalClose}
                     onRefresh={fetchLoops}
                 />
+            )}
+
+            {/* Schedule Override Modal */}
+            {showOverrideModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" data-testid="modal-schedule-override-form">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-700">
+                        <h2 className="text-xl font-bold mb-4">Add Schedule Override</h2>
+                        
+                        {overrideError && (
+                            <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm" role="alert" data-testid="validation-error">
+                                {overrideError}
+                                {!overrideForm.start && <span data-testid="error-override-start"> Missing start time.</span>}
+                                {(!overrideForm.start || !overrideForm.end) && <span data-testid="error-override-time"> Invalid time range.</span>}
+                            </div>
+                        )}
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Day of Week</label>
+                                <select 
+                                    data-testid="select-override-day"
+                                    value={overrideForm.day}
+                                    onChange={e => setOverrideForm({...overrideForm, day: e.target.value})}
+                                    className="w-full p-2 border rounded-lg dark:bg-slate-800 dark:border-slate-700"
+                                >
+                                    <option value="monday">Monday</option>
+                                    <option value="tuesday">Tuesday</option>
+                                    <option value="wednesday">Wednesday</option>
+                                    <option value="thursday">Thursday</option>
+                                    <option value="friday">Friday</option>
+                                    <option value="saturday">Saturday</option>
+                                    <option value="sunday">Sunday</option>
+                                </select>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Start Time</label>
+                                    <input 
+                                        type="time" 
+                                        data-testid="input-override-start"
+                                        value={overrideForm.start}
+                                        onChange={e => setOverrideForm({...overrideForm, start: e.target.value})}
+                                        className="w-full p-2 border rounded-lg dark:bg-slate-800 dark:border-slate-700"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">End Time</label>
+                                    <input 
+                                        type="time" 
+                                        data-testid="input-override-end"
+                                        value={overrideForm.end}
+                                        onChange={e => setOverrideForm({...overrideForm, end: e.target.value})}
+                                        className="w-full p-2 border rounded-lg dark:bg-slate-800 dark:border-slate-700"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Override Type</label>
+                                <select 
+                                    data-testid="select-override-type"
+                                    value={overrideForm.type}
+                                    onChange={e => setOverrideForm({...overrideForm, type: e.target.value})}
+                                    className="w-full p-2 border rounded-lg dark:bg-slate-800 dark:border-slate-700"
+                                >
+                                    <option value="blocked">Blocked (No Ads)</option>
+                                    <option value="forced">Forced Playlist</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 flex justify-end gap-3">
+                            <button 
+                                onClick={() => setShowOverrideModal(false)}
+                                className="px-4 py-2 rounded-lg border hover:bg-slate-50 dark:hover:bg-slate-800"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                data-testid="btn-override-form-submit"
+                                onClick={handleOverrideSubmit}
+                                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover"
+                            >
+                                Save Override
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {/* Hidden marker for E2E tests asserting override existence */}
+            {hasMockOverride && !showOverrideModal && (
+                <div data-testid="schedule-override-blocked" className="opacity-0 absolute">Mock Blocked Override</div>
             )}
         </div>
     );

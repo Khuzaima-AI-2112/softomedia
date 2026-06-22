@@ -644,12 +644,14 @@ function RetailerManagement() {
             </div>
 
             {/* Retailers Table */}
-            <DataTable
-                columns={columns}
-                data={filteredAndSortedRetailers}
-                loading={loading}
-                emptyMessage="No retailers match your filters"
-            />
+            <div data-testid="retailers-list">
+                <DataTable
+                    columns={columns}
+                    data={filteredAndSortedRetailers}
+                    loading={loading}
+                    emptyMessage="No retailers match your filters"
+                />
+            </div>
 
             {/* Selected Retailer — Store Cards */}
             {selectedRetailer && (
@@ -684,11 +686,12 @@ function RetailerManagement() {
                     </div>
 
                     {getRetailerStores(selectedRetailer.id).length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-center">
+                        <div data-testid="stores-list" className="flex flex-col items-center justify-center py-12 text-center">
                             <span className="material-symbols-outlined text-5xl text-slate-300 dark:text-slate-600 mb-3">storefront</span>
                             <p className="text-slate-500 dark:text-slate-400 font-medium">No stores yet</p>
                             <p className="text-sm text-slate-400 dark:text-slate-500 mb-4">Add the first location for {selectedRetailer.name}.</p>
                             <button
+                                data-testid="btn-add-store"
                                 onClick={() => openStoreModal(selectedRetailer)}
                                 className="px-4 py-2 text-sm bg-primary text-white rounded-lg font-medium hover:bg-primary-hover transition-colors"
                             >
@@ -696,7 +699,7 @@ function RetailerManagement() {
                             </button>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="stores-list">
                             {getRetailerStores(selectedRetailer.id).map(store => {
                                 const storeScreens = screens.filter(s => s.store_id === store.id);
                                 const storeOnline = storeScreens.filter(s => s.status === 'online').length;
@@ -782,6 +785,7 @@ function RetailerManagement() {
                                     <label className="block text-sm font-medium mb-1" htmlFor="retailer-name">Company Name</label>
                                     <input
                                         id="retailer-name"
+                                        data-testid="input-retailer-name"
                                         type="text"
                                         value={formData.name}
                                         onChange={(e) => updateRetailerField('name', e.target.value)}
@@ -799,7 +803,8 @@ function RetailerManagement() {
                                     id="retailer-email"
                                     type="email"
                                     value={formData.contact_email}
-                                    onChange={(e) = data-testid="input-email"> updateRetailerField('contact_email', e.target.value)}
+                                    onChange={(e) => updateRetailerField('contact_email', e.target.value)}
+                                    data-testid="input-retailer-contact"
                                     className={inputClass(retailerFieldErrors.contact_email)}
                                     placeholder="admin@retailer.com"
                                     aria-invalid={!!retailerFieldErrors.contact_email}
@@ -864,6 +869,7 @@ function RetailerManagement() {
                                 <input
                                     id="store-name"
                                     type="text"
+                                    data-testid="input-store-name"
                                     value={storeFormData.name}
                                     onChange={(e) => updateStoreField('name', e.target.value)}
                                     className={inputClass(storeFieldErrors.name)}
@@ -878,6 +884,7 @@ function RetailerManagement() {
                                 <input
                                     id="store-address"
                                     type="text"
+                                    data-testid="input-store-address"
                                     value={storeFormData.address}
                                     onChange={(e) => updateStoreField('address', e.target.value)}
                                     className={inputClass(storeFieldErrors.address)}
@@ -892,6 +899,7 @@ function RetailerManagement() {
                                 <input
                                     id="store-city"
                                     type="text"
+                                    data-testid="input-store-city"
                                     value={storeFormData.city}
                                     onChange={(e) => updateStoreField('city', e.target.value)}
                                     className={inputClass(storeFieldErrors.city)}

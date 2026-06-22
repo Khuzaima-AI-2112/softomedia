@@ -165,6 +165,7 @@ function TechOpsDashboard() {
                                 Cancel
                             </button>
                             <button
+                                data-testid="btn-confirm-restart"
                                 onClick={handleRestartConfirm}
                                 disabled={restartLoading}
                                 className="px-4 py-2 bg-amber-500 text-white text-sm font-bold rounded-lg hover:bg-amber-600 transition-all disabled:opacity-60 flex items-center gap-2"
@@ -184,7 +185,7 @@ function TechOpsDashboard() {
                         className="absolute inset-0 bg-black/30 backdrop-blur-sm"
                         onClick={closeTerminal}
                     />
-                    <div className="relative w-full max-w-lg bg-slate-900 text-slate-100 flex flex-col shadow-2xl z-10">
+                    <div data-testid="modal-screen-details" className="relative w-full max-w-lg bg-slate-900 text-slate-100 flex flex-col shadow-2xl z-10">
                         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700">
                             <div className="flex items-center gap-2">
                                 <span className="material-symbols-outlined text-primary">terminal</span>
@@ -194,6 +195,7 @@ function TechOpsDashboard() {
                             <div className="flex items-center gap-2">
                                 {!terminalLoading && (
                                     <button
+                                        data-testid="btn-refresh-cache"
                                         onClick={() => fetchTerminalLogs(terminalTarget.id)}
                                         aria-label="Refresh logs"
                                         className="text-slate-400 hover:text-white transition-colors p-1"
@@ -203,7 +205,7 @@ function TechOpsDashboard() {
                                 )}
                                 <button
                                     onClick={closeTerminal}
-                                    data-testid="btn-modal-close" className="text-slate-400 hover:text-white transition-colors"
+                                    data-testid="btn-close-screen-details" className="text-slate-400 hover:text-white transition-colors"
                                     aria-label="Close log viewer"
                                 >
                                     <span className="material-symbols-outlined">close</span>
@@ -376,7 +378,7 @@ function TechOpsDashboard() {
                                 filteredScreens.map(screen => (
                                     <tr key={screen.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                                         <td className="py-4 px-4 font-mono text-sm text-slate-600 dark:text-slate-300">{screen.id}</td>
-                                        <td className="py-4 px-4">
+                                        <td data-testid={`screen-status-badge-${screen.id}`} className="py-4 px-4">
                                             <StatusBadge status={screen.status === 'ONLINE' ? 'Online' : 'Offline'} />
                                         </td>
                                         <td className="py-4 px-4 text-sm text-slate-500">
@@ -392,6 +394,7 @@ function TechOpsDashboard() {
                                                     <span className="text-xs text-rose-500 mr-1">Failed</span>
                                                 )}
                                                 <button
+                                                    data-testid={`btn-restart-screen-${screen.id}`}
                                                     onClick={() => setRestartTarget({ id: screen.id })}
                                                     disabled={restartLoading}
                                                     aria-label={`Restart screen ${screen.id}`}

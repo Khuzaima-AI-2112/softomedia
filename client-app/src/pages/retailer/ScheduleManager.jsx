@@ -200,7 +200,7 @@ function ScheduleManager() {
     );
 
     return (
-        <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div data-testid="schedule-manager" className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
             {/* Task 3.6: D-1 cutoff warning banner */}
             {isPastCutoff && (
@@ -241,6 +241,7 @@ function ScheduleManager() {
                     </button>
                     {/* Task 3.4: Bulk Approve All — triggers confirmation dialog */}
                     <button
+                        data-testid="btn-approve-schedule"
                         onClick={() => setShowBulkConfirm(true)}
                         disabled={isPastCutoff || unreviewedCount === 0}
                         className="px-4 py-2 bg-emerald-500 text-white font-bold rounded-lg shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -286,7 +287,7 @@ function ScheduleManager() {
             {/* Task 3.5: per-slot rejection modal */}
             {rejectingSlot && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 space-y-4">
+                    <div data-testid="modal-rejection-reason" className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 space-y-4">
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                             Reject slot — {formatHour(rejectingSlot.hour)}
                         </h3>
@@ -295,6 +296,7 @@ function ScheduleManager() {
                                 Rejection note <span className="text-slate-400 font-normal">(optional but recommended)</span>
                             </label>
                             <textarea
+                                data-testid="input-rejection-reason"
                                 maxLength={280}
                                 rows={3}
                                 value={rejectComment}
@@ -328,6 +330,7 @@ function ScheduleManager() {
                                 </button>
                             )}
                             <button
+                                data-testid="btn-confirm-rejection"
                                 onClick={handleRejectSubmit}
                                 disabled={rejectLoading}
                                 className="px-4 py-2 bg-rose-500 text-white text-sm font-bold rounded-lg hover:bg-rose-600 transition-all disabled:opacity-60"
@@ -352,7 +355,7 @@ function ScheduleManager() {
 
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                 {/* Location Sidebar */}
-                <aside className="lg:col-span-1 space-y-4">
+                <aside data-testid="schedule-store-filter" className="lg:col-span-1 space-y-4">
                     <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest px-2">Locations</h3>
                     {locations.map(loc => (
                         <div
@@ -404,6 +407,7 @@ function ScheduleManager() {
                                 {daySlots.map(slot => (
                                     <div
                                         key={slot.hour}
+                                        data-testid="schedule-slot"
                                         className={`p-3 rounded-xl border ${
                                             slot.status === 'approved'
                                                 ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10'
@@ -413,7 +417,7 @@ function ScheduleManager() {
                                         }`}
                                     >
                                         <p className="text-xs font-bold text-slate-500 mb-1">{formatHour(slot.hour)}</p>
-                                        <p className={`text-sm font-semibold capitalize ${
+                                        <p data-testid={`status-badge-${slot.loopId}`} className={`text-sm font-semibold capitalize ${
                                             slot.status === 'approved' ? 'text-emerald-600 dark:text-emerald-400'
                                             : slot.status === 'rejected' ? 'text-rose-600 dark:text-rose-400'
                                             : 'text-amber-600 dark:text-amber-400'
@@ -421,6 +425,7 @@ function ScheduleManager() {
                                         {/* Task 3.5: per-slot reject button */}
                                         {slot.status === 'pending' && !isPastCutoff && (
                                             <button
+                                                data-testid={`btn-reject-schedule-${slot.loopId}`}
                                                 onClick={() => setRejectingSlot({ loopId: slot.loopId, hour: slot.hour })}
                                                 className="mt-2 text-xs text-rose-500 hover:text-rose-700 flex items-center gap-1"
                                             >

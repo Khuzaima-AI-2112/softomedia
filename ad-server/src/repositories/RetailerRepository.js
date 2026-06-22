@@ -13,10 +13,11 @@ export class RetailerRepository extends BaseRepository {
      * @returns {Promise<object>} Created retailer document with id
      */
     async createNew(data) {
-        const id = this.collection
+        const id = data.id || (this.collection
             ? this.collection.doc().id
-            : `ret_${Date.now()}`;
-        return super.create(id, data);
+            : `ret_${Date.now()}`);
+        const { id: _, ...recordData } = data; // remove id from the document payload itself
+        return super.create(id, recordData);
     }
 
     /**

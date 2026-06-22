@@ -262,7 +262,7 @@ Add `test:rules` as a required CI step before the Playwright E2E suite runs.
 | **Gap 1** — 7 uncovered routers | Phase K: 9 `request` fixture calls in `17_api_surface_smoke.spec.js` | ~1 hour | Yes |
 | **Gap 2** — Error paths | 8 negative steps added to existing spec files | ~2 hours | Yes |
 | **Gap 3** — playlist/playlists ambiguity | Pre-flight `beforeAll` in `07_retailer_loops.spec.js` + hygiene rule | ~30 min | Partial |
-| **Gap 4** — Firestore Rules | New `tests/firestore-rules/rules.test.js` + emulator CI step | ~4 hours | Yes |
+| **Gap 4** — Firestore Rules ✅ | New `tests/firestore-rules/rules.test.js` + emulator CI step | Complete | Yes |
 | **Total** | | **~7–8 hours** | Zero new application code required |
 
 ---
@@ -306,3 +306,9 @@ When every file in the register above passes on a clean Firestore emulator with 
 > **Every user-facing flow, every mounted API router, every data access rule, and every documented error path in `softomedia-live2026` has been exercised at least once with a falsifiable assertion.**
 
 This is the production-quality gate. Register as `/demo-consolidated` in `workflows.md`.
+
+---
+### ?? Post-Validation Status (2026-06-19)
+While **Gap 4 (Firestore RBAC)** and the backend logical architectures are fully green and compliant, the automated pipeline validation was blocked by missing UI presentation hooks (data attributes). 
+*   **Root Cause:** Legacy execution of Phase 1c reported false-positives for \data-testid\ injections.
+*   **Remediation:** See \playwright_testids_TRUE_checklist.md\ for the exhaustive manifest of the exact 64 UI hooks required for Playwright to interact with the existing architecture.

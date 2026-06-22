@@ -1,8 +1,62 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Deny all public access by default
-    // Note: Admin SDK (used by ad-server) bypasses these rules
+
+    function isAdmin() {
+      return request.auth != null && request.auth.token.role == 'admin';
+    }
+
+    function isRetailer() {
+      return request.auth != null && (request.auth.token.role == 'retaileradmin' || request.auth.token.role == 'retailer');
+    }
+
+    function isBrand() {
+      return request.auth != null && request.auth.token.role == 'brand';
+    }
+
+    match /retailers/{retailerId} {
+      allow read: if isAdmin() || (isRetailer() && request.auth.token.retailerId == retailerId);
+      allow write: if isAdmin();
+    }
+
+    match /stores/{storeId} {
+      allow read: if isAdmin() || (isRetailer() && resource.data.retailerId == request.auth.token.retailerId);
+      allow create, update: if isAdmin() || (isRetailer() && request.resource.data.retailerId == request.auth.token.retailerId);
+      allow write: if isAdmin();
+    }
+
+    match /screens/{screenId} {
+      allow read: if isAdmin() || (isRetailer() && resource.data.retailerId == request.auth.token.retailerId);
+      allow write: if isAdmin();
+    }
+
+    match /campaigns/{campaignId} {
+      allow read: if isAdmin() || isRetailer() || (isBrand() && resource.data.advertiserId == request.auth.token.advertiserId);
+      allow read, write: if isAdmin();
+      allow create, update: if isBrand() && request.resource.data.advertiserId == request.auth.token.advertiserId;
+      allow delete: if isAdmin();
+    }
+
+    match /loops/{loopId} {
+      allow read: if isAdmin() || (isRetailer() && resource.data.retailerId == request.auth.token.retailerId);
+      allow write: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      allow write: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+    }
+
+    match /telemetry/{docId} {
+      allow read: if isAdmin();
+      allow write: if true;
+    }
+
+    match /impressions/{docId} {
+      allow read: if isAdmin();
+      allow write: if true;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

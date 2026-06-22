@@ -8,13 +8,13 @@ import NetworkErrorBanner from '../components/NetworkErrorBanner';
 
 // ── Role-aware sidebar nav items ───────────────────────────────────────────────
 const ADMIN_NAV = [
-    { to: '/dashboard/admin', icon: 'dashboard', label: 'Overview', end: true },
+    { to: '/dashboard/admin', icon: 'dashboard', label: 'Overview', end: true, testId: 'nav-home' },
     { to: '/dashboard/admin/retailers', icon: 'storefront', label: 'Retailers' },
     { to: '/dashboard/admin/advertisers', icon: 'campaign', label: 'Advertisers' },
-    { to: '/dashboard/admin/campaigns', icon: 'sell', label: 'Campaigns' },
+    { to: '/dashboard/admin/campaigns', icon: 'sell', label: 'Campaigns', testId: 'nav-campaigns' },
     { to: '/dashboard/admin/screens', icon: 'tv', label: 'Screens' },
     { to: '/dashboard/admin/loops', icon: 'subscriptions', label: 'Loops' },
-    { to: '/dashboard/admin/loop-analytics', icon: 'analytics', label: 'Loop Analytics' },
+    { to: '/dashboard/admin/loop-analytics', icon: 'analytics', label: 'Loop Analytics', testId: 'nav-reports' },
     { to: '/dashboard/admin/users', icon: 'group', label: 'Users' },
     { to: '/dashboard/admin/hours', icon: 'schedule', label: 'Business Hours' },
     { to: '/dashboard/admin/pricing', icon: 'payments', label: 'Pricing' },
@@ -24,24 +24,24 @@ const ADMIN_NAV = [
 ];
 
 const BRAND_NAV = [
-    { to: '/dashboard/brand', icon: 'dashboard', label: 'Dashboard', end: true },
+    { to: '/dashboard/brand', icon: 'dashboard', label: 'Dashboard', end: true, testId: 'nav-home' },
     { to: '/dashboard/brand/campaign/new', icon: 'add_circle', label: 'New Campaign' },
     { to: '/dashboard/advertiser/invoices', icon: 'receipt_long', label: 'Invoices' },
 ];
 
 // fix(#26b): add Loops and Campaign Approvals — previously missing from retailer sidebar
 const RETAILER_NAV = [
-    { to: '/dashboard/retailer', icon: 'dashboard', label: 'Dashboard', end: true },
-    { to: '/dashboard/retailer/schedule', icon: 'calendar_month', label: 'Schedule' },
+    { to: '/dashboard/retailer', icon: 'dashboard', label: 'Dashboard', end: true, testId: 'nav-home' },
+    { to: '/dashboard/retailer/schedule', icon: 'calendar_month', label: 'Schedule', testId: 'nav-calendar' },
     { to: '/dashboard/retailer/schedule-history', icon: 'history', label: 'Schedule History' },
     { to: '/dashboard/retailer/schedule-manager', icon: 'event_available', label: 'D-1 Preview' },
     { to: '/dashboard/retailer/loops', icon: 'subscriptions', label: 'Loops' },
-    { to: '/dashboard/retailer/campaign-approvals', icon: 'approval', label: 'Campaign Approvals' },
+    { to: '/dashboard/retailer/campaign-approvals', icon: 'approval', label: 'Campaign Approvals', testId: 'nav-approvals' },
 ];
 
 // Task 4.6 — TechOpsDashboard is now the landing page entry; Health remains accessible
 const TECHOP_NAV = [
-    { to: '/dashboard/techoperator', icon: 'monitor', label: 'Tech Ops', end: true },
+    { to: '/dashboard/techoperator', icon: 'monitor', label: 'Tech Ops', end: true, testId: 'nav-tech-ops' },
     { to: '/dashboard/techoperator/health', icon: 'monitor_heart', label: 'Health' },
 ];
 
@@ -76,6 +76,7 @@ function Sidebar({ persona }) {
                             <NavLink
                                 to={item.to}
                                 end={item.end}
+                                data-testid={item.testId}
                                 className={({ isActive }) =>
                                     `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive
                                         ? 'bg-primary/10 text-primary'
@@ -164,6 +165,7 @@ function DashboardLayout() {
                     {/* Avatar + identity dropdown */}
                     <div className="relative" ref={avatarRef}>
                         <button
+                            data-testid="btn-user-profile"
                             onClick={() => setAvatarOpen(prev => !prev)}
                             aria-label="User menu"
                             aria-expanded={avatarOpen}
@@ -193,6 +195,7 @@ function DashboardLayout() {
                                 {/* Logout */}
                                 <div className="px-2 py-1">
                                     <button
+                                        data-testid="btn-logout"
                                         onClick={handleLogout}
                                         role="menuitem"
                                         className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"

@@ -144,13 +144,15 @@ router.post('/', authenticate, requireRole('advertiser'), async (req, res) => {
         process.env.ALLOW_DEMO_MODE === 'true' &&
         req.user?.id === 'demo-brand'
     ) {
-        return res.status(201).json({
+        const demoPayload = {
             id:            'demo-campaign-001',
-            status:        'active',
+            status:        'pending_approval',  // MUST be pending_approval so it appears in Retailer Approvals queue!
             advertiser_id: req.user.linked_entity_id,  // JWT-stamped, never from body (Rule 7)
             name:          req.body.name || 'BonVie Summer Demo',
             created_at:    new Date().toISOString(),
-        });
+        };
+        await campaignRepository.create('demo-campaign-001', demoPayload);
+        return res.status(201).json(demoPayload);
     }
 
     try {

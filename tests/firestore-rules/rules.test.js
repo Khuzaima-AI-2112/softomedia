@@ -15,13 +15,13 @@
  *   "test:rules": "firebase emulators:exec --only firestore 'jest tests/firestore-rules/'"
  */
 
-import {
+const {
   initializeTestEnvironment,
   assertSucceeds,
   assertFails,
-} from '@firebase/rules-unit-testing';
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
+} = require('@firebase/rules-unit-testing');
+const { readFileSync } = require('fs');
+const { resolve } = require('path');
 
 let testEnv;
 
@@ -29,9 +29,9 @@ beforeAll(async () => {
   testEnv = await initializeTestEnvironment({
     projectId: 'softomedia-demo',
     firestore: {
-      rules: readFileSync(resolve(process.cwd(), 'firestore.rules'), 'utf8'),
-      host: 'localhost',
-      port: 8090,
+      rules: readFileSync(resolve(process.cwd(), 'ad-server/firestore.rules'), 'utf8'),
+      host: '127.0.0.1',
+      port: 8080,
     },
   });
 });

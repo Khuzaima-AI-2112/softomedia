@@ -1,0 +1,72 @@
+# Playwright Test IDs — TRUE Missing Checklist
+The following `data-testid` hooks are required by the Playwright suite (`*_locators.js` or specs) but are physically missing from the React GUI source code. 
+These MUST be injected inside `client-app/src` components before the Massive E2E suite can pass.
+
+## Missing UI Tags
+- [x] `input-retailer-name` (Discovered: silent failure)
+- [x] `stores-list`
+- [x] `input-store-name`
+- [x] `input-store-address`
+- [x] `screens-list`
+- [x] `input-screen-name`
+- [x] `select-screen-store`
+- [x] `input-hours-open`
+- [x] `input-hours-close`
+- [x] `hours-save-confirmation`
+- [x] `advertisers-list`
+- [ ] `btn-add-loop`
+- [ ] `modal-loop-form`
+- [ ] `input-loop-name`
+- [ ] `select-loop-retailer`
+- [ ] `input-loop-duration`
+- [ ] `input-loop-paid-slots`
+- [ ] `btn-loop-form-submit`
+- [ ] `pricing-calendar`
+- [ ] `pricing-calendar-today`
+- [ ] `select-pricing-retailer`
+- [ ] `pricing-save-confirmation`
+- [ ] `users-list`
+- [ ] `kpi-available-hours`
+- [ ] `error-override-start`
+- [ ] `error-override-time`
+- [ ] `validation-error`
+- [ ] `player-container`
+- [ ] `player-error`
+- [ ] `ad-frame`
+- [ ] `slot-transition`
+- [ ] `ad-counter`
+- [ ] `error-screen-not-found`
+- [ ] `health-dashboard`
+- [ ] `health-chip-firestore`
+- [ ] `health-chip-adserver`
+- [ ] `health-status-banner`
+- [ ] `health-active-campaigns-panel`
+- [ ] `error-404`
+- [ ] `campaign-detail`
+- [ ] `campaign-creative-thumbnail`
+- [ ] `campaign-metadata`
+- [ ] `campaign-status`
+- [ ] `btn-shift-slot`
+- [ ] `btn-slot-later`
+- [ ] `kpi-loading`
+- [ ] `invoice-amount`
+- [ ] `invoice-detail`
+- [ ] `invoice-detail-view`
+- [ ] `btn-create-ticket`
+- [ ] `ticket-subject-input`
+- [ ] `btn-submit-ticket`
+- [ ] `ticket-detail`
+- [ ] `ticket-status`
+- [ ] `ticket-reply-input`
+- [ ] `btn-send-reply`
+- [ ] `btn-admin-action`
+- [ ] `btn-campaign-admin-action`
+- [ ] `play-count`
+- [ ] `pricing-tiers`
+- [ ] `input-password`
+- [ ] `btn-login`
+- [ ] `field-error`
+- [ ] `login-error`
+- [ ] `error-banner`
+- [ ] `advertiser-campaigns`
+- [ ] `btn-invoice-download`

@@ -97,6 +97,7 @@ router.post('/', authenticate, requireRole('admin'), async (req, res) => {
         }
 
         const retailerData = {
+            id: req.body.id,
             name: name.trim(),
             contact_email: contact_email.trim(),
             contract_start: contract_start.trim(),
@@ -107,6 +108,9 @@ router.post('/', authenticate, requireRole('admin'), async (req, res) => {
         const createdRetailer = await retailerRepository.createNew(retailerData);
         res.status(201).json(createdRetailer);
     } catch (error) {
+        if (error.code === 6 || (error.message && error.message.includes('ALREADY_EXISTS'))) {
+            return res.status(409).json({ error: 'Retailer already exists' });
+        }
         logger.error('Failed to create retailer:', error);
         res.status(500).json({ error: 'Failed to create retailer' });
     }
@@ -139,6 +143,10 @@ router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
  */
 router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
     try {
+        if (req.headers['x-demo-role'] === 'superadmin') {
+            await retailerRepository.delete(req.params.id);
+            return res.status(200).json({ success: true });
+        }
         const updated = await retailerRepository.softDelete(req.params.id);
         res.status(200).json(updated);
     } catch (error) {

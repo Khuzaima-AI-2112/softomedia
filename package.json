@@ -11,6 +11,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
+    "test:rules": "firebase emulators:exec --project softomedia-demo --only firestore \"npx jest tests/firestore-rules/\"",
     "lint": "cd ad-server && npm run lint && cd ../client-app && npm run lint",
     "db:seed": "cd ad-server && npm run seed"
   },
@@ -19,6 +20,9 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "@playwright/test": "^1.57.0"
+    "@firebase/rules-unit-testing": "^5.0.1",
+    "@playwright/test": "^1.57.0",
+    "firebase-tools": "^15.22.0",
+    "jest": "^30.4.2"
   }
 }

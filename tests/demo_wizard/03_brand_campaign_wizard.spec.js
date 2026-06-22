@@ -47,25 +47,25 @@ test.describe.serial('Phase 3 — Brand Campaign Wizard', () => {
 
   test('3.2 open Campaign Wizard', async ({ page }) => {
     await loginAs(page, DEMO_BRAND);
-    await page.goto(BASE_URL + '/dashboard/advertiser', { waitUntil: 'domcontentloaded' });
-    await getLocator(page, BL.AdvertiserDashboard).waitFor({ timeout: 15000 });
+    await page.goto(BASE_URL + '/dashboard/advertiser/campaigns', { waitUntil: 'domcontentloaded' });
+    await getLocator(page, BL.AdvertiserCampaigns).waitFor({ timeout: 15000 });
 
     // Click New Campaign to trigger modal
-    await getLocator(page, BL.BtnNewCampaign).click();
+    await getLocator(page, BL.BtnNewCampaign).first().click();
     await getLocator(page, WL.CampaignWizardModal).waitFor({ timeout: 10000 });
   });
 
   test('3.3 Fill out campaign creation form', async ({ page }) => {
     await loginAs(page, DEMO_BRAND);
-    await page.goto(BASE_URL + '/dashboard/advertiser', { waitUntil: 'domcontentloaded' });
-    await getLocator(page, BL.AdvertiserDashboard).waitFor({ timeout: 15000 });
+    await page.goto(BASE_URL + '/dashboard/advertiser/campaigns', { waitUntil: 'domcontentloaded' });
+    await getLocator(page, BL.AdvertiserCampaigns).waitFor({ timeout: 15000 });
 
-    await getLocator(page, BL.BtnNewCampaign).click();
+    await getLocator(page, BL.BtnNewCampaign).first().click();
     await getLocator(page, WL.CampaignWizardModal).waitFor({ timeout: 10000 });
 
     // Fill the new streamlined fields
     await getLocator(page, WL.InputCampaignName).fill(CAMP_NAME);
-    await getLocator(page, WL.SelectRetailer).selectOption(SEED.retailerId);
+    await getLocator(page, WL.SelectRetailer).selectOption({ label: 'FreshMart Montréal' });
     await getLocator(page, WL.InputStartDate).fill('2026-07-01');
     await getLocator(page, WL.InputEndDate).fill('2026-07-31');
     await getLocator(page, WL.InputBudget).fill('5000');
@@ -76,14 +76,14 @@ test.describe.serial('Phase 3 — Brand Campaign Wizard', () => {
 
   test('3.4 submit wizard → POST /api/campaigns with brand role header', async ({ page }) => {
     await loginAs(page, DEMO_BRAND);
-    await page.goto(BASE_URL + '/dashboard/advertiser', { waitUntil: 'domcontentloaded' });
-    await getLocator(page, BL.AdvertiserDashboard).waitFor({ timeout: 15000 });
+    await page.goto(BASE_URL + '/dashboard/advertiser/campaigns', { waitUntil: 'domcontentloaded' });
+    await getLocator(page, BL.AdvertiserCampaigns).waitFor({ timeout: 15000 });
 
-    await getLocator(page, BL.BtnNewCampaign).click();
+    await getLocator(page, BL.BtnNewCampaign).first().click();
     await getLocator(page, WL.CampaignWizardModal).waitFor({ timeout: 10000 });
 
     await getLocator(page, WL.InputCampaignName).fill(CAMP_NAME);
-    await getLocator(page, WL.SelectRetailer).selectOption(SEED.retailerId);
+    await getLocator(page, WL.SelectRetailer).selectOption({ label: 'FreshMart Montréal' });
     await getLocator(page, WL.InputStartDate).fill('2026-07-01');
     await getLocator(page, WL.InputEndDate).fill('2026-07-31');
     await getLocator(page, WL.InputCreative).fill('https://cdn.example.com/ad.mp4');
@@ -101,14 +101,14 @@ test.describe.serial('Phase 3 — Brand Campaign Wizard', () => {
   // ─────────────────────────────────────────────────────────────────────────
   test('N-3.1 missing required fields → validation error, no API bypass', async ({ page }) => {
     await loginAs(page, DEMO_BRAND);
-    await page.goto(BASE_URL + '/dashboard/advertiser', { waitUntil: 'domcontentloaded' });
-    await getLocator(page, BL.AdvertiserDashboard).waitFor({ timeout: 15000 });
+    await page.goto(BASE_URL + '/dashboard/advertiser/campaigns', { waitUntil: 'domcontentloaded' });
+    await getLocator(page, BL.AdvertiserCampaigns).waitFor({ timeout: 15000 });
 
-    await getLocator(page, BL.BtnNewCampaign).click();
+    await getLocator(page, BL.BtnNewCampaign).first().click();
     await getLocator(page, WL.CampaignWizardModal).waitFor({ timeout: 10000 });
 
     // Leave name empty to trigger validation
-    await getLocator(page, WL.SelectRetailer).selectOption(SEED.retailerId);
+    await getLocator(page, WL.SelectRetailer).selectOption({ label: 'FreshMart Montréal' });
 
     await getLocator(page, WL.BtnSubmit).click();
 

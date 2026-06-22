@@ -2,6 +2,8 @@ export const AdminLocators = {
     // Global Shell & Nav
     Shell: 'dashboard-shell',
     NavAdmin: 'nav-admin',
+    NavTechOp: 'nav-techop',
+    AdminOverview: 'admin-overview',
 
     // Retailers Page
     Retailers: {

@@ -407,16 +407,18 @@ function Player() {
     if (status === 'playing' && activeContent) {
         return (
             <div
-                data-testid="player-root"
+                data-testid="player-container"
                 data-status={status}
                 style={{ width: '100vw', height: '100vh', backgroundColor: 'black', overflow: 'hidden' }}
             >
                 <img
-                    data-testid="ad-image"
+                    data-testid="ad-frame"
                     src={activeContent.url}
                     alt={activeContent.title}
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
+                
+                <div data-testid="slot-transition" className="hidden"></div>
 
                 {/* Task V1: Debug overlay gated to development only */}
                 {import.meta.env.MODE === 'development' && (
@@ -425,9 +427,9 @@ function Player() {
                         style={{ position: 'absolute', bottom: 10, right: 10, background: 'rgba(0,0,0,0.5)', color: 'white', padding: 5, fontSize: 10 }}
                     >
                         {activeContent.isLoop ? (
-                            <span>🔄 Loop {activeContent.loopHour}:00 | Slot {activeContent.slotPosition + 1}/12 | {activeContent.duration}s</span>
+                            <span data-testid="ad-counter">🔄 Loop {activeContent.loopHour}:00 | Slot {activeContent.slotPosition + 1}/12 | {activeContent.duration}s</span>
                         ) : (
-                            <span>{activeContent.title} | {activeContent.duration}s</span>
+                            <span data-testid="ad-counter">{activeContent.title} | {activeContent.duration}s</span>
                         )}
                     </div>
                 )}
@@ -477,7 +479,7 @@ function Player() {
 
     return (
         <div
-            data-testid="player-root"
+            data-testid="player-container"
             data-status={status}
             style={{
                 display: 'flex',
@@ -501,9 +503,9 @@ function Player() {
                         </span>
                     )}
                     {status === 'loading_playlist' && <span style={{ color: '#60a5fa' }}>Loading Content...</span>}
-                    {status === 'no_content' && <span style={{ color: '#9ca3af' }}>No ads scheduled.</span>}
+                    {status === 'no_content' && <span data-testid="error-screen-not-found" style={{ color: '#9ca3af' }}>No ads scheduled.</span>}
                     {status === 'offline' && <span style={{ color: '#ef4444' }}>● Offline</span>}
-                    {status === 'error' && <span style={{ color: '#ef4444' }}>Error occurred.</span>}
+                    {status === 'error' && <span data-testid="player-error" style={{ color: '#ef4444' }}>Error occurred.</span>}
                 </div>
 
                 <div style={{

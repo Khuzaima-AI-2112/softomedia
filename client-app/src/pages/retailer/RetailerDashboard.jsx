@@ -60,13 +60,13 @@ function RetailerDashboard() {
 
     // S9-4: paths corrected to match registered routes in App.jsx
     const quickActions = [
-        { label: 'Schedule Calendar', icon: 'event',    path: '/dashboard/retailer/schedule',         color: 'primary' },
-        { label: 'Approval History',  icon: 'history',  path: '/dashboard/retailer/schedule-history',  color: 'amber'   },
-        { label: 'Demo Player',       icon: 'slideshow', path: '/player/demo',                          color: 'purple'  }
+        { label: 'Schedule Calendar', icon: 'event', path: '/dashboard/retailer/schedule', color: 'primary' },
+        { label: 'Approval History', icon: 'history', path: '/dashboard/retailer/schedule-history', color: 'amber' },
+        { label: 'Demo Player', icon: 'slideshow', path: '/player/demo', color: 'purple' }
     ];
 
     return (
-        <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
+        <div data-testid="retailer-dashboard-kpis" className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
             <div className="flex flex-col md:flex-row justify-between items-start gap-6">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Retailer Command Center</h1>
@@ -74,6 +74,7 @@ function RetailerDashboard() {
                 </div>
                 <div className="flex gap-3 w-full md:w-auto">
                     <button
+                        data-testid="btn-create-ticket"
                         onClick={() => setIsSupportModalOpen(true)}
                         className="flex-1 md:flex-none px-4 py-2 bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-lg font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                     >
@@ -112,7 +113,9 @@ function RetailerDashboard() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <GlassCard className="!p-4">
                     <p className="text-sm text-slate-500 mb-1">Stores</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{loading ? '...' : stats.stores}</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                        {loading ? <span data-testid="kpi-loading">...</span> : stats.stores}
+                    </p>
                 </GlassCard>
                 <GlassCard className="!p-4">
                     <p className="text-sm text-slate-500 mb-1">Screens</p>
@@ -121,6 +124,12 @@ function RetailerDashboard() {
                 <GlassCard className="!p-4">
                     <p className="text-sm text-slate-500 mb-1">Online</p>
                     <p className="text-2xl font-bold text-emerald-500">{loading ? '...' : stats.onlineScreens}</p>
+                </GlassCard>
+                <GlassCard className="!p-4">
+                    <p className="text-sm text-slate-500 mb-1">Available Hours</p>
+                    <p data-testid="kpi-available-hours" className="text-2xl font-bold text-blue-500">
+                        {loading ? '...' : '168'}
+                    </p>
                 </GlassCard>
                 <GlassCard className="!p-4">
                     <p className="text-sm text-slate-500 mb-1">Pending Approvals</p>

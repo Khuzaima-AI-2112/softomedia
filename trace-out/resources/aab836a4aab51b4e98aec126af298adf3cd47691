@@ -1,0 +1,219 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - alert [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]: wifi_off
+        - generic [ref=e6]:
+          - strong [ref=e7]: Unable to connect
+          - text: — check your internet connection and try again.
+      - button "Dismiss" [ref=e8] [cursor=pointer]:
+        - generic [ref=e9]: close
+    - generic [ref=e10]:
+      - alert [ref=e11]:
+        - generic [ref=e12]:
+          - generic [ref=e13]: wifi_off
+          - generic [ref=e14]:
+            - strong [ref=e15]: Unable to connect
+            - text: — check your internet connection and try again.
+        - button "Dismiss" [ref=e16] [cursor=pointer]:
+          - generic [ref=e17]: close
+      - banner [ref=e18]:
+        - generic [ref=e19]:
+          - generic [ref=e21]: campaign
+          - heading "AdManager" [level=2] [ref=e22]
+          - generic [ref=e24]:
+            - button "Super Admin View" [ref=e25]:
+              - generic [ref=e26]: shield_person
+              - generic [ref=e27]: Super Admin
+            - button "Admin View" [pressed] [ref=e28]:
+              - generic [ref=e29]: admin_panel_settings
+              - generic [ref=e30]: Admin
+            - button "Brand View" [ref=e31]:
+              - generic [ref=e32]: campaign
+              - generic [ref=e33]: Brand
+            - button "Retailer View" [ref=e34]:
+              - generic [ref=e35]: storefront
+              - generic [ref=e36]: Retailer
+            - button "Tech Op View" [ref=e37]:
+              - generic [ref=e38]: build
+              - generic [ref=e39]: Tech Op
+        - generic [ref=e40]:
+          - generic [ref=e41]:
+            - generic [ref=e42]: ADMIN MODE
+            - generic [ref=e43]: Live Infrastructure
+          - button "User menu" [ref=e45]: A
+      - generic [ref=e46]:
+        - complementary "Main navigation" [ref=e47]:
+          - navigation [ref=e48]:
+            - list [ref=e49]:
+              - listitem [ref=e50]:
+                - link "Overview" [ref=e51] [cursor=pointer]:
+                  - /url: /dashboard/admin
+                  - generic [ref=e52]: dashboard
+                  - text: Overview
+              - listitem [ref=e53]:
+                - link "Retailers" [ref=e54] [cursor=pointer]:
+                  - /url: /dashboard/admin/retailers
+                  - generic [ref=e55]: storefront
+                  - text: Retailers
+              - listitem [ref=e56]:
+                - link "Advertisers" [ref=e57] [cursor=pointer]:
+                  - /url: /dashboard/admin/advertisers
+                  - generic [ref=e58]: campaign
+                  - text: Advertisers
+              - listitem [ref=e59]:
+                - link "Campaigns" [ref=e60] [cursor=pointer]:
+                  - /url: /dashboard/admin/campaigns
+                  - generic [ref=e61]: sell
+                  - text: Campaigns
+              - listitem [ref=e62]:
+                - link "Screens" [ref=e63] [cursor=pointer]:
+                  - /url: /dashboard/admin/screens
+                  - generic [ref=e64]: tv
+                  - text: Screens
+              - listitem [ref=e65]:
+                - link "Loops" [ref=e66] [cursor=pointer]:
+                  - /url: /dashboard/admin/loops
+                  - generic [ref=e67]: subscriptions
+                  - text: Loops
+              - listitem [ref=e68]:
+                - link "Loop Analytics" [ref=e69] [cursor=pointer]:
+                  - /url: /dashboard/admin/loop-analytics
+                  - generic [ref=e70]: analytics
+                  - text: Loop Analytics
+              - listitem [ref=e71]:
+                - link "Users" [ref=e72] [cursor=pointer]:
+                  - /url: /dashboard/admin/users
+                  - generic [ref=e73]: group
+                  - text: Users
+              - listitem [ref=e74]:
+                - link "Business Hours" [ref=e75] [cursor=pointer]:
+                  - /url: /dashboard/admin/hours
+                  - generic [ref=e76]: schedule
+                  - text: Business Hours
+              - listitem [ref=e77]:
+                - link "Pricing" [ref=e78] [cursor=pointer]:
+                  - /url: /dashboard/admin/pricing
+                  - generic [ref=e79]: payments
+                  - text: Pricing
+              - listitem [ref=e80]:
+                - link "Pricing Config" [ref=e81] [cursor=pointer]:
+                  - /url: /dashboard/admin/pricing-config
+                  - generic [ref=e82]: tune
+                  - text: Pricing Config
+              - listitem [ref=e83]:
+                - link "Network Map" [ref=e84] [cursor=pointer]:
+                  - /url: /dashboard/admin/map
+                  - generic [ref=e85]: map
+                  - text: Network Map
+              - listitem [ref=e86]:
+                - link "AI Log" [ref=e87] [cursor=pointer]:
+                  - /url: /dashboard/admin/ai-log
+                  - generic [ref=e88]: smart_toy
+                  - text: AI Log
+        - main [ref=e89]:
+          - generic [ref=e90]:
+            - generic [ref=e91]:
+              - generic [ref=e92]:
+                - heading "Retailer Management" [level=1] [ref=e93]
+                - paragraph [ref=e94]: Manage retail partners and their store networks
+              - generic [ref=e95]:
+                - generic [ref=e96]:
+                  - generic [ref=e97]:
+                    - generic [ref=e98]: search
+                    - textbox "Search retailers..." [ref=e99]
+                  - combobox [ref=e100]:
+                    - option "All statuses" [selected]
+                    - option "Active only"
+                    - option "Inactive only"
+                - generic [ref=e101]:
+                  - button "Deactivate empty" [ref=e102]
+                  - button "add_business Add Retailer" [ref=e103]:
+                    - generic [ref=e104]: add_business
+                    - text: Add Retailer
+            - generic [ref=e105]: Failed to load data. Please refresh.
+            - generic [ref=e106]:
+              - generic [ref=e107]:
+                - paragraph [ref=e108]: Total Retailers
+                - paragraph [ref=e109]: "0"
+                - paragraph [ref=e110]: 0 active
+              - generic [ref=e111]:
+                - paragraph [ref=e112]: Total Stores
+                - paragraph [ref=e113]: "0"
+                - paragraph [ref=e114]: Across all retailers
+              - generic [ref=e115]:
+                - paragraph [ref=e116]: Screens Online
+                - paragraph [ref=e117]: "0"
+                - paragraph [ref=e118]: of 0 total
+              - generic [ref=e119]:
+                - paragraph [ref=e120]: Network Health
+                - paragraph [ref=e121]: 0%
+                - paragraph [ref=e122]: Uptime ratio
+            - generic [ref=e123]:
+              - paragraph [ref=e124]: Showing 0 of 0 retailers
+              - generic [ref=e125]:
+                - generic [ref=e126]: "Sort by:"
+                - button "Name expand_less" [ref=e127]:
+                  - text: Name
+                  - generic [ref=e128]: expand_less
+                - button "Stores unfold_more" [ref=e129]:
+                  - text: Stores
+                  - generic [ref=e130]: unfold_more
+                - button "Screens unfold_more" [ref=e131]:
+                  - text: Screens
+                  - generic [ref=e132]: unfold_more
+                - button "Contract start unfold_more" [ref=e133]:
+                  - text: Contract start
+                  - generic [ref=e134]: unfold_more
+            - table [ref=e138]:
+              - rowgroup [ref=e139]:
+                - row "Retailer Stores Screens Contract Start Status Actions" [ref=e140]:
+                  - columnheader "Retailer" [ref=e141]
+                  - columnheader "Stores" [ref=e142]
+                  - columnheader "Screens" [ref=e143]
+                  - columnheader "Contract Start" [ref=e144]
+                  - columnheader "Status" [ref=e145]
+                  - columnheader "Actions" [ref=e146]
+              - rowgroup [ref=e147]:
+                - row "No retailers match your filters" [ref=e148]:
+                  - cell "No retailers match your filters" [ref=e149]
+            - generic [ref=e151]:
+              - heading "Add New Retailer" [level=2] [ref=e152]
+              - generic [ref=e153]:
+                - generic [ref=e154]:
+                  - generic [ref=e155]:
+                    - generic [ref=e156]: Icon
+                    - combobox [ref=e157]:
+                      - option "🏪" [selected]
+                      - option "🛒"
+                      - option "🥬"
+                      - option "⚡"
+                      - option "🏬"
+                      - option "🛍️"
+                      - option "🏢"
+                      - option "🏭"
+                  - generic [ref=e158]:
+                    - generic [ref=e159]: Company Name
+                    - textbox "Company Name" [ref=e160]:
+                      - /placeholder: Acme Retail Corp
+                      - text: FreshMart Montréal
+                - generic [ref=e161]:
+                  - generic [ref=e162]: Contact Email
+                  - textbox "Contact Email" [ref=e163]:
+                    - /placeholder: admin@retailer.com
+                    - text: demo@freshmart.ca
+                - generic [ref=e164]:
+                  - generic [ref=e165]: Contract Start Date
+                  - textbox "Contract Start Date" [ref=e166]: 2026-06-19
+                - generic [ref=e167]:
+                  - button "Cancel" [disabled] [ref=e168]
+                  - button "progress_activity Create Retailer" [disabled] [ref=e169]:
+                    - generic [ref=e170]: progress_activity
+                    - text: Create Retailer
+  - button "smart_toy Ask Gemini" [ref=e172]:
+    - generic [ref=e173]: smart_toy
+    - generic [ref=e174]: Ask Gemini
+```

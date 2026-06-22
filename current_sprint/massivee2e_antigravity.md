@@ -1,0 +1,82 @@
+# Master E2E Stabilization Plan
+
+**Date:** 2026-06-22
+**Status:** Active Execution Plan
+**Executor:** Antigravity (Agent)
+**Target:** E2E Test Suite (`tests/`), API Integration (`ad-server/src/api`), Frontend UI (`client-app/src`)
+
+## 1. Objective
+Achieve a 100% pass rate on the Playwright E2E validation pipeline (`massivee2e`). Previous iterations of this plan failed because they reacted symptomatically to Playwright timeout errors and assumed UI locators were the sole issue. We have since discovered that the true instability stems from **test data seeding**, **backend schema strictness**, and **idempotency failures** across test runs.
+
+This Master Plan shifts from pure UI fixes to a holistic, full-stack stabilization strategy covering database teardowns, seed injection schemas, and locator dictionary parsing.
+
+## 2. The Four Pillars of Stabilization
+
+### Phase 1: Seed Script Idempotency & Teardown Integrity (Backend)
+*Tests fail dynamically when subsequent test runs encounter dirty database state (e.g., `6 ALREADY_EXISTS`).*
+- **Context:** The E2E tests rely on `00_seed.setup.js` to populate required entities (Retailers, Stores, Screens, Advertisers, Loops) via REST API calls before execution.
+- **The Issue:** 
+  - `00_seed.teardown.js` failed to physically wipe the database because `ad-server` `DELETE` routes (e.g., `retailers`, `advertisers`) implemented `softDelete()`. This left dormant records that blocked subsequent `POST` operations with `ALREADY_EXISTS` conflicts.
+  - The API schemas strictly validate payloads. The original seed script sent mismatched payloads (e.g., missing `user_agent`, using `id` instead of `screen_id` for screens; missing `logo`, `budget`, `industry` for advertisers).
+  - The Loop entity had no explicit `POST /api/loops` route available for injection.
+- **Action / Rule:** 
+  - All `DELETE` routes in the API MUST physically delete the document if requested by the `superadmin` role via `x-demo-role: superadmin`.
+  - The `00_seed.setup.js` payload must PERFECTLY match the `ad-server` schemas.
+  - Run the `ad-server` with `$env:ALLOW_DEMO_MODE="true"` to permit `demo-token` bypass.
+
+### Phase 2: Locator Dictionary Authority (Frontend)
+*Tests fail because the agent previously relied on a stale markdown checklist rather than the executable code.*
+- **Context:** Previously, we relied on `playwright_testids_TRUE_checklist.md`.
+- **Action / Rule:** **Single Source of Truth:** The locator dictionaries (`tests/demo_wizard/*_locators.js`) are the absolute authority. We must parse these dictionaries directly to determine which `data-testid` properties the tests are actively querying, and inject those into the `client-app`.
+
+### Phase 3: Structural Test Alignment (Phase 03 Wizard)
+*Tests must match the actual shape of the application, not its historical shape.*
+- **Context:** `LESSONS_LEARNED.md` confirms `CampaignWizardModal.jsx` was refactored from a multi-step wizard into a single-page scrollable form. However, `03_brand_campaign_wizard.spec.js` still expects the old multi-step flow and looks for `wizard-btn-next`.
+- **Action:** Rewrite `03_brand_campaign_wizard.spec.js` to eliminate multi-step assumptions. The test must fill out the flattened form and submit it in a single continuous flow. *(Note: Phase 03 stabilization is now Complete)*.
+
+### Phase 4: API Schema Alignment (Phase 17 Smoke Tests)
+*Tests cannot bypass security and validation schemas.*
+- **Context:** `LESSONS_LEARNED.md` notes that `17_api_surface_smoke.spec.js` was drafted assuming unprotected GET routes (e.g., `GET /api/impressions`). This triggers the backend's 400 Bad Request guardrails which mandate strict parameters to prevent mass data scraping.
+- **Action:** Rewrite the API smoke tests to respect the actual, hardened backend validation schemas. Pass required query parameters where expected, and use correct HTTP methods (e.g., POST for telemetry/monitoring instead of GET).
+
+## 3. Execution Workflow & Verification
+
+To prevent regressions and ensure stability, all modifications will follow this workflow:
+
+1. **Backend Stabilization (COMPLETED for Phase 03):** Patch `DELETE` routes for physical deletion, align `00_seed.setup.js` payloads, and enforce idempotency.
+2. **Execute Phase 1 (Telemetry):** Parse `*_locators.js`, apply `data-testid` tags to the UI, run `npm run lint` and `npm run build` locally.
+3. **Execute Phase 2 (UI Flow Alignment):** Rewrite necessary specs (e.g., Phase 03).
+4. **Execute Phase 3 (API Schema Alignment):** Rewrite the Phase 17 specs.
+5. **System Verification:** Execute the `/bigtest` master verification workflow to run the entire suite locally and prove 100% green status before pushing.
+
+---
+**Status Update (2026-06-22):**
+Phase 03 (`03_brand_campaign_wizard.spec.js`) has achieved 100% stability. The backend seeding pipeline is green (handling `500 ALREADY_EXISTS` safely and executing physical `DELETE` correctly). 
+
+**`/bigtest` Master Suite Execution Results:**
+*   Total Tests: 88
+*   Passed: 24 (Backend Seed & Phase 03 perfectly stable)
+*   Skipped/Unrun: 50 (Due to serial nature of Playwright suite aborting on failures)
+*   Failed: 14
+
+**Incident Analysis (The Missing Elements):**
+The 14 failures are purely frontend `data-testid` omissions. The fundamental error was a State Synchronization failure. We previously relied on a static markdown document (`playwright_testids_TRUE_checklist.md`) as our source of truth. When the frontend `client-app` evolved, the markdown became stale, leading to injected tags that were deprecated or missing.
+
+**Next Steps (Execution of Phase 2):**
+To guarantee zero omissions moving forward, we are adopting a **Code-as-Authority** model. We will statically parse the `*_locators.js` dictionaries, extract every expected `data-testid`, and inject them directly into the `client-app/src` React components to close the final UI gap.
+
+---
+**Status Update (2026-06-22 Part 2):**
+In tracking down the remaining 14 failures, it became clear the issues were not just frontend `data-testid` omissions. There were test-data state gaps, backend demo bypass omissions, and logic mismatches.
+
+**Key Issues Resolved:**
+- **State Breakage (The Cascade):** Phase 8 (Retailer Campaign Approval) failed because Phase 3's demo bypass in the backend short-circuited entirely and didn't save the demo campaign to the DB. Since it wasn't saved, it wasn't visible in Phase 8, which caused a cascade failure for Phases 9 through 15. The `ad-server` was updated to explicitly write the demo campaign to the `campaignRepository` with a `pending_approval` state.
+- **Backend Auth Requirements (Phase 2):** Phase 2 (Retailer Schedule Override) failed because `ScheduleCalendar.jsx` used a raw `fetch` call that didn't pass the `Authorization` or `x-demo-role` headers, leading to a `401 Unauthorized`. This was patched to pass the necessary demo authentication headers.
+- **Role Hierarchy Misalignment (Phase 5):** The demo fixtures provided `'techop'` for `DEMO_TECHOP.role`, but the backend validation and frontend layout components expected `'techoperator'`. This was aligned.
+
+**Pending Item / Blockers:**
+- **Phase 14 (Ticket System):** The `14_ticket_system.spec.js` test looks for a `[data-testid="btn-create-ticket"]` on the `/dashboard/tickets` page as an Admin. During Sprint 10, `TicketDashboard.jsx` was rewritten and the create ticket button was apparently removed or moved to `RetailerDashboard.jsx`. 
+
+**Next Steps:**
+- Add the `SupportTicketModal` and `btn-create-ticket` logic to `TicketDashboard.jsx` to unblock Phase 14.3.
+- Rerun `/bigtest` to verify 100% test completion.

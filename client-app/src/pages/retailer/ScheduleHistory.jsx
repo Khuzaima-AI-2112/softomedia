@@ -21,7 +21,7 @@ function ScheduleHistory() {
 
     useEffect(() => {
         loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [authedRetailerId]);
 
     const loadData = async () => {
@@ -161,7 +161,7 @@ function ScheduleHistory() {
     </div>;
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div data-testid="schedule-history" className="space-y-8 animate-in fade-in duration-500">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -257,6 +257,7 @@ function ScheduleHistory() {
                             .map((group, idx) => (
                                 <div
                                     key={idx}
+                                    data-testid="schedule-history-row"
                                     className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30"
                                 >
                                     <div className="flex items-center justify-between mb-3">
@@ -328,22 +329,21 @@ function ScheduleHistory() {
                             key={entry.id}
                             className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                         >
-                            <div className={`size-8 rounded-lg flex items-center justify-center ${
-                                entry.action === 'loop_approved'
+                            <div className={`size-8 rounded-lg flex items-center justify-center ${entry.action === 'loop_approved'
                                     ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600'
                                     : entry.action === 'slot_rejected' || entry.action === 'loop_cancelled'
                                         ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-600'
                                         : entry.action === 'slot_overridden' || entry.action === 'slot_edited'
                                             ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600'
                                             : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600'
-                            }`}>
+                                }`}>
                                 <span className="material-symbols-outlined text-lg">
                                     {entry.action === 'loop_approved' ? 'check'
                                         : entry.action === 'slot_rejected' ? 'block'
-                                        : entry.action === 'loop_cancelled' ? 'cancel'
-                                        : entry.action === 'slot_overridden' ? 'edit_off'
-                                        : entry.action === 'slot_edited' ? 'edit'
-                                        : 'add_circle'}
+                                            : entry.action === 'loop_cancelled' ? 'cancel'
+                                                : entry.action === 'slot_overridden' ? 'edit_off'
+                                                    : entry.action === 'slot_edited' ? 'edit'
+                                                        : 'add_circle'}
                                 </span>
                             </div>
                             <div className="flex-1">

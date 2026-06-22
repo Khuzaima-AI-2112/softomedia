@@ -56,7 +56,7 @@ const TicketDashboard = () => {
     }
 
     return (
-        <div className="p-8 max-w-7xl mx-auto">
+        <div data-testid="ticket-dashboard" className="p-8 max-w-7xl mx-auto">
             <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">history</span>
                 Ticket Archives

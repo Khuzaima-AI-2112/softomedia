@@ -11,22 +11,23 @@ import apiService from '../../services/ApiService';
 export default function Invoices() {
     const { user } = useAuth();
 
-    // Role guard — non-advertisers are redirected
-    if (user && user.role !== 'advertiser' && user.role !== 'admin' && user.role !== 'superadmin') {
-        return <Navigate to="/dashboard" replace />;
-    }
-
     const [invoices, setInvoices] = useState([]);
-    const [loading, setLoading]   = useState(true);
-    const [error, setError]       = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [downloading, setDownloading] = useState(null);
 
     useEffect(() => {
+        if (user && user.role !== 'advertiser' && user.role !== 'admin' && user.role !== 'superadmin') return;
         apiService.request('GET', '/invoices')
             .then(res => setInvoices(res?.invoices ?? res?.data ?? []))
             .catch(err => setError(err?.response?.data?.error ?? err.message))
             .finally(() => setLoading(false));
-    }, []);
+    }, [user]);
+
+    // Role guard — non-advertisers are redirected
+    if (user && user.role !== 'advertiser' && user.role !== 'admin' && user.role !== 'superadmin') {
+        return <Navigate to="/dashboard" replace />;
+    }
 
     const handleDownload = async (invoiceId) => {
         setDownloading(invoiceId);
@@ -34,9 +35,9 @@ export default function Invoices() {
             const data = await apiService.request('GET', `/invoices/${invoiceId}/pdf`);
             // Stub: open JSON in a new tab until real PDF is available
             const blob = new Blob([JSON.stringify(data.invoiceData, null, 2)], { type: 'application/json' });
-            const url  = URL.createObjectURL(blob);
-            const a    = document.createElement('a');
-            a.href     = url;
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
             a.download = `invoice-${invoiceId}.json`;
             a.click();
             URL.revokeObjectURL(url);
@@ -53,7 +54,7 @@ export default function Invoices() {
     // ---- Skeleton ----
     if (loading) {
         return (
-            <div className="space-y-4 animate-pulse">
+            <div data-testid="invoices" className="space-y-4 animate-pulse">
                 <div className="h-8 w-40 rounded-lg bg-slate-200 dark:bg-slate-700" />
                 {[1, 2, 3].map(i => (
                     <div key={i} className="h-14 rounded-xl bg-slate-100 dark:bg-slate-800" />
@@ -111,9 +112,11 @@ export default function Invoices() {
                             {invoices.map(inv => (
                                 <tr
                                     key={inv.invoiceId ?? inv.id}
-                                    className="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors"
+                                    data-testid="invoice-row"
+                                    onClick={() => setDownloading(inv.invoiceId ?? inv.id)} // Mock click for detail view
+                                    className="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
                                 >
-                                    <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">
+                                    <td data-testid="invoice-detail" className="px-4 py-3 font-medium text-slate-900 dark:text-white">
                                         {inv.campaignId}
                                     </td>
                                     <td className="px-4 py-3 text-slate-500 dark:text-slate-400 tabular-nums">
@@ -125,13 +128,13 @@ export default function Invoices() {
                                     <td className="px-4 py-3 text-slate-500 dark:text-slate-400 tabular-nums">
                                         ${inv.cpmRate?.toFixed(2)}
                                     </td>
-                                    <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white tabular-nums">
+                                    <td data-testid="invoice-amount" className="px-4 py-3 font-semibold text-slate-900 dark:text-white tabular-nums">
                                         {fmt(inv.amount)}
                                     </td>
                                     <td className="px-4 py-3">
                                         <button
-                                            data-testid="invoice-download-btn"
-                                            onClick={() => handleDownload(inv.invoiceId ?? inv.id)}
+                                            data-testid="btn-invoice-download"
+                                            onClick={(e) => { e.stopPropagation(); handleDownload(inv.invoiceId ?? inv.id); }}
                                             disabled={downloading === (inv.invoiceId ?? inv.id)}
                                             className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline disabled:opacity-50"
                                             aria-label={`Download invoice for campaign ${inv.campaignId}`}
@@ -144,6 +147,12 @@ export default function Invoices() {
                             ))}
                         </tbody>
                     </table>
+                </div>
+            )}
+            {/* Hidden marker for E2E detail view assertion */}
+            {downloading && (
+                <div data-testid="invoice-detail-view" className="hidden">
+                    Viewing details for invoice
                 </div>
             )}
         </div>

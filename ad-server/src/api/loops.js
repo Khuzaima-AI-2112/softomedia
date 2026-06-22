@@ -115,36 +115,6 @@ router.get('/pending/:retailerId', authenticate, requireRole('retaileradmin'), a
 });
 
 /**
- * GET /api/locations/:locationId/loops
- * List all loops for a specific location.
- * Optional query params: date, status
- * Auth: requireRole('retaileradmin')
- *
- * S11-5 — #42 guardrail G2 (route exists) + G3 (requireRole retaileradmin).
- * Returns { loops, count } consistent with other collection endpoints.
- *
- * Ordering: registered before GET /:id (already correct in S11-5).
- */
-router.get('/locations/:locationId/loops', authenticate, requireRole('retaileradmin'), async (req, res) => {
-    try {
-        const { locationId } = req.params;
-        const { date, status } = req.query;
-
-        const where = [['location_id', '==', locationId]];
-        if (date)   where.push(['date',   '==', date]);
-        if (status) where.push(['status', '==', status]);
-
-        const loops = await loopRepository.findAll({ where });
-
-        logger.info('[Loops API] GET /locations/:locationId/loops', { locationId, date, status, count: loops.length });
-        res.json({ loops, count: loops.length });
-    } catch (error) {
-        logger.error('[Loops API] GET /locations/:locationId/loops failed', { locationId: req.params.locationId, error: error.message });
-        res.status(500).json({ error: 'Failed to fetch loops for location' });
-    }
-});
-
-/**
  * GET /api/loops/:id
  * Get single loop with slots. Returns screen_count derived from screen_ids.
  *
@@ -169,6 +139,24 @@ router.get('/:id', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // POST routes — static-segment paths MUST precede /:id wildcard
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/loops
+ * Demo Seed Bypass: allow superadmin to explicitly inject loops with a specific ID.
+ */
+router.post('/', authenticate, requireRole('superadmin'), async (req, res) => {
+    try {
+        const { id, ...loopData } = req.body;
+        const loop = await loopRepository.create(id, loopData);
+        res.status(201).json(loop);
+    } catch (error) {
+        if (error.code === 6 || (error.message && error.message.includes('ALREADY_EXISTS'))) {
+            return res.status(409).json({ error: 'Loop already exists' });
+        }
+        logger.error('[Loops API] POST / failed', { error: error.message });
+        res.status(500).json({ error: 'Failed to create loop' });
+    }
+});
 
 /**
  * POST /api/loops/generate
@@ -221,52 +209,6 @@ router.post('/generate', authenticate, async (req, res) => {
 });
 
 /**
- * POST /api/locations/:locationId/loops/approve-all
- * Bulk-approve all pending_approval loops for a given location.
- * Optionally filtered by date (body: { date? }).
- * Returns { approved: N } where N is the count of newly-approved loops.
- * Auth: requireRole('retaileradmin')
- *
- * Mount note: this router handles both /api/loops/* and /api/locations/* paths.
- * For /api/locations/:locationId/loops/approve-all to resolve, the Express app
- * must either:
- *   (a) mount this router at both /api/loops and /api/locations, OR
- *   (b) register this specific route in a dedicated locations router.
- * Confirm mount point per sprint13.md S13-2 AC-2 before marking story Done.
- *
- * Ordering: registered before POST /:loopId/reject to prevent "locations"
- * being matched as a loopId param.
- *
- * S13-2 AC-2, AC-3
- */
-router.post('/locations/:locationId/loops/approve-all', authenticate, requireRole('retaileradmin'), async (req, res) => {
-    try {
-        const { locationId } = req.params;
-        const { date } = req.body;
-
-        const where = [
-            ['location_id', '==', locationId],
-            ['status', '==', LOOP_STATUS.PENDING_APPROVAL],
-        ];
-        if (date) where.push(['date', '==', date]);
-
-        const pendingLoops = await loopRepository.findAll({ where });
-
-        if (pendingLoops.length === 0) {
-            return res.json({ approved: 0, message: 'No pending loops found for this location' });
-        }
-
-        const userId = req.user?.uid || null;
-        const approvalPromises = pendingLoops.map(loop =>
-            loopRepository.update(loop.id, {
-                status: LOOP_STATUS.APPROVED,
-                approved_at: new Date().toISOString(),
-                approved_by: userId,
-            })
-        );
-        await Promise.all(approvalPromises);
-
-        logger.info('[Loops API] Bulk approve-all', { locationId, date, count: pendingLoops.length, userId });
         res.json({ approved: pendingLoops.length });
     } catch (error) {
         logger.error('[Loops API] POST /locations/:locationId/loops/approve-all failed', { locationId: req.params.locationId, error: error.message });

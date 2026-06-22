@@ -240,7 +240,7 @@ function UserManagement() {
                 ))}
             </div>
 
-            <GlassCard>
+            <GlassCard data-testid="users-list">
                 <DataTable columns={columns} data={filteredUsers} />
             </GlassCard>
 

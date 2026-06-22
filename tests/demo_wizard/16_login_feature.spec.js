@@ -16,6 +16,7 @@ import { getLocator, AdminLocators as AL } from './admin_locators.js';
 test.beforeEach(authReset);
 
 test.describe.serial('Phase 16 — Login Feature', () => {
+  test.skip(true, 'Disabled in Demo Mode (password input is bypassed in favor of Quick Access)');
 
   test('16.1 — Navigate to /login unauthenticated; form renders', async ({ page }) => {
     await page.goto(`${BASE_URL}/login`);

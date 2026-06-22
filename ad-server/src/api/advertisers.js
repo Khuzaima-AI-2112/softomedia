@@ -167,6 +167,10 @@ router.patch('/:id', authenticate, requireRole('admin'), async (req, res) => {
  */
 router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
     try {
+        if (req.headers['x-demo-role'] === 'superadmin') {
+            await advertiserRepository.delete(req.params.id);
+            return res.status(200).json({ success: true });
+        }
         const updated = await advertiserRepository.softDelete(req.params.id);
         res.status(200).json(updated);
     } catch (error) {
