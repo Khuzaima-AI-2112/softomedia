@@ -64,7 +64,7 @@ export default function Invoices() {
     }
 
     return (
-        <div className="space-y-6">
+        <div data-testid="advertiser-invoices" className="space-y-6">
             {/* Header */}
             <div>
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Invoices</h1>

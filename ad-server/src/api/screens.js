@@ -47,6 +47,20 @@ router.post('/register', authenticate, async (req, res) => {
         const screen = await screenRepository.create(screen_id, screenData);
         res.json(screen);
     } catch (error) {
+        if (error.code === 6 || (error.message && error.message.includes('ALREADY_EXISTS'))) {
+            try {
+                const existingScreen = await screenRepository.findById(req.body.screen_id);
+                // Device rebooted — update its last_seen and resolution
+                await screenRepository.update(req.body.screen_id, {
+                    last_seen: new Date().toISOString(),
+                    resolution: req.body.resolution,
+                    status: 'ONLINE'
+                });
+                return res.status(200).json(existingScreen);
+            } catch (findErr) {
+                console.error('Failed to update existing screen during register:', findErr);
+            }
+        }
         if (handleCircuitBreakerError(error, res)) return;
         res.status(500).json({ error: error.message });
     }

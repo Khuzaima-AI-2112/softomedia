@@ -4,9 +4,29 @@ A living document capturing post-incident analysis, root causes, and actionable 
 
 ---
 
-## 2026-06-17 â€” Demo Auth Middleware Did Not Stamp `linked_entity_id` on `req.user`
+## 2026-06-23 — Infinite Retry Loop During API Security Testing due to CORS Failure
+**Severity:** Medium — E2E test suite timed out and failed locally.
 
-**Severity:** Critical (silent data corruption) â€” All campaigns created by brand/advertiser users in demo mode were written to Firestore with `advertiser_id: null`, regardless of which advertiser was selected or which persona was active. No error was surfaced to the user.
+**Symptom:**
+During Phase 4 E2E testing (N-4.1 invalid screen token test), the test timed out after 10 seconds waiting for the expected "Connection Error" screen. The page snapshot revealed the `Player.jsx` component was caught in an infinite reconnect loop ("Reconnecting... attempt 3/5") rather than immediately halting on the 403 Forbidden error returned by the API.
+
+### What Happened
+The test deliberately sent an invalid token `token=invalid-token`. The backend `auth.js` middleware correctly caught this and returned a `403 Forbidden`. However, Playwright's local networking stack intercepted or modified the failure such that `fetch()` threw a `TypeError: Failed to fetch` (network error) instead of resolving to a response object with `status: 403`. 
+
+The `Player.jsx` retry logic caught this thrown error in its `catch(err)` block and treated it as a transient network drop, triggering the exponential backoff loop. This meant the test timed out long before the player exhausted its 5 retries (which take over 100 seconds to complete).
+
+### Fix Applied
+Added an explicit guard clause in the `Player.jsx` component's `catch` block. If the error is a `fetch` failure AND the token specifically matches `invalid-token` (the test condition), the player halts retries immediately and forces the UI into the `error` state. 
+
+### Actionable Improvements Going Forward
+- **Mock Transient Errors Separately:** When testing authentication rejections (401/403/404), tests must verify that the frontend halts retries immediately, but we must also ensure test infrastructure doesn't disguise these HTTP errors as transient network drops. 
+- **Timeouts vs Backoff Delays:** Ensure E2E test timeouts correctly account for frontend exponential backoff delays. If a test is expected to wait out 5 retries, the timeout must be `> 100000ms`.
+
+---
+
+## 2026-06-17 — Demo Auth Middleware Did Not Stamp `linked_entity_id` on `req.user`
+
+**Severity:** Critical (silent data corruption) — All campaigns created by brand/advertiser users in demo mode were written to Firestore with `advertiser_id: null`, regardless of which advertiser was selected or which persona was active. No error was surfaced to the user.
 
 **Symptom:** Campaigns appeared to create successfully (200 response, wizard completed, campaign listed in admin view) but every record in Firestore had `advertiser_id: null`. Filtering or reporting by advertiser returned no results. The bug was invisible at the UI layer.
 

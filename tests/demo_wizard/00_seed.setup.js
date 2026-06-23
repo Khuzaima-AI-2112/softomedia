@@ -51,21 +51,27 @@ function buildDemoSlots() {
     return [
         {
             slotIndex: 0,
-            startTime: currentHourStart,                  // current hour
+            position: 0,
+            startTime: currentHourStart,
             endTime: currentHourStart + 15_000,
             duration: 15,
-            status: 'available',
-            campaign_id: null,
-            creative_url: null,
+            status: 'booked',
+            campaign_id: DEMO_CAMPAIGN_ID,
+            advertiser_id: DEMO_ADVERTISER_ID,
+            creative_url: 'https://cdn.softomedia.demo/bonvie-ad-1.mp4',
+            asset_id: 'bonvie-ad-1',
         },
         {
             slotIndex: 1,
-            startTime: currentHourStart + 30_000,         // 30 s into current hour
-            endTime: currentHourStart + 45_000,
+            position: 1,
+            startTime: currentHourStart + 15_000,
+            endTime: currentHourStart + 30_000,
             duration: 15,
-            status: 'available',
-            campaign_id: null,
-            creative_url: null,
+            status: 'booked',
+            campaign_id: DEMO_CAMPAIGN_ID,
+            advertiser_id: DEMO_ADVERTISER_ID,
+            creative_url: 'https://cdn.softomedia.demo/bonvie-ad-2.mp4',
+            asset_id: 'bonvie-ad-2',
         },
     ];
 }
@@ -222,7 +228,7 @@ async function demoSeedSetup(config) {
                 retailer_id: DEMO_RETAILER_ID,
                 screen_ids: DEMO_SCREEN_IDS,
                 duration: 60,
-                status: 'active',
+                status: 'approved',
                 hour: 12,
                 date: new Date().toISOString().split('T')[0],
                 slots,          // startTime = Date.now() — kills timeout failures

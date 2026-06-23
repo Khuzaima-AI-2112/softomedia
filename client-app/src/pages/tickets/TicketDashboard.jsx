@@ -14,11 +14,13 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { API_URL } from '../../config';
+import SupportTicketModal from '../../components/SupportTicketModal';
 
 const TicketDashboard = () => {
     const [tickets, setTickets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [showModal, setShowModal] = useState(false);
 
     useEffect(() => {
         fetch(`${API_URL}/ghost-api/tickets`)
@@ -57,10 +59,20 @@ const TicketDashboard = () => {
 
     return (
         <div data-testid="ticket-dashboard" className="p-8 max-w-7xl mx-auto">
-            <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">history</span>
-                Ticket Archives
-            </h1>
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="text-2xl font-bold flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary">history</span>
+                    Ticket Archives
+                </h1>
+                <button
+                    data-testid="btn-create-ticket"
+                    onClick={() => setShowModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                >
+                    <span className="material-symbols-outlined text-[18px]">add</span>
+                    Create Ticket
+                </button>
+            </div>
 
             {tickets.length === 0 ? (
                 <div className="text-center py-20 text-slate-400">
@@ -89,6 +101,7 @@ const TicketDashboard = () => {
                     ))}
                 </div>
             )}
+            {showModal && <SupportTicketModal onClose={() => setShowModal(false)} />}
         </div>
     );
 };

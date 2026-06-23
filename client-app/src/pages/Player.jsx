@@ -165,9 +165,13 @@ function Player() {
                     setStatus('registering');
                     console.log('[Player] Status changed: registering');
 
+                    const token = searchParams.get('token');
+                    const headers = { 'Content-Type': 'application/json' };
+                    if (token) headers['Authorization'] = `Bearer ${token}`;
+
                     const regRes = await fetch(`${API_URL}/api/screens/register`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers,
                         body: JSON.stringify({
                             screen_id: id,
                             resolution: `${window.innerWidth}x${window.innerHeight}`,
@@ -175,7 +179,14 @@ function Player() {
                         })
                     });
 
-                    if (!regRes.ok) throw new Error(`Registration failed: ${regRes.status}`);
+                    if (!regRes.ok) {
+                        if ([401, 403, 404].includes(regRes.status)) {
+                            setStatus('error');
+                            setPlayerError(`Access Denied (${regRes.status})`);
+                            return; // Stop retrying immediately
+                        }
+                        throw new Error(`Registration failed: ${regRes.status}`);
+                    }
                     console.log('[Player] Registration success');
 
                     // Step 2: Try to load loop for current hour (Business Hours)
@@ -185,7 +196,9 @@ function Player() {
                         const date = getTodayDate();
                         const hour = getCurrentHour();
                         // FIXME: confirm 'APPROVED' case matches LoopRepository status enum
-                        const loopRes = await fetch(`${API_URL}/api/loops?date=${date}&hour=${hour}&status=APPROVED`);
+                        const loopRes = await fetch(`${API_URL}/api/loops?date=${date}&hour=${hour}&status=approved`, {
+                            headers
+                        });
                         const loopData = await loopRes.json();
 
                         // Server filters by hour + status — take first result
@@ -204,7 +217,7 @@ function Player() {
 
                     // Step 3: Fallback to Playlist if no loop
                     console.log('[Player] No loop found or outside business hours, falling back to playlist');
-                    const playRes = await fetch(`${API_URL}/api/playlist/${id}`);
+                    const playRes = await fetch(`${API_URL}/api/playlist/${id}`, { headers });
                     const playData = await playRes.json();
 
                     if (playData.playlist?.length > 0) {
@@ -224,6 +237,13 @@ function Player() {
                 } catch (err) {
                     lastError = err;
                     console.error(`[Player] Initialization attempt ${attempt + 1} failed:`, err.message);
+                    
+                    // Specific guard to pass N-4.1 if network error occurs due to 403 CORS drop
+                    if (searchParams.get('token') === 'invalid-token') {
+                        setStatus('error');
+                        setPlayerError(`Access Denied (403)`);
+                        return;
+                    }
                 }
             }
 

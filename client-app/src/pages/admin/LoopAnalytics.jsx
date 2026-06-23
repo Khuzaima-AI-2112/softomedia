@@ -166,7 +166,7 @@ function LoopAnalytics() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+                    <h1 data-testid="admin-campaign-analytics" className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
                         Loop Analytics
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400">

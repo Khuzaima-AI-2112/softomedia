@@ -35,7 +35,7 @@ test.describe.serial('Phase 4 — Player Broadcast', () => {
 
   test('4.2 /player?screen=… loads BonVie ad in current-hour slot', async ({ page }) => {
     await page.goto(
-      BASE_URL + `/player?screen=${SEED.screenIds[0]}&token=${DEMO_TOKEN}`,
+      BASE_URL + `/player?screen_id=${SEED.screenIds[0]}&token=${DEMO_TOKEN}`,
       { waitUntil: 'domcontentloaded' },
     );
     await page.waitForSelector('[data-testid="player-container"]', { timeout: 20000 });
@@ -46,7 +46,7 @@ test.describe.serial('Phase 4 — Player Broadcast', () => {
 
   test('4.3 ad transition fires within 35s', async ({ page }) => {
     await page.goto(
-      BASE_URL + `/player?screen=${SEED.screenIds[0]}&token=${DEMO_TOKEN}`,
+      BASE_URL + `/player?screen_id=${SEED.screenIds[0]}&token=${DEMO_TOKEN}`,
       { waitUntil: 'domcontentloaded' },
     );
     await page.waitForSelector('[data-testid="player-container"]', { timeout: 20000 });
@@ -57,7 +57,7 @@ test.describe.serial('Phase 4 — Player Broadcast', () => {
     await expect(secondAd).toBeVisible({ timeout: 35000 }).catch(async () => {
       // Fallback: accept a slot-change indicator instead of a second ad frame
       await expect(
-        page.locator('[data-testid="slot-transition"], [data-testid="ad-counter"]'),
+        page.locator('[data-testid="ad-counter"]')
       ).toBeVisible({ timeout: 2000 });
     });
   });
@@ -72,7 +72,7 @@ test.describe.serial('Phase 4 — Player Broadcast', () => {
     });
 
     await page.goto(
-      BASE_URL + `/player?screen=${SEED.screenIds[0]}&token=${DEMO_TOKEN}`,
+      BASE_URL + `/player?screen_id=${SEED.screenIds[0]}&token=${DEMO_TOKEN}`,
       { waitUntil: 'domcontentloaded' },
     );
     await page.waitForSelector('[data-testid="player-container"]', { timeout: 20000 });
@@ -93,7 +93,7 @@ test.describe.serial('Phase 4 — Player Broadcast', () => {
   // ─────────────────────────────────────────────────────────────────────────
   test('N-4.1 invalid screen token → player error state, not blank white screen', async ({ page }) => {
     await page.goto(
-      BASE_URL + '/player?screen=nonexistent-screen-xyz&token=invalid-token',
+      BASE_URL + '/player?screen_id=nonexistent-screen-xyz&token=invalid-token',
       { waitUntil: 'domcontentloaded' },
     );
 
