@@ -1,32 +1,11 @@
 const { test, expect } = require('@playwright/test');
 
+const { mockScreenRegisterApi, mockLoopsApi } = require('./fixtures/mock-routes.js');
+
 test.fixme('Ad Player transitions images every 5 seconds', async ({ page }) => {
     // SRE Fix: Mock registration and loop for the new Player state machine
-    await page.route('**/api/screens/register', async route => {
-        await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ id: 'test-screen', status: 'ACTIVE' })
-        });
-    });
-
-    await page.route('**/api/loops?date=**', async route => {
-        await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-                loops: [{
-                    hour: 10,
-                    status: 'APPROVED',
-                    slots: Array(12).fill({
-                        asset_id: 'mock-asset',
-                        asset_url: 'https://placehold.co/600x400?text=Mock+Ad',
-                        duration: 5
-                    })
-                }]
-            })
-        });
-    });
+    await mockScreenRegisterApi(page);
+    await mockLoopsApi(page);
 
     // Mock Date to 10 AM
     await page.addInitScript(() => {

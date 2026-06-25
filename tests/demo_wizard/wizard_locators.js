@@ -7,7 +7,8 @@ export const WizardLocators = {
     InputEndDate: 'wizard-input-end-date',
     InputBudget: 'wizard-input-budget',
     InputCreative: 'wizard-input-creative',
-    BtnSubmit: 'wizard-btn-submit'
+    BtnSubmit: 'wizard-btn-submit',
+    Step1: 'wizard-input-name'
 };
 
 export function getLocator(page, testId) {

@@ -14,6 +14,8 @@ jest.unstable_mockModule('../src/services/BusinessHoursService.js', () => ({
     }
 }));
 
+import { createTestApp } from './fixtures/test-app.js';
+
 describe('Schedule API', () => {
     let app;
 
@@ -21,9 +23,7 @@ describe('Schedule API', () => {
         jest.resetModules();
         // Re-import router to ensure mocks are applied
         const routerModule = await import('../src/api/schedules.js');
-        app = express();
-        app.use(express.json());
-        app.use('/api/schedules', routerModule.default);
+        app = createTestApp(routerModule.default, '/api/schedules');
         mockGetEffectiveHours.mockReset();
     });
 

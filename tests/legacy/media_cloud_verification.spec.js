@@ -4,7 +4,7 @@ import path from 'path';
 
 test.describe('Media Lifecycle & Cloud Storage Verification', () => {
 
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ adminPage: page }) => {
         // Fix #3: Ensure Date/Time Mock Applies Early
         await page.addInitScript(() => {
             // Freeze time at 10:00 AM on 2026-01-02
@@ -31,10 +31,10 @@ test.describe('Media Lifecycle & Cloud Storage Verification', () => {
             await route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({
+                body: JSON.stringify( Object.assign({},  {
                     screenId: 'test-screen-123',
                     status: 'registered'
-                })
+                } ) )
             });
         });
 
@@ -91,7 +91,7 @@ test.describe('Media Lifecycle & Cloud Storage Verification', () => {
         expect(assetResponse.status()).toBe(200);
     });
 
-    test('Player transitions from splash to playing state', async ({ page }) => {
+    test('Player transitions from splash to playing state', async ({ adminPage: page }) => {
         const mockAsset = {
             id: 'ast_mock_123',
             url: 'https://storage.googleapis.com/softomedia-live-2026-assets/test-ad.png',
@@ -105,7 +105,7 @@ test.describe('Media Lifecycle & Cloud Storage Verification', () => {
             await route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({
+                body: JSON.stringify( Object.assign({},  {
                     loops: [{
                         id: 'loop_now',
                         hour: 10,
@@ -117,7 +117,7 @@ test.describe('Media Lifecycle & Cloud Storage Verification', () => {
                             url: mockAsset.url
                         }]
                     }]
-                })
+                } ) )
             });
         });
 

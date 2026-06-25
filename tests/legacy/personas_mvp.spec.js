@@ -7,31 +7,33 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Softomedia MVP: Persona Journeys', () => {
 
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ adminPage: page }) => {
         // Mock the upload endpoint for consistent test behavior
         await page.route('**/api/assets/upload', route => {
+            const assetPayload = {
+                id: 'mock-asset-001',
+                filename: 'demo-ad.mp4',
+                duration: 5,
+                status: 'ready'
+            };
             route.fulfill({
                 status: 201,
                 contentType: 'application/json',
-                body: JSON.stringify({
-                    id: 'mock-asset-001',
-                    filename: 'demo-ad.mp4',
-                    duration: 5,
-                    status: 'ready'
-                })
+                body: JSON.stringify(assetPayload)
             });
         });
         // Mock the campaigns endpoint
         await page.route('**/api/campaigns', route => {
             if (route.request().method() === 'POST') {
+                const campaignPayload = {
+                    id: `campaign-${Date.now()}`,
+                    title: 'Test Campaign',
+                    status: 'active'
+                };
                 route.fulfill({
                     status: 201,
                     contentType: 'application/json',
-                    body: JSON.stringify({
-                        id: `campaign-${Date.now()}`,
-                        title: 'Test Campaign',
-                        status: 'active'
-                    })
+                    body: JSON.stringify(campaignPayload)
                 });
             } else {
                 route.continue();
@@ -51,7 +53,7 @@ test.describe('Softomedia MVP: Persona Journeys', () => {
         await page.goto('/dashboard');
     });
 
-    test('Super Admin: Global Governance', async ({ page }) => {
+    test('Super Admin: Global Governance', async ({ adminPage: page }) => {
         // Select Super Admin Persona
         await page.locator('[data-testid="persona-admin"]').click();
         await expect(page).toHaveURL(/.*\/dashboard\/admin/);
@@ -64,7 +66,7 @@ test.describe('Softomedia MVP: Persona Journeys', () => {
         // await expect(page.locator('[data-testid="stat-value-retailers"]')).not.toBeEmpty();
     });
 
-    test.skip('Brand Manager: Campaign Wizard & 5s Rule', async ({ page }) => {
+    test.skip('Brand Manager: Campaign Wizard & 5s Rule', async ({ adminPage: page }) => {
         await page.locator('[data-testid="persona-brand"]').click();
         await page.locator('[data-testid="new-campaign-btn"]').click();
 
@@ -91,7 +93,7 @@ test.describe('Softomedia MVP: Persona Journeys', () => {
         await expect(page.getByText(/visualization/i)).toBeVisible();
     });
 
-    test.skip('Retailer Manager: Ad Review & Loop Validation', async ({ page }) => {
+    test.skip('Retailer Manager: Ad Review & Loop Validation', async ({ adminPage: page }) => {
         await page.locator('[data-testid="persona-retailer"]').click();
 
         // Verify Retailer Command Center visible
@@ -106,7 +108,7 @@ test.describe('Softomedia MVP: Persona Journeys', () => {
         await expect(page.getByText(/schedule manager/i)).toBeVisible();
     });
 
-    test.skip('Tech Operator: Fleet Health Dashboard', async ({ page }) => {
+    test.skip('Tech Operator: Fleet Health Dashboard', async ({ adminPage: page }) => {
         await page.locator('[data-testid="persona-tech"]').click();
         await expect(page.getByText(/technical operations/i)).toBeVisible();
     });

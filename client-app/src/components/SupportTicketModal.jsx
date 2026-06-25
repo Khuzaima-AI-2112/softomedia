@@ -1,12 +1,33 @@
 import { useState } from 'react';
+import { API_URL } from '../config';
 
-function SupportTicketModal({ onClose }) {
+function SupportTicketModal({ onClose, onTicketCreated }) {
     const [step, setStep] = useState('selection');
     const [issueType, setIssueType] = useState('');
+    const [submitting, setSubmitting] = useState(false);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        setStep('success');
+        setSubmitting(true);
+        const subject = e.target.querySelector('[data-testid="ticket-subject-input"]')?.value || 'Support Request';
+        try {
+            // POST to ghost-api tickets endpoint (demo-mode stub, 404s in production gracefully)
+            // eslint-disable-next-line no-restricted-syntax
+            const res = await fetch(`${API_URL.replace('/api', '')}/ghost-api/tickets`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ subject, issueType }),
+            });
+            if (res.ok && onTicketCreated) {
+                const ticket = await res.json();
+                onTicketCreated(ticket);
+            }
+        } catch (_err) {
+            // Non-blocking — modal still shows success screen
+        } finally {
+            setSubmitting(false);
+            setStep('success');
+        }
     };
 
     return (
@@ -53,6 +74,7 @@ function SupportTicketModal({ onClose }) {
                             />
                             <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem' }}>Observation Notes</label>
                             <textarea
+                                data-testid="ticket-notes-input"
                                 required
                                 placeholder="Describe what you see on the screen..."
                                 style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #d1d5db', minHeight: '100px', outline: 'none' }}
@@ -61,7 +83,7 @@ function SupportTicketModal({ onClose }) {
 
                         <div style={{ display: 'flex', gap: '1rem' }}>
                             <button type="button" onClick={() => setStep('selection')} style={{ flex: 1, padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #d1d5db', background: 'white', cursor: 'pointer' }}>Back</button>
-                            <button data-testid="btn-submit-ticket" type="submit" style={{ flex: 1, padding: '0.75rem', borderRadius: '0.5rem', backgroundColor: '#6366f1', color: 'white', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}>Submit Ticket</button>
+                            <button data-testid="btn-submit-ticket" type="submit" disabled={submitting} style={{ flex: 1, padding: '0.75rem', borderRadius: '0.5rem', backgroundColor: '#6366f1', color: 'white', border: 'none', fontWeight: 'bold', cursor: submitting ? 'wait' : 'pointer', opacity: submitting ? 0.7 : 1 }}>{submitting ? 'Submitting…' : 'Submit Ticket'}</button>
                         </div>
                     </form>
                 )}

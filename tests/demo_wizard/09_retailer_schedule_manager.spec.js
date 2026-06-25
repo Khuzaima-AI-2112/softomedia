@@ -28,7 +28,7 @@ test.describe.serial('Phase 9 — Retailer Schedule Manager', () => {
     await loginAs(page, DEMO_RETAILER);
     await page.goto(`${BASE_URL}/dashboard/retailer/schedule-manager`);
     // Post-Phase 8 approval: BonVie slots must be present
-    await expect(page.getByText('BonVie').first()).toBeVisible();
+    await expect(page.getByText('BonVie').filter({ visible: true }).first()).toBeVisible();
     // Must NOT show a 'pending approval' badge on any BonVie slot
     const pendingBadge = getLocator(page, RL.PendingApprovalBadge);
     await expect(pendingBadge).toHaveCount(0);

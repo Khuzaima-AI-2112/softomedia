@@ -11,7 +11,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { authReset, loginAs, DEMO_RETAILER, BASE_URL } from './demo.fixtures.js';
+import { authReset, loginAs, DEMO_RETAILER, BASE_URL, API_BASE_URL } from './demo.fixtures.js';
 import { getLocator, RetailerLocators as RL } from './retailer_locators.js';
 
 test.beforeEach(authReset);
@@ -62,7 +62,7 @@ test.describe.serial('Phase 8 - Retailer Campaign Approval Gate', () => {
     expect(capturedHeaders['x-demo-role']).toBe('retaileradmin');
 
     // Status changes in UI without reload
-    await expect(page.locator('[data-testid="campaign-status"]')).toContainText('Approved');
+    await expect(page.locator('[data-testid="campaign-row-demo-campaign-001"] [data-testid="campaign-status"]')).toContainText('approved');
   });
 
   test('8.4 - Hard-refresh: approval persists, not in pending queue', async ({ page }) => {
@@ -96,18 +96,19 @@ test.describe.serial('Phase 8 - Retailer Campaign Approval Gate', () => {
     ]);
 
     expect(rejectResponse.status()).toBe(200);
-    await expect(page.locator('[data-testid="campaign-status"]')).toContainText('Rejected');
+    await expect(page.locator('[data-testid="campaign-row-demo-campaign-001"] [data-testid="campaign-status"]')).toContainText('rejected');
   });
 
 });
 
 // Restore demo-campaign-001 to 'approved' before Phase 9 runs
 test.afterAll(async ({ request }) => {
-  await request.patch(`${BASE_URL}/api/campaigns/demo-campaign-001/status`, {
+  const response = await request.patch(`${API_BASE_URL}/api/campaigns/demo-campaign-001/status`, {
     headers: {
       'Authorization': 'Bearer demo-token',
       'x-demo-role': 'admin',
     },
     data: { status: 'approved' },
   });
+  expect(response.status()).toBe(200);
 });

@@ -216,7 +216,7 @@ test.describe.serial('Phase 1 — Admin Provision', () => {
     await assertHeader();
 
     await expect(
-      page.locator('[data-testid="advertisers-list"]').getByText('BonVie Snacks'),
+      page.locator('[data-testid="advertisers-list"]').getByText('BonVie Snacks').first(),
     ).toBeVisible({ timeout: 10000 });
   });
 
@@ -299,7 +299,7 @@ test.describe.serial('Phase 1 — Admin Provision', () => {
       await assertHeader();
 
       await expect(
-        page.locator('[data-testid="users-list"]').getByText(user.email),
+        page.locator('[data-testid="users-list"]').getByText(user.email).first(),
       ).toBeVisible({ timeout: 10000 });
     }
   });

@@ -135,10 +135,10 @@ describe('PricingRepository', () => {
             expect(result.baseCPM).toBe(25.00);
 
             // Verify update was called
-            expect(mockDocUpdate).toHaveBeenCalled();
+            expect(mockDocSet).toHaveBeenCalled();
 
             // Verify the data passed to update uses camelCase
-            const updateCall = mockDocUpdate.mock.calls[0][0];
+            const updateCall = mockDocSet.mock.calls[0][0];
             expect(updateCall.baseCPM).toBe(25.00);
             expect(updateCall.base_cpm).toBeUndefined();
         });
@@ -155,8 +155,8 @@ describe('PricingRepository', () => {
             await repo.updateConfig({ baseCPM: 20.00 }, true);
 
             // Verify update was called with empty retailerOverrides
-            expect(mockDocUpdate).toHaveBeenCalled();
-            const updateCall = mockDocUpdate.mock.calls[0][0];
+            expect(mockDocSet).toHaveBeenCalled();
+            const updateCall = mockDocSet.mock.calls[0][0];
             expect(updateCall.retailerOverrides).toEqual({});
         });
 
@@ -172,7 +172,7 @@ describe('PricingRepository', () => {
             await repo.updateConfig({ currency: 'EUR' });
 
             // Verify retailerOverrides preserved
-            const updateCall = mockDocUpdate.mock.calls[0][0];
+            const updateCall = mockDocSet.mock.calls[0][0];
             expect(updateCall.retailerOverrides).toEqual({ 'retailer_1': { baseCPM: 18.00 } });
         });
 
@@ -186,7 +186,7 @@ describe('PricingRepository', () => {
             // Update baseCPM but with clearOverrides=false
             await repo.updateConfig({ baseCPM: 20.00 }, false);
 
-            const updateCall = mockDocUpdate.mock.calls[0][0];
+            const updateCall = mockDocSet.mock.calls[0][0];
             expect(updateCall.retailerOverrides).toEqual({ 'retailer_1': { baseCPM: 18.00 } });
         });
     });

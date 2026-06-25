@@ -2,6 +2,7 @@ import express from 'express';
 import { userRepository } from '../repositories/index.js';
 import logger from '../utils/logger.js';
 import { requireSuperAdmin } from '../middleware/requireRole.js';
+import { ROLES } from '../constants/roles.js';
 
 const router = express.Router();
 
@@ -50,12 +51,12 @@ router.post('/', async (req, res) => {
             }
         }
 
-        const allowedRoles = ['superadmin', 'contentmanager', 'techoperator', 'retaileradmin', 'advertiser'];
+        const allowedRoles = [ROLES.SUPERADMIN, ROLES.CONTENTMANAGER, ROLES.TECHOPERATOR, ROLES.RETAILERADMIN, ROLES.ADVERTISER];
         if (!role || typeof role !== 'string' || !allowedRoles.includes(role)) {
             errors.push(`Role is required and must be one of: ${allowedRoles.join(', ')}`);
         }
 
-        if (role === 'advertiser' || role === 'retaileradmin') {
+        if (role === ROLES.ADVERTISER || role === ROLES.RETAILERADMIN) {
             if (!linkedentityid || typeof linkedentityid !== 'string') {
                 errors.push('Linked entity ID is required when role is advertiser or retaileradmin');
             }
@@ -113,7 +114,7 @@ router.put('/:id', async (req, res) => {
             }
         }
 
-        const allowedRoles = ['superadmin', 'contentmanager', 'techoperator', 'retaileradmin', 'advertiser'];
+        const allowedRoles = [ROLES.SUPERADMIN, ROLES.CONTENTMANAGER, ROLES.TECHOPERATOR, ROLES.RETAILERADMIN, ROLES.ADVERTISER];
         if (role !== undefined && !allowedRoles.includes(role)) {
             errors.push(`Role must be one of: ${allowedRoles.join(', ')}`);
         }
@@ -156,7 +157,7 @@ router.patch('/:id', async (req, res) => {
 
         const { name, email, role, linkedentityid, status } = req.body;
         const errors = [];
-        const allowedRoles    = ['superadmin', 'contentmanager', 'techoperator', 'retaileradmin', 'advertiser'];
+        const allowedRoles    = [ROLES.SUPERADMIN, ROLES.CONTENTMANAGER, ROLES.TECHOPERATOR, ROLES.RETAILERADMIN, ROLES.ADVERTISER];
         const allowedStatuses = ['active', 'inactive'];
 
         if (name     !== undefined && (typeof name !== 'string' || name.trim().length < 1)) errors.push('Name must be a non-empty string');

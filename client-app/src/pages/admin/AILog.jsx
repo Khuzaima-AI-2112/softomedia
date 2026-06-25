@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import GlassCard from '../../components/GlassCard';
 import AILogAnalytics from '../../components/AILogAnalytics';
-import { API_URL } from '../../config';
+import apiClient from '../../services/api';
 import useGeminiStore from '../../stores/GeminiStore';
 
 const PERSONAS = [
@@ -68,10 +68,7 @@ function AILog() {
             if (filters.maxRating) params.append('maxRating', filters.maxRating);
             if (filters.persona !== 'all') params.append('persona', filters.persona);
 
-            const response = await fetch(`${API_URL}/ghost-api/admin/logs?${params}`);
-            if (!response.ok) throw new Error('Failed to fetch logs');
-
-            const data = await response.json();
+            const data = await apiClient.get(`/ghost-api/admin/logs?${params}`);
             setLogs(data.logs);
             setTotals(data.totals);
             setPagination(prev => ({ ...prev, ...data.pagination }));
@@ -90,10 +87,7 @@ function AILog() {
         }
 
         try {
-            const response = await fetch(`${API_URL}/ghost-api/tickets/${logId}`);
-            if (!response.ok) throw new Error('Failed to fetch details');
-
-            const data = await response.json();
+            const data = await apiClient.get(`/ghost-api/tickets/${logId}`);
             setExpandedLog(logId);
             setExpandedDetails(data);
         } catch (error) {

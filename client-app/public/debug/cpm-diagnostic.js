@@ -27,6 +27,7 @@ async function diagnoseCPMPricing() {
     // 2. Check backend data
     console.log('\n2. Backend Data:');
     try {
+        // eslint-disable-next-line no-restricted-syntax
         const response = await fetch('/api/pricing/config');
         if (!response.ok) {
             console.error('   ❌ API Error:', response.status, response.statusText);

@@ -75,7 +75,17 @@ export class CircuitBreaker {
             this.onSuccess();
             return result;
         } catch (error) {
-            this.onFailure(error);
+            // Do not count expected database errors (e.g. ALREADY_EXISTS or NOT_FOUND) as circuit failures
+            const isExpectedDbError = error.code === 6 || 
+                                     error.code === 5 ||
+                                     (error.message && (
+                                         error.message.includes('ALREADY_EXISTS') || 
+                                         error.message.includes('NOT_FOUND') ||
+                                         error.message.includes('already exists')
+                                     ));
+            if (!isExpectedDbError) {
+                this.onFailure(error);
+            }
             throw error;
         }
     }

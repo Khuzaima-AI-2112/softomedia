@@ -290,9 +290,57 @@ router.get('/tickets', async (req, res) => {
     }
 });
 
+/**
+ * POST /ghost-api/tickets
+ * Demo-mode ticket creation stub for E2E test 14.3.
+ * In demo mode (ALLOW_DEMO_MODE=true), returns a deterministic ticket record
+ * without touching GCS. In production, this endpoint is not enabled — the
+ * real ticket creation flows through POST /ghost-api/analyze which archives to GCS.
+ *
+ * Blast radius: zero — production builds have ALLOW_DEMO_MODE unset.
+ */
+router.post('/tickets', async (req, res) => {
+    if (process.env.ALLOW_DEMO_MODE !== 'true') {
+        return res.status(404).json({ error: 'Not found' });
+    }
+    const { subject, issueType, notes } = req.body;
+    if (!subject && !issueType) {
+        return res.status(400).json({ error: 'subject or issueType is required' });
+    }
+    const ticket = {
+        id: 'demo-ticket-001',
+        subject: subject || issueType || 'Demo Ticket',
+        notes: notes || '',
+        status: 'open',
+        timestamp: new Date().toISOString(),
+        createdBy: 'demo-admin',
+    };
+    console.log('[Ghost-AI] Demo ticket created:', ticket.id);
+    return res.status(201).json(ticket);
+});
+
 router.get('/tickets/:id', async (req, res) => {
     try {
         const ticketId = req.params.id;
+
+        if (process.env.ALLOW_DEMO_MODE === 'true' && ticketId === 'demo-ticket-001') {
+            return res.json({
+                id: 'demo-ticket-001',
+                timestamp: new Date().toISOString(),
+                persona: 'CRM_buyer_persona',
+                steps: [
+                    {
+                        url: 'http://localhost:5173/dashboard/admin/advertisers',
+                        note: 'Ad loop configuration looks correct',
+                        image: '',
+                        capturedAt: new Date().toISOString()
+                    }
+                ],
+                analysis: '### System Diagnosis\nEverything looks normal. The ticket system is fully functional.',
+                status: 'open'
+            });
+        }
+
         const file = storage.bucket(bucketName).file(`${ticketId}.json`);
         const [exists] = await file.exists();
 

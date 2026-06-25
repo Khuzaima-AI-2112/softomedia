@@ -6,59 +6,21 @@
 
 const { test, expect } = require('./base.fixtures');
 
+const { mockLoopsApi, mockAnalyticsApi } = require('./fixtures/mock-routes.js');
+
 test.describe('Loop Analytics - Sprint 5', () => {
     test.beforeEach(async ({ page }) => {
-        // Mock loops endpoint for analytics
-        await page.route('**/api/loops**', route => {
-            const date = new Date().toISOString().split('T')[0];
-            const loops = [];
-            for (let hour = 8; hour < 22; hour++) {
-                loops.push({
-                    id: `${date}_${hour}_loc_downtown`,
-                    date,
-                    hour,
-                    status: 'APPROVED',
-                    slots: Array.from({ length: 12 }, (_, i) => ({
-                        position: i,
-                        asset_id: `asset_${i}`,
-                        duration: 5,
-                        status: 'APPROVED'
-                    }))
-                });
-            }
-
-            route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify({ loops, business_hours: { start: 8, end: 22 } })
-            });
-        });
-
-        // Mock analytics endpoint (future implementation)
-        await page.route('**/api/analytics/loops**', route => {
-            route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify({
-                    summary: {
-                        totalLoops: 154,
-                        avgIntegrityScore: 98.2,
-                        fullDeliveryCount: 12,
-                        partialCount: 2
-                    },
-                    hourly: []
-                })
-            });
-        });
+        await mockLoopsApi(page);
+        await mockAnalyticsApi(page);
     });
 
-    test('Admin can navigate to Loop Analytics', async ({ page }) => {
+    test('Admin can navigate to Loop Analytics', async ({ adminPage: page }) => {
         await page.goto('/dashboard/admin/analytics');
         await expect(page.getByText('Loop Analytics')).toBeVisible();
         await expect(page.getByText('Playlist integrity')).toBeVisible();
     });
 
-    test('Analytics shows summary stats', async ({ page }) => {
+    test('Analytics shows summary stats', async ({ adminPage: page }) => {
         await page.goto('/dashboard/admin/analytics');
 
         // Check for stat cards
@@ -68,7 +30,7 @@ test.describe('Loop Analytics - Sprint 5', () => {
         await expect(page.locator('[data-testid="partial-delivery-count"]')).toBeVisible();
     });
 
-    test('Analytics shows hourly chart', async ({ page }) => {
+    test('Analytics shows hourly chart', async ({ adminPage: page }) => {
         await page.goto('/dashboard/admin/analytics');
 
         await expect(page.locator('[data-testid="hourly-chart"]')).toBeVisible();
@@ -78,7 +40,7 @@ test.describe('Loop Analytics - Sprint 5', () => {
         await expect(page.locator('[data-testid="analytics-hour-14"]')).toBeVisible();
     });
 
-    test('Admin can click hour to see slot details', async ({ page }) => {
+    test('Admin can click hour to see slot details', async ({ adminPage: page }) => {
         await page.goto('/dashboard/admin/analytics');
 
         // Click on 2pm slot
@@ -89,13 +51,13 @@ test.describe('Loop Analytics - Sprint 5', () => {
         await expect(page.locator('[data-testid="slot-detail-0"]')).toBeVisible();
     });
 
-    test('Analytics has date picker', async ({ page }) => {
+    test('Analytics has date picker', async ({ adminPage: page }) => {
         await page.goto('/dashboard/admin/analytics');
 
         await expect(page.locator('[data-testid="analytics-date-picker"]')).toBeVisible();
     });
 
-    test('Analytics shows delivery rate colors', async ({ page }) => {
+    test('Analytics shows delivery rate colors', async ({ adminPage: page }) => {
         await page.goto('/dashboard/admin/analytics');
 
         // Legend should be visible

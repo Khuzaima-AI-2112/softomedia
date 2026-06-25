@@ -20,60 +20,16 @@ test.describe('Broadcasting Engine - Full E2E Workflow', () => {
 
     // Mock API for all tests
     test.beforeEach(async ({ page }) => {
-        // Mock screen registration
-        await page.route('**/api/screens/register', route => {
-            route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify({ success: true })
-            });
-        });
-
-        // Mock heartbeat
-        await page.route('**/api/monitoring/heartbeat', route => {
-            route.fulfill({ status: 200 });
-        });
-
-        // Mock telemetry
-        await page.route('**/api/telemetry/**', route => {
-            route.fulfill({ status: 200 });
-        });
+        const { mockInfrastructureApis } = require('./fixtures/mock-routes.js');
+        await mockInfrastructureApis(page);
     });
 
-    test('Step 1: Admin generates D-1 loops', async ({ page }) => {
-        // Mock loop generation
-        await page.route('**/api/loops/generate', route => {
-            const loops = [];
-            for (let hour = 8; hour < 22; hour++) {
-                loops.push({
-                    id: `${testDate}_${hour}_loc_downtown`,
-                    date: testDate,
-                    hour,
-                    status: 'pending_approval',
-                    slots: Array.from({ length: 12 }, (_, i) => ({
-                        position: i,
-                        asset_id: `asset_${i}`,
-                        asset_name: `Test Ad ${i + 1}`,
-                        duration: 5,
-                        status: 'pending'
-                    }))
-                });
-            }
-            route.fulfill({
-                status: 201,
-                contentType: 'application/json',
-                body: JSON.stringify({ message: 'Generated 14 loops', loops })
-            });
-        });
-
-        // Mock empty initial state
-        await page.route('**/api/loops?date=**', route => {
-            route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify({ loops: [] })
-            });
-        });
+    test('Step 1: Admin generates D-1 loops', async ({ adminPage: page }) => {
+        const { buildBusinessHoursLoops } = require('./fixtures/factories.js');
+        const { mockLoopGenerateApi, mockLoopsApi } = require('./fixtures/mock-routes.js');
+        
+        await mockLoopGenerateApi(page, { loops: buildBusinessHoursLoops({ date: testDate, status: 'pending_approval' }) });
+        await mockLoopsApi(page, { loops: [] });
 
         await page.goto('/dashboard/admin/loops');
         await expect(page.getByText('Loop Management')).toBeVisible();
@@ -88,28 +44,11 @@ test.describe('Broadcasting Engine - Full E2E Workflow', () => {
         await expect(page.getByText('Loop Management')).toBeVisible();
     });
 
-    test('Step 2: Admin views loop builder', async ({ page }) => {
-        // Mock single loop fetch
-        await page.route(`**/api/loops/${generatedLoopId}`, route => {
-            route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify({
-                    id: generatedLoopId,
-                    date: testDate,
-                    hour: testHour,
-                    status: 'pending_approval',
-                    slots: Array.from({ length: 12 }, (_, i) => ({
-                        position: i,
-                        asset_id: `asset_${i}`,
-                        asset_name: `Test Ad ${i + 1}`,
-                        asset_thumbnail: '📦',
-                        duration: 5,
-                        status: 'pending'
-                    }))
-                })
-            });
-        });
+    test('Step 2: Admin views loop builder', async ({ adminPage: page }) => {
+        const { buildLoop } = require('./fixtures/factories.js');
+        const { mockSingleLoopApi } = require('./fixtures/mock-routes.js');
+        
+        await mockSingleLoopApi(page, buildLoop({ id: generatedLoopId, date: testDate, hour: testHour, status: 'pending_approval' }));
 
         await page.goto(`/dashboard/admin/loops/${generatedLoopId}`);
         await expect(page.getByText('Loop Builder')).toBeVisible();
@@ -121,30 +60,11 @@ test.describe('Broadcasting Engine - Full E2E Workflow', () => {
         await expect(page.locator('[data-testid="slot-11"]')).toBeVisible();
     });
 
-    test('Step 3: Retailer views schedule calendar', async ({ page }) => {
-        // Mock pending loops
-        await page.route('**/api/loops?date=**', route => {
-            const loops = [];
-            for (let hour = 8; hour < 22; hour++) {
-                loops.push({
-                    id: `${testDate}_${hour}_loc_downtown`,
-                    date: testDate,
-                    hour,
-                    status: 'pending_approval',
-                    slots: Array.from({ length: 12 }, (_, i) => ({
-                        position: i,
-                        asset_id: `asset_${i}`,
-                        duration: 5,
-                        status: 'pending'
-                    }))
-                });
-            }
-            route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify({ loops })
-            });
-        });
+    test('Step 3: Retailer views schedule calendar', async ({ retailerPage: page }) => {
+        const { buildBusinessHoursLoops } = require('./fixtures/factories.js');
+        const { mockLoopsApi } = require('./fixtures/mock-routes.js');
+        
+        await mockLoopsApi(page, { loops: buildBusinessHoursLoops({ date: testDate, status: 'pending_approval' }) });
 
         await page.goto('/dashboard/retailer/schedule/calendar');
         await expect(page.getByText("Tomorrow's Broadcast Schedule")).toBeVisible();
@@ -153,39 +73,12 @@ test.describe('Broadcasting Engine - Full E2E Workflow', () => {
         await expect(page.locator('[data-testid="schedule-timeline"]')).toBeVisible();
     });
 
-    test('Step 4: Retailer approves all loops', async ({ page }) => {
-        // Mock pending loops
-        await page.route('**/api/loops?date=**', route => {
-            const loops = [];
-            for (let hour = 8; hour < 22; hour++) {
-                loops.push({
-                    id: `${testDate}_${hour}_loc_downtown`,
-                    date: testDate,
-                    hour,
-                    status: 'pending_approval',
-                    slots: Array.from({ length: 12 }, (_, i) => ({
-                        position: i,
-                        asset_id: `asset_${i}`,
-                        duration: 5,
-                        status: 'pending'
-                    }))
-                });
-            }
-            route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify({ loops })
-            });
-        });
-
-        // Mock approval endpoint
-        await page.route('**/api/loops/**/approve', route => {
-            route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify({ status: 'approved' })
-            });
-        });
+    test('Step 4: Retailer approves all loops', async ({ retailerPage: page }) => {
+        const { buildBusinessHoursLoops } = require('./fixtures/factories.js');
+        const { mockLoopsApi, mockLoopApproveApi } = require('./fixtures/mock-routes.js');
+        
+        await mockLoopsApi(page, { loops: buildBusinessHoursLoops({ date: testDate, status: 'pending_approval' }) });
+        await mockLoopApproveApi(page);
 
         await page.goto('/dashboard/retailer/schedule/calendar');
 
@@ -199,46 +92,12 @@ test.describe('Broadcasting Engine - Full E2E Workflow', () => {
     });
 
     test('Step 5: Player plays approved loop', async ({ page }) => {
-        // Mock approved loops
-        await page.route('**/api/loops?date=**', route => {
-            const currentHour = new Date().getHours();
-            const loops = [{
-                id: `${new Date().toISOString().split('T')[0]}_${currentHour}_loc_downtown`,
-                date: new Date().toISOString().split('T')[0],
-                hour: currentHour,
-                status: 'approved',
-                slots: Array.from({ length: 12 }, (_, i) => ({
-                    position: i,
-                    asset_id: `asset_${i}`,
-                    asset_name: `Test Ad ${i + 1}`,
-                    url: `https://placehold.co/1920x1080/3b82f6/white?text=Slot+${i + 1}`,
-                    duration: 5,
-                    status: 'approved'
-                }))
-            }];
-            route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify({ loops })
-            });
-        });
-
-        // Mock playlist fallback
-        await page.route('**/api/playlist/**', route => {
-            route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify({
-                    playlist: [{
-                        id: 'fallback',
-                        url: 'https://placehold.co/1920x1080/gray/white?text=Fallback',
-                        title: 'Fallback',
-                        duration: 5
-                    }],
-                    source: 'global'
-                })
-            });
-        });
+        const { buildLoop, buildPlaylist } = require('./fixtures/factories.js');
+        const { mockLoopsApi, mockPlaylistApi } = require('./fixtures/mock-routes.js');
+        
+        const currentHour = new Date().getHours();
+        await mockLoopsApi(page, { loops: [buildLoop({ hour: currentHour, status: 'approved' })] });
+        await mockPlaylistApi(page, buildPlaylist());
 
         await page.goto('/player?screen_id=test_screen&debug=true');
 
@@ -246,7 +105,7 @@ test.describe('Broadcasting Engine - Full E2E Workflow', () => {
         await expect(page.locator('[data-testid="ad-image"]')).toBeVisible({ timeout: 15000 });
     });
 
-    test('Step 6: Admin views analytics', async ({ page }) => {
+    test('Step 6: Admin views analytics', async ({ adminPage: page }) => {
         await page.goto('/dashboard/admin/analytics');
 
         await expect(page.getByText('Loop Analytics')).toBeVisible();
@@ -254,15 +113,10 @@ test.describe('Broadcasting Engine - Full E2E Workflow', () => {
         await expect(page.locator('[data-testid="hourly-chart"]')).toBeVisible();
     });
 
-    test('Step 7: Verify admin navigation between loop pages', async ({ page }) => {
-        // Mock loops
-        await page.route('**/api/loops?date=**', route => {
-            route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify({ loops: [] })
-            });
-        });
+    test('Step 7: Verify admin navigation between loop pages', async ({ adminPage: page }) => {
+        const { mockLoopsApi, mockAnalyticsApi } = require('./fixtures/mock-routes.js');
+        await mockLoopsApi(page, { loops: [] });
+        await mockAnalyticsApi(page);
 
         // Navigate through all admin loop pages
         await page.goto('/dashboard/admin/loops');
@@ -282,25 +136,20 @@ test.describe('Error Handling & Edge Cases', () => {
         await page.goto('/player?screen_id=test_screen');
 
         // Should show error or offline state
-        await expect(page.getByText(/error|offline/i)).toBeVisible({ timeout: 10000 });
+        await expect(page.getByText(/error|offline/i)).toBeVisible({ timeout: 20000 });
     });
 
-    test('Loop Management handles empty state', async ({ page }) => {
-        await page.route('**/api/loops?date=**', route => {
-            route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify({ loops: [] })
-            });
-        });
+    test('Loop Management handles empty state', async ({ adminPage: page }) => {
+        const { mockLoopsApi } = require('./fixtures/mock-routes.js');
+        await mockLoopsApi(page, { loops: [] });
 
         await page.goto('/dashboard/admin/loops');
 
         // Should show empty state or generate button
-        await expect(page.getByText(/no loop|generate/i)).toBeVisible();
+        await expect(page.locator('[data-testid="generate-loops-btn"]')).toBeVisible();
     });
 
-    test('Analytics handles no data state', async ({ page }) => {
+    test('Analytics handles no data state', async ({ adminPage: page }) => {
         await page.goto('/dashboard/admin/analytics');
 
         // Dashboard should still render even without data

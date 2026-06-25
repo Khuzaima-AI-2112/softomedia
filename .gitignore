@@ -16,3 +16,10 @@ test-results/
 
 *.log
 .gemini
+ad-server/coverage/
+ad-server/assets/
+coverage/
+test-logs/
+screenshots/
+trace-out/
+tests/.auth/

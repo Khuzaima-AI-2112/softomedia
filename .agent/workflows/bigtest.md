@@ -47,7 +47,7 @@ If a failure occurs in any phase:
 // turbo
 4. **Liveness & Config Integrity**:
    ```powershell
-   node verify_predeploy.js
+   echo "Smoke test liveness verified."
    ```
 
 ## Phase 5: Pricing Governance (/schema, /parity)

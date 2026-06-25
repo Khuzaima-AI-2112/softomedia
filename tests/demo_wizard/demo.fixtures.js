@@ -1,5 +1,5 @@
 /**
- * demo.fixtures.js — Single source of truth for all demo_wizard spec files.
+ * demo.fixtures.js — Shared test utilities for all demo_wizard spec files.
  *
  * USAGE IN EVERY SPEC FILE:
  *   import { DEMO_ADMIN, DEMO_RETAILER, DEMO_BRAND, DEMO_ADVERTISER,
@@ -12,126 +12,38 @@
  * See massivee2e.md → "Demo Auth State" for the rationale (demo_role / active_persona
  * conflict, PR #46).
  *
+ * REFACTORED (2026-06-25):
+ *   Persona constants, environment config, and SEED IDs are now imported from
+ *   tests/fixtures/personas.js (single source of truth). This file re-exports
+ *   them for backward compatibility — existing spec imports remain unchanged.
+ *
  * AUDIT: 2026-06-17 — 3 critical + 2 stability issues patched (see previous commit).
  * PATCH: 2026-06-17 — SEED constants aligned with 00_seed.setup.js actual written IDs.
- *   All 5 ID mismatches corrected; storeIds export added; API_BASE_URL default fixed.
  */
 
 import { expect } from '@playwright/test';
 
 // ---------------------------------------------------------------------------
-// Environment
+// Re-export persona constants, env config, and SEED IDs from the unified
+// personas module. All spec files that import from demo.fixtures.js continue
+// to work without changes.
 // ---------------------------------------------------------------------------
 
-export const BASE_URL = process.env.BASE_URL || 'http://localhost:5173';
-export const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8080';
+export {
+  BASE_URL,
+  API_BASE_URL,
+  DEMO_TOKEN,
+  DEMO_SUPERADMIN,
+  DEMO_ADMIN,
+  DEMO_RETAILER,
+  DEMO_BRAND,
+  DEMO_ADVERTISER,
+  DEMO_TECHOP,
+  SEED,
+} from '../fixtures/personas.js';
 
-/**
- * DEMO_TOKEN is the single token constant used everywhere in this file.
- * Previously, loginAs() had a hardcoded 'demo-token' string that diverged
- * from this constant when DEMO_TOKEN env var was set. Now fixed.
- */
-export const DEMO_TOKEN = process.env.DEMO_TOKEN || 'demo-token';
-
-// ---------------------------------------------------------------------------
-// Persona constants
-// Each persona maps to the x-demo-role header value and the localStorage key
-// written by the DemoLogin component.
-// ---------------------------------------------------------------------------
-
-export const DEMO_SUPERADMIN = {
-  id: 'demo-superadmin-uid',
-  role: 'superadmin',
-  email: 'superadmin@softomedia.demo',
-  displayName: 'Demo Super Admin',
-};
-
-export const DEMO_ADMIN = {
-  id: 'demo-admin-uid',
-  role: 'admin',            // x-demo-role header value
-  email: 'admin@softomedia.demo',
-  displayName: 'Demo Admin',
-  firestoreId: 'demo-admin',
-};
-
-export const DEMO_RETAILER = {
-  id: 'demo-retailer-uid',
-  role: 'retaileradmin',    // x-demo-role header value
-  email: 'retailer@softomedia.demo',
-  displayName: 'Demo Retailer',
-  firestoreId: 'demo-retailer-freshmart',
-  retailerId: 'demo-retailer-freshmart', // FIX: was 'demo-freshmart'
-};
-
-/**
- * INTENTIONAL: DEMO_BRAND and DEMO_ADVERTISER share advertiserId.
- * They represent the same company (BonVie Snacks) with different system access roles.
- * Do NOT change one without the other — cross-persona assertions in Phases 11–13
- * depend on this alignment.
- */
-export const DEMO_BRAND = {
-  id: 'demo-brand-uid',
-  role: 'brand',            // x-demo-role header value
-  email: 'brand@softomedia.demo',
-  displayName: 'Demo Brand',
-  firestoreId: 'demo-brand',
-  advertiserId: 'demo-advertiser-bonvie', // FIX: was 'demo-bonvie'
-};
-
-export const DEMO_ADVERTISER = {
-  id: 'demo-advertiser-uid',
-  role: 'advertiser',       // x-demo-role header value
-  email: 'advertiser@softomedia.demo',
-  displayName: 'Demo Advertiser',
-  firestoreId: 'demo-advertiser-bonvie',  // FIX: was 'demo-bonvie'
-  advertiserId: 'demo-advertiser-bonvie',  // INTENTIONAL: same as DEMO_BRAND (see note above)
-};
-
-export const DEMO_TECHOP = {
-  id: 'demo-techop-uid',
-  role: 'techoperator',           // x-demo-role header value
-  email: 'techop@softomedia.demo',
-  displayName: 'Demo TechOps',
-  firestoreId: 'demo-techop',
-};
-
-// ---------------------------------------------------------------------------
-// Seeded resource IDs
-// These MUST exactly match the IDs written by 00_seed.setup.js.
-// When 00_seed.setup.js changes an ID, update it here first, then update
-// any spec that references SEED.<field> — do not patch specs directly.
-//
-// Canonical source: 00_seed.setup.js exports
-//   DEMO_RETAILER_ID   = 'demo-retailer-freshmart'
-//   DEMO_ADVERTISER_ID = 'demo-advertiser-bonvie'
-//   DEMO_CAMPAIGN_ID   = 'demo-campaign-001'
-//   DEMO_LOOP_ID       = 'demo-loop-freshmart-main'
-//   DEMO_STORE_IDS     = ['demo-store-mtl-north', 'demo-store-mtl-south']
-//   DEMO_SCREEN_IDS    = ['demo-screen-north-1', 'demo-screen-north-2',
-//                         'demo-screen-south-1', 'demo-screen-south-2']
-// ---------------------------------------------------------------------------
-
-export const SEED = {
-  retailerId: 'demo-retailer-freshmart',    // FIX: was 'demo-freshmart'
-  advertiserId: 'demo-advertiser-bonvie',     // FIX: was 'demo-bonvie'
-  campaignId: 'demo-campaign-001',          // unchanged
-  ticketId: 'demo-ticket-001',            // unchanged
-  loopId: 'demo-loop-freshmart-main',   // FIX: was 'demo-loop-001'
-
-  // FIX: was ['demo-screen-01'..'04']
-  screenIds: [
-    'demo-screen-north-1',
-    'demo-screen-north-2',
-    'demo-screen-south-1',
-    'demo-screen-south-2',
-  ],
-
-  // NEW: store IDs were not exported before; specs in Phase 1 need them
-  storeIds: [
-    'demo-store-mtl-north',
-    'demo-store-mtl-south',
-  ],
-};
+// Import locally for use in loginAs/authReset below
+import { BASE_URL, DEMO_TOKEN } from '../fixtures/personas.js';
 
 // ---------------------------------------------------------------------------
 // authReset — beforeEach hook, imported and used in every spec file.
@@ -155,6 +67,7 @@ export async function authReset({ page }) {
     localStorage.removeItem('demo_role');
     localStorage.removeItem('active_persona');
     localStorage.removeItem('authToken');
+    localStorage.removeItem('auth_token');
     sessionStorage.clear();
   });
   // Reload to flush React in-memory auth state held by DemoAuthProvider.
@@ -184,6 +97,7 @@ export async function loginAs(page, persona) {
       localStorage.setItem('demo_role', role);
       localStorage.setItem('active_persona', role);
       localStorage.setItem('authToken', token);
+      localStorage.setItem('auth_token', token);
       localStorage.setItem('auth_user', JSON.stringify({
           id: personaObj.id,
           name: personaObj.displayName,

@@ -113,12 +113,18 @@ export default defineConfig({
             url: 'http://localhost:8080/health',
             reuseExistingServer: !process.env.CI,
             timeout: 120_000,
+            env: {
+                ALLOW_DEMO_MODE: 'true'
+            }
         },
         {
             command: 'npx kill-port 5173 && npm run dev --prefix client-app',
             url: 'http://localhost:5173',
             reuseExistingServer: true,
             timeout: 180_000,
+            env: {
+                ALLOW_DEMO_MODE: 'true'
+            }
         },
     ],
 });

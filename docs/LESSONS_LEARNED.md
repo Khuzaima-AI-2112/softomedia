@@ -4,6 +4,116 @@ A living document capturing post-incident analysis, root causes, and actionable 
 
 ---
 
+## 2026-06-25 — E2E Alignment: Playwright Locators, Layout Mismatches, and Telemetry Parameter Normalisation
+**Severity:** High — Broken E2E test suite pass rate due to hidden locators, layout-dependent state logic, and parameter naming mismatches between player telemetry and database logging.
+
+**Symptom:**
+1. Phase 9.2 failed with `expect(locator).toBeVisible()` matching a hidden tooltip card instead of the visible list items.
+2. Phase 9.3 timed out because `schedule-slot` elements only exist in `'fullday'` view mode, whereas the UI defaulted to `'hourly'` view mode.
+3. Phase 13.1 failed because the page wrapper test ID (`invoices`) was swapped to `advertiser-invoices` after loading finished, causing Playwright to assert on a missing locator.
+4. Phase 15.4 play counts returned `0` or `NaN` because E2E tests read the loading indicator before API results loaded, and the player sent camelCase variables (`screenId`, `campaignId`) while the telemetry backend repository only parsed snake_case, leading to unrecorded impressions.
+
+### What Happened
+1. **Hidden DOM Matches:** Reusable hover widgets rendered the campaign name `BonVie` in a hidden tool-tip details card. When Playwright searched for `getByText('BonVie').first()`, it resolved to the hidden element in the DOM instead of the visible text.
+2. **Default State Inconsistency:** The schedule manager declared a default state of `viewMode = 'hourly'`, which was inconsistent with developer notes stating that full-day view was default and hid the necessary elements for slot-shifting E2E tests.
+3. **Skeleton ID Swaps:** The UI swapped container test-ids between the loading state skeleton and the final loaded state container, breaking assertions waiting for container visibility.
+4. **Interface Contract Divergence:** The player UI consumed camelCase variables locally, while the telemetry endpoint expected snake_case. Because JavaScript objects are dynamically typed, this mismatch was silent, resulting in empty keys sent to the backend database.
+
+### Fix Applied
+- **Locator Refinements:** Updated E2E locators in schedule manager and loop analytics to explicitly filter for visible items (e.g., `filter({ visible: true })`) and assert that loaders are complete before parsing values.
+- **Dynamic Full-Day Grid & View Restoration:** Defaulted view mode to `fullday` and refactored `fetchDaySlots` to fetch real data from the nested endpoint `/api/locations/:id/loops`, showing the campaign names dynamically in the full-day grid.
+- **Container test-id Consolidation:** Preserved the `invoices` test ID on the main container post-load and placed the checklist-required `advertiser-invoices` test ID on the page header.
+- **Telemetry Key Normalisation:** Updated `TelemetryService.js` to map both camelCase and snake_case properties (`screenId`/`screen_id`, etc.) to the telemetry POST payload, establishing backend/frontend parameter parity.
+
+### Actionable Improvements Going Forward
+- **Use Visible Filters for Common Names:** When searching for text in tests that also exists in hovers or headers, always use `.filter({ visible: true })` to avoid DOM index collisions.
+- **Preserve test-ids Across Load States:** Keep primary outer container test-ids consistent across loading skeleton states and final loaded templates.
+- **Normalize Interface Contracts:** Implement robust translation wrappers or runtime schema validation (like Zod) on telemetry pipelines to prevent camelCase/snake_case contract mismatch issues from silently dropping database fields.
+
+
+
+## 2026-06-25 — Multiple Sources of Truth for RBAC Role Strings (MSOT Remediation P1)
+**Severity:** High — Silent authorization failures and hierarchy synchronization drift due to decentralized "magic strings" and duplicate mappings.
+
+**Symptom:**
+As roles evolved or normalized, authorization logic was prone to silent breakage. The frontend, backend route handlers, and middleware each defined their own local role checks and hierarchy mappings (e.g., `CampaignManagement.jsx` redefining `ROLE_LEVEL` maps and its own `normalizeRole` function).
+
+### What Happened
+1. **Magic Strings:** Multiple files on the client and server relied on literal strings (e.g., `'superadmin'`, `'retaileradmin'`, `'advertiser'`) for routing navigation element visibility, API authorization checks, and test fixtures.
+2. **Duplicate Local Mappings:** Components like `CampaignManagement.jsx` and backend routes like `campaigns.js` hardcoded local copies of the role hierarchy level map, creating multiple sources of truth. If the role hierarchy was adjusted in middleware, these local maps would silently fall out of sync.
+
+### Fix Applied
+- **Centralized Role Constants:** Created unified `roles.js` files containing the canonical `ROLES` enum, `ROLE_HIERARCHY` mapping, and `normalizeRole` helper.
+- **Aggressive Refactoring:** Migrated all backend API files (`requireRole.js`, `invoices.js`, `campaigns.js`, `users.js`, `advertisers.js`, `retailers.js`, `screens.js`, and `auth.js`) and frontend components (`DashboardLayout.jsx`, `PersonaSwitcher.jsx`, `AuthContext.jsx`, `CampaignManagement.jsx`, `LoopDemoPlayer.jsx`, `Overview.jsx`, and `UserManagement.jsx`) to consume the centralized constants.
+- **Cleaned Up Duplications:** Removed duplicate local role level maps and local normalization functions from files, routing them all to the central definition.
+
+### Actionable Improvements Going Forward
+- **Enforce Enums Early:** System-wide static attributes (like user roles, transaction types, or status enums) must be declared in shared/central constant files from the onset of a project, rather than being retrofitted later.
+- **Avoid Local Maps:** Never duplicate authorization logic or level maps in individual components. Route all logic that relies on hierarchy levels to a single helper or centralized map.
+
+---
+
+## 2026-06-25 — UI Component Bypassing API Singleton (MSOT Remediation P0)
+**Severity:** High — "Magic string" breakages and E2E Auth Bypass due to Multiple Sources of Truth (MSOT).
+
+**Symptom:**
+Certain UI components (`ScheduleCalendar.jsx`, `LoopDemoPlayer.jsx`) failed to react to Persona switching in demo mode. E2E tests generated 403 errors across the platform due to misaligned headers.
+
+### What Happened
+1. **API Comm Bypass:** Several components bypassed the centralized `apiClient` singleton and invoked native `fetch()` directly. They failed to inject the necessary `auth_token`, `active_persona`, and `demo_role` headers that the interceptors were designed to handle.
+2. **State Bleeds:** UI components were querying `localStorage.getItem('active_persona')` synchronously instead of subscribing to `useAuth()` React Context state changes. This caused the UI state and API requests to drift when an Admin dynamically changed personas, requiring manual page reloads to sync.
+
+### Fix Applied
+- **Banned Native Fetch:** Enforced `no-restricted-syntax` ESLint rule across `client-app` to forbid native `fetch()`, guaranteeing all network traffic routes through `services/api.js`.
+- **Refactored Components:** Migrated all isolated `fetch()` calls to `apiClient` in `Player.jsx`, `TechOpsDashboard.jsx`, `TicketDashboard.jsx`, `ScheduleManager.jsx`, and `LoopAnalytics.jsx`.
+- **Context Injection:** Swapped `localStorage.getItem` reads in `ScheduleCalendar` and `LoopDemoPlayer` with `useAuth().persona` for reactive updates.
+
+### Actionable Improvements Going Forward
+- **Enforce Singletons:** Whenever an abstraction (like `apiClient`) is built to handle cross-cutting concerns like Authentication, the underlying primitive (like `fetch()`) must be aggressively lint-banned to prevent accidental bypasses.
+- **Context over Storage:** React components must never read session state from `localStorage` directly. They should consume Context to ensure reactivity and unidirectional data flow.
+
+---
+
+## 2026-06-25 — Playwright Legacy Test File Cascade and Silent Seed `404`s
+**Severity:** Medium — The Playwright E2E suite (`npm run test:e2e`) encountered 404s during seed verification and syntax errors in root specs.
+
+**Symptom:**
+1. `00_seed.setup.js` failed its `seed-health.js` check: `GET /api/advertisers/demo-advertiser-bonvie` returned 404.
+2. After fixing the seed check, Playwright threw syntax errors (`Unexpected token, expected ","`) and fixture errors (`unknown parameter "brandPage"`) in the `tests/` root specs.
+
+### What Happened
+1. **Seed 404:** The `00_seed.setup.js` creates a test advertiser and campaign by POSTing to the `/api/advertisers` and `/api/campaigns` endpoints. However, the API route handlers completely ignored `req.body.id` and always generated random internal IDs (e.g., `adv_12345`). As a result, the subsequent `GET` for the expected demo IDs returned 404.
+2. **Legacy Specs Running in CI:** The Playwright `chromium` project in `playwright.config.js` ran all `.spec.js` files in `tests/` except `demo_wizard`. Several old legacy specs (`campaign_wizard_happy_path.spec.js`, `personas_mvp.spec.js`, `media_cloud_verification.spec.js`) referenced custom fixtures (`brandPage`, `adminPage`) that no longer existed. Additionally, `loop_builder.spec.js`, `retailer_validation.spec.js`, and `telemetry.spec.js` had trailing syntax errors (`} ) ))` and missing `JSON.stringify` closures) from a previous incomplete refactoring.
+
+### Fix Applied
+- **API ID Support:** Modified `ad-server/src/api/advertisers.js` and `campaigns.js` to accept `req.body.id` if provided (falling back to generated IDs if absent), allowing deterministic seeding.
+- **Syntax Correction:** Fixed the trailing bracket mismatches in the Playwright mock JSON payloads in the root specs.
+- **Legacy Spec Isolation:** Moved the unmaintained fixture-dependent tests to `tests/legacy/` and updated `playwright.config.js`'s `testIgnore` array to explicitly skip the `legacy/` directory, preventing them from failing the E2E suite.
+
+### Actionable Improvements Going Forward
+- **Deterministic Seeding:** When test infrastructure relies on predictable API seeding, the backend must support overriding generated IDs for admin/system roles.
+- **Test Suite Hygiene:** Deprecated or unmaintained E2E specs should be removed or moved to an ignored folder, rather than left sitting in the execution path, as Playwright will automatically attempt to compile and run them.
+
+---
+
+## 2026-06-25 — /bigtest Failure Due to Strict Hygiene (Linting and Unused Test Variables)
+**Severity:** Low — SRE pipeline (`/hygiene`) failed locally on `npm run lint`.
+
+**Symptom:**
+The `npm run lint` command failed with exit code 1 due to 591 problems (561 formatting errors, 30 warnings for unused variables in test files).
+
+### What Happened
+After the massive refactoring of 13 backend Jest suites (Phase 2A) to use centralized test fixtures, numerous imports (like `express`, `jest`, and `createMockAuthMiddleware`) were left unused. Combined with `linebreak-style` (CRLF vs LF) discrepancies across developer environments, the strict zero-error operational hygiene check rejected the build.
+
+### Fix Applied
+- Ran `npm run lint -- --fix` to auto-resolve 561 formatting/indentation errors.
+- Manually cleaned up the 30 unused variables across all refactored `ad-server/tests/*.test.js` files.
+
+### Actionable Improvements Going Forward
+- **Clean as you go:** Refactoring test files to use new centralized architectures often leaves behind dead imports. Always follow up structural refactoring with an immediate lint check to prevent compounding technical debt.
+
+---
+
 ## 2026-06-23 — Infinite Retry Loop During API Security Testing due to CORS Failure
 **Severity:** Medium — E2E test suite timed out and failed locally.
 

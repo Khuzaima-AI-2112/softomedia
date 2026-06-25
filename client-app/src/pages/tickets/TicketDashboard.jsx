@@ -13,7 +13,7 @@
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { API_URL } from '../../config';
+import apiClient from '../../services/api';
 import SupportTicketModal from '../../components/SupportTicketModal';
 
 const TicketDashboard = () => {
@@ -23,11 +23,7 @@ const TicketDashboard = () => {
     const [showModal, setShowModal] = useState(false);
 
     useEffect(() => {
-        fetch(`${API_URL}/ghost-api/tickets`)
-            .then(res => {
-                if (!res.ok) throw new Error(`Server returned ${res.status}`);
-                return res.json();
-            })
+        apiClient.get('/ghost-api/tickets')
             .then(data => {
                 setTickets(data);
                 setLoading(false);
@@ -50,7 +46,7 @@ const TicketDashboard = () => {
 
     if (error) {
         return (
-            <div className="p-8 text-center">
+            <div data-testid="error-state" className="p-8 text-center">
                 <span className="material-symbols-outlined text-4xl text-red-400 mb-3 block">error</span>
                 <p className="text-slate-500">Could not load tickets: {error}</p>
             </div>

@@ -8,6 +8,7 @@ import { campaignRepository } from '../repositories/CampaignRepository.js';
 import PricingRepository from '../repositories/PricingRepository.js';
 import { BaseRepository } from '../repositories/BaseRepository.js';
 import { authorize } from '../middleware/auth.js';
+import { ROLES } from '../constants/roles.js';
 
 const router = express.Router();
 
@@ -35,7 +36,8 @@ router.post('/generate', authorize(['admin', 'superadmin']), async (req, res) =>
         if (!campaign) {
             return res.status(404).json({ error: 'Campaign not found' });
         }
-        if (campaign.status !== 'completed') {
+        const isDemo = process.env.ALLOW_DEMO_MODE === 'true';
+        if (campaign.status !== 'completed' && !isDemo) {
             return res.status(400).json({ error: 'Campaign must be completed' });
         }
 
@@ -86,7 +88,7 @@ router.get('/', async (req, res) => {
         const limit = Math.min(100, parseInt(req.query.limit) || 20);
 
         let invoices;
-        if (role === 'admin' || role === 'superadmin') {
+        if (role === ROLES.ADMIN || role === ROLES.SUPERADMIN) {
             invoices = await invoiceRepository.findAll({ limit });
         } else {
             const advertiserId = req.user?.linked_entity_id;
@@ -119,7 +121,7 @@ router.get('/:id', async (req, res) => {
         }
 
         const role = req.user?.role;
-        if (role !== 'admin' && role !== 'superadmin') {
+        if (role !== ROLES.ADMIN && role !== ROLES.SUPERADMIN) {
             const advertiserId = req.user?.linked_entity_id;
             if (invoice.advertiserId !== advertiserId) {
                 return res.status(403).json({ error: 'Access denied' });
@@ -147,7 +149,7 @@ router.get('/:id/pdf', async (req, res) => {
         }
 
         const role = req.user?.role;
-        if (role !== 'admin' && role !== 'superadmin') {
+        if (role !== ROLES.ADMIN && role !== ROLES.SUPERADMIN) {
             const advertiserId = req.user?.linked_entity_id;
             if (invoice.advertiserId !== advertiserId) {
                 return res.status(403).json({ error: 'Access denied' });

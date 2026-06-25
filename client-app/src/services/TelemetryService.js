@@ -83,18 +83,24 @@ class TelemetryService {
             uuid: crypto.randomUUID()
         };
 
+        const screen_id = record.screen_id || record.screenId;
+        const campaign_id = record.campaign_id || record.campaignId;
+        const asset_id = record.asset_id || record.assetId || record.mediaId;
+        const loop_id = record.loop_id || record.loopId;
+
         // ── Layer 1: real-time per-impression POST ────────────────────────────
         // Fire-and-forget — player must never await this.
         // The server handler (telemetry.js) validates screen_id + campaign_id,
         // persists to Firestore, and increments campaign.play_count.
+        // eslint-disable-next-line no-restricted-syntax
         fetch(`${API_URL}/api/telemetry/impression`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                screen_id:   record.screen_id,
-                campaign_id: record.campaign_id,
-                asset_id:    record.asset_id  || null,
-                loop_id:     record.loop_id   || null,
+                screen_id,
+                campaign_id,
+                asset_id:    asset_id  || null,
+                loop_id:     loop_id   || null,
                 played_at:   record.played_at
             })
         }).catch(err => {
@@ -133,10 +139,12 @@ class TelemetryService {
 
         try {
             // 1. Get signed upload URL
+            // eslint-disable-next-line no-restricted-syntax
             const response = await fetch(`${API_URL}/api/telemetry/upload-url`);
             const { uploadUrl } = await response.json();
 
             // 2. Upload full buffer as JSON
+            // eslint-disable-next-line no-restricted-syntax
             const putResponse = await fetch(uploadUrl, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },

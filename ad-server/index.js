@@ -97,10 +97,8 @@ import apiRouter from './src/api/index.js';
 import { seedDatabase } from './src/services/SeedService.js';
 import { initCronJobs } from './src/utils/cron.js';
 
-// Auto-seed for development/test
-if (process.env.NODE_ENV !== 'production') {
-    seedDatabase();
-}
+// Auto-seed runs inside listen() so Jest test imports don't trigger it.
+// (Jest imports `app` without calling listen — seed must not fire at module load time.)
 
 // Boot up automated Cron tasks (e.g., MVP D-1 Loop Generators)
 initCronJobs();
@@ -128,8 +126,17 @@ app.get('/', (req, res) => res.send('SoftoMedia Ad Server Online'));
 import { errorHandler } from './src/middleware/error.js';
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT}`);
-});
+// Only bind the port for a real server boot.
+// When Jest imports `app` via supertest, JEST_WORKER_ID is set — skip listen()
+// entirely to prevent EADDRINUSE on parallel test suites.
+if (!process.env.JEST_WORKER_ID) {
+    app.listen(PORT, () => {
+        console.log(`Server listening on port ${PORT}`);
+        if (process.env.NODE_ENV !== 'production') {
+            seedDatabase();
+        }
+    });
+}
 
 export default app;
+

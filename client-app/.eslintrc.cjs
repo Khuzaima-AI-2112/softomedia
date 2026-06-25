@@ -18,5 +18,12 @@ module.exports = {
         ],
         'react/prop-types': 'off',
         'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+        'no-restricted-syntax': [
+            'error',
+            {
+                selector: "CallExpression[callee.name='fetch']",
+                message: "Do not use native fetch(). Import the centralized apiClient from services/api.js to ensure proper headers and error handling."
+            }
+        ]
     },
 }

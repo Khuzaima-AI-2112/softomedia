@@ -11,6 +11,16 @@ For the complete 18-file spec register, see `massivee2e_gaps.md` → Spec File R
 
 ---
 
+## Update 2026-06-25 - E2E Testing Progress
+- Fixed 13 backend Jest suites in Phase 2A (removed unused global mocks).
+- Cleared 591 linting errors across the codebase to pass strict `/hygiene`.
+- Flushed and re-seeded local database successfully.
+- Fixed 404 seed verification error in `00_seed.setup.js` by allowing deterministic ID seeding in API routes.
+- Removed deprecated `verify_predeploy.js` script.
+- Created `tests/legacy/` folder to isolate broken and outdated root specs that were causing false negatives in the Playwright E2E suite.
+
+---
+
 ## Critical Pre-Conditions (Blockers — Resolve Before Running Any Phase)
 
 Pre-Condition 0 is a hard gate — without it every API call returns 401 regardless of persona.

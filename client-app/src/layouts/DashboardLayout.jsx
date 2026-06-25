@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Outlet, useLocation, useNavigate, NavLink } from 'react-router-dom';
 import PersonaSwitcher from '../components/PersonaSwitcher';
 import { useAuth } from '../contexts/AuthContext';
+import { ROLES } from '../constants/roles';
 import ErrorBoundary from '../components/ErrorBoundary';
 import SafeWidgetLoader from '../components/SafeWidgetLoader';
 import NetworkErrorBanner from '../components/NetworkErrorBanner';
@@ -47,10 +48,10 @@ const TECHOP_NAV = [
 
 function getNavItems(persona) {
     if (!persona) return [];
-    if (persona === 'admin' || persona === 'superadmin' || persona === 'super_admin') return ADMIN_NAV;
-    if (persona === 'advertiser' || persona === 'brand') return BRAND_NAV;
-    if (persona === 'retaileradmin') return RETAILER_NAV;
-    if (persona === 'techoperator') return TECHOP_NAV;
+    if (persona === ROLES.ADMIN || persona === ROLES.SUPERADMIN || persona === 'super_admin') return ADMIN_NAV;
+    if (persona === ROLES.ADVERTISER || persona === ROLES.BRAND) return BRAND_NAV;
+    if (persona === ROLES.RETAILERADMIN) return RETAILER_NAV;
+    if (persona === ROLES.TECHOPERATOR) return TECHOP_NAV;
     return [];
 }
 
@@ -59,9 +60,9 @@ function Sidebar({ persona }) {
     if (!navItems.length) return null;
 
     let testId = 'nav-admin';
-    if (persona === 'advertiser' || persona === 'brand') testId = 'nav-brand';
-    else if (persona === 'retaileradmin') testId = 'nav-retailer';
-    else if (persona === 'techoperator') testId = 'nav-techop';
+    if (persona === ROLES.ADVERTISER || persona === ROLES.BRAND) testId = 'nav-brand';
+    else if (persona === ROLES.RETAILERADMIN) testId = 'nav-retailer';
+    else if (persona === ROLES.TECHOPERATOR) testId = 'nav-techop';
 
     return (
         <aside
@@ -120,7 +121,7 @@ function DashboardLayout() {
     // Health screen remains accessible via nav but is no longer the default landing page.
     React.useEffect(() => {
         if (!loading && persona && location.pathname === '/dashboard') {
-            const routePersona = persona === 'super_admin' ? 'admin' : persona;
+            const routePersona = (persona === 'super_admin' || persona === ROLES.SUPERADMIN) ? 'admin' : persona;
             navigate(`/dashboard/${routePersona}`, { replace: true });
         }
     }, [persona, loading, location.pathname, navigate]);

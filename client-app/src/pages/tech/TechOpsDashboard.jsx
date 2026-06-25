@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import { API_URL } from '../../config';
+import apiClient from '../../services/api';
 
 function TechOpsDashboard() {
     const [stats, setStats] = useState({ total: 0, online: 0, offline: 0, screens: [] });
@@ -31,11 +32,8 @@ function TechOpsDashboard() {
 
     const fetchStatus = async () => {
         try {
-            const res = await fetch(`${API_URL}/api/monitoring/status`);
-            if (res.ok) {
-                const data = await res.json();
-                setStats(data);
-            }
+            const data = await apiClient.get('/api/monitoring/status');
+            setStats(data);
         } catch (error) {
             console.error('Failed to fetch screen status', error);
         } finally {
@@ -49,15 +47,7 @@ function TechOpsDashboard() {
         setTerminalError(null);
         setTerminalLogs([]);
         try {
-            const token = localStorage.getItem('auth_token');
-            const res = await fetch(`${API_URL}/api/screens/${screenId}/logs`, {
-                headers: { 'Authorization': `Bearer ${token}` },
-            });
-            if (!res.ok) {
-                const body = await res.json().catch(() => ({}));
-                throw new Error(body.error || `HTTP ${res.status}`);
-            }
-            const data = await res.json();
+            const data = await apiClient.get(`/api/screens/${screenId}/logs`);
             setTerminalLogs(data.logs || []);
         } catch (err) {
             setTerminalError(err.message);
@@ -84,32 +74,20 @@ function TechOpsDashboard() {
         const screenId = restartTarget.id;
         let outcome = 'failure';
         try {
-            const token = localStorage.getItem('auth_token');
-            const res = await fetch(`${API_URL}/api/screens/${screenId}/restart`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
-            });
-            outcome = res.ok ? 'success' : 'failure';
-            setRestartResults(prev => ({ ...prev, [screenId]: res.ok ? 'success' : 'error' }));
+            await apiClient.post(`/api/screens/${screenId}/restart`, {});
+            outcome = 'success';
+            setRestartResults(prev => ({ ...prev, [screenId]: 'success' }));
         } catch {
             setRestartResults(prev => ({ ...prev, [screenId]: 'error' }));
         } finally {
             // Task 4.3 — audit log entry (fire-and-forget; failure does not block restart result)
             try {
-                const token = localStorage.getItem('auth_token');
-                await fetch(`${API_URL}/api/audit`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        action: 'screen_restart',
-                        screen_id: screenId,
-                        user_id: localStorage.getItem('user_id') || 'unknown',
-                        timestamp: new Date().toISOString(),
-                        outcome,
-                    }),
+                await apiClient.post(`/api/audit`, {
+                    action: 'screen_restart',
+                    screen_id: screenId,
+                    user_id: localStorage.getItem('user_id') || 'unknown',
+                    timestamp: new Date().toISOString(),
+                    outcome,
                 });
             } catch {
                 // audit log failure is silent — does not surface to user

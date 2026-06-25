@@ -1,0 +1,22 @@
+# .gitattributes
+# Enforce CRLF line endings on Windows for all text files
+# This prevents the ESLint linebreak-style rule from failing on CI/Windows
+
+* text=auto eol=crlf
+
+# Explicitly keep shell scripts and YAML as LF
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Binary files — no line ending conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.zip binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary

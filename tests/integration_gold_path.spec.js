@@ -1,7 +1,7 @@
 const { test, expect } = require('./base.fixtures');
 
 test.describe('End-to-End Gold Path: Multi-Persona Journey', () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ adminPage: page }) => {
         // Mock API endpoints for consistent test behavior
         await page.route('**/api/assets/upload', route => {
             route.fulfill({
@@ -32,7 +32,7 @@ test.describe('End-to-End Gold Path: Multi-Persona Journey', () => {
         });
     });
 
-    test.fixme('should allow a seamless journey from Admin to Brand to Retailer', async ({ page }) => {
+    test.fixme('should allow a seamless journey from Admin to Brand to Retailer', async ({ adminPage: page }) => {
         // 1. Start as Admin - Check Health
         await page.goto('/dashboard/admin');
         await expect(page.getByText(/admin mode/i)).toBeVisible();

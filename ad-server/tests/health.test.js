@@ -4,26 +4,26 @@ import express from 'express';
 
 // ESM mocking requires top-level await or careful import order
 // We use unstable_mockModule for the repositories
+import { createMockScreenRepository, createMockAdRepository } from './fixtures/mock-repos.js';
+
+const mockScreenRepo = createMockScreenRepository();
+const mockAdRepo = createMockAdRepository();
+
 jest.unstable_mockModule('../src/repositories/index.js', () => ({
-    screenRepository: {
-        breaker: { getHealth: jest.fn(() => ({ state: 'CLOSED', failures: 0 })) },
-        db: true
-    },
-    adRepository: {
-        breaker: { getHealth: jest.fn(() => ({ state: 'CLOSED', failures: 0 })) }
-    }
+    screenRepository: mockScreenRepo,
+    adRepository: mockAdRepo
 }));
 
 // Now we can import the stuff that uses the mock
 const { screenRepository } = await import('../src/repositories/index.js');
 const { default: healthRouter } = await import('../src/api/health.js');
+import { createTestApp } from './fixtures/test-app.js';
 
 describe('Health API', () => {
     let app;
 
     beforeEach(() => {
-        app = express();
-        app.use('/api/health', healthRouter);
+        app = createTestApp(healthRouter, '/api/health');
     });
 
     test('GET /api/health/v2 returns healthy status', async () => {

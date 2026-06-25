@@ -80,6 +80,7 @@ class APIClient {
         const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
         try {
+            // eslint-disable-next-line no-restricted-syntax
             const response = await fetch(url, {
                 ...modifiedOptions,
                 signal: controller.signal,
@@ -199,14 +200,16 @@ apiClient.addRequestInterceptor((url, options) => {
     const token    = localStorage.getItem('auth_token');
     const demoRole = localStorage.getItem('demo_role') || localStorage.getItem('active_persona');
 
-    if (token) {
+    const hasAuth = options.headers && (options.headers['Authorization'] || options.headers['authorization']);
+    if (token && !hasAuth) {
         options.headers = {
             ...options.headers,
             'Authorization': `Bearer ${token}`,
         };
     }
 
-    if (demoRole) {
+    const hasDemoRole = options.headers && (options.headers['x-demo-role'] || options.headers['X-Demo-Role']);
+    if (demoRole && !hasDemoRole) {
         options.headers = {
             ...options.headers,
             'x-demo-role': demoRole,

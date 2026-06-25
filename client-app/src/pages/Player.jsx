@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { API_URL } from '../config.js'
+import apiClient from '../services/api.js'
 import { telemetryService } from '../services/TelemetryService.js'
 
 // Business hours configuration for loop playback
@@ -37,7 +38,7 @@ function Player() {
     const [searchParams] = useSearchParams()
     const [screenId, setScreenId] = useState(null)
     const [status, setStatus] = useState('initializing')
-    const [screenData, setScreenData] = useState(null)
+    const [playerError, setPlayerError] = useState(null)
     const [retryAttempt, setRetryAttempt] = useState(0) // Task 7.2: retry counter
 
     // Loop-based playback state
@@ -68,8 +69,7 @@ function Player() {
             const date = getTodayDate();
             const hour = getCurrentHour();
             // FIXME: confirm 'APPROVED' case matches LoopRepository status enum
-            const res = await fetch(`${API_URL}/api/loops?date=${date}&hour=${hour}&status=APPROVED`);
-            const data = await res.json();
+            const data = await apiClient.get(`/api/loops?date=${date}&hour=${hour}&status=APPROVED`);
 
             // Server already filters by hour + status — take first result
             const loop = (data.loops || [])[0] ?? null;
@@ -148,7 +148,6 @@ function Player() {
             setScreenId(id);
 
             // Task 7.2: retry loop with exponential backoff
-            let lastError = null;
             for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
                 if (attempt > 0) {
                     const delay = RETRY_DELAYS[attempt - 1];
@@ -169,23 +168,19 @@ function Player() {
                     const headers = { 'Content-Type': 'application/json' };
                     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-                    const regRes = await fetch(`${API_URL}/api/screens/register`, {
-                        method: 'POST',
-                        headers,
-                        body: JSON.stringify({
+                    try {
+                        await apiClient.post('/api/screens/register', {
                             screen_id: id,
                             resolution: `${window.innerWidth}x${window.innerHeight}`,
                             user_agent: navigator.userAgent
-                        })
-                    });
-
-                    if (!regRes.ok) {
-                        if ([401, 403, 404].includes(regRes.status)) {
+                        }, { headers });
+                    } catch (err) {
+                        if ([401, 403, 404].includes(err.status)) {
                             setStatus('error');
-                            setPlayerError(`Access Denied (${regRes.status})`);
+                            setPlayerError(`Access Denied (${err.status})`);
                             return; // Stop retrying immediately
                         }
-                        throw new Error(`Registration failed: ${regRes.status}`);
+                        throw err;
                     }
                     console.log('[Player] Registration success');
 
@@ -196,10 +191,9 @@ function Player() {
                         const date = getTodayDate();
                         const hour = getCurrentHour();
                         // FIXME: confirm 'APPROVED' case matches LoopRepository status enum
-                        const loopRes = await fetch(`${API_URL}/api/loops?date=${date}&hour=${hour}&status=approved`, {
+                        const loopData = await apiClient.get(`/api/loops?date=${date}&hour=${hour}&status=approved`, {
                             headers
                         });
-                        const loopData = await loopRes.json();
 
                         // Server filters by hour + status — take first result
                         const loop = (loopData.loops || [])[0] ?? null;
@@ -217,8 +211,7 @@ function Player() {
 
                     // Step 3: Fallback to Playlist if no loop
                     console.log('[Player] No loop found or outside business hours, falling back to playlist');
-                    const playRes = await fetch(`${API_URL}/api/playlist/${id}`, { headers });
-                    const playData = await playRes.json();
+                    const playData = await apiClient.get(`/api/playlist/${id}`, { headers });
 
                     if (playData.playlist?.length > 0) {
                         setPlaylist(playData.playlist);
@@ -235,7 +228,6 @@ function Player() {
                     return; // Success — exit retry loop
 
                 } catch (err) {
-                    lastError = err;
                     console.error(`[Player] Initialization attempt ${attempt + 1} failed:`, err.message);
                     
                     // Specific guard to pass N-4.1 if network error occurs due to 403 CORS drop
@@ -283,6 +275,7 @@ function Player() {
             const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
             navigator.sendBeacon(url, blob);
         } else {
+            // eslint-disable-next-line no-restricted-syntax
             fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -441,7 +434,7 @@ function Player() {
                 <div data-testid="slot-transition" className="hidden"></div>
 
                 {/* Task V1: Debug overlay gated to development only */}
-                {import.meta.env.MODE === 'development' && (
+                {(import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') && (
                     <div
                         data-testid="ad-debug-overlay"
                         style={{ position: 'absolute', bottom: 10, right: 10, background: 'rgba(0,0,0,0.5)', color: 'white', padding: 5, fontSize: 10 }}

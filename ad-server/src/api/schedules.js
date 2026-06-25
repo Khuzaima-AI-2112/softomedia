@@ -137,6 +137,35 @@ router.get('/', (req, res) => {
  *
  * TODO: replace both paths with ScheduleRepository.create() when implemented.
  */
+router.get('/history', (req, res) => {
+    if (IS_DEMO_MODE) {
+        const getSundayOfCurrentWeek = (hour) => {
+            const now = new Date();
+            const day = now.getDay();
+            const diff = now.getDate() - day;
+            const sunday = new Date(now.setDate(diff));
+            sunday.setHours(hour, 0, 0, 0);
+            return sunday.toISOString();
+        };
+
+        return res.json([
+            {
+                type: 'override',
+                actorId: 'demo-freshmart',
+                startTime: getSundayOfCurrentWeek(2),
+                endTime: getSundayOfCurrentWeek(4),
+            },
+            {
+                type: 'slot-shift',
+                actorId: 'demo-freshmart',
+                previousStartTime: new Date().toISOString(),
+                newStartTime: new Date(Date.now() + 3600000).toISOString(),
+            }
+        ]);
+    }
+    return res.status(404).json({ error: 'Not found' });
+});
+
 router.post('/', authenticate, requireRole('retaileradmin'), (req, res) => {
     const id = IS_DEMO_MODE
         ? `sched_demo_${Date.now()}`

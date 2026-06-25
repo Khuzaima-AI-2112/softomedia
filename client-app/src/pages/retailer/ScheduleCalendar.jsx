@@ -10,7 +10,8 @@ import { useState, useEffect } from 'react';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import LoopPreviewModal from '../../components/LoopPreviewModal';
-import { API_URL } from '../../config';
+import apiClient from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 // Business hours configuration
 const BUSINESS_HOURS = {
@@ -45,6 +46,7 @@ const getStatusStyle = (status) => {
 };
 
 function ScheduleCalendar() {
+    const { persona } = useAuth();
     // Get tomorrow's date
     const [targetDate] = useState(() => {
         const tomorrow = new Date();
@@ -72,24 +74,13 @@ function ScheduleCalendar() {
 
     useEffect(() => {
         fetchLoops();
-    }, [targetDate]);
+    }, [targetDate, persona]);
 
     const fetchLoops = async () => {
         setLoading(true);
         try {
-            // 🔶 TODO: Filter by retailer_id from auth context
-            const token = localStorage.getItem('authToken');
-            const role = localStorage.getItem('active_persona');
-            const res = await fetch(`${API_URL}/api/loops?date=${targetDate}`, {
-                headers: {
-                    ...(token && { 'Authorization': `Bearer ${token}` }),
-                    ...(role && { 'x-demo-role': role })
-                }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setLoops(data.loops || []);
-            }
+            const data = await apiClient.get(`/api/loops?date=${targetDate}`);
+            setLoops(data.loops || []);
         } catch (error) {
             console.error('Failed to fetch schedule:', error);
         } finally {
@@ -107,16 +98,8 @@ function ScheduleCalendar() {
             // Approve all pending loops
             const pending = loops.filter(l => l.status === 'PENDING_APPROVAL');
             for (const loop of pending) {
-                const token = localStorage.getItem('authToken');
-                const role = localStorage.getItem('active_persona');
-                await fetch(`${API_URL}/api/loops/${loop.id}/approve`, {
-                    method: 'PATCH',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        ...(token && { 'Authorization': `Bearer ${token}` }),
-                        ...(role && { 'x-demo-role': role })
-                    },
-                    body: JSON.stringify({ userId: 'retailer_demo' }) // 🔶 TODO: Get from auth
+                await apiClient.patch(`/api/loops/${loop.id}/approve`, {
+                    userId: 'retailer_demo' // 🔶 TODO: Get from auth
                 });
             }
             await fetchLoops();
@@ -135,17 +118,7 @@ function ScheduleCalendar() {
         }
         
         try {
-            const token = localStorage.getItem('authToken');
-            const role = localStorage.getItem('active_persona');
-            await fetch(`${API_URL}/api/schedules`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    ...(token && { 'Authorization': `Bearer ${token}` }),
-                    ...(role && { 'x-demo-role': role })
-                },
-                body: JSON.stringify(overrideForm)
-            });
+            await apiClient.post('/api/schedules', overrideForm);
             setShowOverrideModal(false);
             if (overrideForm.day === 'sunday' && overrideForm.type === 'blocked') {
                 setHasMockOverride(true);

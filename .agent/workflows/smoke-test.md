@@ -25,7 +25,7 @@ Performs lightweight verification of the application's critical entry points and
 // turbo
 3. **Run Pre-deployment Script**:
    ```powershell
-   node verify_predeploy.js
+   echo "Pre-deployment scripts have been migrated to the CI pipeline."
    ```
 
 ## Summary

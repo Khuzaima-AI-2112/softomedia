@@ -337,6 +337,10 @@ class ApiService {
         return apiClient.put('/api/pricing/config', data);
     }
 
+    async getAuditLogs() {
+        return apiClient.get('/api/audit');
+    }
+
     // ============================================
     // GENERIC REQUEST (used by Invoices.jsx)
     // ============================================

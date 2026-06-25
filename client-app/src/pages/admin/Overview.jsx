@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { ROLES } from '../../constants/roles';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import apiService from '../../services/ApiService';
@@ -11,7 +12,7 @@ function AdminOverview() {
     const { user } = useAuth();
 
     // Phase 1: canonical role check — 'superadmin' (no underscore)
-    const isSuperAdmin = user?.role === 'superadmin';
+    const isSuperAdmin = user?.role === ROLES.SUPERADMIN;
 
     const [stats, setStats] = useState({
         retailers: 0,

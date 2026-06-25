@@ -12,7 +12,7 @@ test.describe('Softomedia MVP: Player Telemetry', () => {
             await route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({ id: 'test-screen', status: 'ACTIVE' })
+                body: JSON.stringify( Object.assign({}, { id: 'test-screen', status: 'ACTIVE' } ) )
             });
         });
 
@@ -20,7 +20,7 @@ test.describe('Softomedia MVP: Player Telemetry', () => {
             await route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({
+                body: JSON.stringify( Object.assign({}, {
                     loops: [{
                         hour: 10,
                         status: 'APPROVED',
@@ -30,8 +30,8 @@ test.describe('Softomedia MVP: Player Telemetry', () => {
                             duration: 5
                         })
                     }]
-                })
-            });
+                  }))
+              });
         });
 
         // Mock Date to 10 AM

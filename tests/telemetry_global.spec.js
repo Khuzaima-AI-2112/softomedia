@@ -18,7 +18,7 @@ test.describe('Global Playlist Telemetry', () => {
                 route.fulfill({
                     status: 200,
                     contentType: 'application/json',
-                    body: JSON.stringify({ status: 'ok', screen_id: 'mocked' })
+                    body: JSON.stringify( Object.assign({},  { status: 'ok', screen_id: 'mocked' } ) )
                 });
             });
         });

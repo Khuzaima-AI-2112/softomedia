@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">46.98% </span>
+                <span class="strong">51.8% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>39/83</span>
+                <span class='fraction'>43/83</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">38.33% </span>
+                <span class="strong">45% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>23/60</span>
+                <span class='fraction'>27/60</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">51.31% </span>
+                <span class="strong">56.57% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>39/76</span>
+                <span class='fraction'>43/76</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -406,8 +406,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -517,21 +517,21 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -539,7 +539,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -840,30 +840,30 @@ export class LoopRepository extends BaseRepository {
         const loop = await this.findById(loopId);
         <span class="missing-if-branch" title="if path not taken" >I</span>if (!loop) <span class="cstat-no" title="statement not covered" >throw new Error(`Loop ${loopId} not found`);</span>
 &nbsp;
-        <span class="missing-if-branch" title="else path not taken" >E</span>if (loop.status !== LOOP_STATUS.PENDING_APPROVAL) {
-            throw new Error(`Loop ${loopId} cannot be approved from status: ${loop.status}`);
+        <span class="missing-if-branch" title="if path not taken" >I</span>if (loop.status !== LOOP_STATUS.PENDING_APPROVAL) {
+<span class="cstat-no" title="statement not covered" >            throw new Error(`Loop ${loopId} cannot be approved from status: ${loop.status}`);</span>
         }
 &nbsp;
-        const emptySlots = <span class="cstat-no" title="statement not covered" >(loop.slots || []).filter(<span class="fstat-no" title="function not covered" >s </span>=&gt; <span class="cstat-no" title="statement not covered" >!s?.asset_id)</span>;</span>
-<span class="cstat-no" title="statement not covered" >        if (emptySlots.length &gt; 0) {</span>
+        const emptySlots = (loop.slots || <span class="branch-1 cbranch-no" title="branch not covered" >[])</span>.filter(<span class="fstat-no" title="function not covered" >s </span>=&gt; <span class="cstat-no" title="statement not covered" >!s?.asset_id)</span>;
+        <span class="missing-if-branch" title="if path not taken" >I</span>if (emptySlots.length &gt; 0) {
 <span class="cstat-no" title="statement not covered" >            throw new Error(`Loop ${loopId} has ${emptySlots.length} empty slot(s) and cannot be approved`);</span>
         }
 &nbsp;
-        const result = <span class="cstat-no" title="statement not covered" >await this.update(loopId, {</span>
+        const result = await this.update(loopId, {
             status: LOOP_STATUS.APPROVED,
             approved_at: new Date().toISOString(),
             approved_by: userId
         });
 &nbsp;
-<span class="cstat-no" title="statement not covered" >        await schedulingAuditRepository.logAction('loop_approved', {</span>
+        await schedulingAuditRepository.logAction('loop_approved', {
             entity_id: loopId,
             user_id: userId,
-            version: loop.version ?? 1,
-            screen_count: loop.screen_ids?.length ?? 1,
+            version: loop.version ?? <span class="branch-1 cbranch-no" title="branch not covered" >1,</span>
+            screen_count: loop.screen_ids?.length ?? <span class="branch-1 cbranch-no" title="branch not covered" >1,</span>
             timestamp: new Date().toISOString()
         });
 &nbsp;
-<span class="cstat-no" title="statement not covered" >        return result;</span>
+        return result;
     }
 &nbsp;
     /**
@@ -1042,7 +1042,7 @@ export const loopRepository = new LoopRepository();
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-06-17T03:30:33.264Z
+                at 2026-06-25T04:17:15.810Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

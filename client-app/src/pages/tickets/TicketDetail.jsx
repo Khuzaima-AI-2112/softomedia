@@ -14,19 +14,35 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
-import { API_URL } from '../../config';
+import apiClient from '../../services/api';
 
 const TicketDetail = () => {
     const { id } = useParams();
     const [report, setReport] = useState(null);
     const [error, setError] = useState(null);
+    const [replyText, setReplyText] = useState('');
+    const [replies, setReplies] = useState([]);
+    const [submittingReply, setSubmittingReply] = useState(false);
+
+    const handleSendReply = async () => {
+        if (!replyText.trim()) return;
+        setSubmittingReply(true);
+        try {
+            const data = await apiClient.post(`/api/tickets/${id}/replies`, { reply: replyText });
+            setReplies(prev => [...prev, {
+                reply: replyText,
+                timestamp: data.timestamp || new Date().toISOString()
+            }]);
+            setReplyText('');
+        } catch (err) {
+            console.error('Failed to send reply', err);
+        } finally {
+            setSubmittingReply(false);
+        }
+    };
 
     useEffect(() => {
-        fetch(`${API_URL}/ghost-api/tickets/${id}`)
-            .then(res => {
-                if (!res.ok) throw new Error(`Server returned ${res.status}`);
-                return res.json();
-            })
+        apiClient.get(`/ghost-api/tickets/${id}`)
             .then(data => setReport(data))
             .catch(err => {
                 console.error('Failed to load ticket', err);
@@ -36,7 +52,7 @@ const TicketDetail = () => {
 
     if (error) {
         return (
-            <div className="p-8 text-center">
+            <div data-testid="error-state" className="p-8 text-center">
                 <span className="material-symbols-outlined text-4xl text-red-400 mb-3 block">error</span>
                 <p className="text-slate-500">Could not load ticket #{id}: {error}</p>
                 <Link to="/dashboard/tickets" className="mt-4 inline-flex items-center gap-1 text-primary hover:underline text-sm">
@@ -142,17 +158,34 @@ const TicketDetail = () => {
                     </div>
                     <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-4 mt-8">Reply</h2>
                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                        {replies.length > 0 && (
+                            <div className="space-y-4 mb-6">
+                                {replies.map((rep, idx) => (
+                                    <div key={idx} className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+                                        <p className="text-sm text-slate-800 dark:text-slate-200">{rep.reply}</p>
+                                        <span className="text-[10px] text-slate-400 mt-1 block">
+                                            {new Date(rep.timestamp).toLocaleString()}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         <textarea
                             data-testid="ticket-reply-input"
+                            value={replyText}
+                            onChange={(e) => setReplyText(e.target.value)}
+                            disabled={submittingReply}
                             className="w-full p-3 border rounded-lg dark:bg-slate-900 dark:border-slate-700 min-h-[100px] mb-4 outline-none"
                             placeholder="Type your reply here..."
                         />
                         <div className="flex justify-end">
                             <button
                                 data-testid="btn-send-reply"
-                                className="px-4 py-2 bg-primary text-white rounded-lg font-bold hover:bg-primary-hover transition-colors"
+                                onClick={handleSendReply}
+                                disabled={submittingReply || !replyText.trim()}
+                                className="px-4 py-2 bg-primary text-white rounded-lg font-bold hover:bg-primary-hover transition-colors disabled:opacity-50"
                             >
-                                Send Reply
+                                {submittingReply ? 'Sending...' : 'Send Reply'}
                             </button>
                         </div>
                     </div>

@@ -137,6 +137,7 @@ const useGeminiStore = create((set, get) => ({
                 systemInstruction: customInstructions[currentPersona] || null
             };
 
+            // eslint-disable-next-line no-restricted-syntax
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -187,6 +188,7 @@ const useGeminiStore = create((set, get) => ({
 
         try {
             const apiUrl = `${API_URL}/ghost-api/tickets/${currentTicketId}/rate`;
+            // eslint-disable-next-line no-restricted-syntax
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

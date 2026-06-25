@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import apiService from '../services/ApiService';
+import { useAuth } from '../contexts/AuthContext';
+import { ROLES } from '../constants/roles';
 
 const SLOT_DURATION = 5000;
 const TOTAL_SLOTS = 12;
@@ -13,13 +15,6 @@ const DEMO_CONTENT = [
     { color: 'from-cyan-500 to-cyan-700', text: 'Reach Millions', icon: 'visibility' },
 ];
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-function getRole() {
-    return localStorage.getItem('demo_role') || localStorage.getItem('active_persona') || '';
-}
-
 // Use locale-aware date string (YYYY-MM-DD) to avoid UTC drift for timezones
 // behind UTC — toISOString() would return yesterday after midnight UTC.
 function todayISO() {
@@ -31,8 +26,8 @@ function todayISO() {
 // ---------------------------------------------------------------------------
 function LoopDemoPlayer() {
     // ── role ────────────────────────────────────────────────────────────────
-    const role = getRole();
-    const isSuperAdmin = role === 'superadmin';
+    const { persona } = useAuth();
+    const isSuperAdmin = persona === ROLES.SUPERADMIN;
 
     // ── 4.1 / 4.3 — cascade selection state ────────────────────────────────
     const [retailers, setRetailers] = useState([]);
@@ -464,7 +459,7 @@ function LoopDemoPlayer() {
                     )}
 
                     {error && (
-                        <p className="text-xs text-rose-400 font-semibold">{error}</p>
+                        <p data-testid="player-error" className="text-xs text-rose-400 font-semibold">{error}</p>
                     )}
                 </div>
             </div>
@@ -483,12 +478,14 @@ function LoopDemoPlayer() {
                             {slotContent.type === 'ad' ? (
                                 <div className="w-full h-full relative">
                                     <img
+                                        data-testid="ad-frame"
                                         key={`${currentLoopIndex}-${currentSlotIndex}`}
                                         src={slotContent.content.creative_url}
                                         alt="Advertisement"
                                         className="w-full h-full object-cover animate-in fade-in duration-500"
                                         onError={e => { e.target.style.display = 'none'; }}
                                     />
+                                    <div data-testid="slot-transition" className="hidden"></div>
                                     <div className="absolute bottom-20 right-4 px-4 py-2 rounded-lg bg-black/60 backdrop-blur-sm text-white text-sm max-w-xs shadow-2xl border border-white/10">
                                         <p className="font-bold truncate">{slotContent.content.campaign_name}</p>
                                         <p className="text-white/60 text-xs">{slotContent.content.advertiser_name}</p>
@@ -616,7 +613,7 @@ function LoopDemoPlayer() {
                         <div className="absolute top-8 right-8 px-6 py-3 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/10 text-white shadow-2xl">
                             <p className="text-[10px] text-white/40 font-black uppercase tracking-[0.2em] mb-1">Active Slot</p>
                             <div className="flex items-baseline gap-1">
-                                <span className="text-4xl font-black text-primary">{currentSlotIndex + 1}</span>
+                                <span data-testid="ad-counter" className="text-4xl font-black text-primary">{currentSlotIndex + 1}</span>
                                 <span className="text-white/40 text-xl font-bold"> / {TOTAL_SLOTS}</span>
                             </div>
                         </div>

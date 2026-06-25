@@ -7,7 +7,7 @@
 const { test, expect } = require('./base.fixtures');
 
 test.describe('Retailer Validation - Sprint 3', () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ retailerPage: page }) => {
         // Mock the loops API with pending loops
         await page.route('**/api/loops**', route => {
             const url = route.request().url();
@@ -35,14 +35,14 @@ test.describe('Retailer Validation - Sprint 3', () => {
                 route.fulfill({
                     status: 200,
                     contentType: 'application/json',
-                    body: JSON.stringify({ loops, business_hours: { start: 8, end: 22 } })
+                    body: JSON.stringify( Object.assign({},  { loops, business_hours: { start: 8, end: 22 } } ) )
                 });
             } else if (url.includes('/approve')) {
                 // Mock loop approval
                 route.fulfill({
                     status: 200,
                     contentType: 'application/json',
-                    body: JSON.stringify({ status: 'APPROVED' })
+                    body: JSON.stringify( Object.assign({},  { status: 'APPROVED' } ) )
                 });
             } else if (url.includes('/reject')) {
                 // Mock slot rejection
@@ -55,7 +55,7 @@ test.describe('Retailer Validation - Sprint 3', () => {
                 route.fulfill({
                     status: 200,
                     contentType: 'application/json',
-                    body: JSON.stringify({ id: 'test_loop', slots })
+                    body: JSON.stringify( Object.assign({},  { id: 'test_loop', slots } ) )
                 });
             } else if (url.includes('/replace')) {
                 // Mock slot replacement
@@ -67,14 +67,14 @@ test.describe('Retailer Validation - Sprint 3', () => {
                 route.fulfill({
                     status: 200,
                     contentType: 'application/json',
-                    body: JSON.stringify({ id: 'test_loop', slots })
+                    body: JSON.stringify( Object.assign({},  { id: 'test_loop', slots } ) )
                 });
             } else if (route.request().url().match(/\/api\/loops\/[^/]+$/)) {
                 // Mock single loop fetch
                 route.fulfill({
                     status: 200,
                     contentType: 'application/json',
-                    body: JSON.stringify({
+                    body: JSON.stringify( Object.assign({},  {
                         id: '2026-01-03_14_loc_downtown',
                         date: '2026-01-03',
                         hour: 14,
@@ -87,20 +87,20 @@ test.describe('Retailer Validation - Sprint 3', () => {
                             duration: 5,
                             status: 'PENDING'
                         }))
-                    })
-                });
+                      }))
+                  });
             } else {
                 route.continue();
             }
         });
     });
 
-    test('Retailer sees Schedule Calendar', async ({ page }) => {
+    test('Retailer sees Schedule Calendar', async ({ retailerPage: page }) => {
         await page.goto('/dashboard/retailer/schedule/calendar');
         await expect(page.getByText("Tomorrow's Broadcast Schedule")).toBeVisible();
     });
 
-    test('Retailer sees 14-hour timeline', async ({ page }) => {
+    test('Retailer sees 14-hour timeline', async ({ retailerPage: page }) => {
         await page.goto('/dashboard/retailer/schedule/calendar');
 
         await expect(page.locator('[data-testid="schedule-timeline"]')).toBeVisible();
@@ -111,7 +111,7 @@ test.describe('Retailer Validation - Sprint 3', () => {
         await expect(page.locator('[data-testid="schedule-hour-21"]')).toBeVisible();
     });
 
-    test('Retailer can click hour to preview loop', async ({ page }) => {
+    test('Retailer can click hour to preview loop', async ({ retailerPage: page }) => {
         await page.goto('/dashboard/retailer/schedule/calendar');
 
         // Click on 2pm slot
@@ -121,7 +121,7 @@ test.describe('Retailer Validation - Sprint 3', () => {
         await expect(page.getByText('2:00 PM — Loop Preview')).toBeVisible();
     });
 
-    test('Retailer sees 12 slots in preview modal', async ({ page }) => {
+    test('Retailer sees 12 slots in preview modal', async ({ retailerPage: page }) => {
         await page.goto('/dashboard/retailer/schedule/calendar');
 
         await page.locator('[data-testid="schedule-hour-14"]').click();
@@ -132,7 +132,7 @@ test.describe('Retailer Validation - Sprint 3', () => {
         await expect(page.locator('[data-testid="preview-slot-11"]')).toBeVisible();
     });
 
-    test('Retailer can reject a slot', async ({ page }) => {
+    test('Retailer can reject a slot', async ({ retailerPage: page }) => {
         await page.goto('/dashboard/retailer/schedule/calendar');
 
         await page.locator('[data-testid="schedule-hour-14"]').click();
@@ -146,7 +146,7 @@ test.describe('Retailer Validation - Sprint 3', () => {
         await expect(page.locator('[data-testid="rejection-reason-select"]')).toBeVisible();
     });
 
-    test('Retailer must select reason before rejecting', async ({ page }) => {
+    test('Retailer must select reason before rejecting', async ({ retailerPage: page }) => {
         await page.goto('/dashboard/retailer/schedule/calendar');
 
         await page.locator('[data-testid="schedule-hour-14"]').click();
@@ -162,7 +162,7 @@ test.describe('Retailer Validation - Sprint 3', () => {
         await expect(page.locator('[data-testid="replacement-picker"]')).toBeVisible({ timeout: 5000 });
     });
 
-    test('Retailer can select replacement for rejected slot', async ({ page }) => {
+    test('Retailer can select replacement for rejected slot', async ({ retailerPage: page }) => {
         await page.goto('/dashboard/retailer/schedule/calendar');
 
         await page.locator('[data-testid="schedule-hour-14"]').click();
@@ -177,7 +177,7 @@ test.describe('Retailer Validation - Sprint 3', () => {
         await page.locator('[data-testid="replacement-replace_001"]').click();
     });
 
-    test('Retailer can approve all pending loops', async ({ page }) => {
+    test('Retailer can approve all pending loops', async ({ retailerPage: page }) => {
         await page.goto('/dashboard/retailer/schedule/calendar');
 
         // Click approve all button
@@ -188,7 +188,7 @@ test.describe('Retailer Validation - Sprint 3', () => {
         await expect(page.getByText('Approving...')).toBeVisible();
     });
 
-    test('Retailer can approve single loop from preview', async ({ page }) => {
+    test('Retailer can approve single loop from preview', async ({ retailerPage: page }) => {
         await page.goto('/dashboard/retailer/schedule/calendar');
 
         await page.locator('[data-testid="schedule-hour-14"]').click();

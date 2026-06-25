@@ -17,7 +17,8 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
     try {
-        const id = await locationRepository.create(req.body);
+        const id = req.body.id || `loc_${Date.now()}`;
+        await locationRepository.create(id, req.body);
         const added = await locationRepository.findById(id);
         res.status(201).json(added);
     } catch (error) {

@@ -9,7 +9,7 @@ function ScheduleHistory() {
     // Task 2.3: scope to authenticated retailer — never retailers[0]
     // FIXME: replace apiService.getLoops() with apiService.getLoopsByRetailer(retailerId)
     //        when that scoped endpoint is available in the backend.
-    const authedRetailerId = user?.retailerId || user?.retailer_id || null;
+    const authedRetailerId = user?.retailerId || user?.retailer_id || user?.linked_entity_id || null;
 
     const [loops, setLoops] = useState([]);
     const [auditLog, setAuditLog] = useState([]);
@@ -26,19 +26,22 @@ function ScheduleHistory() {
 
     const loadData = async () => {
         try {
-            setLoading(true);
+            loading && setLoading(true);
             // Task 2.3: fetch only the authed retailer + all loops (scoped endpoint pending)
             // Task 2.6: fetch audit logs filtered to relevant event types (expanded below)
             const [retailer, allLoops, log] = await Promise.all([
                 authedRetailerId
-                    ? apiService.getRetailerById(authedRetailerId)
+                    ? apiService.getRetailer(authedRetailerId)
                     : Promise.resolve(null),
                 apiService.getLoops(),
                 apiService.getAuditLogs()
             ]);
 
             setCurrentRetailer(retailer);
-            setLoops(allLoops);
+            const loopsArray = Array.isArray(allLoops)
+                ? allLoops
+                : (allLoops?.loops || []);
+            setLoops(loopsArray);
 
             // Task 2.6: expanded event types — edits, overrides, cancellations added.
             // Backend tracking note: slot_edited, slot_overridden, loop_cancelled must

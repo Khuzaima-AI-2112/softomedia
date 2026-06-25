@@ -2,6 +2,7 @@ import express from 'express';
 import { screenRepository, impressionRepository } from '../repositories/index.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole, ROLE_HIERARCHY, normalizeRole } from '../middleware/requireRole.js';
+import { ROLES } from '../constants/roles.js';
 
 const router = express.Router();
 
@@ -128,9 +129,8 @@ router.get('/', authenticate, async (req, res) => {
     try {
         const role = normalizeRole(req.user?.role);
         const userLevel = ROLE_HIERARCHY[role] ?? -1;
-        const techopLevel = ROLE_HIERARCHY['techoperator'];    // 2
-        const retailerLevel = ROLE_HIERARCHY['retaileradmin']; // 1
-        const brandLevel = ROLE_HIERARCHY['brand'];            // 1
+        const techopLevel = ROLE_HIERARCHY[ROLES.TECHOPERATOR];    // 2
+        const retailerLevel = ROLE_HIERARCHY[ROLES.RETAILERADMIN]; // 1
 
         if (userLevel >= techopLevel) {
             // techoperator, contentmanager, admin, superadmin — see everything
@@ -142,7 +142,7 @@ router.get('/', authenticate, async (req, res) => {
         }
 
         if (userLevel === retailerLevel) {
-            if (role === 'brand') {
+            if (role === ROLES.BRAND) {
                 // brand — sees all screens so campaign wizard can show available inventory
                 const storeId = req.query.store_id || req.query.storeId || req.query.storeid;
                 const screens = storeId
@@ -168,7 +168,7 @@ router.get('/', authenticate, async (req, res) => {
         // advertiser or unrecognised role — no screen visibility
         return res.status(403).json({
             error: 'Forbidden',
-            required: 'techoperator',
+            required: ROLES.TECHOPERATOR,
             actual: role || 'unauthenticated'
         });
     } catch (error) {
@@ -322,9 +322,9 @@ router.get('/:id/playback-loop', async (req, res) => {
             console.warn(`[Brand Safety Filter] Screen ${screenId} requested loop for ${targetDate}@${currentHour}. Loop was undefined, pending, or rejected. Executing fallback protocols.`);
 
             // Task 3.1: Descriptive Telemetry & Error Contexts
-            const fallbackReason = !activeLoop ? "UNGENERATED_INVENTORY" :
-                activeLoop.status === LOOP_STATUS.PENDING_APPROVAL ? "PENDING_APPROVAL" :
-                    activeLoop.status === LOOP_STATUS.REJECTED ? "REJECTED_INVENTORY" : "UNKNOWN_STATE";
+            const fallbackReason = !activeLoop ? 'UNGENERATED_INVENTORY' :
+                activeLoop.status === LOOP_STATUS.PENDING_APPROVAL ? 'PENDING_APPROVAL' :
+                    activeLoop.status === LOOP_STATUS.REJECTED ? 'REJECTED_INVENTORY' : 'UNKNOWN_STATE';
 
             // Task 3.2: Graceful Degradation (Temporal Sliding)
             // Expand the search radius if current hour is unapproved. Slide backward to previous hour.

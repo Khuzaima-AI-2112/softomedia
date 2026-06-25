@@ -15,7 +15,8 @@ const COLLECTIONS = [
     'scheduling_audits',
     'loops',
     'stores',
-    'pricing'
+    'pricing',
+    'invoices'
 ];
 
 async function deleteCollection(db, collectionPath, batchSize = 100) {

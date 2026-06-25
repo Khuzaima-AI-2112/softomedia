@@ -47,14 +47,12 @@ for (const id of locators) {
     }
 }
 
-// Generate the markdown content
-const mdContent = `# Playwright Test IDs — TRUE Missing Checklist
-The following \`data-testid\` hooks are required by the Playwright suite (\`*_locators.js\` or specs) but are physically missing from the React GUI source code. 
-These MUST be injected inside \`client-app/src\` components before the Massive E2E suite can pass.
+// Generate the report
+console.log("=== Missing data-testid Properties ===");
+if (missing.length === 0) {
+    console.log("All locators are correctly mapped in client-app!");
+} else {
+    console.log(`Found ${missing.length} missing locators in client-app:`);
+    missing.forEach(id => console.log(` - ${id}`));
+}
 
-## Missing UI Tags
-${missing.map(id => `- [ ] \`${id}\``).join('\n')}
-`;
-
-fs.writeFileSync('current_sprint/playwright_testids_TRUE_checklist.md', mdContent);
-console.log("Checklist generated!");

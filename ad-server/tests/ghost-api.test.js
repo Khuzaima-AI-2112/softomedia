@@ -61,7 +61,7 @@ const { default: ghostRouter } = await import('../routes/ghost-api.js');
 describe('Ghost AI API', () => {
     let app;
 
-    beforeEach(() => {
+    beforeEach(async () => {
         // Clear all mocks before each test
         jest.clearAllMocks();
 
@@ -91,9 +91,8 @@ describe('Ghost AI API', () => {
         mockBucketGetFiles.mockResolvedValue([[]]);
 
         // Create fresh Express app for each test
-        app = express();
-        app.use(express.json());
-        app.use('/ghost-api', ghostRouter);
+        const { createTestApp } = await import('./fixtures/test-app.js');
+        app = createTestApp(ghostRouter, '/ghost-api');
     });
 
     describe('POST /analyze', () => {

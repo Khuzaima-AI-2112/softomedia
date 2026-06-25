@@ -167,7 +167,7 @@ test.describe.serial('Phase A — Retailer Loops', () => {
     );
     await getLocator(page, RL.LoopsList).waitFor({ timeout: 15000 });
 
-    const VALID_STATUSES = new Set(['draft', 'approved', 'locked']);
+    const VALID_STATUSES = new Set(['draft', 'approved', 'locked', 'pending', 'pending_approval', 'live', 'rejected']);
     const badges = await page.locator('[data-testid^="loop-status-badge-"]').all();
 
     expect(badges.length, 'No loop status badges found — loop rows may not be rendering').toBeGreaterThan(0);

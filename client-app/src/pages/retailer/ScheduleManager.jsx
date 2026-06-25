@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import GlassCard from '../../components/GlassCard';
 import LoopPreview from '../../components/LoopPreview';
-import { API_URL } from '../../config';
+import apiClient from '../../services/api';
 
 // Task 3.2: resolve timezone from location record, fall back to browser
 function resolveTimezone(location) {
@@ -71,18 +71,12 @@ function ScheduleManager() {
 
     const fetchLocations = async () => {
         try {
-            const token = localStorage.getItem('auth_token');
-            const res = await fetch(`${API_URL}/api/locations`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setLocations(data);
-                if (data.length > 0) {
-                    setSelectedLocation(data[0]);
-                    fetchLoop(data[0].id, data);
-                    fetchDaySlots(data[0].id);
-                }
+            const data = await apiClient.get(`/api/locations`);
+            setLocations(data);
+            if (data.length > 0) {
+                setSelectedLocation(data[0]);
+                fetchLoop(data[0].id, data);
+                fetchDaySlots(data[0].id);
             }
         } catch (error) {
             console.error('Failed to fetch locations', error);
@@ -96,11 +90,31 @@ function ScheduleManager() {
             const allLocs = locs || locations;
             const loc = allLocs.find(l => l.id === locId) || selectedLocation;
             if (!loc || !loc.screen_ids || loc.screen_ids.length === 0) return;
-            const res = await fetch(`${API_URL}/api/playlist/${loc.screen_ids[0]}`);
-            if (res.ok) {
-                const data = await res.json();
-                setHourlyLoop(data.playlist);
+
+            // Fetch loop for current date and hour (D-1 loop management preview)
+            const date = new Date().toISOString().split('T')[0];
+            const hour = new Date().getHours();
+            
+            try {
+                const response = await apiClient.get(`/api/loops?location_id=${loc.id}&date=${date}&hour=${hour}&status=approved`);
+                // Find loop for this hour or take the first approved loop
+                const loop = (response.loops || []).find(l => l.hour === hour) || (response.loops || [])[0];
+                if (loop && loop.slots && loop.slots.length > 0) {
+                    const mappedSlots = loop.slots.map(s => ({
+                        ...s,
+                        title: s.campaign_id === 'demo-campaign-001' ? 'BonVie Summer Demo' : (s.title || s.asset_name || 'Fallback / Empty Slot'),
+                        type: s.campaign_id === 'demo-campaign-001' ? 'paid' : (s.type || 'fallback')
+                    }));
+                    setHourlyLoop(mappedSlots);
+                    return;
+                }
+            } catch (err) {
+                console.warn('[ScheduleManager] Failed to fetch loop preview, falling back to playlist', err);
             }
+
+            // Fallback to legacy playlist endpoint
+            const data = await apiClient.get(`/api/playlist/${loc.screen_ids[0]}`);
+            setHourlyLoop(data.playlist || []);
         } catch (error) {
             console.error('Failed to fetch loop preview', error);
         }
@@ -108,16 +122,32 @@ function ScheduleManager() {
 
     // Task 3.3: fetch or synthesise the full-day 24-hour slot summary
     const fetchDaySlots = async (locId) => {
-        // Synthesise 24 slots from available loop data; replace with
-        // dedicated API endpoint when available.
-        setDaySlots(
-            Array.from({ length: 24 }, (_, h) => ({
-                hour: h,
-                status: 'pending', // will be overwritten by real API
-                loopId: `${locId}_h${h}`,
-                slotCount: 12,
-            }))
-        );
+        try {
+            const date = new Date().toISOString().split('T')[0];
+            const loops = await apiClient.get(`/api/locations/${locId}/loops?date=${date}`);
+            const slots = Array.from({ length: 24 }, (_, h) => {
+                const loop = (loops || []).find(l => l.hour === h);
+                const hasBonVie = loop && loop.slots && loop.slots.some(s => s.campaign_id === 'demo-campaign-001');
+                return {
+                    hour: h,
+                    status: loop ? loop.status : 'pending',
+                    loopId: loop ? loop.id : `${locId}_h${h}`,
+                    slotCount: 12,
+                    campaignName: hasBonVie ? 'BonVie Summer Demo' : null
+                };
+            });
+            setDaySlots(slots);
+        } catch (error) {
+            console.error('Failed to fetch day slots', error);
+            setDaySlots(
+                Array.from({ length: 24 }, (_, h) => ({
+                    hour: h,
+                    status: 'pending',
+                    loopId: `${locId}_h${h}`,
+                    slotCount: 12,
+                }))
+            );
+        }
     };
 
     const tz = useMemo(() => resolveTimezone(selectedLocation), [selectedLocation]);
@@ -131,21 +161,9 @@ function ScheduleManager() {
         setBulkLoading(true);
         setBulkResult(null);
         try {
-            const token = localStorage.getItem('auth_token');
-            const res = await fetch(`${API_URL}/api/locations/${selectedLocation.id}/loops/approve-all`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ date: dateLabel }),
-            });
-            if (res.ok) {
-                setDaySlots(prev => prev.map(s => ({ ...s, status: 'approved' })));
-                setBulkResult('success');
-            } else {
-                setBulkResult('error');
-            }
+            await apiClient.post(`/api/locations/${selectedLocation.id}/loops/approve-all`, { date: dateLabel });
+            setDaySlots(prev => prev.map(s => ({ ...s, status: 'approved' })));
+            setBulkResult('success');
         } catch {
             setBulkResult('error');
         } finally {
@@ -162,20 +180,10 @@ function ScheduleManager() {
         }
         setRejectLoading(true);
         try {
-            const token = localStorage.getItem('auth_token');
-            const res = await fetch(`${API_URL}/api/loops/${rejectingSlot.loopId}/reject`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ reason: rejectComment }),
-            });
-            if (res.ok) {
-                setDaySlots(prev =>
-                    prev.map(s => s.loopId === rejectingSlot.loopId ? { ...s, status: 'rejected' } : s)
-                );
-            }
+            await apiClient.post(`/api/loops/${rejectingSlot.loopId}/reject`, { reason: rejectComment });
+            setDaySlots(prev =>
+                prev.map(s => s.loopId === rejectingSlot.loopId ? { ...s, status: 'rejected' } : s)
+            );
         } catch {
             // silent — slot status unchanged, user can retry
         } finally {
@@ -422,6 +430,9 @@ function ScheduleManager() {
                                             : slot.status === 'rejected' ? 'text-rose-600 dark:text-rose-400'
                                             : 'text-amber-600 dark:text-amber-400'
                                         }`}>{slot.status}</p>
+                                        {slot.campaignName && (
+                                            <p className="text-xs font-semibold text-primary mt-1">{slot.campaignName}</p>
+                                        )}
                                         {/* Task 3.5: per-slot reject button */}
                                         {slot.status === 'pending' && !isPastCutoff && (
                                             <button

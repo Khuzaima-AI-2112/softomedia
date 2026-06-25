@@ -10,28 +10,9 @@
  * that doesn't match the expected role.
  */
 
-export const ROLE_HIERARCHY = {
-    superadmin:     5,
-    admin:          4,
-    contentmanager: 3,
-    techoperator:   2,
-    retaileradmin:  1,
-    brand:          1,   // fix: brand was missing — level 1 (same tier as retaileradmin)
-    advertiser:     0,
-};
+import { ROLES, ROLE_HIERARCHY, normalizeRole } from '../constants/roles.js';
 
-/**
- * Normalize legacy / inconsistent SUPER_ADMIN variants to the
- * canonical 'superadmin' string used everywhere in Phase 1.
- *
- * Handles: 'super_admin', 'SUPER_ADMIN', 'SuperAdmin', 'Super Admin'
- */
-export function normalizeRole(raw) {
-    if (!raw || typeof raw !== 'string') return raw;
-    const cleaned = raw.replace(/[\s_-]/g, '').toLowerCase();
-    if (cleaned === 'superadmin') return 'superadmin';
-    return raw; // pass other roles through unchanged
-}
+export { ROLES, ROLE_HIERARCHY, normalizeRole };
 
 /**
  * requireRole(minRole)
@@ -70,5 +51,5 @@ export function requireRole(minRole) {
 }
 
 /** Convenience shorthand */
-export const requireSuperAdmin = requireRole('superadmin');
-export const requireAdmin      = requireRole('admin');
+export const requireSuperAdmin = requireRole(ROLES.SUPERADMIN);
+export const requireAdmin      = requireRole(ROLES.ADMIN);

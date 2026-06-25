@@ -7,7 +7,7 @@
 const { test, expect } = require('./base.fixtures');
 
 test.describe('Loop Management - Sprint 2', () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ adminPage: page }) => {
         // Mock the loops API
         await page.route('**/api/loops**', route => {
             const url = route.request().url();
@@ -34,7 +34,7 @@ test.describe('Loop Management - Sprint 2', () => {
                 route.fulfill({
                     status: 201,
                     contentType: 'application/json',
-                    body: JSON.stringify({ message: 'Generated 14 loops', loops })
+                    body: JSON.stringify( Object.assign({},  { message: 'Generated 14 loops', loops } ) )
                 });
             } else if (url.includes('date=')) {
                 // Mock loop list by date
@@ -63,7 +63,7 @@ test.describe('Loop Management - Sprint 2', () => {
                 route.fulfill({
                     status: 200,
                     contentType: 'application/json',
-                    body: JSON.stringify({
+                    body: JSON.stringify( Object.assign({},  {
                         id: '2026-01-03_14_loc_downtown',
                         date: '2026-01-03',
                         hour: 14,
@@ -76,8 +76,8 @@ test.describe('Loop Management - Sprint 2', () => {
                             duration: 5,
                             status: 'pending'
                         }))
-                    })
-                });
+                      }))
+                  });
             } else if (url.includes('/api/assets')) {
                 // Mock assets for picker
                 route.fulfill({
@@ -94,13 +94,13 @@ test.describe('Loop Management - Sprint 2', () => {
         });
     });
 
-    test('Admin can navigate to Loop Management', async ({ page }) => {
+    test('Admin can navigate to Loop Management', async ({ adminPage: page }) => {
         await page.goto('/dashboard/admin/loops');
         await expect(page.getByText('Loop Management')).toBeVisible();
         await expect(page.getByText('8AM - 10PM')).toBeVisible();
     });
 
-    test('Admin can see 14-hour grid', async ({ page }) => {
+    test('Admin can see 14-hour grid', async ({ adminPage: page }) => {
         await page.goto('/dashboard/admin/loops');
 
         // Wait for grid to load
@@ -112,7 +112,7 @@ test.describe('Loop Management - Sprint 2', () => {
         await expect(page.locator('[data-testid="loop-hour-21"]')).toBeVisible();
     });
 
-    test('Admin can generate loops for a date', async ({ page }) => {
+    test('Admin can generate loops for a date', async ({ adminPage: page }) => {
         await page.goto('/dashboard/admin/loops');
 
         // Click generate button
@@ -122,7 +122,7 @@ test.describe('Loop Management - Sprint 2', () => {
         await expect(page.getByText('12 slots filled').first()).toBeVisible({ timeout: 5000 });
     });
 
-    test('Admin can click hour to open Loop Builder', async ({ page }) => {
+    test('Admin can click hour to open Loop Builder', async ({ adminPage: page }) => {
         await page.goto('/dashboard/admin/loops');
 
         // Wait for loops to load
@@ -136,7 +136,7 @@ test.describe('Loop Management - Sprint 2', () => {
         await expect(page.getByText('Loop Builder')).toBeVisible();
     });
 
-    test('Loop Builder shows 12 slots', async ({ page }) => {
+    test('Loop Builder shows 12 slots', async ({ adminPage: page }) => {
         await page.goto('/dashboard/admin/loops/2026-01-03_14_loc_downtown');
 
         // Wait for slot grid
@@ -148,7 +148,7 @@ test.describe('Loop Management - Sprint 2', () => {
         }
     });
 
-    test.fixme('Loop Builder shows timeline preview', async ({ page }) => {
+    test.fixme('Loop Builder shows timeline preview', async ({ adminPage: page }) => {
         await page.goto('/dashboard/admin/loops/2026-01-03_14_loc_downtown');
 
         await expect(page.getByText('Timeline Preview (60 seconds)')).toBeVisible();
@@ -156,7 +156,7 @@ test.describe('Loop Management - Sprint 2', () => {
         await expect(page.getByText('60s')).toBeVisible();
     });
 
-    test('Admin can click slot to open asset picker', async ({ page }) => {
+    test('Admin can click slot to open asset picker', async ({ adminPage: page }) => {
         await page.goto('/dashboard/admin/loops/2026-01-03_14_loc_downtown');
 
         // Click on first slot
@@ -166,7 +166,7 @@ test.describe('Loop Management - Sprint 2', () => {
         await expect(page.getByText('Select Asset for Slot 1')).toBeVisible();
     });
 
-    test('Admin can select asset for slot', async ({ page }) => {
+    test('Admin can select asset for slot', async ({ adminPage: page }) => {
         await page.goto('/dashboard/admin/loops/2026-01-03_14_loc_downtown');
 
         // Click on empty slot (slot 10)

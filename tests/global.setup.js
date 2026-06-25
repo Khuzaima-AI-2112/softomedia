@@ -4,71 +4,58 @@
  *
  * Changes from original:
  *
- * 1. localStorage key: auth_token → authToken (camelCase).
+ * 1. Persona definitions imported from tests/fixtures/personas.js (single
+ *    source of truth). All persona constants, entity IDs, and role values
+ *    are now maintained in one place.
+ *
+ * 2. All 6 personas are now registered (was 4): superadmin and advertiser
+ *    added. storageState files are written for each.
+ *
+ * 3. localStorage key: auth_token → authToken (camelCase).
  *    demo.fixtures.js assertRoleHeader() reads 'authToken'. The original wrote
- *    'auth_token' (snake_case). They were two different keys — every
- *    assertRoleHeader() call in the codebase was reading undefined.
- *    Both keys are now written for backward compatibility with any spec that
- *    hasn't migrated to demo.fixtures.js yet (see 00_seed.setup.js).
+ *    'auth_token' (snake_case). Both keys are now written for backward
+ *    compatibility with any spec that hasn't migrated yet.
  *
- * 2. linked_entity_id added to mockUser.
+ * 4. linked_entity_id added to mockUser.
  *    campaigns.js POST T5 stamping reads req.user.linked_entity_id and writes
- *    it as advertiser_id. Without it, every brand/advertiser campaign creation
- *    wrote advertiser_id: null to Firestore — an orphaned document that then
- *    triggered the 409 inventory-full conflict on the second test run.
- *
- * 3. 'techoperator' added to personas array.
- *    Was missing — loginAs(DEMO_TECHOP) in Phase 5 threw immediately because
- *    tests/.auth/techoperator.json did not exist.
+ *    it as advertiser_id.
  */
 
 import { chromium } from '@playwright/test';
 import fs from 'fs';
-import path from 'path';
+import { PERSONA_SETUP_LIST, DEMO_TOKEN } from './fixtures/personas.js';
 import demoSeedSetup from './demo_wizard/00_seed.setup.js';
-
-// linked_entity_id values mirror 00_seed.setup.js constants.
-// Keep in sync if entity IDs change.
-const PERSONA_ENTITIES = {
-    brand:         'demo-advertiser-bonvie',
-    admin:         'entity-admin-001',
-    retailer:      'demo-retailer-freshmart',
-    techoperator:  'entity-techop-001',
-};
 
 async function globalSetup(config) {
     const { baseURL } = config.projects[0].use;
     const browser = await chromium.launch();
 
     if (!fs.existsSync('tests/.auth')) {
-        fs.mkdirSync('tests/.auth');
+        fs.mkdirSync('tests/.auth', { recursive: true });
     }
 
-    // 'techoperator' added — required for Phase 5 storageState.
-    const personas = ['brand', 'admin', 'retailer', 'techoperator'];
-
-    for (const persona of personas) {
+    for (const persona of PERSONA_SETUP_LIST) {
         const context = await browser.newContext();
         const page = await context.newPage();
 
         await page.goto(baseURL);
 
-        await page.evaluate(({ p, entityId }) => {
+        await page.evaluate(({ p, token }) => {
             const mockUser = {
-                id:               `user-${p}`,
-                email:            `${p}@softomedia.com`,
-                name:             `Test ${p.charAt(0).toUpperCase() + p.slice(1)}`,
-                role:             p,
-                linked_entity_id: entityId,  // fix: campaigns.js T5 advertiser_id stamping
+                id:               p.id,
+                email:            p.email,
+                name:             p.displayName,
+                role:             p.role,
+                linked_entity_id: p.linkedEntityId,
             };
-            localStorage.setItem('active_persona', p);
-            localStorage.setItem('demo_role',      p);
-            localStorage.setItem('authToken',      'demo-token');  // PRIMARY (camelCase — matches demo.fixtures.js)
-            localStorage.setItem('auth_token',     'demo-token');  // LEGACY  (snake_case — backward compat)
+            localStorage.setItem('active_persona', p.role);
+            localStorage.setItem('demo_role',      p.role);
+            localStorage.setItem('authToken',      token);   // PRIMARY (camelCase — matches demo.fixtures.js)
+            localStorage.setItem('auth_token',     token);   // LEGACY  (snake_case — backward compat)
             localStorage.setItem('auth_user',      JSON.stringify(mockUser));
-        }, { p: persona, entityId: PERSONA_ENTITIES[persona] ?? null });
+        }, { p: persona, token: DEMO_TOKEN });
 
-        await page.context().storageState({ path: `tests/.auth/${persona}.json` });
+        await page.context().storageState({ path: `tests/.auth/${persona.key}.json` });
         await context.close();
     }
 

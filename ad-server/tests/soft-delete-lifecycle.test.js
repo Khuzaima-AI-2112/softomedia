@@ -38,21 +38,37 @@ const mockDocRef = (id, col) => ({
 /**
  * mockCollection simulates:
  *   - deleted_at filter (GUARDRAIL-15): records with truthy deleted_at are excluded
- *   - The base list query used by getAll() / list() in BaseRepository
+ *   - where() filter chains applied by the route (e.g. status='active' for ?for=campaign)
  */
-const mockCollection = (name) => ({
-    doc:     (id) => mockDocRef(id, name),
-    where:   jest.fn().mockReturnThis(),
-    orderBy: jest.fn().mockReturnThis(),
-    limit:   jest.fn().mockReturnThis(),
-    get:     jest.fn(async () => {
-        const entries = [...firestoreStore.entries()]
-            .filter(([k])  => k.startsWith(`${name}/`))
-            .map(([k, v])  => ({ id: k.split('/')[1], data: () => v, exists: true }))
-            .filter(e      => !e.data().deleted_at);  // GUARDRAIL-15
-        return { docs: entries, empty: entries.length === 0 };
-    }),
-});
+const mockCollection = (name) => {
+    // Accumulate where constraints for the current query chain.
+    // Each where() call adds a [field, op, value] tuple.
+    const makeQuery = (constraints = []) => ({
+        doc:     (id) => mockDocRef(id, name),
+        where:   jest.fn((field, op, value) => makeQuery([...constraints, [field, op, value]])),
+        orderBy: jest.fn().mockReturnThis(),
+        limit:   jest.fn().mockReturnThis(),
+        get:     jest.fn(async () => {
+            let entries = [...firestoreStore.entries()]
+                .filter(([k]) => k.startsWith(`${name}/`))
+                .map(([k, v])  => ({ id: k.split('/')[1], data: () => v, exists: true }))
+                .filter(e => !e.data().deleted_at); // GUARDRAIL-15 baseline filter
+
+            // Apply accumulated where() constraints
+            for (const [field, op, value] of constraints) {
+                if (op === '==') entries = entries.filter(e => e.data()[field] === value);
+                else if (op === '!=') entries = entries.filter(e => e.data()[field] !== value);
+                else if (op === '>')  entries = entries.filter(e => e.data()[field] >  value);
+                else if (op === '>=') entries = entries.filter(e => e.data()[field] >= value);
+                else if (op === '<')  entries = entries.filter(e => e.data()[field] <  value);
+                else if (op === '<=') entries = entries.filter(e => e.data()[field] <= value);
+            }
+
+            return { docs: entries, empty: entries.length === 0 };
+        }),
+    });
+    return makeQuery();
+};
 
 jest.unstable_mockModule('../src/utils/firestore.js', () => ({
     getFirestore:   jest.fn(() => ({ collection: mockCollection })),
@@ -72,10 +88,10 @@ jest.unstable_mockModule('../src/middleware/auth.js', () => ({
 const { default: retailersRouter }   = await import('../src/api/retailers.js');
 const { default: advertisersRouter } = await import('../src/api/advertisers.js');
 
+const { createTestApp } = await import('./fixtures/test-app.js');
+
 function makeApp() {
-    const app = express();
-    app.use(express.json());
-    app.use('/api/retailers',   retailersRouter);
+    const app = createTestApp(retailersRouter, '/api/retailers');
     app.use('/api/advertisers', advertisersRouter);
     return app;
 }

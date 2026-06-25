@@ -13,7 +13,7 @@ test.describe('Loop Playback - Sprint 4', () => {
             route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({ success: true, screen_id: 'test_screen' })
+                body: JSON.stringify( Object.assign({},  { success: true, screen_id: 'test_screen' } ) )
             });
         });
 
@@ -38,7 +38,7 @@ test.describe('Loop Playback - Sprint 4', () => {
             route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({ loops, business_hours: { start: 8, end: 22 } })
+                body: JSON.stringify( Object.assign({},  { loops, business_hours: { start: 8, end: 22 } } ) )
             });
         });
 
@@ -47,7 +47,7 @@ test.describe('Loop Playback - Sprint 4', () => {
             route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({
+                body: JSON.stringify( Object.assign({},  {
                     playlist: [{
                         id: 'fallback_ad',
                         url: 'https://placehold.co/1920x1080/gray/white?text=Fallback',
@@ -55,7 +55,7 @@ test.describe('Loop Playback - Sprint 4', () => {
                         duration: 5
                     }],
                     source: 'global'
-                })
+                } ) )
             });
         });
 
@@ -119,7 +119,7 @@ test.describe('Loop Playback - Sprint 4', () => {
             route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({ loops: [], business_hours: { start: 8, end: 22 } })
+                body: JSON.stringify( Object.assign({},  { loops: [], business_hours: { start: 8, end: 22 } } ) )
             });
         });
 

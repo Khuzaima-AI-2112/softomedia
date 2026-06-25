@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { ROLES } from '../constants/roles';
 
 const AuthContext = createContext(null);
 
@@ -21,7 +22,7 @@ export const AuthProvider = ({ children }) => {
             setPersonaState(JSON.parse(savedUser).role);
         } else {
             // 'advertiser' is the canonical ROLE_HIERARCHY key (was 'brand' — stale)
-            setPersonaState('advertiser');
+            setPersonaState(ROLES.ADVERTISER);
         }
         setLoading(false);
     }, []);
@@ -62,7 +63,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('active_persona');
         setUser(null);
         // 'advertiser' is the canonical ROLE_HIERARCHY key (was 'brand' — stale)
-        setPersonaState('advertiser');
+        setPersonaState(ROLES.ADVERTISER);
     };
 
     return (

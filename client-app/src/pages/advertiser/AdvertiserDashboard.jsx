@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import apiService from '../../services/ApiService';
+import StatusBadge from '../../components/StatusBadge';
 
 /**
  * AdvertiserDashboard — S14-3
@@ -132,12 +133,8 @@ export default function AdvertiserDashboard() {
                                                 {c.name ?? c.id}
                                             </Link>
                                         </td>
-                                        <td className="px-4 py-3">
-                                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_CONFIG.find(s => s.key === c.status)?.colour ??
-                                                'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                                                }`}>
-                                                {c.status ?? 'unknown'}
-                                            </span>
+                                        <td className="px-4 py-3" data-testid="campaign-status">
+                                            <StatusBadge status={c.status ? (STATUS_CONFIG.find(s => s.key === c.status)?.label || c.status) : 'unknown'} />
                                         </td>
                                         <td className="px-4 py-3 text-slate-500 dark:text-slate-400 tabular-nums">
                                             {c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'}

@@ -10,19 +10,19 @@ Playwright serves as the fast, codified safety net. It runs locally against isol
 ### ⚠️ Local Prerequisites & Troubleshooting
 1. **Never run `npm audit fix`** immediately before running E2E tests, as it can destabilize package locks mid-test.
 2. **Missing locators (`data-testid`):** If tests hang indefinitely on component checks, UI refactoring may have stripped out the test IDs.
-   * **The Quick Fix:** Identify the missing locator via test output and add it back into the target `.jsx` component. Reference the `playwright_testids_checklist.md` to see the full manifest of 110+ required locators.
-   * **The Architectural Fix (Page Object Model):** Do not hardcode strings like `'[data-testid="btn-add-retailer"]'` into your `.spec.js` scripts. Abstract all selectors into central dictionary files (e.g., `admin_locators.js`) so that a single change propagates instantly across all 16 test phases. *(See `playwright_db_setup.md` for the full sprint plan).*
+   * **The Quick Fix:** Identify the missing locator via test output and add it back into the target `.jsx` component. Reference the canonical Page Object Model dictionary files under [tests/demo_wizard/*_locators.js](file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/tests/demo_wizard/) to find the correct selector ID.
+   * **The Architectural Fix (Page Object Model):** Do not hardcode strings like `'[data-testid="btn-add-retailer"]'` into your `.spec.js` scripts. Abstract all selectors into central dictionary files (e.g., `admin_locators.js`) so that a single change propagates instantly across all 17 test phases. *(See `playwright_db_setup.md` for the full sprint plan).*
    * **The Visual Database (Future Goal):** Integrate **Storybook** with a visual regression tool like **Chromatic**. This renders your components locally in an isolated visual database. It prevents designers or developers from accidentally deleting `data-testid` attributes because the test runner highlights the DOM nodes visually before pushing to `main`.
 3. **Refresh Authentication:** If the tests immediately fail with `403 Forbidden` during setup/teardown, your local JWT tokens have expired. Run the `/validate-testids` workflow to refresh your `.auth/` JSON tokens.
 4. **Superadmin RBAC Bypass:** Destructive API routes (like `DELETE /api/campaigns`) strictly require the `superadmin` role. Ensure `tests/demo_wizard/00_seed.setup.js` specifically injects `'x-demo-role': 'superadmin'` in header fetches to prevent auth failures.
 5. **Local Infrastructure:** Run `/starttesting` to ensure you are hitting local databases/emulators and not mutating production Cloud Firestore data.
-6. **Manual Server Booting:** Always boot servers manually. Playwright's `webServer` auto-boot block frequently hangs on `npx kill-port`.
+6. **Server Ports & Env Shadowing:** The ad-server MUST run with `ALLOW_DEMO_MODE="true"` to prevent override IDs from reverting to non-demo Firestore values. Playwright's `webServer` block automatically manages this by killing running services on ports `8080` and `5173` and spawning clean node subprocesses with `ALLOW_DEMO_MODE="true"`. If booting servers manually, ensure you terminate any orphan nodes first.
 
 ### Step 1: Prepare the Ad Server (Terminal 1)
-The backend MUST run on port `3001` to match Playwright API expectations.
+The backend MUST run on port `8080` to match Playwright API and client-app development config expectations.
 ```powershell
 cd C:\path\to\softomedia-live2026\ad-server
-$env:PORT="3001"
+$env:PORT="8080"
 $env:NODE_ENV="development"
 $env:ALLOW_DEMO_MODE="true"
 npm start

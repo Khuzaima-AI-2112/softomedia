@@ -1,37 +1,37 @@
 const { test, expect } = require('./base.fixtures');
 
 test.describe('Persona Switching & Persistence', () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ adminPage: page }) => {
         await page.goto('/');
     });
 
-    test('should default to Brand persona', async ({ page }) => {
+    test('should default to Brand persona', async ({ adminPage: page }) => {
         const brandButton = page.locator('[data-testid="persona-advertiser"]');
         await expect(brandButton).toHaveClass(/bg-primary/);
         await expect(page.getByText(/brand mode/i)).toBeVisible();
     });
 
-    test('should switch to Admin persona', async ({ page }) => {
+    test('should switch to Admin persona', async ({ adminPage: page }) => {
         const adminButton = page.locator('[data-testid="persona-admin"]');
         await adminButton.click();
         await expect(adminButton).toHaveClass(/bg-blue-500/);
         await expect(page.getByText(/admin mode/i)).toBeVisible();
     });
 
-    test('should switch to Super Admin persona', async ({ page }) => {
+    test('should switch to Super Admin persona', async ({ adminPage: page }) => {
         const superAdminButton = page.locator('[data-testid="persona-superadmin"]');
         await superAdminButton.click();
         await expect(superAdminButton).toHaveClass(/bg-red-600/);
     });
 
-    test('should switch to Retailer persona', async ({ page }) => {
+    test('should switch to Retailer persona', async ({ adminPage: page }) => {
         const retailerButton = page.locator('[data-testid="persona-retaileradmin"]');
         await retailerButton.click();
         await expect(retailerButton).toHaveClass(/bg-emerald-500/);
         await expect(page.getByText(/retailer mode/i)).toBeVisible();
     });
 
-    test('should persist persona across reloads', async ({ page }) => {
+    test('should persist persona across reloads', async ({ adminPage: page }) => {
         await page.locator('[data-testid="persona-admin"]').click();
         await expect(page.getByText(/admin mode/i)).toBeVisible();
         await page.reload();
@@ -39,7 +39,7 @@ test.describe('Persona Switching & Persistence', () => {
         await expect(page.locator('[data-testid="persona-admin"]')).toHaveClass(/bg-blue-500/);
     });
 
-    test('should render all 5 persona buttons', async ({ page }) => {
+    test('should render all 5 persona buttons', async ({ adminPage: page }) => {
         const buttons = page.locator('[data-testid^="persona-"]');
         await expect(buttons).toHaveCount(5);
     });
@@ -48,23 +48,23 @@ test.describe('Persona Switching & Persistence', () => {
 test.describe('Brand Dashboard', () => {
     test.use({ storageState: 'tests/.auth/brand.json' });
 
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ adminPage: page }) => {
         // Ensure we are on brand page
         await page.goto('/dashboard/brand');
     });
 
-    test('should display KPI cards', async ({ page }) => {
+    test('should display KPI cards', async ({ adminPage: page }) => {
         // KPICard uses data-testid based on label: kpi-card-${label.toLowerCase().replace(/\s+/g, '-')}
         await expect(page.locator('[data-testid="kpi-card-active-campaigns"]')).toBeVisible();
         await expect(page.locator('[data-testid="kpi-card-screens-available"]')).toBeVisible();
         await expect(page.locator('[data-testid="kpi-card-total-spent"]')).toBeVisible();
     });
 
-    test('should display campaign table', async ({ page }) => {
+    test('should display campaign table', async ({ adminPage: page }) => {
         await expect(page.getByText(/summer sale promo 2024/i)).toBeVisible();
     });
 
-    test('should navigate to new campaign wizard', async ({ page }) => {
+    test('should navigate to new campaign wizard', async ({ adminPage: page }) => {
         // Use data-test-id for new campaign button
         await page.locator('[data-testid="new-campaign-btn"]').click();
         await expect(page).toHaveURL(/.*campaign\/new/);
@@ -74,7 +74,7 @@ test.describe('Brand Dashboard', () => {
 test.describe('Brand Campaign Wizard E2E', () => {
     test.use({ storageState: 'tests/.auth/brand.json' });
 
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ adminPage: page }) => {
         // Setup environment
         await page.setViewportSize({ width: 1440, height: 900 });
         page.on('dialog', dialog => dialog.dismiss().catch(() => { }));
@@ -112,14 +112,14 @@ test.describe('Brand Campaign Wizard E2E', () => {
         }));
         await page.route(/\/api\/loops/, route => route.fulfill({
             status: 200, contentType: 'application/json',
-            body: JSON.stringify({
+            body: JSON.stringify( Object.assign({},  {
                 loops: [],
                 business_hours: { start: 8, end: 22, is_closed: false }
-            })
+            } ) )
         }));
         await page.route(/\/api\/assets\/upload/, route => route.fulfill({
             status: 201, contentType: 'application/json',
-            body: JSON.stringify({ id: 'mock-asset-001', filename: 'demo-ad.mp4', duration: 5, status: 'ready' })
+            body: JSON.stringify( Object.assign({},  { id: 'mock-asset-001', filename: 'demo-ad.mp4', duration: 5, status: 'ready' } ) )
         }));
         await page.route(/\/api\/assets/, route => route.fulfill({
             status: 200, contentType: 'application/json',
@@ -129,7 +129,7 @@ test.describe('Brand Campaign Wizard E2E', () => {
             if (route.request().method() === 'POST') {
                 route.fulfill({
                     status: 201, contentType: 'application/json',
-                    body: JSON.stringify({ id: `campaign-${Date.now()}`, title: 'Test Campaign', status: 'active' })
+                    body: JSON.stringify( Object.assign({},  { id: `campaign-${Date.now()}`, title: 'Test Campaign', status: 'active' } ) )
                 });
             } else route.continue();
         });
@@ -138,7 +138,7 @@ test.describe('Brand Campaign Wizard E2E', () => {
         await page.waitForTimeout(1000);
     });
 
-    test('should complete Step 1: Location & Screen', async ({ page }) => {
+    test('should complete Step 1: Location & Screen', async ({ adminPage: page }) => {
         // Wait for store and select it
         const storeCard = page.locator('[data-testid^="store-"]').first();
         await storeCard.waitFor({ state: 'visible' });
@@ -157,7 +157,7 @@ test.describe('Brand Campaign Wizard E2E', () => {
         await expect(page.locator('[data-testid="campaign-name-input"]')).toBeVisible();
     });
 
-    test('should complete Step 2: Schedule & Budget', async ({ page }) => {
+    test('should complete Step 2: Schedule & Budget', async ({ adminPage: page }) => {
         await page.locator('[data-testid^="store-"]').first().click({ force: true });
         await page.locator('[data-testid^="screen-"]').first().waitFor({ state: 'visible' });
         await page.locator('[data-testid^="screen-"]').first().click({ force: true });
@@ -170,7 +170,7 @@ test.describe('Brand Campaign Wizard E2E', () => {
         await expect(page.getByText(/select loops/i)).toBeVisible({ timeout: 15000 });
     });
 
-    test('should complete full Wizard flow (Steps 1-5)', async ({ page }) => {
+    test('should complete full Wizard flow (Steps 1-5)', async ({ adminPage: page }) => {
         // Step 1
         await page.locator('[data-testid^="store-"]').first().click({ force: true });
         await page.locator('[data-testid^="screen-"]').first().waitFor({ state: 'visible' });

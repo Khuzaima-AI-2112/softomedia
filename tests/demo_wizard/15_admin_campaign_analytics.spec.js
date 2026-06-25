@@ -26,7 +26,7 @@ test.describe.serial('Phase 15 — Admin Campaign Analytics', () => {
     await expect(page.locator('[data-testid="campaign-management"]')).toBeVisible();
     await expect(page.getByText('BonVie Summer Demo')).toBeVisible();
     await expect(
-      page.locator('[data-testid="campaign-status"]').filter({ hasText: 'Approved' })
+      page.locator('[data-testid="campaign-status"]').filter({ hasText: /approved/i })
     ).toBeVisible();
   });
 
@@ -49,6 +49,7 @@ test.describe.serial('Phase 15 — Admin Campaign Analytics', () => {
     await expect(page.locator('[data-testid="error-state"]')).toHaveCount(0);
     // Play counts from Phase 4 (telemetry heartbeats) must be > 0
     const playCount = page.locator('[data-testid="play-count"]').first();
+    await expect(playCount).not.toHaveText('—');
     if (await playCount.isVisible()) {
       const countText = await playCount.textContent();
       expect(parseInt(countText || '0', 10)).toBeGreaterThan(0);

@@ -40,7 +40,7 @@ function LoopPreview({ slots = [] }) {
                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-3 rounded-xl bg-slate-900 text-white text-xs invisible group-hover:visible z-50 shadow-2xl ring-1 ring-white/10 translate-y-2 group-hover:translate-y-0 transition-all opacity-0 group-hover:opacity-100">
                                 <p className="font-bold mb-1 truncate">{slot.title}</p>
                                 <div className="flex justify-between items-center opacity-70">
-                                    <span>{slot.type.toUpperCase()}</span>
+                                    <span>{(slot.type || 'fallback').toUpperCase()}</span>
                                     <span>5.0s</span>
                                 </div>
                                 <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900"></div>
@@ -49,6 +49,27 @@ function LoopPreview({ slots = [] }) {
                     );
                 })}
             </div>
+
+            {slots && slots.length > 0 && (
+                <div className="mt-4 space-y-2">
+                    <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Loop Items</h5>
+                    <ul className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                        {Array.from(new Set(slots.map(s => s.title || 'Fallback / Empty Slot'))).map(title => {
+                            const count = slots.filter(s => (s.title || 'Fallback / Empty Slot') === title).length;
+                            const firstSlot = slots.find(s => (s.title || 'Fallback / Empty Slot') === title);
+                            const typeLabel = firstSlot ? (firstSlot.type || 'fallback').toUpperCase() : 'FALLBACK';
+                            return (
+                                <li key={title} className="py-2 flex justify-between items-center text-slate-700 dark:text-slate-300">
+                                    <span className="font-semibold">{title}</span>
+                                    <span className="text-slate-400 font-mono text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                                        {typeLabel} &bull; {count} slot(s)
+                                    </span>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </div>
+            )}
 
             <div className="p-4 rounded-xl bg-blue-500/5 border border-blue-500/10 flex gap-3 items-start">
                 <span className="material-symbols-outlined text-blue-500 text-[20px]">info</span>

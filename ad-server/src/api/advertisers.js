@@ -3,6 +3,7 @@ import { advertiserRepository } from '../repositories/AdvertiserRepository.js';
 import logger from '../utils/logger.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { ROLES } from '../constants/roles.js';
 
 const router = express.Router();
 
@@ -76,7 +77,7 @@ router.post('/', authenticate, requireRole('admin'), async (req, res) => {
 
         const timestamp = Date.now();
         const random = Math.random().toString(36).substring(2, 8);
-        const docId = `adv_${timestamp}_${random}`;
+        const docId = req.body.id || `adv_${timestamp}_${random}`;
 
         const data = {
             name: name.trim(),
@@ -90,6 +91,9 @@ router.post('/', authenticate, requireRole('admin'), async (req, res) => {
         const advertiser = await advertiserRepository.create(docId, data);
         res.status(201).json(advertiser);
     } catch (error) {
+        if (error.code === 6 || (error.message && error.message.includes('ALREADY_EXISTS'))) {
+            return res.status(409).json({ error: 'Advertiser already exists' });
+        }
         logger.error('Failed to create advertiser:', error);
         res.status(500).json({ error: 'Failed to create advertiser' });
     }
@@ -167,7 +171,7 @@ router.patch('/:id', authenticate, requireRole('admin'), async (req, res) => {
  */
 router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
     try {
-        if (req.headers['x-demo-role'] === 'superadmin') {
+        if (req.headers['x-demo-role'] === ROLES.SUPERADMIN) {
             await advertiserRepository.delete(req.params.id);
             return res.status(200).json({ success: true });
         }

@@ -6,6 +6,7 @@ import DataTable from '../../components/DataTable';
 import apiService from '../../services/ApiService';
 import { useAuth } from '../../contexts/AuthContext';
 import { Trash2, X, PlusCircle } from 'lucide-react';
+import { ROLES, ROLE_HIERARCHY, normalizeRole } from '../../constants/roles';
 
 const CAMPAIGN_STATUSES = [
     { value: 'all',              label: 'All' },
@@ -15,16 +16,6 @@ const CAMPAIGN_STATUSES = [
     { value: 'active',           label: 'Active' },
 ];
 
-// Role levels mirrored from requireRole.js — used for UI gate checks only.
-const ROLE_LEVEL = {
-    superadmin:     5,
-    admin:          4,
-    contentmanager: 3,
-    techoperator:   2,
-    retaileradmin:  1,
-    advertiser:     0,
-};
-
 const EMPTY_FORM = {
     name:          '',
     advertiser_id: '',
@@ -33,27 +24,20 @@ const EMPTY_FORM = {
     end_date:      new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
 };
 
-function normalizeRole(raw) {
-    if (!raw || typeof raw !== 'string') return raw;
-    const cleaned = raw.replace(/[\s_-]/g, '').toLowerCase();
-    if (cleaned === 'superadmin') return 'superadmin';
-    return raw;
-}
-
 function CampaignManagement() {
     const navigate = useNavigate();
     const { user, loading } = useAuth();
 
     const userRole   = normalizeRole(user?.role);
-    const userLevel  = ROLE_LEVEL[userRole] ?? -1;
+    const userLevel  = ROLE_HIERARCHY[userRole] ?? -1;
     // Only admin+ may view this page
-    const canView    = userLevel >= ROLE_LEVEL['admin'];
+    const canView    = userLevel >= ROLE_HIERARCHY[ROLES.ADMIN];
     // Only superadmin may hard-delete
-    const canDelete  = userLevel >= ROLE_LEVEL['superadmin'];
+    const canDelete  = userLevel >= ROLE_HIERARCHY[ROLES.SUPERADMIN];
     // retaileradmin+ may approve/reject
-    const canApprove = userLevel >= ROLE_LEVEL['retaileradmin'];
+    const canApprove = userLevel >= ROLE_HIERARCHY[ROLES.RETAILERADMIN];
     // admin+ may create campaigns
-    const canCreate  = userLevel >= ROLE_LEVEL['admin'];
+    const canCreate  = userLevel >= ROLE_HIERARCHY[ROLES.ADMIN];
 
     const [campaigns,        setCampaigns]        = useState([]);
     const [advertisers,      setAdvertisers]      = useState([]);
@@ -216,7 +200,11 @@ function CampaignManagement() {
         {
             key: 'status',
             label: 'Status',
-            render: (_value, row) => <StatusBadge status={row.status || 'pending_approval'} />
+            render: (_value, row) => (
+                <span data-testid="campaign-status">
+                    <StatusBadge status={row.status || 'pending_approval'} />
+                </span>
+            )
         },
         {
             key: 'created_at',

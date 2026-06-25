@@ -6,13 +6,14 @@ import DataTable from '../../components/DataTable';
 import apiService from '../../services/ApiService';
 import { useAuth } from '../../contexts/AuthContext';
 import { Trash2, Pencil } from 'lucide-react';
+import { ROLES as CANONICAL_ROLES } from '../../constants/roles';
 
 const ROLES = [
-    { value: 'superadmin', label: 'Super Admin', color: 'text-purple-500', icon: 'shield_person' },
-    { value: 'contentmanager', label: 'Content Manager', color: 'text-blue-500', icon: 'edit_note' },
-    { value: 'techoperator', label: 'Tech Operator', color: 'text-amber-500', icon: 'engineering' },
-    { value: 'retaileradmin', label: 'Retailer Admin', color: 'text-emerald-500', icon: 'storefront' },
-    { value: 'advertiser', label: 'Advertiser', color: 'text-rose-500', icon: 'campaign' }
+    { value: CANONICAL_ROLES.SUPERADMIN, label: 'Super Admin', color: 'text-purple-500', icon: 'shield_person' },
+    { value: CANONICAL_ROLES.CONTENTMANAGER, label: 'Content Manager', color: 'text-blue-500', icon: 'edit_note' },
+    { value: CANONICAL_ROLES.TECHOPERATOR, label: 'Tech Operator', color: 'text-amber-500', icon: 'engineering' },
+    { value: CANONICAL_ROLES.RETAILERADMIN, label: 'Retailer Admin', color: 'text-emerald-500', icon: 'storefront' },
+    { value: CANONICAL_ROLES.ADVERTISER, label: 'Advertiser', color: 'text-rose-500', icon: 'campaign' }
 ];
 
 function UserManagement() {
@@ -22,7 +23,7 @@ function UserManagement() {
     // Phase 3: gate entire page behind superadmin.
     // Guard behind loading so we never redirect during the auth hydration
     // window when user is still null and isSuperAdmin would be a false negative.
-    const isSuperAdmin = user?.role === 'superadmin';
+    const isSuperAdmin = user?.role === CANONICAL_ROLES.SUPERADMIN;
 
     const [users, setUsers] = useState([]);
     const [retailers, setRetailers] = useState([]);
@@ -30,7 +31,7 @@ function UserManagement() {
     const [dataLoading, setDataLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [formData, setFormData] = useState({
-        name: '', email: '', role: 'advertiser', linkedentityid: ''
+        name: '', email: '', role: CANONICAL_ROLES.ADVERTISER, linkedentityid: ''
     });
     const [editingUserId, setEditingUserId] = useState(null);
     const [filterRole, setFilterRole] = useState('all');
@@ -69,7 +70,7 @@ function UserManagement() {
 
     const openCreateModal = () => {
         setEditingUserId(null);
-        setFormData({ name: '', email: '', role: 'advertiser', linkedentityid: '' });
+        setFormData({ name: '', email: '', role: CANONICAL_ROLES.ADVERTISER, linkedentityid: '' });
         setModalError('');
         setShowModal(true);
     };
@@ -79,7 +80,7 @@ function UserManagement() {
         setFormData({
             name: u.name || '',
             email: u.email || '',
-            role: u.role || 'advertiser',
+            role: u.role || CANONICAL_ROLES.ADVERTISER,
             linkedentityid: u.linkedentityid || ''
         });
         setModalError('');
@@ -125,8 +126,8 @@ function UserManagement() {
         : users.filter(u => u.role === filterRole);
 
     const linkedEntityOptions = () => {
-        if (formData.role === 'retaileradmin') return retailers;
-        if (formData.role === 'advertiser') return advertisers;
+        if (formData.role === CANONICAL_ROLES.RETAILERADMIN) return retailers;
+        if (formData.role === CANONICAL_ROLES.ADVERTISER) return advertisers;
         return [];
     };
 

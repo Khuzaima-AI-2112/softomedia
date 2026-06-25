@@ -78,16 +78,29 @@ function NetworkMap() {
                         {loadingScreens ? '…' : onlineScreens} active screens in {selectedRegion}.
                     </p>
 
-                    {/* Mock Map Points */}
-                    <div className="absolute top-1/4 left-1/4 animate-bounce duration-1000">
-                        <span className="material-symbols-outlined text-red-500 text-3xl drop-shadow-md cursor-pointer hover:scale-125 transition-transform" title="Retailer A - Offline">location_on</span>
-                    </div>
-                    <div className="absolute top-1/2 left-1/2 animate-bounce duration-[2000ms]">
-                        <span className="material-symbols-outlined text-emerald-500 text-3xl drop-shadow-md cursor-pointer hover:scale-125 transition-transform" title="Retailer B - Online">location_on</span>
-                    </div>
-                    <div className="absolute bottom-1/3 right-1/4 animate-bounce duration-[1500ms]">
-                        <span className="material-symbols-outlined text-emerald-500 text-3xl drop-shadow-md cursor-pointer hover:scale-125 transition-transform" title="Retailer C - Online">location_on</span>
-                    </div>
+                    {/* Dynamic Map Pins */}
+                    {!loadingScreens && screens.map((screen, idx) => {
+                        const isOnline = screen.status?.toUpperCase() === 'ONLINE' || screen.status === 'online';
+                        const top = 15 + (idx * 23) % 70;
+                        const left = 15 + (idx * 29) % 70;
+                        return (
+                            <div 
+                                key={screen.id || screen.screen_id} 
+                                className="absolute animate-bounce"
+                                style={{ top: `${top}%`, left: `${left}%` }}
+                            >
+                                <span 
+                                    data-testid={`screen-pin-${screen.id || screen.screen_id}`}
+                                    className={`material-symbols-outlined text-3xl drop-shadow-md cursor-pointer hover:scale-125 transition-transform ${
+                                        isOnline ? 'text-emerald-500' : 'text-red-500'
+                                    }`}
+                                    title={`${screen.name || screen.screen_id} - ${isOnline ? 'Online' : 'Offline'}`}
+                                >
+                                    location_on
+                                </span>
+                            </div>
+                        );
+                    })}
                 </div>
             </GlassCard>
 

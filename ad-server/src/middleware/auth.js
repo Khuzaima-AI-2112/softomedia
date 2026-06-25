@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import logger from '../utils/logger.js';
+import { ROLES } from '../constants/roles.js';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -20,10 +21,10 @@ const JWT_SECRET = process.env.JWT_SECRET;
  * causing T5 advertiser_id stamping to resolve to a non-existent entity.
  */
 const DEMO_LINKED_ENTITY_OVERRIDES = {
-    brand:         'demo-advertiser-bonvie',   // DEMO_ADVERTISER_ID
-    advertiser:    'demo-advertiser-bonvie',   // DEMO_ADVERTISER_ID
-    retailer:      'demo-retailer-freshmart',  // DEMO_RETAILER_ID
-    retaileradmin: 'demo-retailer-freshmart',  // DEMO_RETAILER_ID (alias)
+    [ROLES.BRAND]:         'demo-advertiser-bonvie',   // DEMO_ADVERTISER_ID
+    [ROLES.ADVERTISER]:    'demo-advertiser-bonvie',   // DEMO_ADVERTISER_ID
+    retailer:              'demo-retailer-freshmart',  // DEMO_RETAILER_ID
+    [ROLES.RETAILERADMIN]: 'demo-retailer-freshmart',  // DEMO_RETAILER_ID (alias)
 };
 
 /**

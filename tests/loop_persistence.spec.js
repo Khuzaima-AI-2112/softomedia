@@ -45,7 +45,7 @@ async function mockLoopStatus(page, loopId, status, slotStatus = 'PENDING') {
         route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify({ ...BASE_LOOP, id: loopId, status, slots }),
+            body: JSON.stringify( Object.assign({},  { ...BASE_LOOP, id: loopId, status, slots } ) ),
         });
     });
 }
@@ -59,10 +59,10 @@ async function mockLoopListStatus(page, status) {
         route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify({
+            body: JSON.stringify( Object.assign({},  {
                 loops: [{ ...BASE_LOOP, status }],
                 business_hours: { start: 8, end: 22, is_closed: false, total_loops: 14 },
-            }),
+            } ) ),
         });
     });
 }
@@ -79,7 +79,7 @@ test.describe('P-01..03 — Status survives hard reload', () => {
         ['P-02', 'APPROVED',         'Approved'],
         ['P-03', 'REJECTED',         'Rejected'],
     ]) {
-        test(`${testId}: ${label} loop status persists after page reload`, async ({ page }) => {
+        test(`${testId}: ${label} loop status persists after page reload`, async ({ adminPage: page }) => {
             // The API returns the given status both before and after reload.
             // This tests that the UI derives status from the API response
             // rather than caching stale state in memory.
@@ -109,7 +109,7 @@ test.describe('P-01..03 — Status survives hard reload', () => {
 test.describe('P-04 — Slot assignment persists across navigation', () => {
     const LOOP_ID = BASE_LOOP.id;
 
-    test('P-04: Slot asset assignment visible after navigate-away + back', async ({ page }) => {
+    test('P-04: Slot asset assignment visible after navigate-away + back', async ({ adminPage: page }) => {
         // First fetch: loop with all slots filled.
         await mockLoopStatus(page, LOOP_ID, 'PENDING_APPROVAL', 'PENDING');
 
@@ -118,13 +118,13 @@ test.describe('P-04 — Slot assignment persists across navigation', () => {
             route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({
+                body: JSON.stringify( Object.assign({},  {
                     ...BASE_LOOP,
                     status: 'PENDING_APPROVAL',
                     slots: BASE_LOOP.slots.map((s, i) =>
                         i === 0 ? { ...s, asset_id: 'asset_new_001', asset_name: 'New Ad', status: 'REPLACED' } : s
                     ),
-                }),
+                } ) ),
             });
         });
 
@@ -143,7 +143,7 @@ test.describe('P-04 — Slot assignment persists across navigation', () => {
             route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({
+                body: JSON.stringify( Object.assign({},  {
                     ...BASE_LOOP,
                     status: 'PENDING_APPROVAL',
                     slots: BASE_LOOP.slots.map((s, i) =>
@@ -151,7 +151,7 @@ test.describe('P-04 — Slot assignment persists across navigation', () => {
                             ? { ...s, asset_id: 'asset_new_001', asset_name: 'New Ad', status: 'REPLACED' }
                             : s
                     ),
-                }),
+                } ) ),
             });
         });
 
@@ -169,7 +169,7 @@ test.describe('P-04 — Slot assignment persists across navigation', () => {
 test.describe('P-05 — Approved loop not re-settable by reload', () => {
     const LOOP_ID = BASE_LOOP.id;
 
-    test('P-05: Approve button absent and status stays APPROVED after reload', async ({ page }) => {
+    test('P-05: Approve button absent and status stays APPROVED after reload', async ({ adminPage: page }) => {
         await mockLoopStatus(page, LOOP_ID, 'APPROVED', 'APPROVED');
 
         await page.goto(`/dashboard/admin/loops/${LOOP_ID}`);
@@ -201,7 +201,7 @@ test.describe('P-05 — Approved loop not re-settable by reload', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 test.describe('P-06 — Bulk approve-all persists', () => {
-    test('P-06: All loops show APPROVED status after bulk approve-all + reload', async ({ page }) => {
+    test('P-06: All loops show APPROVED status after bulk approve-all + reload', async ({ adminPage: page }) => {
         // Before approve-all: loops are PENDING_APPROVAL.
         let approved = false;
 
@@ -216,10 +216,10 @@ test.describe('P-06 — Bulk approve-all persists', () => {
             route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({
+                body: JSON.stringify( Object.assign({},  {
                     loops,
                     business_hours: { start: 8, end: 22, is_closed: false, total_loops: 14 },
-                }),
+                } ) ),
             });
         });
 
@@ -229,7 +229,7 @@ test.describe('P-06 — Bulk approve-all persists', () => {
             route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({ approved: 3 }),
+                body: JSON.stringify( Object.assign({},  { approved: 3 } ) ),
             });
         });
         // Also handle the locations-scoped route.
@@ -238,7 +238,7 @@ test.describe('P-06 — Bulk approve-all persists', () => {
             route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({ approved: 3 }),
+                body: JSON.stringify( Object.assign({},  { approved: 3 } ) ),
             });
         });
 
@@ -271,7 +271,7 @@ test.describe('P-06 — Bulk approve-all persists', () => {
 test.describe('P-07 — Polling does not overwrite optimistic state', () => {
     const LOOP_ID = BASE_LOOP.id;
 
-    test('P-07: Status badge stays APPROVED when polling returns APPROVED', async ({ page }) => {
+    test('P-07: Status badge stays APPROVED when polling returns APPROVED', async ({ adminPage: page }) => {
         // Both initial load and any subsequent poll return APPROVED.
         // This verifies the polling path reads from the API (which reflects
         // persisted state) rather than resetting to a local default.

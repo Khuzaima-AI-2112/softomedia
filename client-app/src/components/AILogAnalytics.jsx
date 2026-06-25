@@ -14,6 +14,7 @@ function AILogAnalytics() {
     const loadStats = async () => {
         try {
             setLoading(true);
+            // eslint-disable-next-line no-restricted-syntax
             const response = await fetch(`${API_URL}/ghost-api/admin/stats?days=${days}`);
             if (!response.ok) throw new Error('Failed to fetch stats');
             const data = await response.json();

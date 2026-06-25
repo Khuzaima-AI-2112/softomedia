@@ -55,7 +55,7 @@ test.describe.serial('Phase 6 — Admin Full-Circle Validation', () => {
 
   test('6.3 FreshMart screens show active in Network Map', async ({ page }) => {
     await loginAs(page, DEMO_ADMIN);
-    await page.goto(BASE_URL + '/dashboard/admin/network-map', { waitUntil: 'domcontentloaded' });
+    await page.goto(BASE_URL + '/dashboard/admin/map', { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-testid="network-map"]', { timeout: 20000 });
 
     // At least one FreshMart screen must be present and show active status

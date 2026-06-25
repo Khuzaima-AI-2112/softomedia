@@ -1,14 +1,15 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { ROLES } from '../constants/roles';
 
 // Role ids must match the server's ROLE_HIERARCHY keys in requireRole.js
 // and the PERSONA_SWATCHES in HamburgerMenu.jsx exactly.
 const PERSONAS = [
-    { id: 'superadmin',    label: 'Super Admin', icon: 'shield_person',       color: 'bg-red-600',     route: 'admin'               },
-    { id: 'admin',         label: 'Admin',       icon: 'admin_panel_settings', color: 'bg-blue-500',    route: 'admin'               },
-    { id: 'advertiser',    label: 'Brand',       icon: 'campaign',             color: 'bg-primary',     route: 'brand'               },
-    { id: 'retaileradmin', label: 'Retailer',    icon: 'storefront',           color: 'bg-emerald-500', route: 'retailer'            },
-    { id: 'techoperator',  label: 'Tech Op',     icon: 'build',                color: 'bg-slate-600',   route: 'techoperator/health' },
+    { id: ROLES.SUPERADMIN,    label: 'Super Admin', icon: 'shield_person',       color: 'bg-red-600',     route: 'admin'               },
+    { id: ROLES.ADMIN,         label: 'Admin',       icon: 'admin_panel_settings', color: 'bg-blue-500',    route: 'admin'               },
+    { id: ROLES.ADVERTISER,    label: 'Brand',       icon: 'campaign',             color: 'bg-primary',     route: 'brand'               },
+    { id: ROLES.RETAILERADMIN, label: 'Retailer',    icon: 'storefront',           color: 'bg-emerald-500', route: 'retailer'            },
+    { id: ROLES.TECHOPERATOR,  label: 'Tech Op',     icon: 'build',                color: 'bg-slate-600',   route: 'techoperator/health' },
 ];
 
 const PersonaSwitcher = () => {

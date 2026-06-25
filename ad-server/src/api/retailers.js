@@ -3,6 +3,7 @@ import { retailerRepository } from '../repositories/RetailerRepository.js';
 import logger from '../utils/logger.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { ROLES } from '../constants/roles.js';
 
 const router = express.Router();
 
@@ -143,7 +144,7 @@ router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
  */
 router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
     try {
-        if (req.headers['x-demo-role'] === 'superadmin') {
+        if (req.headers['x-demo-role'] === ROLES.SUPERADMIN) {
             await retailerRepository.delete(req.params.id);
             return res.status(200).json({ success: true });
         }

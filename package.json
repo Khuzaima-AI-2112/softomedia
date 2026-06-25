@@ -7,12 +7,16 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "test:e2e": "playwright test",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "cd ad-server && node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:e2e": "npx cross-env ALLOW_DEMO_MODE=true playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
+    "test:e2e:mock": "playwright test --grep-invert @seed",
+    "test:e2e:seed": "npx cross-env ALLOW_DEMO_MODE=true playwright test --grep @seed",
+    "pretest:e2e": "node scripts/test-preflight.js",
     "test:rules": "firebase emulators:exec --project softomedia-demo --only firestore \"npx jest tests/firestore-rules/\"",
-    "lint": "cd ad-server && npm run lint && cd ../client-app && npm run lint",
+    "lint": "node scripts/lint-tests.js && cd ad-server && npm run lint && cd ../client-app && npm run lint",
     "db:seed": "cd ad-server && npm run seed"
   },
   "keywords": [],

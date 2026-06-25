@@ -43,18 +43,30 @@ const mockDocRef = (id, col) => ({
  * here we front-run it in the mock to keep tests deterministic regardless
  * of whether filtering is in the repo or the route.
  */
-const mockCollection = (name) => ({
-    doc:     (id) => mockDocRef(id, name),
-    where:   jest.fn().mockReturnThis(),
-    orderBy: jest.fn().mockReturnThis(),
-    get:     jest.fn(async () => {
-        const entries = [...firestoreStore.entries()]
-            .filter(([k])  => k.startsWith(`${name}/`))
-            .map(([k, v])  => ({ id: k.split('/')[1], data: () => v, exists: true }))
-            .filter(e      => !e.data().deleted_at);
-        return { docs: entries, empty: entries.length === 0 };
-    }),
-});
+const mockCollection = (name) => {
+    const makeQuery = (constraints = []) => ({
+        doc:     (id) => mockDocRef(id, name),
+        where:   jest.fn((field, op, value) => makeQuery([...constraints, [field, op, value]])),
+        orderBy: jest.fn().mockReturnThis(),
+        get:     jest.fn(async () => {
+            let entries = [...firestoreStore.entries()]
+                .filter(([k])  => k.startsWith(`${name}/`))
+                .map(([k, v])  => ({ id: k.split('/')[1], data: () => v, exists: true }))
+                .filter(e      => !e.data().deleted_at);
+            
+            for (const [field, op, value] of constraints) {
+                if (op === '==') entries = entries.filter(e => e.data()[field] === value);
+                else if (op === '!=') entries = entries.filter(e => e.data()[field] !== value);
+                else if (op === '>')  entries = entries.filter(e => e.data()[field] >  value);
+                else if (op === '>=') entries = entries.filter(e => e.data()[field] >= value);
+                else if (op === '<')  entries = entries.filter(e => e.data()[field] <  value);
+                else if (op === '<=') entries = entries.filter(e => e.data()[field] <= value);
+            }
+            return { docs: entries, empty: entries.length === 0 };
+        }),
+    });
+    return makeQuery();
+};
 
 jest.unstable_mockModule('../src/utils/firestore.js', () => ({
     getFirestore:   jest.fn(() => ({ collection: mockCollection })),
@@ -79,12 +91,11 @@ jest.unstable_mockModule('../src/middleware/auth.js', () => ({
 
 const { default: retailersRouter } = await import('../src/api/retailers.js');
 
+const { createTestApp } = await import('./fixtures/test-app.js');
+
 function makeApp(role = 'admin') {
     _currentRole = role;
-    const app = express();
-    app.use(express.json());
-    app.use('/api/retailers', retailersRouter);
-    return app;
+    return createTestApp(retailersRouter, '/api/retailers');
 }
 
 function seedFixtures() {

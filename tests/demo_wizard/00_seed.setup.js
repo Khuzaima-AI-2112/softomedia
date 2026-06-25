@@ -16,6 +16,7 @@
 
 import { chromium } from '@playwright/test';
 import fs from 'fs';
+import { verifySeedHealth } from '../fixtures/seed-health.js';
 
 // ---------------------------------------------------------------------------
 // Demo persona constants — single source of truth for all 16 phases.
@@ -180,6 +181,18 @@ async function demoSeedSetup(config) {
                 contract_start: '2026-01-01',
             },
         },
+        // Locations
+        ...DEMO_STORE_IDS.map((storeId, i) => ({
+            endpoint: '/api/locations',
+            body: {
+                id: storeId,
+                name: `FreshMart ${i === 0 ? 'North' : 'South'} — Demo`,
+                retailer_id: DEMO_RETAILER_ID,
+                screen_ids: i === 0 
+                    ? ['demo-screen-north-1', 'demo-screen-north-2']
+                    : ['demo-screen-south-1', 'demo-screen-south-2']
+            }
+        })),
         // Stores
         ...DEMO_STORE_IDS.map((storeId, i) => ({
             endpoint: `/api/stores`,
@@ -226,12 +239,38 @@ async function demoSeedSetup(config) {
                 id: DEMO_LOOP_ID,
                 name: 'FreshMart Main Loop — Demo',
                 retailer_id: DEMO_RETAILER_ID,
+                location_id: 'demo-store-mtl-north',
                 screen_ids: DEMO_SCREEN_IDS,
                 duration: 60,
                 status: 'approved',
                 hour: 12,
                 date: new Date().toISOString().split('T')[0],
                 slots,          // startTime = Date.now() — kills timeout failures
+            },
+        },
+        // Campaign — seeded as 'approved' so Phase 15 (15.2) can assert on it
+        // without depending on Phase 3 wizard run + admin approval chain.
+        {
+            endpoint: '/api/campaigns',
+            body: {
+                id: DEMO_CAMPAIGN_ID,
+                name: 'BonVie Summer Demo',
+                advertiser_id: DEMO_ADVERTISER_ID,
+                retailer_id: DEMO_RETAILER_ID,
+                status: 'approved',
+                start_date: '2026-06-01',
+                end_date: '2026-08-31',
+                budget: 5000,
+                cpm: 12.5,
+                creative_url: 'https://cdn.softomedia.demo/bonvie-ad-1.mp4',
+                impressions_delivered: 120000,
+            },
+        },
+        // Invoice — generate an invoice for the demo campaign
+        {
+            endpoint: '/api/invoices/generate',
+            body: {
+                campaignId: DEMO_CAMPAIGN_ID,
             },
         },
     ];
@@ -247,6 +286,15 @@ async function demoSeedSetup(config) {
             }
         }
     }
+
+    console.log('[00_seed.setup.js] Demo seed writes complete. Verifying seed health...');
+
+    // -----------------------------------------------------------------------
+    // Step 3 — Seed Verification Gate
+    // Confirms all seeded entities are accessible via GET. Converts silent
+    // seed failures into loud errors at suite startup.
+    // -----------------------------------------------------------------------
+    await verifySeedHealth({ apiBase, token: adminToken, verbose: true });
 
     console.log('[00_seed.setup.js] Demo seed complete. Dynamic slot startTime:', new Date(buildDemoSlots()[0].startTime).toISOString());
 }
@@ -267,6 +315,7 @@ export async function demoSeedTeardown() {
         { method: 'DELETE', endpoint: `/api/loops/${DEMO_LOOP_ID}` },
         ...DEMO_SCREEN_IDS.map(id => ({ method: 'DELETE', endpoint: `/api/screens/${id}` })),
         ...DEMO_STORE_IDS.map(id => ({ method: 'DELETE', endpoint: `/api/stores/${id}` })),
+        ...DEMO_STORE_IDS.map(id => ({ method: 'DELETE', endpoint: `/api/locations/${id}` })),
         { method: 'DELETE', endpoint: `/api/advertisers/${DEMO_ADVERTISER_ID}` },
         { method: 'DELETE', endpoint: `/api/retailers/${DEMO_RETAILER_ID}` },
     ];

@@ -1,20 +1,22 @@
 const { test, expect } = require('@playwright/test');
+const { buildCampaign, buildRetailer } = require('./fixtures/factories.js');
 
 test.describe('Campaign Wizard E2E Happy Path', () => {
 
-    test('should allow a brand user to create a campaign and list it', async ({ page }) => {
+    test('should allow a brand user to create a campaign and list it', async ({ brandPage: page }) => {
+        const mockAuth = {
+            uid: 'test-brand-user',
+            role: 'advertiser',
+            linked_entity_id: 'adv-001',
+            email: 'brand@test.com',
+            name: 'Brand Tester'
+        };
         // Mock Auth
         await page.route('**/api/auth/me', async route => {
             await route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({
-                    uid: 'test-brand-user',
-                    role: 'advertiser',
-                    linked_entity_id: 'adv-001',
-                    email: 'brand@test.com',
-                    name: 'Brand Tester'
-                })
+                body: JSON.stringify(mockAuth)
             });
         });
 
@@ -24,8 +26,8 @@ test.describe('Campaign Wizard E2E Happy Path', () => {
                 status: 200,
                 contentType: 'application/json',
                 body: JSON.stringify([
-                    { id: 'ret-101', name: 'SuperMart' },
-                    { id: 'ret-102', name: 'MegaStore' }
+                    buildRetailer({ id: 'ret-101', name: 'SuperMart' }),
+                    buildRetailer({ id: 'ret-102', name: 'MegaStore' })
                 ])
             });
         });
@@ -37,11 +39,11 @@ test.describe('Campaign Wizard E2E Happy Path', () => {
                 await route.fulfill({
                     status: 201,
                     contentType: 'application/json',
-                    body: JSON.stringify({
+                    body: JSON.stringify(buildCampaign({
                         id: `cmp-${Date.now()}`,
                         ...reqBody,
                         status: 'pending_approval'
-                    })
+                    }))
                 });
             } else if (route.request().method() === 'GET') {
                 // Return campaign list
@@ -49,25 +51,26 @@ test.describe('Campaign Wizard E2E Happy Path', () => {
                     status: 200,
                     contentType: 'application/json',
                     body: JSON.stringify([
-                        {
+                        buildCampaign({
                             id: 'cmp-mock-1',
                             name: 'Summer Sale 2026',
                             retailer_id: 'ret-101',
                             start_date: new Date().toISOString().split('T')[0],
                             end_date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
                             status: 'pending_approval'
-                        }
+                        })
                     ])
                 });
             }
         });
 
+        const mockStats = { campaignsActive: 0, campaignsPending: 1 };
         // Mock Dashboard API which the frontend might hit
         await page.route('**/api/dashboard/kpis**', async route => {
             await route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({ campaignsActive: 0, campaignsPending: 1 })
+                body: JSON.stringify(mockStats)
             });
         });
 

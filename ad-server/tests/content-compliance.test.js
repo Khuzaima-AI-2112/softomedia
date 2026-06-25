@@ -1,7 +1,11 @@
+import { jest } from '@jest/globals';
 import request from 'supertest';
-import app from '../index.js';
 import path from 'path';
 import fs from 'fs';
+import { createTestApp } from './fixtures/test-app.js';
+import './fixtures/mock-repos.js';
+
+const { default: apiRouter } = await import('../src/api/index.js');
 
 const roles = {
     ADVERTISER: 'advertiser',
@@ -9,11 +13,18 @@ const roles = {
 };
 
 const reqAs = (role, method, route) => {
-    return request(app)[method](route)
-        .set('Authorization', 'Bearer demo-token')
-        .set('x-demo-role', role)
-        .set('x-demo-user-id', `${role}_user_123`)
-        .set('x-demo-retailer-id', 'test_retailer_id');
+    const app = createTestApp(apiRouter, '/api', {
+        middleware: [
+            (req, res, next) => {
+                req.headers['authorization'] = 'Bearer demo-token';
+                req.headers['x-demo-role'] = role;
+                req.headers['x-demo-user-id'] = `${role}_user_123`;
+                req.headers['x-demo-retailer-id'] = 'test_retailer_id';
+                next();
+            }
+        ]
+    });
+    return request(app)[method](route);
 };
 
 describe('4.4 Content Specifications & Compliance', () => {
