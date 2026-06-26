@@ -1,8 +1,8 @@
-﻿import jwt from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import { userRepository } from '../repositories/index.js';
 import logger from '../utils/logger.js';
 
-const JWT_SECRET = process.env.JWT_SECRET;
+// JWT_SECRET is loaded dynamically to avoid ESM hoisting issues
 
 export class AuthService {
     /**
@@ -19,7 +19,7 @@ export class AuthService {
 
             const token = jwt.sign(
                 { id: user.id, email: user.email, role: user.role, linked_entity_id: user.linked_entity_id },
-                JWT_SECRET,
+                process.env.JWT_SECRET,
                 { expiresIn: '24h' }
             );
 
@@ -38,7 +38,7 @@ export class AuthService {
      */
     verifyToken(token) {
         try {
-            return jwt.verify(token, JWT_SECRET);
+            return jwt.verify(token, process.env.JWT_SECRET);
         } catch (error) {
             throw new Error('Invalid or expired token');
         }

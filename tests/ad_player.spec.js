@@ -26,7 +26,7 @@ test.fixme('Ad Player transitions images every 5 seconds', async ({ page }) => {
 
     // 2. Wait for the player to initialize and load the first ad
     // The player shows "Connecting..." initially, then transitions to playing
-    const adImage = page.getByTestId('ad-image');
+    const adImage = page.getByTestId('ad-frame');
     await expect(adImage).toBeVisible({ timeout: 15000 });
 
     // 3. Record the initial image src

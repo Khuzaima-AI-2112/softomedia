@@ -63,7 +63,6 @@ test.describe.serial('Phase 5 — TechOps Health Check', () => {
     await page.route('**/api/health**', async (route) => {
       await route.fulfill({
         status: 200,
-        contentType: 'application/json',
         json: MOCK_HEALTH_RESPONSE,
       });
     });
@@ -101,7 +100,6 @@ test.describe.serial('Phase 5 — TechOps Health Check', () => {
     await page.route('**/api/health**', async (route) => {
       await route.fulfill({
         status: 200,
-        contentType: 'application/json',
         json: MOCK_HEALTH_RESPONSE,
       });
     });

@@ -16,7 +16,7 @@ test.describe('Global Playlist Feature', () => {
                 data: {
                     name: 'TDD Global Test Playlist',
                     description: 'Created via TDD test',
-                    status: 'ACTIVE',
+                    status: 'active',
                     is_global: true,
                     items: [
                         { media_id: 'demo-asset-1', duration: 10, order: 1 },
@@ -46,7 +46,7 @@ test.describe('Global Playlist Feature', () => {
             const res = await request.post(`${API_BASE}/api/playlists`, {
                 data: {
                     name: 'Global Fallback Test',
-                    status: 'ACTIVE',
+                    status: 'active',
                     is_global: true,
                     items: [{ media_id: 'demo-asset-1', duration: 10, order: 1 }]
                 }

@@ -121,7 +121,12 @@ export async function mockLoopApproveApi(page) {
 export async function mockAnalyticsApi(page, summary) {
   const data = summary ?? buildAnalyticsSummary();
 
-  await page.route('**/api/analytics/**', route => {
+  await page.route('**/api/analytics/loops**', route => {
+    // UI expects an array for loops
+    route.fulfill(jsonResponse(data.hourly));
+  });
+  
+  await page.route('**/api/analytics/summary**', route => {
     route.fulfill(jsonResponse(data));
   });
 }

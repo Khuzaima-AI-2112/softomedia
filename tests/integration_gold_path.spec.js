@@ -6,7 +6,6 @@ test.describe('End-to-End Gold Path: Multi-Persona Journey', () => {
         await page.route('**/api/assets/upload', route => {
             route.fulfill({
                 status: 201,
-                contentType: 'application/json',
                 json: {
                     id: 'mock-asset-001',
                     filename: 'demo-ad.mp4',
@@ -19,7 +18,6 @@ test.describe('End-to-End Gold Path: Multi-Persona Journey', () => {
             if (route.request().method() === 'POST') {
                 route.fulfill({
                     status: 201,
-                    contentType: 'application/json',
                     json: {
                         id: `campaign-${Date.now()}`,
                         title: 'Test Campaign',

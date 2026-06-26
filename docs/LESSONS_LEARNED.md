@@ -45,6 +45,28 @@ The security secret audit (`Select-String` / `ripgrep`) detected a hardcoded Gem
 
 ---
 
+## 2026-06-26 — E2E Integration Suite Analysis: Backoff Latencies, View-Mode Assumptions, Casing Typos, and Mock Completeness
+**Severity:** Medium — Five E2E test failures in root test suites due to retry backoff timeouts, hidden hourly charts, test casing typos, idle demo player states, and incomplete mock schemas.
+
+**Symptom:**
+1. Step 6 (Analytics) in `integration_broadcasting.spec.js` failed because it expected `[data-testid="hourly-chart"]` to be visible immediately, but the chart is only rendered in the "Day" view mode.
+2. `Player handles API failure gracefully` in `integration_broadcasting.spec.js` timed out at 20 seconds because the player reconnect backoff delays (`2s, 4s, 8s, 16s, 30s`) take over 60 seconds to finish retrying and fall back to the offline player state.
+3. `P-01` reload persistence in `loop_persistence.spec.js` failed after reload because a casing typo compared uppercase `status` with `'pending_approval'` (lowercase) instead of `'PENDING_APPROVAL'`.
+4. `player_demo.spec.js` timed out on an idle screen because it navigated directly to `/player/demo?screenId=scr_001_01` without simulating the selection of Retailer, Store, and Screen dropdowns to start the player.
+5. `telemetry.spec.js` failed to emit `campaignId` because the test's mock loop slots omitted the mandatory `campaign_id` schema field.
+
+### What Happened
+- **Backoff Latency Noise**: Exponential backoff reconnection delays designed for production resilience can block and timeout E2E assertions if not dynamically scaled down during test executions.
+- **UI Default State Assumptions**: E2E tests often assume a specific component view mode is active. If the default mode changes or defaults to a wider view (e.g. "Week" aggregate summary), elements specific to other views (e.g. "Day" hourly charts) will be absent.
+- **Casing and Contract Drift**: String comparisons in tests matching database enum states (e.g., `'PENDING_APPROVAL'` vs `'pending_approval'`) are highly error-prone if not normalized or checked case-insensitively. Inline route mocks that manually build complex data structures often omit optional fields (e.g. `campaign_id`), causing telemetry failures.
+
+### Actionable Improvements Going Forward
+- **Scale Retry Backoffs in Tests**: Configure connection retry delays to be minimal (e.g. <100ms) when running in test environments to ensure state machines transition fast and prevent Playwright timeout errors.
+- **Simulate User Navigation Steps**: Never assume elements are visible without simulating the required user actions (like toggling view tabs) to render them.
+- **Use Canonical Factories**: Prefer using centralized test factories (like `factories.js`) rather than inlining raw mock objects to ensure mocks remain schema-compliant.
+
+---
+
 ## 2026-06-25 — E2E Alignment: Playwright Locators, Layout Mismatches, and Telemetry Parameter Normalisation
 **Severity:** High — Broken E2E test suite pass rate due to hidden locators, layout-dependent state logic, and parameter naming mismatches between player telemetry and database logging.
 
@@ -768,3 +790,14 @@ Two distinct but related failures crippled the Brand Campaign Wizard E2E tests:
 ### Prevention
 1. **Playwright Native JSON Fulfillment:** We learned that Playwright's `route.fulfill()` provides native JSON serialization via the `json` option (`route.fulfill({ json: mockData })`). This natively handles `Content-Type` headers and complies with AST linting rules, preventing the need for raw strings.
 2. **Consistent Log Sanitation:** Enforced through `/hygiene` checks, preventing deployment of un-sanitized client logs.
+# [2026-06-26] Loop Analytics Time-of-Day Flakiness (Phase 15)
+
+## What Happened
+The E2E test suite failed during overnight runs in Phase 15. The analytics backend extracted the hour from the UTC timestamp using new Date().getHours(), which meant impressions generated outside the hardcoded 8am-10pm dashboard bounds were entirely dropped, causing playCount assertions to fail.
+
+## Why It Happened
+The server local time caused telemetry to fall into buckets outside the visual timeline (e.g. 2am), leading to dropped metrics in the UI. This is a severe data-loss vector for timezone-shifted physical screens.
+
+## Prevention
+Implemented Data Clamping in the telemetry aggregation logic (analytics.js) to clamp hours into the visible 8 to 21 range. All telemetry processing should validate bounds and fallback to safe bucket limits to prevent silent data loss.
+

@@ -11,7 +11,7 @@ test.describe('Playlist Orchestration API', () => {
 
     test.beforeAll(async ({ request }) => {
         // 1. Authenticate as Admin
-        const loginRes = await request.post('http://localhost:8080/api/auth/login', {
+        const loginRes = await request.post('/api/auth/login', {
             data: { email: 'admin@softomedia.com' }
         });
         expect(loginRes.ok()).toBeTruthy();
@@ -37,7 +37,7 @@ test.describe('Playlist Orchestration API', () => {
         const payload = {
             name: "E2E Summer Sale",
             description: "Integration Test Playlist",
-            status: "ACTIVE",
+            status: "active",
             assignments: [testScreenId], // Explicit assignment
             items: [
                 { media_id: "demo-asset-1", duration: 15, order: 1 },

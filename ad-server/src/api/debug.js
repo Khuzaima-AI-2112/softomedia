@@ -86,4 +86,14 @@ router.post('/reset', async (req, res) => {
     }
 });
 
+router.get('/users', async (req, res) => {
+    try {
+        const { userRepository } = await import('../repositories/index.js');
+        const users = await userRepository.findAll();
+        res.json(users);
+    } catch(err) {
+        res.status(500).json({error: err.message});
+    }
+});
+
 export default router;

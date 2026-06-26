@@ -24,7 +24,7 @@ const StatusBadge = ({ status }) => {
     const styles = STATUS_STYLES[status?.toLowerCase()] ?? DEFAULT_STYLE;
 
     return (
-        <span style={{
+        <span data-testid="loop-status" style={{
             display: 'inline-flex',
             alignItems: 'center',
             padding: '2px 10px',

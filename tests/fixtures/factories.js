@@ -235,7 +235,12 @@ export function buildAnalyticsSummary(overrides = {}) {
       partialCount: 2,
       ...overrides.summary,
     },
-    hourly: overrides.hourly ?? [],
+    hourly: overrides.hourly ?? Array.from({ length: 14 }, (_, i) => ({
+      hour: 8 + i,
+      loopCompletions: 11,
+      integrityScore: 98.2,
+      status: 'DELIVERED',
+    })),
     business_hours: {
       start: 8,
       end: 22,

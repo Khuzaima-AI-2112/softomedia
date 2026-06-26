@@ -15,7 +15,6 @@ test.describe('Playlist Lifecycle E2E', () => {
         await page.route('**/api/screens/register', route => {
             route.fulfill({
                 status: 200,
-                contentType: 'application/json',
                 json: { status: 'ok', screen_id: 'mocked' }
             });
         });
@@ -31,7 +30,7 @@ test.describe('Playlist Lifecycle E2E', () => {
             const globalRes = await request.post(`${API_BASE}/api/playlists`, {
                 data: {
                     name: 'E2E Global Fallback',
-                    status: 'ACTIVE',
+                    status: 'active',
                     is_global: true,
                     items: [{ media_id: 'global-asset', duration: 5, order: 1 }]
                 }
@@ -42,7 +41,7 @@ test.describe('Playlist Lifecycle E2E', () => {
             const assignedRes = await request.post(`${API_BASE}/api/playlists`, {
                 data: {
                     name: 'E2E Assigned Playlist',
-                    status: 'ACTIVE',
+                    status: 'active',
                     is_global: false,
                     assignments: [screenId],
                     items: [{ media_id: 'assigned-asset', duration: 10, order: 1 }]
@@ -93,7 +92,7 @@ test.describe('Playlist Lifecycle E2E', () => {
             const playlistRes = await request.post(`${API_BASE}/api/playlists`, {
                 data: {
                     name: 'Telemetry Global',
-                    status: 'ACTIVE',
+                    status: 'active',
                     is_global: true,
                     items: [{ media_id: 'tele-asset', duration: 5, order: 1 }]
                 }
@@ -101,7 +100,7 @@ test.describe('Playlist Lifecycle E2E', () => {
             const playlistId = (await playlistRes.json()).id;
 
             await page.goto(`${PLAYER_URL}?screen_id=telemetry-test-${Date.now()}&debug=true`);
-            await expect(page.locator('[data-testid="ad-image"]')).toBeVisible({ timeout: 15000 });
+            await expect(page.locator('[data-testid="ad-frame"]')).toBeVisible({ timeout: 15000 });
 
             const buffer = await page.evaluate(() => {
                 const data = localStorage.getItem('softomedia_impression_buffer');

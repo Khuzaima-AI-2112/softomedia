@@ -74,7 +74,7 @@ test.describe('Loop Playback - Sprint 4', () => {
         await page.goto('/player?screen_id=test_screen');
 
         // Wait for ad to display
-        await expect(page.locator('[data-testid="ad-image"]')).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('[data-testid="ad-frame"]')).toBeVisible({ timeout: 10000 });
     });
 
     test('Player shows loop indicator when in loop mode', async ({ page }) => {
@@ -101,7 +101,7 @@ test.describe('Loop Playback - Sprint 4', () => {
         await page.goto('/player?screen_id=test_screen');
 
         // Wait for first ad
-        await expect(page.locator('[data-testid="ad-image"]')).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('[data-testid="ad-frame"]')).toBeVisible({ timeout: 10000 });
 
         // Get initial slot info
         const initialOverlay = await page.locator('[data-testid="ad-debug-overlay"]').textContent();
@@ -126,7 +126,7 @@ test.describe('Loop Playback - Sprint 4', () => {
         await page.goto('/player?screen_id=test_screen');
 
         // Should still show content from playlist fallback
-        await expect(page.locator('[data-testid="ad-image"]')).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('[data-testid="ad-frame"]')).toBeVisible({ timeout: 15000 });
     });
 
     test('Player sends telemetry', async ({ page }) => {
@@ -138,7 +138,7 @@ test.describe('Loop Playback - Sprint 4', () => {
         await page.goto('/player?screen_id=test_screen&debug=true');
 
         // Wait for playback to start
-        await expect(page.locator('[data-testid="ad-image"]')).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('[data-testid="ad-frame"]')).toBeVisible({ timeout: 10000 });
 
         // Check telemetry was logged
         const telemetryLog = await page.evaluate(() => window.__TELEMETRY_LOG__ || []);

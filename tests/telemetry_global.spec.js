@@ -17,7 +17,6 @@ test.describe('Global Playlist Telemetry', () => {
             await page.route('**/api/screens/register', route => {
                 route.fulfill({
                     status: 200,
-                    contentType: 'application/json',
                     json: { status: 'ok', screen_id: 'mocked' }
                 });
             });
@@ -30,12 +29,14 @@ test.describe('Global Playlist Telemetry', () => {
             const res = await request.post(`${API_BASE}/api/playlists`, {
                 data: {
                     name: 'Telemetry Test Global',
-                    status: 'ACTIVE',
+                    status: 'active',
                     is_global: true,
                     items: [{ media_id: 'demo-asset-1', duration: 5, order: 1 }]
                 }
             });
-            globalPlaylistId = (await res.json()).id;
+            const data = await res.json();
+            console.log('CREATE RES:', data);
+            globalPlaylistId = data.id;
             console.log('Created Global Playlist:', globalPlaylistId);
 
             // DEBUG: Verify it exists and is public
@@ -66,9 +67,9 @@ test.describe('Global Playlist Telemetry', () => {
             // Navigate to player with debug mode
             await page.goto(`${PLAYER_URL}?screen_id=${screenId}&debug=true`);
 
-            // Wait for player to start playing (shows ad-image)
+            // Wait for player to start playing (shows ad-frame)
             // Increased timeout for slow initialization
-            await expect(page.locator('[data-testid="ad-image"]')).toBeVisible({ timeout: 15000 });
+            await expect(page.locator('[data-testid="ad-frame"]')).toBeVisible({ timeout: 15000 });
 
             // Check localStorage buffer (Batch Architecture)
             const buffer = await page.evaluate(() => {
@@ -96,7 +97,7 @@ test.describe('Global Playlist Telemetry', () => {
             const res = await request.post(`${API_BASE}/api/playlists`, {
                 data: {
                     name: 'Assigned Telemetry Test',
-                    status: 'ACTIVE',
+                    status: 'active',
                     is_global: false,
                     assignments: [screenId],
                     items: [{ media_id: 'demo-asset-2', duration: 5, order: 1 }]
@@ -106,7 +107,7 @@ test.describe('Global Playlist Telemetry', () => {
 
             // 2. Play
             await page.goto(`${PLAYER_URL}?screen_id=${screenId}&debug=true`);
-            await expect(page.locator('[data-testid="ad-image"]')).toBeVisible();
+            await expect(page.locator('[data-testid="ad-frame"]')).toBeVisible();
 
             // 3. Verify buffer
             const buffer = await page.evaluate(() => {

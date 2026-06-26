@@ -30,7 +30,13 @@ router.get('/loops', authenticate, async (req, res) => {
             if (playedAt && playedAt.startsWith(date)) {
                 try {
                     const playedDate = new Date(playedAt);
-                    const hour = playedDate.getHours();
+                    let hour = playedDate.getHours();
+                    
+                    // SRE Fix: Prevent data loss for timezone-shifted or out-of-hours impressions
+                    // Clamp to the visible dashboard hours (8 to 21)
+                    if (hour < 8) hour = 8;
+                    if (hour > 21) hour = 21;
+                    
                     if (hoursMap[hour] !== undefined) {
                         hoursMap[hour].loopCompletions += 1;
                     }

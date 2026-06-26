@@ -34,14 +34,12 @@ test.describe('Retailer Validation - Sprint 3', () => {
                 }
                 route.fulfill({
                     status: 200,
-                    contentType: 'application/json',
                     json: { loops, business_hours: { start: 8, end: 22 } }
                 });
             } else if (url.includes('/approve')) {
                 // Mock loop approval
                 route.fulfill({
                     status: 200,
-                    contentType: 'application/json',
                     json: { status: 'APPROVED' }
                 });
             } else if (url.includes('/reject')) {
@@ -54,7 +52,6 @@ test.describe('Retailer Validation - Sprint 3', () => {
                 }));
                 route.fulfill({
                     status: 200,
-                    contentType: 'application/json',
                     json: { id: 'test_loop', slots }
                 });
             } else if (url.includes('/replace')) {
@@ -66,14 +63,12 @@ test.describe('Retailer Validation - Sprint 3', () => {
                 }));
                 route.fulfill({
                     status: 200,
-                    contentType: 'application/json',
                     json: { id: 'test_loop', slots }
                 });
             } else if (route.request().url().match(/\/api\/loops\/[^/]+$/)) {
                 // Mock single loop fetch
                 route.fulfill({
                     status: 200,
-                    contentType: 'application/json',
                     json: {
                         id: '2026-01-03_14_loc_downtown',
                         date: '2026-01-03',
@@ -96,12 +91,15 @@ test.describe('Retailer Validation - Sprint 3', () => {
     });
 
     test('Retailer sees Schedule Calendar', async ({ retailerPage: page }) => {
-        await page.goto('/dashboard/retailer/schedule/calendar');
+        
+        
+        
+        await page.goto('/dashboard/retailer/schedule');
         await expect(page.getByText("Tomorrow's Broadcast Schedule")).toBeVisible();
     });
 
     test('Retailer sees 14-hour timeline', async ({ retailerPage: page }) => {
-        await page.goto('/dashboard/retailer/schedule/calendar');
+        await page.goto('/dashboard/retailer/schedule');
 
         await expect(page.locator('[data-testid="schedule-timeline"]')).toBeVisible();
 
@@ -112,7 +110,7 @@ test.describe('Retailer Validation - Sprint 3', () => {
     });
 
     test('Retailer can click hour to preview loop', async ({ retailerPage: page }) => {
-        await page.goto('/dashboard/retailer/schedule/calendar');
+        await page.goto('/dashboard/retailer/schedule');
 
         // Click on 2pm slot
         await page.locator('[data-testid="schedule-hour-14"]').click();
@@ -122,7 +120,7 @@ test.describe('Retailer Validation - Sprint 3', () => {
     });
 
     test('Retailer sees 12 slots in preview modal', async ({ retailerPage: page }) => {
-        await page.goto('/dashboard/retailer/schedule/calendar');
+        await page.goto('/dashboard/retailer/schedule');
 
         await page.locator('[data-testid="schedule-hour-14"]').click();
 
@@ -133,7 +131,7 @@ test.describe('Retailer Validation - Sprint 3', () => {
     });
 
     test('Retailer can reject a slot', async ({ retailerPage: page }) => {
-        await page.goto('/dashboard/retailer/schedule/calendar');
+        await page.goto('/dashboard/retailer/schedule');
 
         await page.locator('[data-testid="schedule-hour-14"]').click();
         await expect(page.getByText('Loop Preview')).toBeVisible();
@@ -147,7 +145,7 @@ test.describe('Retailer Validation - Sprint 3', () => {
     });
 
     test('Retailer must select reason before rejecting', async ({ retailerPage: page }) => {
-        await page.goto('/dashboard/retailer/schedule/calendar');
+        await page.goto('/dashboard/retailer/schedule');
 
         await page.locator('[data-testid="schedule-hour-14"]').click();
         await page.locator('[data-testid="reject-btn-3"]').click();
@@ -163,7 +161,7 @@ test.describe('Retailer Validation - Sprint 3', () => {
     });
 
     test('Retailer can select replacement for rejected slot', async ({ retailerPage: page }) => {
-        await page.goto('/dashboard/retailer/schedule/calendar');
+        await page.goto('/dashboard/retailer/schedule');
 
         await page.locator('[data-testid="schedule-hour-14"]').click();
         await page.locator('[data-testid="reject-btn-3"]').click();
@@ -178,7 +176,7 @@ test.describe('Retailer Validation - Sprint 3', () => {
     });
 
     test('Retailer can approve all pending loops', async ({ retailerPage: page }) => {
-        await page.goto('/dashboard/retailer/schedule/calendar');
+        await page.goto('/dashboard/retailer/schedule');
 
         // Click approve all button
         await expect(page.locator('[data-testid="approve-all-btn"]')).toBeVisible();
@@ -189,7 +187,7 @@ test.describe('Retailer Validation - Sprint 3', () => {
     });
 
     test('Retailer can approve single loop from preview', async ({ retailerPage: page }) => {
-        await page.goto('/dashboard/retailer/schedule/calendar');
+        await page.goto('/dashboard/retailer/schedule');
 
         await page.locator('[data-testid="schedule-hour-14"]').click();
 

@@ -36,10 +36,12 @@ export class UserRepository extends BaseRepository {
      * @param {object} data - User data (name, email, role, linkedentityid, status)
      * @returns {Promise<object>} Created user document with id
      */
-    async create(data) {
-        const id = this.collection
-            ? this.collection.doc().id
-            : `usr_${Date.now()}`;
+    async create(idOrData, maybeData) {
+        if (arguments.length === 2) {
+            return super.create(idOrData, maybeData);
+        }
+        const data = idOrData;
+        const id = data.id || (this.collection ? this.collection.doc().id : `usr_${Date.now()}`);
         return super.create(id, data);
     }
 
