@@ -130,22 +130,33 @@ Here are specific examples of how you can apply Loop Engineering to automate cod
 
 ---
 
-### 6. Self-Seeding Isolated Test Cycles (E.g. Mitigating Shared DB State Pollution)
+### 6. Sequential Global Self-Seeding Test Cycles (E.g. Mitigating Shared DB State Pollution)
 *   **The Problem:** Tests share the same Firestore instance and clash with preexisting seed data (e.g. `ALREADY_EXISTS: ent_costco`), causing test suite cascades and false positives depending on execution order.
-*   **Loop Engineering Solution:** Automate environment provisioning per test execution, preventing cross-test pollution. Every test run should run inside a clean Firestore emulator session or use dynamically isolated entity namespacing (e.g., prefixing collections or IDs with a unique run ID).
-*   **Automated Guardrail (test isolation lifecycle):**
-    Instead of manually running database flushes (`/flush`) before running tests, configure unit and integration tests to automatically spin up a fresh, localized emulator memory space or programmatically trigger clear/reset requests:
+*   **Loop Engineering Solution:** Automate environment provisioning globally before the test suite runs. Trigger an endpoint that programmatically clears existing data **and** immediately runs the database seed service, ensuring the test run begins with a guaranteed, fresh seed state. Enforce sequential execution (`workers: 1`) to prevent cascading database contamination during the run rather than restructuring for per-test isolation.
+*   **Automated Guardrail (dev-only reset endpoint, global setup integration, and sequential execution):**
+    Expose a development-only reset endpoint in the backend API and configure the test framework's global setup hooks to call it before executing any spec files. Additionally, enforce `workers: 1` in `playwright.config.js`:
     ```javascript
-    // ad-server/tests/setup.js
-    const axios = require('axios');
-
-    beforeEach(async () => {
-      if (process.env.FIRESTORE_EMULATOR_HOST) {
-        // Programmatically clear emulator Firestore DB before each spec run
-        const emulatorUrl = `http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/softomedia-live-2026/databases/(default)/documents`;
-        await axios.delete(emulatorUrl);
+    // ad-server/src/api/debug.js (Development-only route)
+    router.post('/reset', async (req, res) => {
+      if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEMO_MODE !== 'true') {
+        return res.status(403).json({ error: 'Denied' });
       }
+      const db = getFirestore();
+      for (const collection of COLLECTIONS) {
+        await deleteCollection(db, collection); // Batch delete all documents
+      }
+      clearMockStorage(); // Clear in-memory singleton Maps
+      await seedDatabase(); // Populate default seed entities
+      res.status(200).json({ status: 'success' });
     });
+
+    // tests/global.setup.js (Playwright global setup)
+    async function globalSetup(config) {
+      console.log('🔄 Resetting database to clean seeded state...');
+      const res = await fetch('http://localhost:8080/api/debug/reset', { method: 'POST' });
+      if (!res.ok) throw new Error('Database reset failed');
+      console.log('✅ Clean database re-seeded successfully.');
+    }
     ```
 
 ---
@@ -211,3 +222,121 @@ Here are specific examples of how you can apply Loop Engineering to automate cod
     }
     ```
 
+---
+
+### 9. Deferring Env Evaluation to Avoid ESM Hoisting Bugs
+*   **The Problem:** ES Module (ESM) resolution statically parses and executes imports before running script files. Top-level statements like `const ALLOW_DEMO = process.env.ALLOW_DEMO_MODE === 'true';` are evaluated *before* the entry script (e.g., `server.js`) can call `dotenv.config()`, resulting in `undefined` configuration values.
+*   **Loop Engineering Solution:** Defer the resolution of environment variables to request/evaluation time (e.g., within route handler scopes, getters, or config resolution helpers) instead of executing them statically at module load time.
+*   **Automated Guardrail (Dynamic Env Getters):**
+    Ensure environment checks are encapsulated in getters or functions:
+    ```javascript
+    // ad-server/src/api/schedules.js
+    router.get('/', (req, res) => {
+        // Evaluated at request time, safely after dotenv.config() has loaded
+        const allowDemo = process.env.ALLOW_DEMO_MODE === 'true';
+        if (allowDemo) {
+            // handle demo logic
+        }
+    });
+    ```
+
+---
+
+### 10. Mock Map Reference Retention vs Re-assignment
+*   **The Problem:** Backend repositories often cache references to in-memory mock storage objects at load time. Reassigning or deleting the root reference keys (e.g., `MOCK_STORAGE = {}` or `delete MOCK_STORAGE[key]`) breaks connection to the active singleton repositories initialized during startup.
+*   **Loop Engineering Solution:** Keep the storage reference object constant and clear its values internally (using `Map.prototype.clear()`) rather than reassigning the map or deleting keys.
+*   **Automated Guardrail (Reference-safe Mock Purge):**
+    Implement a safe reset function that purges the contents of existing Maps without breaking references:
+    ```javascript
+    // ad-server/src/repositories/BaseRepository.js
+    export function clearMockStorage() {
+        // Safe: clears entries inside the Map while retaining the object reference
+        MOCK_STORAGE.clear();
+    }
+    ```
+
+---
+
+### 11. Fail-Fast Test Preflight Audits
+*   **The Problem:** Executing E2E test suites when the backend server or the database emulator is offline launches hundreds of browser processes that immediately timeout, consuming local CPU resources and generating useless log noise.
+*   **Loop Engineering Solution:** Integrate a preflight health check script that verifies all dependencies and emulators are listening on their respective ports, halting execution immediately if they are unreachable.
+*   **Automated Guardrail (test-preflight.js):**
+    Before booting Playwright, run a lightweight validation script:
+    ```javascript
+    // scripts/test-preflight.js
+    const http = require('http');
+
+    function checkPort(port, name) {
+      return new Promise((resolve, reject) => {
+        const req = http.request({ host: 'localhost', port, path: '/health', method: 'GET', timeout: 2000 }, (res) => {
+          if (res.statusCode === 200) resolve();
+          else reject(new Error(`${name} returned status ${res.statusCode}`));
+        });
+        req.on('error', () => reject(new Error(`${name} is offline`)));
+        req.end();
+      });
+    }
+
+    Promise.all([
+      checkPort(8080, 'Ad Server'),
+      checkPort(8090, 'Firestore Emulator')
+    ]).catch(err => {
+      console.error(`❌ Preflight check failed: ${err.message}`);
+      process.exit(1);
+    });
+    ```
+
+---
+
+### 12. Dedicated Test Linter Rules
+*   **The Problem:** Developers sometimes hardcode mock JSON responses or manual authentication sequences directly inside spec files, fracturing the centralized testing architecture and leading to silent test drifts.
+*   **Loop Engineering Solution:** Introduce an automated script to lint test files, using pattern matching or AST analysis to reject files containing raw mocks or manual storage bypasses.
+*   **Automated Guardrail (lint-tests.js):**
+    Add a script to lint the test specs before execution:
+    ```javascript
+    // scripts/lint-tests.js
+    const fs = require('fs');
+    const path = require('path');
+
+    const testsDir = path.resolve(__dirname, '../tests');
+    const specFiles = fs.readdirSync(testsDir).filter(f => f.endsWith('.spec.js'));
+
+    specFiles.forEach(file => {
+      const content = fs.readFileSync(path.join(testsDir, file), 'utf8');
+      if (content.includes('JSON.stringify') && content.includes('page.route')) {
+        console.error(`❌ [Lint Error] File ${file} uses inline JSON.stringify within page.route(). Use factories instead.`);
+        process.exit(1);
+      }
+      if (content.includes('localStorage.setItem') && content.includes('auth_token')) {
+        console.error(`❌ [Lint Error] File ${file} sets auth token manually. Use loginAs() helper instead.`);
+        process.exit(1);
+      }
+    });
+    ```
+
+---
+
+### 13. Playwright Actionability & Floating UI Interception
+*   **The Problem:** E2E tests utilizing Playwright's actionability checks (e.g., `locator.click()`) fail intermittently or consistently because floating UI elements (like a sticky chat widget or the Gemini AI helper) overlay the target element, causing a "subtree intercepts pointer events" error. 
+*   **Loop Engineering Solution:** Instead of polluting individual test files with `{ force: true }` (which bypasses actionability and can mask real visibility bugs) or manual `addStyleTag` calls that reset upon navigation (or fail if executed before the DOM head exists), programmatically disable the rendering of non-essential UI elements globally for the entire test environment using an injected environment flag.
+*   **Automated Guardrail (Global Init Script Injection & App Environment Check):**
+    Inject a global `window` flag via Playwright's `addInitScript` in `test.beforeEach` or `global.setup.js` to ensure the state persists across all page navigations:
+    ```javascript
+    // tests/personas.spec.js
+    test.beforeEach(async ({ page }) => {
+        // Globally flag the environment as a Playwright test
+        await page.addInitScript(() => {
+            window.__PLAYWRIGHT_TEST__ = true;
+        });
+    });
+    ```
+    Then, in the React application's widget loader, intercept this flag to bypass rendering entirely:
+    ```javascript
+    // client-app/src/components/SafeWidgetLoader.jsx
+    const SafeWidgetLoader = () => {
+        const isTestEnv = typeof window !== 'undefined' && window.__PLAYWRIGHT_TEST__;
+        if (isTestEnv) return null; // Invisible in Playwright
+
+        return <GeminiWidget />;
+    };
+    ```

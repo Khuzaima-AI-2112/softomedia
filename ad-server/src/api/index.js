@@ -24,12 +24,14 @@ import impressionsRouter from './impressions.js';
 import invoicesRouter from './invoices.js';
 import ticketsRouter from './tickets.js';
 import analyticsRouter from './analytics.js';
+import debugRouter from './debug.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // --- Public Routes ---
 router.use('/auth', authRouter);
+router.use('/debug', debugRouter);
 router.use('/health', healthRouter);
 router.use('/assets', assetsRouter);
 // Note: 'playlist' (singular) is the Player endpoint, 'playlists' (plural) is the Admin CRUD

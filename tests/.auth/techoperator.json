@@ -22,7 +22,7 @@
         },
         {
           "name": "auth_user",
-          "value": "{\"id\":\"user-techoperator\",\"email\":\"techoperator@softomedia.com\",\"name\":\"Demo Techoperator\",\"role\":\"techoperator\",\"linked_entity_id\":\"entity-techop-001\"}"
+          "value": "{\"id\":\"demo-techop-uid\",\"email\":\"techop@softomedia.demo\",\"name\":\"Demo TechOps\",\"role\":\"techoperator\",\"linked_entity_id\":\"entity-techop-001\"}"
         }
       ]
     }

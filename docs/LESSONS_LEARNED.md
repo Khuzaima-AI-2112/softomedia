@@ -4,6 +4,28 @@ A living document capturing post-incident analysis, root causes, and actionable 
 
 ---
 
+## 2026-06-25 — Hardcoded API Keys In Test Scripts (DevSecOps Remediation)
+**Severity:** High — Hardcoded GCP/Gemini API keys committed to the codebase, creating a credentials leak risk.
+
+**Symptom:**
+The security secret audit (`Select-String` / `ripgrep`) detected a hardcoded Gemini API key fallback (`AIzaSyAYgmZKRaGIiLjtNWCNmA2sTR2gPIxMV5o`) in utility/test scripts.
+
+### What Happened
+1. **Convenience Fallbacks:** Developers hardcoded the API key directly as a fallback inline string (`const apiKey = process.env.GEMINI_API_KEY || 'AIzaSy...'`) to simplify running standalone test scripts locally without needing to set environment variables.
+2. **Incomplete Purging:** Git history purges (`git filter-repo`) only targeted the `.env.development` file path, leaving inline hardcoded strings inside tracked javascript code files untouched.
+
+### Fix Applied
+- **Removed Fallbacks:** Removed the fallback hardcoded API key from [check-models.js](file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/ad-server/check-models.js) and [test-gemini-2.0.js](file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/ad-server/test-gemini-2.0.js) and enforced that `GEMINI_API_KEY` must come from `process.env`.
+- **Stand-alone Dotenv Setup:** Configured both scripts to initialize `dotenv` pointing to the parent directory's `.env.development` file so they run seamlessly in development.
+- **Example Documentation:** Documented the key placeholder in [.env.example](file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/.env.example).
+
+### Actionable Improvements Going Forward
+- **Zero-Tolerance for Inline Keys:** Never use hardcoded strings as fallbacks for environment variables in source files, even in "temporary" scripts or test helpers.
+- **Require Dotenv in Standalone Scripts:** Any scripts designed to run standalone (outside the main server startup) that consume secrets must initialize `dotenv` pointing to local gitignored env files.
+- **Automated Secret Audits:** Implement secret scanners (or pre-commit hooks) to search for GCP key prefixes (`AIzaSy`) before code is staged or committed.
+
+---
+
 ## 2026-06-25 — E2E Alignment: Playwright Locators, Layout Mismatches, and Telemetry Parameter Normalisation
 **Severity:** High — Broken E2E test suite pass rate due to hidden locators, layout-dependent state logic, and parameter naming mismatches between player telemetry and database logging.
 
@@ -691,3 +713,22 @@ Vite proxy default was improperly configured to a dormant port, meaning any API 
 1. **Always Verify Proxy Ports:** The Vite config proxy must strictly mirror the local backend's actual running port (\8080\).
 2. **Isolate Stateful Test Suites:** When a test suite (like demo wizard) is highly state-dependent across multiple phases, ensure it runs strictly under its designated Playwright project by using \--project=demo-wizard\ and setting the correct environment flags like \ALLOW_DEMO_MODE=true\.
 
+
+
+---
+
+## 2026-06-25 — Playwright UI Interception & Data Seeding Deadlocks
+**Severity:** High — Intermittent and silent E2E pipeline failures.
+
+**Symptom:**
+Two distinct but related failures crippled the Brand Campaign Wizard E2E tests:
+1.  **Pointer Event Interception:** The Gemini AI widget was intercepting Playwright's `locator.click()` calls because it floats over the UI globally, throwing "subtree intercepts pointer events" errors.
+2.  **Silent UI Blockade:** The "Continue" button in Step 3 was disabled without any visible test framework error, causing a 30-second timeout waiting for Step 4.
+
+### Why it Happened
+1.  **Flaky Global CSS Hacks:** We initially attempted to hide the Gemini widget via a Playwright `addInitScript` injecting CSS (`display: none`). This approach is notoriously flaky because the DOM `document.head` may not exist at the exact microsecond the script executes, rendering the CSS injection void.
+2.  **Incomplete Mock Contracts:** The E2E suite successfully mocked the `/api/loops` route, but returned an empty array `loops: []`. The UI's defensive validation gracefully detected the empty inventory and disabled the "Continue" button (`hasRealInventory = false`). The test blindly attempted to click a disabled button.
+
+### Prevention
+1.  **Environment Flagging over CSS Injection:** Instead of manipulating the DOM externally, use `addInitScript` to inject a definitive runtime flag: `window.__PLAYWRIGHT_TEST__ = true`. Consume this flag natively within React components (e.g., `SafeWidgetLoader.jsx`) to conditionally bypass mounting the component entirely during tests.
+2.  **Mock Validation Parity:** Always ensure API mocks satisfy the UI's internal validation contracts. We resolved the deadlock by seeding `/api/loops` with an active, available `mock-loop-1`, satisfying `hasRealInventory` and unlocking the flow.

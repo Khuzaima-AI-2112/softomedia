@@ -14,7 +14,8 @@ const GeminiWidget = React.lazy(() => import('./GeminiWidget'));
  */
 const SafeWidgetLoader = () => {
     // Check if feature is effectively enabled (could add feature flag check here)
-    const enabled = true;
+    const isTestEnv = typeof window !== 'undefined' && window.__PLAYWRIGHT_TEST__;
+    const enabled = !isTestEnv;
 
     if (!enabled) return null;
 

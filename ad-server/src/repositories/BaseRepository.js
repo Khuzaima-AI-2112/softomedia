@@ -9,7 +9,13 @@ import { CircuitBreaker } from '../utils/ResilienceUtility.js';
 const MOCK_STORAGE = {};
 
 export const clearMockStorage = () => {
-    Object.keys(MOCK_STORAGE).forEach(key => delete MOCK_STORAGE[key]);
+    Object.keys(MOCK_STORAGE).forEach(key => {
+        if (MOCK_STORAGE[key] instanceof Map) {
+            MOCK_STORAGE[key].clear();
+        } else {
+            delete MOCK_STORAGE[key];
+        }
+    });
 };
 
 export class BaseRepository {

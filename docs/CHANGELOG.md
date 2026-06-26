@@ -21,4 +21,16 @@
 - Normalized telemetry API parameter mappings in `TelemetryService.js` (supporting both camelCase and snake_case properties like `screenId` vs `screen_id`) to ensure play events are correctly logged to the database.
 - Cleaned up unused imports/variables in 13 backend Jest suites to satisfy strict linting.
 - Moved unmaintained legacy E2E specs to `tests/legacy/` and configured Playwright to ignore them.
+- Fixed Playwright "subtree intercepts pointer events" errors globally by injecting `window.__PLAYWRIGHT_TEST__ = true` via `addInitScript` to suppress floating UI widgets like Gemini during tests.
+- Fixed `personas.spec.js` Brand Campaign Wizard Step 3 timeout by correctly seeding `/api/loops` with mock inventory so the "Continue" button unlocks.
+- Fixed `personas.spec.js` Step 5 Review timeout by correcting the target locator to `[data-testid="btn-submit-campaign"]`.
+
+### Security
+- Removed hardcoded Gemini API key fallback strings from [check-models.js](file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/ad-server/check-models.js) and [test-gemini-2.0.js](file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/ad-server/test-gemini-2.0.js), and updated them to load environment variables from the `.env` configuration using `dotenv`.
+- Added a `GEMINI_API_KEY=` environment variable placeholder to the end of [.env.example](file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/.env.example).
+
+### Removed
+- Archived obsolete debug scripts and moved them to the new [archives/root_scripts/](file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/archives/root_scripts/), [archives/ad-server_scripts/](file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/archives/ad-server_scripts/), and [archives/client-app_scripts/](file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/archives/client-app_scripts/) folders.
+- Moved unmaintained legacy E2E test files under [tests/legacy/](file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/tests/legacy/) to [archives/tests/legacy/](file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/archives/tests/legacy/) to keep them separate from the active E2E test suite.
+- Cleared out temporary test logs, trace logs, and text output files from the workspace root, `ad-server/`, and `client-app/` directories.
 

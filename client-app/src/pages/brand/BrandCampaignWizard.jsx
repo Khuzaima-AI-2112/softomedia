@@ -22,6 +22,7 @@ const BrandCampaignWizard = () => {
     const { user } = useAuth();
     // Bug #27 fix: track in-flight submission to prevent double-fire
     const [submitting, setSubmitting] = useState(false);
+    const [currentStep, setCurrentStep] = useState(1);
     const [wizardData, setWizardData] = useState({
         // Step 1: Location
         selectedRetailers: [],
@@ -117,8 +118,6 @@ const BrandCampaignWizard = () => {
             setSubmitting(false);
         }
     };
-
-    const [currentStep, setCurrentStep] = useState(1);
 
     const renderStep = () => {
         switch (currentStep) {

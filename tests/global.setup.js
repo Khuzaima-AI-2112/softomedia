@@ -27,6 +27,19 @@ import { PERSONA_SETUP_LIST, DEMO_TOKEN } from './fixtures/personas.js';
 import demoSeedSetup from './demo_wizard/00_seed.setup.js';
 
 async function globalSetup(config) {
+    // Reset database to ensure isolated clean environment
+    try {
+        console.log('🔄 Resetting backend database for E2E run...');
+        const res = await fetch('http://localhost:8080/api/debug/reset', { method: 'POST' });
+        if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`Database reset failed: ${res.status} ${res.statusText} - ${errText}`);
+        }
+        console.log('✅ Database successfully flushed and re-seeded.');
+    } catch (err) {
+        console.error('❌ Warning: Database reset failed during globalSetup:', err.message);
+    }
+
     const { baseURL } = config.projects[0].use;
     const browser = await chromium.launch();
 

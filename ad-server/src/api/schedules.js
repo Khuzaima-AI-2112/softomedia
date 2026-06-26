@@ -32,7 +32,7 @@ import { requireRole } from '../middleware/requireRole.js';
 import BusinessHoursService from '../services/BusinessHoursService.js';
 
 const router = express.Router();
-const IS_DEMO_MODE = process.env.ALLOW_DEMO_MODE === 'true';
+const getIsDemoMode = () => process.env.ALLOW_DEMO_MODE === 'true';
 
 /**
  * GET /api/schedules/preview
@@ -96,7 +96,7 @@ router.get('/preview', async (req, res) => {
  * Phase 9 assertions can verify the demo data path without a Firestore read.
  */
 router.get('/', (req, res) => {
-    if (IS_DEMO_MODE) {
+    if (getIsDemoMode()) {
         res.set('x-demo-source', 'mock');
     }
 
@@ -138,7 +138,7 @@ router.get('/', (req, res) => {
  * TODO: replace both paths with ScheduleRepository.create() when implemented.
  */
 router.get('/history', (req, res) => {
-    if (IS_DEMO_MODE) {
+    if (getIsDemoMode()) {
         const getSundayOfCurrentWeek = (hour) => {
             const now = new Date();
             const day = now.getDay();
@@ -167,11 +167,12 @@ router.get('/history', (req, res) => {
 });
 
 router.post('/', authenticate, requireRole('retaileradmin'), (req, res) => {
-    const id = IS_DEMO_MODE
+    const isDemoMode = getIsDemoMode();
+    const id = isDemoMode
         ? `sched_demo_${Date.now()}`
         : `sched_${Date.now()}`;
 
-    if (IS_DEMO_MODE) {
+    if (isDemoMode) {
         res.set('x-demo-source', 'mock');
     }
 

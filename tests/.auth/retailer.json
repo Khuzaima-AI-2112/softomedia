@@ -6,7 +6,7 @@
       "localStorage": [
         {
           "name": "demo_role",
-          "value": "retailer"
+          "value": "retaileradmin"
         },
         {
           "name": "auth_token",
@@ -14,7 +14,7 @@
         },
         {
           "name": "active_persona",
-          "value": "retailer"
+          "value": "retaileradmin"
         },
         {
           "name": "authToken",
@@ -22,7 +22,7 @@
         },
         {
           "name": "auth_user",
-          "value": "{\"id\":\"user-retailer\",\"email\":\"retailer@softomedia.com\",\"name\":\"Demo Retailer\",\"role\":\"retailer\",\"linked_entity_id\":\"demo-retailer-freshmart\"}"
+          "value": "{\"id\":\"demo-retailer-uid\",\"email\":\"retailer@softomedia.demo\",\"name\":\"Demo Retailer\",\"role\":\"retaileradmin\",\"linked_entity_id\":\"demo-retailer-freshmart\"}"
         }
       ]
     }

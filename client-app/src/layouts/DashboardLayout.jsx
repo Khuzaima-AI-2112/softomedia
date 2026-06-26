@@ -121,7 +121,10 @@ function DashboardLayout() {
     // Health screen remains accessible via nav but is no longer the default landing page.
     React.useEffect(() => {
         if (!loading && persona && location.pathname === '/dashboard') {
-            const routePersona = (persona === 'super_admin' || persona === ROLES.SUPERADMIN) ? 'admin' : persona;
+            let routePersona = persona;
+            if (persona === 'super_admin' || persona === ROLES.SUPERADMIN) routePersona = 'admin';
+            if (persona === ROLES.ADVERTISER) routePersona = 'brand';
+            
             navigate(`/dashboard/${routePersona}`, { replace: true });
         }
     }, [persona, loading, location.pathname, navigate]);

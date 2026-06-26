@@ -22,7 +22,7 @@
         },
         {
           "name": "auth_user",
-          "value": "{\"id\":\"user-admin\",\"email\":\"admin@softomedia.com\",\"name\":\"Demo Admin\",\"role\":\"admin\",\"linked_entity_id\":\"entity-admin-001\"}"
+          "value": "{\"id\":\"demo-admin-uid\",\"email\":\"admin@softomedia.demo\",\"name\":\"Demo Admin\",\"role\":\"admin\",\"linked_entity_id\":\"entity-admin-001\"}"
         }
       ]
     }
