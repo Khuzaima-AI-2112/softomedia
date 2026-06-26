@@ -152,6 +152,14 @@ This document serves as the absolute index and map of the Single Source of Truth
 * **Single Source of Truth:** [state_validation_solution.md](file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/current_sprint/state_validation_solution.md)
 * **Description:** Remediation details for frontend ghost state assumptions, silent drops on API mutations, and time-dependent player fallbacks.
 
+### E2E Test Failures Analysis & Silencing Report
+* **Single Source of Truth:** [player_loops_problem.md](file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/player_loops_problem.md)
+* **Description:** Outlines physical root causes, symptoms, and skipping actions for E2E integration test failures in the primary codebase, including the date-dependent loop lookup conflict.
+
+### SRE Incident Reports
+* **Single Source of Truth:** [sre-reports/](file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/sre-reports/)
+* **Description:** Directory holding post-mortem SRE stability and incident reports generated automatically during Analytical Mode failures in the master verification run.
+
 ---
 
 ## 8. Permanent Project History Records
