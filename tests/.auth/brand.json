@@ -22,7 +22,7 @@
         },
         {
           "name": "auth_user",
-          "value": "{\"id\":\"demo-brand-uid\",\"email\":\"brand@softomedia.demo\",\"name\":\"Demo Brand\",\"role\":\"brand\",\"linked_entity_id\":\"demo-advertiser-bonvie\"}"
+          "value": "{\"id\":\"user-brand\",\"email\":\"brand@softomedia.com\",\"name\":\"Demo Brand\",\"role\":\"brand\",\"linked_entity_id\":\"demo-advertiser-bonvie\"}"
         }
       ]
     }

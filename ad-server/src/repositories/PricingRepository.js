@@ -95,7 +95,7 @@ export class PricingRepositoryClass extends BaseRepository {
             Number(normalizedUpdates.baseCPM) !== Number(existing.baseCPM);
 
         if (baseCPMChanged && clearOverridesOnBaseCPMChange) {
-            console.log(`[PricingRepository] baseCPM changed from ${existing.baseCPM} to ${normalizedUpdates.baseCPM} - clearing retailerOverrides to prevent ghost prices`);
+
             normalizedUpdates.retailerOverrides = {};
         }
 

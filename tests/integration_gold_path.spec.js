@@ -7,12 +7,12 @@ test.describe('End-to-End Gold Path: Multi-Persona Journey', () => {
             route.fulfill({
                 status: 201,
                 contentType: 'application/json',
-                body: JSON.stringify({
+                json: {
                     id: 'mock-asset-001',
                     filename: 'demo-ad.mp4',
                     duration: 5,
                     status: 'ready'
-                })
+                }
             });
         });
         await page.route('**/api/campaigns', route => {
@@ -20,11 +20,11 @@ test.describe('End-to-End Gold Path: Multi-Persona Journey', () => {
                 route.fulfill({
                     status: 201,
                     contentType: 'application/json',
-                    body: JSON.stringify({
+                    json: {
                         id: `campaign-${Date.now()}`,
                         title: 'Test Campaign',
                         status: 'active'
-                    })
+                    }
                 });
             } else {
                 route.continue();

@@ -117,30 +117,19 @@ function CPMCalendar() {
 
     const handleSaveBaseCPM = async () => {
         try {
-            console.log('[CPM_CALENDAR] Save initiated:', { newBaseCPM: editedBaseCPM });
+
 
             // Call backend API to update
             const result = await apiService.updatePricingConfig({ baseCPM: editedBaseCPM });
 
-            console.log('[CPM_CALENDAR] Backend response:', {
-                baseCPM: result.baseCPM,
-                retailerOverrides: result.retailerOverrides,
-                updatedAt: result.updatedAt
-            });
-
             // CRITICAL: Force refresh of pricing service with new data from database
-            console.log('[CPM_CALENDAR] Forcing pricing service refresh...');
+
             await pricingService.init(true);
 
             // Update local state with fresh data from service
             const updatedConfig = pricingService.config;
             setPricingConfig(updatedConfig);
             setEditMode(false);
-
-            console.log('[CPM_CALENDAR] Update complete:', {
-                baseCPM: updatedConfig?.baseCPM,
-                retailerOverrides: Object.keys(updatedConfig?.retailerOverrides || {}).length
-            });
 
         } catch (error) {
             console.error('[CPM_CALENDAR] Save failed:', error);
@@ -150,12 +139,12 @@ function CPMCalendar() {
 
     const handleSaveTiers = async () => {
         try {
-            console.log('[CPM_CALENDAR] Saving traffic tiers...');
+
             const updated = await apiService.updatePricingConfig({ trafficTiers: editedTiers });
             await pricingService.updateConfig(updated);
             setPricingConfig(pricingService.config);
             setTierEditMode(false);
-            console.log('[CPM_CALENDAR] Tiers saved successfully');
+
         } catch (error) {
             console.error('[CPM_CALENDAR] Failed to update traffic tiers:', error);
             alert('Update failed');
@@ -206,12 +195,12 @@ function CPMCalendar() {
 
     const handleSaveTrafficTier = async (tierKey, updates) => {
         try {
-            console.log(`[CPM_CALENDAR] Saving tier ${tierKey}...`, updates);
+
             const newTiers = { ...pricingConfig.trafficTiers, [tierKey]: { ...pricingConfig.trafficTiers[tierKey], ...updates } };
             await apiService.updatePricingConfig({ trafficTiers: newTiers });
 
             // LAYER 2: Secure Reactive Pulse
-            console.log('[CPM_CALENDAR] Refreshing pricing service...');
+
             await pricingService.init(true);
             const updatedConfig = pricingService.getConfig();
             setPricingConfig(updatedConfig);

@@ -24,7 +24,7 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
             setRetailers(retailersData);
             setStores(storesData);
             setScreens(screensData);
-            console.log(`[Diagnostic] Loaded ${retailersData.length} retailers, ${storesData.length} stores, ${screensData.length} screens`);
+
         } catch (error) {
             console.error('[Diagnostic] Failed to load wizard data:', error);
         } finally {

@@ -7,5 +7,5 @@ export const API_URL = (window.ENV && window.ENV.VITE_API_URL) || import.meta.en
 
 // Log configuration in development (removed in production build)
 if (import.meta.env.DEV) {
-    console.log('[Config] API_URL:', API_URL);
+
 }

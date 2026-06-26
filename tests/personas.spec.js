@@ -60,7 +60,7 @@ test.describe('Brand Dashboard', () => {
         await page.route(/\/api\/campaigns/, route => {
             route.fulfill({
                 status: 200, contentType: 'application/json',
-                body: JSON.stringify([buildCampaign()])
+                json: [buildCampaign()]
             });
         });
         // Ensure we are on brand page
@@ -112,40 +112,40 @@ test.describe('Brand Campaign Wizard E2E', () => {
 
         await page.route(/\/api\/retailers/, route => route.fulfill({
             status: 200, contentType: 'application/json',
-            body: JSON.stringify(mockRetailers)
+            json: mockRetailers
         }));
         await page.route(/\/api\/stores/, route => route.fulfill({
             status: 200, contentType: 'application/json',
-            body: JSON.stringify(mockStores)
+            json: mockStores
         }));
         await page.route(/\/api\/screens/, route => route.fulfill({
             status: 200, contentType: 'application/json',
-            body: JSON.stringify(mockScreens)
+            json: mockScreens
         }));
         await page.route(/\/api\/pricing\/config/, route => route.fulfill({
             status: 200, contentType: 'application/json',
-            body: JSON.stringify(mockPricing)
+            json: mockPricing
         }));
         await page.route(/\/api\/loops/, route => route.fulfill({
             status: 200, contentType: 'application/json',
-            body: JSON.stringify( Object.assign({},  {
+            json: {
                 loops: [{ id: 'mock-loop-1', screen_id: 'screen-1', hour: 8, slots: Array(12).fill({ status: 'available' }) }],
                 business_hours: { start: 8, end: 22, is_closed: false }
-            } ) )
+            }
         }));
         await page.route(/\/api\/assets\/upload/, route => route.fulfill({
             status: 201, contentType: 'application/json',
-            body: JSON.stringify( Object.assign({},  { id: 'mock-asset-001', filename: 'demo-ad.mp4', duration: 5, status: 'ready' } ) )
+            json: { id: 'mock-asset-001', filename: 'demo-ad.mp4', duration: 5, status: 'ready' }
         }));
         await page.route(/\/api\/assets/, route => route.fulfill({
             status: 200, contentType: 'application/json',
-            body: JSON.stringify([{ id: 'mock-asset-001', name: 'demo-ad.mp4', url: 'demo.mp4', duration: 5 }])
+            json: [{ id: 'mock-asset-001', name: 'demo-ad.mp4', url: 'demo.mp4', duration: 5 }]
         }));
         await page.route(/\/api\/campaigns/, route => {
             if (route.request().method() === 'POST') {
                 route.fulfill({
                     status: 201, contentType: 'application/json',
-                    body: JSON.stringify( Object.assign({},  { id: `campaign-${Date.now()}`, title: 'Test Campaign', status: 'active' } ) )
+                    json: { id: `campaign-${Date.now()}`, title: 'Test Campaign', status: 'active' }
                 });
             } else route.continue();
         });

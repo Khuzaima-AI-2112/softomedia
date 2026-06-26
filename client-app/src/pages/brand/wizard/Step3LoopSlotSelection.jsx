@@ -42,12 +42,12 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
 
     useEffect(() => {
         const init = async () => {
-            console.log('[Diagnostic] Step 3 Init started...');
+
             setLoading(true);
             try {
                 await pricingService.init();
                 await loadLoops();
-                console.log('[Diagnostic] Step 3 Init finished successfully');
+
             } catch (err) {
                 console.error('[Diagnostic] Step 3 Init failed:', err);
             } finally {
@@ -102,7 +102,7 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
                 });
             });
             setLoops(allLoops);
-            console.log(`[Diagnostic] Step 3 Loaded ${allLoops.length} loop combinations`);
+
         } catch (error) {
             console.error('[Diagnostic] Failed to load loops:', error);
         }
@@ -219,7 +219,7 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
     };
 
     const handleContinue = () => {
-        console.log(`[Diagnostic] Step 3 Continue clicked. Selections: ${selections.length}`);
+
         updateData({ selectedSlots: selections });
         onNext();
     };

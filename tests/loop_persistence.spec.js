@@ -45,7 +45,7 @@ async function mockLoopStatus(page, loopId, status, slotStatus = 'PENDING') {
         route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify( Object.assign({},  { ...BASE_LOOP, id: loopId, status, slots } ) ),
+            json: { ...BASE_LOOP, id: loopId, status, slots },
         });
     });
 }
@@ -59,10 +59,10 @@ async function mockLoopListStatus(page, status) {
         route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify( Object.assign({},  {
+            json: {
                 loops: [{ ...BASE_LOOP, status }],
                 business_hours: { start: 8, end: 22, is_closed: false, total_loops: 14 },
-            } ) ),
+            },
         });
     });
 }
@@ -118,13 +118,13 @@ test.describe('P-04 — Slot assignment persists across navigation', () => {
             route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify( Object.assign({},  {
+                json: {
                     ...BASE_LOOP,
                     status: 'PENDING_APPROVAL',
                     slots: BASE_LOOP.slots.map((s, i) =>
                         i === 0 ? { ...s, asset_id: 'asset_new_001', asset_name: 'New Ad', status: 'REPLACED' } : s
                     ),
-                } ) ),
+                },
             });
         });
 
@@ -143,7 +143,7 @@ test.describe('P-04 — Slot assignment persists across navigation', () => {
             route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify( Object.assign({},  {
+                json: {
                     ...BASE_LOOP,
                     status: 'PENDING_APPROVAL',
                     slots: BASE_LOOP.slots.map((s, i) =>
@@ -151,7 +151,7 @@ test.describe('P-04 — Slot assignment persists across navigation', () => {
                             ? { ...s, asset_id: 'asset_new_001', asset_name: 'New Ad', status: 'REPLACED' }
                             : s
                     ),
-                } ) ),
+                },
             });
         });
 
@@ -216,10 +216,10 @@ test.describe('P-06 — Bulk approve-all persists', () => {
             route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify( Object.assign({},  {
+                json: {
                     loops,
                     business_hours: { start: 8, end: 22, is_closed: false, total_loops: 14 },
-                } ) ),
+                },
             });
         });
 
@@ -229,7 +229,7 @@ test.describe('P-06 — Bulk approve-all persists', () => {
             route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify( Object.assign({},  { approved: 3 } ) ),
+                json: { approved: 3 },
             });
         });
         // Also handle the locations-scoped route.
@@ -238,7 +238,7 @@ test.describe('P-06 — Bulk approve-all persists', () => {
             route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify( Object.assign({},  { approved: 3 } ) ),
+                json: { approved: 3 },
             });
         });
 

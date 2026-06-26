@@ -35,14 +35,14 @@ test.describe('Retailer Validation - Sprint 3', () => {
                 route.fulfill({
                     status: 200,
                     contentType: 'application/json',
-                    body: JSON.stringify( Object.assign({},  { loops, business_hours: { start: 8, end: 22 } } ) )
+                    json: { loops, business_hours: { start: 8, end: 22 } }
                 });
             } else if (url.includes('/approve')) {
                 // Mock loop approval
                 route.fulfill({
                     status: 200,
                     contentType: 'application/json',
-                    body: JSON.stringify( Object.assign({},  { status: 'APPROVED' } ) )
+                    json: { status: 'APPROVED' }
                 });
             } else if (url.includes('/reject')) {
                 // Mock slot rejection
@@ -55,7 +55,7 @@ test.describe('Retailer Validation - Sprint 3', () => {
                 route.fulfill({
                     status: 200,
                     contentType: 'application/json',
-                    body: JSON.stringify( Object.assign({},  { id: 'test_loop', slots } ) )
+                    json: { id: 'test_loop', slots }
                 });
             } else if (url.includes('/replace')) {
                 // Mock slot replacement
@@ -67,14 +67,14 @@ test.describe('Retailer Validation - Sprint 3', () => {
                 route.fulfill({
                     status: 200,
                     contentType: 'application/json',
-                    body: JSON.stringify( Object.assign({},  { id: 'test_loop', slots } ) )
+                    json: { id: 'test_loop', slots }
                 });
             } else if (route.request().url().match(/\/api\/loops\/[^/]+$/)) {
                 // Mock single loop fetch
                 route.fulfill({
                     status: 200,
                     contentType: 'application/json',
-                    body: JSON.stringify( Object.assign({},  {
+                    json: {
                         id: '2026-01-03_14_loc_downtown',
                         date: '2026-01-03',
                         hour: 14,
@@ -87,7 +87,7 @@ test.describe('Retailer Validation - Sprint 3', () => {
                             duration: 5,
                             status: 'PENDING'
                         }))
-                      }))
+                      }
                   });
             } else {
                 route.continue();

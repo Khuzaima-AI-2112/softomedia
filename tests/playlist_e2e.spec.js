@@ -16,7 +16,7 @@ test.describe('Playlist Lifecycle E2E', () => {
             route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify( Object.assign({}, { status: 'ok', screen_id: 'mocked' } ) )
+                json: { status: 'ok', screen_id: 'mocked' }
             });
         });
     });

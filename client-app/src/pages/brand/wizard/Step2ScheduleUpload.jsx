@@ -17,10 +17,10 @@ const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
 
     const duration = getDuration();
 
-    console.log(`[Diagnostic] Step 2 Render. Duration: ${duration}, campaignName: ${data.campaignName}`, data.dateRange);
+
 
     const handleContinue = () => {
-        console.log('[Diagnostic] Step 2 Continue clicked. Name:', data.campaignName);
+
         if (!data.campaignName) {
             updateData({ campaignName: 'Untitled Campaign' });
         }

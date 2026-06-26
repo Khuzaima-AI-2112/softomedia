@@ -751,3 +751,20 @@ Two distinct but related failures crippled the Brand Campaign Wizard E2E tests:
 ### Prevention
 1.  **Environment Flagging over CSS Injection:** Instead of manipulating the DOM externally, use `addInitScript` to inject a definitive runtime flag: `window.__PLAYWRIGHT_TEST__ = true`. Consume this flag natively within React components (e.g., `SafeWidgetLoader.jsx`) to conditionally bypass mounting the component entirely during tests.
 2.  **Mock Validation Parity:** Always ensure API mocks satisfy the UI's internal validation contracts. We resolved the deadlock by seeding `/api/loops` with an active, available `mock-loop-1`, satisfying `hasRealInventory` and unlocking the flow.
+
+---
+
+## 2026-06-25 — Loop Engineering and Playwright Mocking
+**Severity:** Medium — Operational hygiene and codebase resilience.
+
+**Symptom:**
+1. Test suites failing the `eslint` check due to `JSON.stringify` usages inside mock route fulfillment (`tests/telemetry_global.spec.js`, etc.).
+2. The UI containing latent debug statements (`console.log`) affecting operational hygiene standards.
+
+### Why it Happened
+1. **Playwright Mocking Anti-Patterns:** Tests were originally written passing serialized strings (`body: JSON.stringify({...})`) into Playwright's `route.fulfill()`. This violates the `eslint` rule established to prevent raw `JSON.stringify` in testing in favor of using data factories or native serialization features.
+2. **Lingering Diagnostic Output:** Extensive diagnostic logging was introduced in UI files (`Player.jsx`, `CPMCalendar.jsx`, wizard flows) during initial development and was left behind after the MVP stabilized.
+
+### Prevention
+1. **Playwright Native JSON Fulfillment:** We learned that Playwright's `route.fulfill()` provides native JSON serialization via the `json` option (`route.fulfill({ json: mockData })`). This natively handles `Content-Type` headers and complies with AST linting rules, preventing the need for raw strings.
+2. **Consistent Log Sanitation:** Enforced through `/hygiene` checks, preventing deployment of un-sanitized client logs.

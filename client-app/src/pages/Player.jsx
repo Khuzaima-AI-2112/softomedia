@@ -61,7 +61,7 @@ function Player() {
     // Task 7.3: scoped by hour + status server-side for efficiency
     const fetchCurrentLoop = useCallback(async (screenId) => {
         if (!isBusinessHours()) {
-            console.log('[Player] Outside business hours, using playlist fallback');
+
             return null;
         }
 
@@ -75,7 +75,7 @@ function Player() {
             const loop = (data.loops || [])[0] ?? null;
 
             if (loop && loop.slots && loop.slots.length > 0) {
-                console.log(`[Player] Found approved loop for ${hour}:00`, loop.id);
+
                 return loop;
             }
         } catch (e) {
@@ -89,7 +89,7 @@ function Player() {
         const checkHourChange = () => {
             const newHour = getCurrentHour();
             if (newHour !== currentHour) {
-                console.log(`[Player] Hour changed: ${currentHour} → ${newHour}`);
+
                 setCurrentHour(newHour);
                 setCurrentSlotIndex(0); // Reset to first slot
             }
@@ -105,15 +105,15 @@ function Player() {
         // Only switch if already playing in loop mode — don't fire before init
         if (!screenId || status !== 'playing' || playbackMode !== 'loop') return;
 
-        console.log(`[Player] Hour changed to ${currentHour} — switching loop`);
+
         fetchCurrentLoop(screenId).then((loop) => {
             if (loop) {
                 setCurrentLoop(loop);
                 setCurrentSlotIndex(0);
-                console.log(`[Player] Switched to loop for ${currentHour}:00`, loop.id);
+
             } else {
                 // No approved loop for new hour — fall back to playlist
-                console.log('[Player] No approved loop for new hour, keeping current content');
+
             }
         });
     }, [currentHour]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -153,7 +153,7 @@ function Player() {
                     const delay = RETRY_DELAYS[attempt - 1];
                     setStatus('retrying');
                     setRetryAttempt(attempt);
-                    console.log(`[Player] Retry attempt ${attempt}/${RETRY_DELAYS.length} in ${delay}ms`);
+
                     await new Promise((resolve) => {
                         retryTimeoutRef.current = setTimeout(resolve, delay);
                     });
@@ -162,7 +162,7 @@ function Player() {
                 try {
                     // Step 1: Register Screen
                     setStatus('registering');
-                    console.log('[Player] Status changed: registering');
+
 
                     const token = searchParams.get('token');
                     const headers = { 'Content-Type': 'application/json' };
@@ -182,12 +182,12 @@ function Player() {
                         }
                         throw err;
                     }
-                    console.log('[Player] Registration success');
+
 
                     // Step 2: Try to load loop for current hour (Business Hours)
                     // Task 7.3: fetch scoped server-side by hour + status
                     if (isBusinessHours()) {
-                        console.log('[Player] Business hours active, fetching loop...');
+
                         const date = getTodayDate();
                         const hour = getCurrentHour();
                         // FIXME: confirm 'APPROVED' case matches LoopRepository status enum
@@ -199,18 +199,18 @@ function Player() {
                         const loop = (loopData.loops || [])[0] ?? null;
 
                         if (loop && loop.slots?.length > 0) {
-                            console.log('[Player] Found approved loop:', loop.id);
+
                             setCurrentLoop(loop);
                             setPlaybackMode('loop');
                             setStatus('playing');
                             setRetryAttempt(0);
-                            console.log('[Player] Status changed: playing (loop mode)');
+
                             return; // Successfully initialized with loop
                         }
                     }
 
                     // Step 3: Fallback to Playlist if no loop
-                    console.log('[Player] No loop found or outside business hours, falling back to playlist');
+
                     const playData = await apiClient.get(`/api/playlist/${id}`, { headers });
 
                     if (playData.playlist?.length > 0) {
@@ -219,10 +219,10 @@ function Player() {
                         setPlaybackMode('playlist');
                         setStatus('playing');
                         setRetryAttempt(0);
-                        console.log('[Player] Status changed: playing (playlist mode)');
+
                     } else {
                         setStatus('no_content');
-                        console.log('[Player] Status changed: no_content');
+
                     }
 
                     return; // Success — exit retry loop

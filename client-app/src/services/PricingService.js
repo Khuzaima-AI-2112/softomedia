@@ -14,7 +14,7 @@ class PricingService {
     async init(forceRefresh = false) {
         if (this.config && !forceRefresh) return;
         try {
-            console.log('[PricingService] Initializing...', { forceRefresh });
+
             const [configData, screensData, storesData] = await Promise.all([
                 apiService.getPricingConfig(),
                 apiService.getScreens(),
@@ -24,7 +24,7 @@ class PricingService {
             this.screens = screensData;
             this.stores = storesData;
 
-            console.log('[PricingService] Initialized with baseCPM:', this.config?.baseCPM, 'screens:', this.screens?.length, 'stores:', this.stores?.length);
+
 
             // Validate configuration after loading
             this.validateConfiguration();
@@ -112,7 +112,7 @@ class PricingService {
         let baseCPM = this.config.baseCPM;
         if (retailerId && this.config.retailerOverrides?.[retailerId]?.baseCPM) {
             baseCPM = this.config.retailerOverrides[retailerId].baseCPM;
-            console.log(`[PricingService] Applying Retailer Override for ${retailerId}: $${baseCPM}`);
+
         }
 
         // 2. Get Traffic Tier Multiplier
@@ -134,8 +134,7 @@ class PricingService {
         // LAYER 3: Removed hidden multipliers (storeTrafficMultiplier)
         const finalPrice = baseCPM * tierMultiplier * dateMultiplier;
 
-        // Log calculation details
-        console.log(`[PricingService] Slot Calculation: $${baseCPM} (Base) * ${tierMultiplier}x (Tier: ${tier.key}) * ${dateMultiplier}x (Date: ${dateKey}) = $${finalPrice.toFixed(2)}`);
+
 
         return finalPrice;
     }
@@ -191,8 +190,7 @@ class PricingService {
         // Formula: Base CPM × Traffic Tier × Date Multiplier
         const price = baseCPM * trafficTier.multiplier * dateMultiplier;
 
-        // DEBUG: Log calculation details
-        console.log(`[PricingService] getSlotPrice: screenId=${screenId}, baseCPM=${baseCPM}, tier=${trafficTier.multiplier}, date=${dateMultiplier}, price=${price.toFixed(2)}`);
+
 
         return {
             price: Math.round(price * 100) / 100, // Round to 2 decimal places
@@ -411,19 +409,13 @@ class PricingService {
     async updateConfig(newConfig) {
         if (!newConfig) return;
 
-        console.log('[PricingService] updateConfig called with:', newConfig);
+
 
         // If baseCPM changed, must refresh from database to get updated overrides
         if (newConfig.baseCPM !== undefined &&
             newConfig.baseCPM !== this.config?.baseCPM) {
 
-            console.log(
-                '[PricingService] Base CPM changed from',
-                this.config?.baseCPM,
-                'to',
-                newConfig.baseCPM,
-                '- forcing full refresh'
-            );
+
 
             // Force complete re-initialization to fetch fresh data from DB
             await this.init(true);
@@ -457,7 +449,7 @@ class PricingService {
             this.config.retailerOverrides = newConfig.retailer_overrides;
         }
 
-        console.log('[PricingService] Config updated:', this.config);
+
 
         // Validate after update
         this.validateConfiguration();
@@ -501,7 +493,7 @@ class PricingService {
             return false;
         }
 
-        console.log('[PricingService] Configuration validated successfully');
+
         return true;
     }
 }

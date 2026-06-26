@@ -37,7 +37,7 @@ export class PlaylistRepository extends BaseRepository {
             where: [['status', '==', 'active']]
         });
         const global = all.find(p => p.is_global === true) || null;
-        console.log(`[PlaylistRepo] findGlobalPlaylist: found=${!!global}, totalActive=${all.length}`);
+
         return global;
     }
 }

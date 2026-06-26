@@ -200,7 +200,7 @@ const useGeminiStore = create((set, get) => ({
             }
 
             set({ hasRated: true });
-            console.log(`[GeminiStore] Rated ticket ${currentTicketId}: ${rating} stars`);
+
             return true;
 
         } catch (err) {

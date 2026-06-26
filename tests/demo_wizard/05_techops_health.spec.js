@@ -64,7 +64,7 @@ test.describe.serial('Phase 5 — TechOps Health Check', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(MOCK_HEALTH_RESPONSE),
+        json: MOCK_HEALTH_RESPONSE,
       });
     });
 
@@ -102,7 +102,7 @@ test.describe.serial('Phase 5 — TechOps Health Check', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(MOCK_HEALTH_RESPONSE),
+        json: MOCK_HEALTH_RESPONSE,
       });
     });
 

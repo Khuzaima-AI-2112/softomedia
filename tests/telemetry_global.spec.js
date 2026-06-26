@@ -18,7 +18,7 @@ test.describe('Global Playlist Telemetry', () => {
                 route.fulfill({
                     status: 200,
                     contentType: 'application/json',
-                    body: JSON.stringify( Object.assign({},  { status: 'ok', screen_id: 'mocked' } ) )
+                    json: { status: 'ok', screen_id: 'mocked' }
                 });
             });
         });
@@ -46,7 +46,7 @@ test.describe('Global Playlist Telemetry', () => {
         test('Debug: Check all active playlists', async ({ request }) => {
             const res = await request.get(`${API_BASE}/api/playlists`);
             const data = await res.json();
-            console.log('All Playlists in Server:', JSON.stringify(data.map(p => ({ id: p.id, global: p.is_global, status: p.status })), null, 2));
+            console.log('All Playlists in Server:', data.map(p => ({ id: p.id, global: p.is_global, status: p.status })));
         });
 
         test('Verify API response for global fallback', async ({ request }) => {
@@ -54,7 +54,7 @@ test.describe('Global Playlist Telemetry', () => {
             const res = await request.get(`${API_BASE}/api/playlist/${screenId}`);
             console.log('API Status:', res.status());
             const data = await res.json();
-            console.log('API Response Body:', JSON.stringify(data, null, 2));
+            console.log('API Response Body:', data);
             expect(data.source).toBe('global_playlist');
             expect(data.playlist_id).toBe(globalPlaylistId);
         });
@@ -76,7 +76,7 @@ test.describe('Global Playlist Telemetry', () => {
                 return data ? JSON.parse(data) : [];
             });
 
-            console.log('Telemetry Buffer:', JSON.stringify(buffer, null, 2));
+            console.log('Telemetry Buffer:', buffer);
 
             expect(buffer.length).toBeGreaterThan(0);
 

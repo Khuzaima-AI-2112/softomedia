@@ -23,6 +23,8 @@
 - Restored `fullday` view as default in `ScheduleManager.jsx` and updated it to fetch actual location loops from `/api/locations/:id/loops` to resolve slot-shifting E2E timeouts.
 - Consolidated invoice test ID states in `Invoices.jsx` to prevent page wrapper swaps from breaking loaded-state E2E assertions.
 - Normalized telemetry API parameter mappings in `TelemetryService.js` (supporting both camelCase and snake_case properties like `screenId` vs `screen_id`) to ensure play events are correctly logged to the database.
+- Removed `console.log` statements globally across `client-app/src` and `ad-server/src` (including UI components like `Player.jsx`, `CPMCalendar.jsx`, and Wizard Steps) to comply with Phase 3 operational hygiene.
+- Fixed Playwright E2E mock implementation by migrating away from lint-failing `JSON.stringify` inline routes to Playwright's native `route.fulfill({ json: payload })` mapping.
 - Cleaned up unused imports/variables in 13 backend Jest suites to satisfy strict linting.
 - Moved unmaintained legacy E2E specs to `tests/legacy/` and configured Playwright to ignore them.
 - Fixed Playwright "subtree intercepts pointer events" errors globally by injecting `window.__PLAYWRIGHT_TEST__ = true` via `addInitScript` to suppress floating UI widgets like Gemini during tests.

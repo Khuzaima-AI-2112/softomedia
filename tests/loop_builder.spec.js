@@ -34,7 +34,7 @@ test.describe('Loop Management - Sprint 2', () => {
                 route.fulfill({
                     status: 201,
                     contentType: 'application/json',
-                    body: JSON.stringify( Object.assign({},  { message: 'Generated 14 loops', loops } ) )
+                    json: { message: 'Generated 14 loops', loops }
                 });
             } else if (url.includes('date=')) {
                 // Mock loop list by date
@@ -56,14 +56,14 @@ test.describe('Loop Management - Sprint 2', () => {
                 route.fulfill({
                     status: 200,
                     contentType: 'application/json',
-                    body: JSON.stringify(loops)
+                    json: loops
                 });
             } else if (route.request().url().match(/\/api\/loops\/[^/]+$/)) {
                 // Mock single loop fetch
                 route.fulfill({
                     status: 200,
                     contentType: 'application/json',
-                    body: JSON.stringify( Object.assign({},  {
+                    json: {
                         id: '2026-01-03_14_loc_downtown',
                         date: '2026-01-03',
                         hour: 14,
@@ -76,17 +76,17 @@ test.describe('Loop Management - Sprint 2', () => {
                             duration: 5,
                             status: 'pending'
                         }))
-                      }))
+                      }
                   });
             } else if (url.includes('/api/assets')) {
                 // Mock assets for picker
                 route.fulfill({
                     status: 200,
                     contentType: 'application/json',
-                    body: JSON.stringify([
+                    json: [
                         { id: 'asset_001', name: 'Mock Asset 1', type: 'image', thumbnail: '📦' },
                         { id: 'asset_002', name: 'Mock Asset 2', type: 'video', thumbnail: '🎬' }
-                    ])
+                    ]
                 });
             } else {
                 route.continue();

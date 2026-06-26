@@ -158,7 +158,7 @@ class TelemetryService {
             this.saveBuffer();
             this.lastUploadAttempt = Date.now();
 
-            console.log(`[Telemetry] Batch upload success: ${batchCount} items`);
+
 
             if (window.__TELEMETRY_LOG__) {
                 window.__TELEMETRY_LOG__.push({ type: 'BATCH_UPLOAD_SUCCESS', count: batchCount });

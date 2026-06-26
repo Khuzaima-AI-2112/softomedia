@@ -45,11 +45,7 @@ const BrandCampaignWizard = () => {
         totalImpressions: 0
     });
 
-    console.log(`[Diagnostic] Wizard Step: ${currentStep}`, {
-        stores: wizardData.selectedStores.length,
-        screens: wizardData.selectedScreens.length,
-        hasName: !!wizardData.campaignName
-    });
+
 
     const nextStep = () => setCurrentStep((prev) => Math.min(prev + 1, 5));
     const prevStep = () => setCurrentStep((prev) => Math.max(prev - 1, 1));
