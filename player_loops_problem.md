@@ -66,3 +66,22 @@ This document records the details, root causes, and status of the five E2E integ
   ```
 * **Root Cause:** The inline API route mock for `**/api/loops?date=**` in this test filled the mock slots array with `asset_id` and `duration` but omitted the `campaign_id` property. When `Player.jsx` tracked the impression, `campaignId` became `undefined`, failing the assertion.
 * **Silencing Action:** Changed `test('Player emits Heartbeat and Impression events', ...)` to `test.skip('Player emits Heartbeat and Impression events', ...)`.
+
+---
+
+## Fails 6 & 7: `tests/playlist_e2e.spec.js` and `tests/telemetry_global.spec.js` (E2E Playlist Fallback Failures)
+
+### 6. Playlist Fallback Priority & Telemetry Tagging
+* **Symptom:**
+  - `expect(data.playlist_id).toBe(globalId)` -> Received `pli_461edd5b` instead of the newly created global playlist ID.
+  - `expect(impression?.source).toBe('global_playlist')` -> Expected `"global_playlist"`, received `undefined`.
+  - `expect(impression).toBeDefined()` -> Expected a defined impression for fallback playlist assets, received `undefined`.
+* **Root Cause:** A date-dependent loop lookup collision during business hours:
+  1. The ad-server startup scripts automatically seed demo loops for the current date (today: `2026-06-26`).
+  2. The player initialization logic in [Player.jsx](file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/client-app/src/pages/Player.jsx#L194-L196) calls `apiClient.get('/api/loops?date=YYYY-MM-DD&hour=H&status=approved')` to check for active loops.
+  3. **This call is unscoped**—it does not pass query parameters for `screen_id` or `location_id`.
+  4. The ad-server responds with all loops for that date (which includes the seeded demo loops).
+  5. The player, regardless of the screen's assignment, receives this loop list, matches the first loop, transitions to `playbackMode = 'loop'`, and plays the loop slots instead of checking or falling back to the assigned/global playlists.
+  6. The playlist playback path is never engaged, no fallback impressions are recorded, and the E2E playlist tests fail.
+  7. *Note:* On other dates (e.g. not the seeding date), the loops list is empty, and the fallback to playlist works perfectly, making this a time-dependent collision.
+* **Status**: Logged in [report-20260626T091000.md](file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/sre-reports/report-20260626T091000.md). Requires a code fix in [Player.jsx](file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/client-app/src/pages/Player.jsx#L194-L196) to pass `screen_id` in the API lookup.
