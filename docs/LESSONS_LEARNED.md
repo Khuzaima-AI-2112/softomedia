@@ -4,6 +4,25 @@ A living document capturing post-incident analysis, root causes, and actionable 
 
 ---
 
+## 2026-06-25 — ESM Hoisting Bug Bypassing Dotenv Config
+**Severity:** Medium — Server startup crash due to `dotenv` environment variables not being populated during module initialization.
+
+**Symptom:**
+After introducing `zod` environment schema validation to fail-fast on missing `.env` keys, the backend crashed on boot stating that `JWT_SECRET` was undefined, even though the `.env.development` file was perfectly intact and correctly configured.
+
+### What Happened
+1. **ESM Hoisting:** `index.js` statically imported the configuration validator (`import envConfig from './src/config/env.js'`) lower down in the file, *after* executing `dotenv.config()`.
+2. **Execution Order Bypass:** Because ES Module `import` statements are hoisted and executed before *any* synchronous code runs, the `env.js` file evaluated `process.env` *before* `dotenv.config()` was called. `zod` therefore found empty values and intentionally crashed the app.
+
+### Fix Applied
+- **Deferred Evaluation:** Removed the static import of the parsed object. Wrapped the Zod validation logic inside an exported `validateEnv()` function within `env.js`.
+- **Dynamic Invocation:** In `index.js`, called `const env = validateEnv();` sequentially *after* `dotenv.config()`.
+
+### Actionable Improvements Going Forward
+- **Never evaluate `process.env` at the top level of an ES Module:** If the module is imported by an entry point that sets up `dotenv`, the module will evaluate before the `.env` file is loaded. Always defer `process.env` reads by wrapping them in getter functions or invoking them sequentially after boot.
+
+---
+
 ## 2026-06-25 — Hardcoded API Keys In Test Scripts (DevSecOps Remediation)
 **Severity:** High — Hardcoded GCP/Gemini API keys committed to the codebase, creating a credentials leak risk.
 

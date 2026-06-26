@@ -3,9 +3,13 @@
 ## [Unreleased]
 
 ### Added
+- Implemented AST-based Playwright test linter using `@babel/parser` to robustly detect inline JSON mocks (`scripts/lint-tests.js`).
+- Implemented Startup Environment Schema Validation using Zod to fail-fast on missing backend `.env` variables (`ad-server/src/config/env.js`).
+- Added Pre-commit Git hooks and CI verification scripts to enforce Document Permanence rules and protect sacred files.
 - Created unified role string constants (`ROLES`, `ROLE_HIERARCHY`, and `normalizeRole()`) in `client-app/src/constants/roles.js` and `ad-server/src/constants/roles.js` to serve as a Single Source of Truth (SSOT) for RBAC roles.
 
 ### Fixed
+- Resolved ESM Hoisting bug that caused `dotenv.config()` to be bypassed during static schema load by deferring validation into an explicit `validateEnv()` call.
 - Migrated frontend and backend files (including `DashboardLayout.jsx`, `PersonaSwitcher.jsx`, `AuthContext.jsx`, `CampaignManagement.jsx`, `LoopDemoPlayer.jsx`, `Overview.jsx`, `UserManagement.jsx`, `requireRole.js`, `invoices.js`, `campaigns.js`, `users.js`, `advertisers.js`, `retailers.js`, and `screens.js`) to consume central role constants, eliminating all magic role strings and duplicate role maps across the project.
 - Migrated 5 isolated UI components to the `apiClient` singleton and banned native `fetch()` via ESLint to prevent API auth bypasses.
 - Switched UI components (`ScheduleCalendar.jsx`, `LoopDemoPlayer.jsx`) from reading `localStorage` synchronously to consuming `useAuth()` React Context to resolve demo persona switching latency.
@@ -24,6 +28,9 @@
 - Fixed Playwright "subtree intercepts pointer events" errors globally by injecting `window.__PLAYWRIGHT_TEST__ = true` via `addInitScript` to suppress floating UI widgets like Gemini during tests.
 - Fixed `personas.spec.js` Brand Campaign Wizard Step 3 timeout by correctly seeding `/api/loops` with mock inventory so the "Continue" button unlocks.
 - Fixed `personas.spec.js` Step 5 Review timeout by correcting the target locator to `[data-testid="btn-submit-campaign"]`.
+
+### Changed
+- Updated `scripts/test-preflight.js` to dynamically resolve backend ports via `dotenv` instead of relying on a hardcoded 8080 fallback.
 
 ### Security
 - Removed hardcoded Gemini API key fallback strings from [check-models.js](file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/ad-server/check-models.js) and [test-gemini-2.0.js](file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/ad-server/test-gemini-2.0.js), and updated them to load environment variables from the `.env` configuration using `dotenv`.

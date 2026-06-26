@@ -27,34 +27,21 @@ Here are specific examples of how you can apply Loop Engineering to automate cod
 
 ### 2. Static Middleware Audit (E.g. Preventing Route Gate Omission)
 *   **The Problem:** A status transition route (`PATCH /api/campaigns/:id/status`) had `requireRole('retaileradmin')` applied but was missing the preceding `authenticate` middleware, causing `req.user` to be unpopulated and returning `403 Forbidden` to everyone.
-*   **Loop Engineering Solution:** Automate middleware dependency analysis at commit/build time by walking the Abstract Syntax Tree (AST) of the router file to flag unsafe ordering.
-*   **Automated Guardrail (audit-routes.js):**
-    ```javascript
-    const fs = require('fs');
-    const parser = require('@babel/parser');
-    const traverse = require('@babel/traverse').default;
-
-    function auditRouterFile(filePath) {
-      const code = fs.readFileSync(filePath, 'utf8');
-      const ast = parser.parse(code, { sourceType: 'module' });
-
-      traverse(ast, {
-        CallExpression(path) {
-          const callee = path.node.callee;
-          // Check for router handler methods (e.g., router.patch, router.post)
-          if (callee.object?.name === 'router' && ['get', 'post', 'put', 'patch', 'delete'].includes(callee.property?.name)) {
-            const middlewareArgs = path.node.arguments.slice(1, -1);
-            
-            const hasRequireRole = middlewareArgs.some(arg => arg.name === 'requireRole' || arg.callee?.name === 'requireRole');
-            const hasAuthenticate = middlewareArgs.some(arg => arg.name === 'authenticate');
-
-            if (hasRequireRole && !hasAuthenticate) {
-              console.error(`❌ [Security Alert] File: ${filePath} contains requireRole() but is missing authenticate!`);
-              process.exit(1);
-            }
-          }
-        }
-      });
+*   **Loop Engineering Solution:** Automate middleware dependency analysis. However, rather than writing fragile custom AST traversers (which fail if developers use `router.use(authenticate)` globally), adopt compiler-level enforcement. Use established schema validation frameworks (like tRPC, Zod, or NestJS Guards) or centralize role-checks inside strongly typed controllers where the user object is guaranteed.
+*   **Automated Guardrail (Centralized Type-Safe Auth):**
+    ```typescript
+    // Instead of relying on sequential Express middleware:
+    // router.patch('/path', authenticate, requireRole('admin'), handler)
+    
+    // Use a central, strongly-typed handler that enforces auth before business logic:
+    import { z } from 'zod';
+    
+    export const createAdminRoute = (handler) => {
+       return async (req, res) => {
+           // Enforce authentication at compiler level: req.user MUST exist here
+           if (!req.user || req.user.role !== 'admin') return res.status(403).send('Forbidden');
+           return handler(req, res);
+       }
     }
     ```
 
@@ -84,11 +71,11 @@ Here are specific examples of how you can apply Loop Engineering to automate cod
 
 ### 4. Prompt Engineering Automation (E.g. "Do Not Overwrite Sacred Files")
 *   **The Problem:** System instructions are long, causing the model to occasionally drop constraints (like Document Permanence rules).
-*   **Loop Engineering Solution:** Put the critical constraints inside a local script or git hook that checks files before commit.
-*   **Automated Guardrail (Pre-commit hook for sacred files):**
-    Instead of telling the AI agent in a prompt "never delete lessons_learned.md", install a git pre-commit hook that rejects deletions of these files programmatically:
+*   **Loop Engineering Solution:** Put the critical constraints inside a git hook and replicate it in your CI/CD pipeline to prevent bypassing.
+*   **Automated Guardrail (Pre-commit & CI Enforcement):**
+    Install a git pre-commit hook that rejects deletions of these files locally, but *crucially*, duplicate this check in your server-side CI pipeline (e.g., GitHub Actions) since local hooks can be bypassed with `git commit --no-verify`:
     ```bash
-    # .git/hooks/pre-commit
+    # .git/hooks/pre-commit OR .github/workflows/verify-sacred.yml
     #!/bin/sh
     # Check if LESSONS_LEARNED.md is being deleted or truncated significantly
     if git diff --name-only | grep -q "LESSONS_LEARNED.md"; then
@@ -259,12 +246,15 @@ Here are specific examples of how you can apply Loop Engineering to automate cod
 
 ### 11. Fail-Fast Test Preflight Audits
 *   **The Problem:** Executing E2E test suites when the backend server or the database emulator is offline launches hundreds of browser processes that immediately timeout, consuming local CPU resources and generating useless log noise.
-*   **Loop Engineering Solution:** Integrate a preflight health check script that verifies all dependencies and emulators are listening on their respective ports, halting execution immediately if they are unreachable.
+*   **Loop Engineering Solution:** Integrate a preflight health check script that verifies all dependencies and emulators are listening on their respective ports, halting execution immediately if they are unreachable. The script must parse environment configurations dynamically rather than hardcoding ports.
 *   **Automated Guardrail (test-preflight.js):**
     Before booting Playwright, run a lightweight validation script:
     ```javascript
     // scripts/test-preflight.js
+    require('dotenv').config({ path: '.env.development' });
     const http = require('http');
+
+    const AD_SERVER_PORT = process.env.PORT || 8080;
 
     function checkPort(port, name) {
       return new Promise((resolve, reject) => {
@@ -278,8 +268,7 @@ Here are specific examples of how you can apply Loop Engineering to automate cod
     }
 
     Promise.all([
-      checkPort(8080, 'Ad Server'),
-      checkPort(8090, 'Firestore Emulator')
+      checkPort(AD_SERVER_PORT, 'Ad Server')
     ]).catch(err => {
       console.error(`❌ Preflight check failed: ${err.message}`);
       process.exit(1);
@@ -290,28 +279,25 @@ Here are specific examples of how you can apply Loop Engineering to automate cod
 
 ### 12. Dedicated Test Linter Rules
 *   **The Problem:** Developers sometimes hardcode mock JSON responses or manual authentication sequences directly inside spec files, fracturing the centralized testing architecture and leading to silent test drifts.
-*   **Loop Engineering Solution:** Introduce an automated script to lint test files, using pattern matching or AST analysis to reject files containing raw mocks or manual storage bypasses.
-*   **Automated Guardrail (lint-tests.js):**
-    Add a script to lint the test specs before execution:
+*   **Loop Engineering Solution:** Introduce an automated AST linter to reject files containing raw mocks. Do *not* use naive string matching (e.g., `content.includes('JSON.stringify')`) as it is easily bypassed by multi-line formatting. Use a custom ESLint plugin.
+*   **Automated Guardrail (Playwright ESLint Rule):**
+    Add a custom AST-based rule to enforce factory usage:
     ```javascript
-    // scripts/lint-tests.js
-    const fs = require('fs');
-    const path = require('path');
-
-    const testsDir = path.resolve(__dirname, '../tests');
-    const specFiles = fs.readdirSync(testsDir).filter(f => f.endsWith('.spec.js'));
-
-    specFiles.forEach(file => {
-      const content = fs.readFileSync(path.join(testsDir, file), 'utf8');
-      if (content.includes('JSON.stringify') && content.includes('page.route')) {
-        console.error(`❌ [Lint Error] File ${file} uses inline JSON.stringify within page.route(). Use factories instead.`);
-        process.exit(1);
+    // tests/.eslintrc.cjs custom rule snippet
+    'tests/no-inline-mocks': {
+      meta: { messages: { noInlineMocks: "Use mock factories instead of inline JSON.stringify in page.route()." } },
+      create(context) {
+        return {
+          CallExpression(node) {
+            // Traverse AST to detect page.route(..., (route) => route.fulfill({ json: JSON.stringify(...) }))
+            if (node.callee.property && node.callee.property.name === 'route') {
+               // ... AST traversal logic to find JSON.stringify
+               context.report({ node, messageId: 'noInlineMocks' });
+            }
+          }
+        };
       }
-      if (content.includes('localStorage.setItem') && content.includes('auth_token')) {
-        console.error(`❌ [Lint Error] File ${file} sets auth token manually. Use loginAs() helper instead.`);
-        process.exit(1);
-      }
-    });
+    }
     ```
 
 ---
@@ -339,4 +325,22 @@ Here are specific examples of how you can apply Loop Engineering to automate cod
 
         return <GeminiWidget />;
     };
+    ```
+
+---
+
+### 14. Mock Validation Parity (E.g. Preventing Silent UI Blockades)
+*   **The Problem:** The E2E suite mocked an API response (`/api/loops` returning `loops: []`), but the frontend UI contained defensive validation logic that gracefully disabled the "Continue" button because it required `activeLoops.length > 0`. The E2E test timed out trying to click a disabled button, without any explicit error.
+*   **Loop Engineering Solution:** E2E mocks must perfectly emulate the actual API contracts expected by the frontend's defensive UI logic. Ensure your Mock factories share the exact same validation schemas (Zod) as the backend, and never mock empty responses for critical path test fixtures.
+*   **Automated Guardrail (Shared Zod Validation):**
+    Route mock factories through strict validators before allowing `page.route` to serve them:
+    ```javascript
+    import { LoopResponseSchema } from '../shared/contracts/loops';
+    
+    export function createLoopMock(overrides) {
+        const mock = { loops: [ { id: 'mock-1', status: 'active', ...overrides } ] };
+        // Will throw an error immediately during the test if the mock is invalid
+        LoopResponseSchema.parse(mock); 
+        return mock;
+    }
     ```

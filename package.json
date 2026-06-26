@@ -24,8 +24,11 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
+    "@babel/parser": "^8.0.0",
+    "@babel/traverse": "^8.0.0",
     "@firebase/rules-unit-testing": "^5.0.1",
     "@playwright/test": "^1.57.0",
+    "dotenv": "^17.4.2",
     "firebase-tools": "^15.22.0",
     "jest": "^30.4.2"
   }

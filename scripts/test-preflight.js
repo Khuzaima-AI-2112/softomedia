@@ -1,3 +1,4 @@
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env.development') });
 const http = require('http');
 
 async function checkPort(port, host = 'localhost', path = '/') {

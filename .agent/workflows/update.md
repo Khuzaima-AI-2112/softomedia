@@ -13,7 +13,8 @@ Use this workflow to consistently update project documentation after finishing a
 3. **Update Changelog**:
    - Add a new entry or update the current date in [changelog.md](file:///c:/Users/ChrisFro/Desktop/EmoGini/softomedia-live2026/changelog.md).
    - Use standard categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`.
-4. **Final Review**: Ensure the documentation accurately reflects the state of the workspace.
+4. **Preserve Walkthroughs**: If a `walkthrough.md` artifact was generated, copy it to the `current_sprint/walkthrough/` directory, renaming it to describe the feature (e.g. `walkthrough-loop-engineering.md`).
+5. **Final Review**: Ensure the documentation accurately reflects the state of the workspace.
 
 // turbo
-5. Suggest a commit message based on these updates.
+6. Suggest a commit message based on these updates.
