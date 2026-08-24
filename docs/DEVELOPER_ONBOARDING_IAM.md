@@ -10,7 +10,7 @@ This guide documents the API verification, GitHub configuration, and GCP IAM rol
 | :--- | :--- | :--- | :--- |
 | **GitHub Repository** | `khuzaimai.design@gmail.com` | ✅ **Granted** | Collaborator access added to `cfroszte/softomedia-live2026` |
 | **GCP APIs Enabled** | `softomedia-live-2026` | ✅ **Verified** | All 8 required APIs are active (Cloud Build, Cloud Run, Firestore, Secret Manager, Gemini API, etc.) |
-| **GCP IAM Policy** | `user:khuzaimai.design@gmail.com` | ⚠️ **Pending** | Run `gcloud` binding commands below to grant GCP roles |
+| **GCP IAM Policy** | `user:khuzaimai.design@gmail.com` | ✅ **Granted** | All 7 required IAM roles granted on project `softomedia-live-2026` |
 
 ---
 
