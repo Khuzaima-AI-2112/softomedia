@@ -115,6 +115,7 @@ Deployments depend on two secrets stored in GCP Secret Manager under project `so
 ## 📁 Key Project Files & Documentation
 
 * **Environment Setup Guide**: [`docs/ENVIRONMENT_SETUP.md`](docs/ENVIRONMENT_SETUP.md)
+* **Developer IAM Onboarding Guide**: [`docs/DEVELOPER_ONBOARDING_IAM.md`](docs/DEVELOPER_ONBOARDING_IAM.md)
 * **API Route Specifications**: [`docs/API_ROUTES.md`](docs/API_ROUTES.md)
 * **Database & Firestore Schema**: [`docs/DATABASE_SCHEMA.md`](docs/DATABASE_SCHEMA.md)
 * **Cloud Build Pipeline**: [`cloudbuild.yaml`](cloudbuild.yaml)
