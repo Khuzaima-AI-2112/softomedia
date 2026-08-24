@@ -7,6 +7,10 @@
     "test": "tests"
   },
   "scripts": {
+    "setup": "npm run install:all && npx playwright install",
+    "install:all": "npm install && cd ad-server && npm install && cd ../client-app && npm install",
+    "dev:server": "cd ad-server && npm run dev",
+    "dev:client": "cd client-app && npm run dev",
     "test": "npm run test:unit && npm run test:e2e",
     "test:unit": "cd ad-server && node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:e2e": "npx cross-env ALLOW_DEMO_MODE=true playwright test",

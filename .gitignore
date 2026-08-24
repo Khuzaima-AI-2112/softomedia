@@ -23,3 +23,10 @@ test-logs/
 screenshots/
 trace-out/
 tests/.auth/
+
+# Generated reports & dumps
+*_report.json
+test_out_*.json
+test_output.json
+*.pdf
+
