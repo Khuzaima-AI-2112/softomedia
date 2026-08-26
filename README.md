@@ -24,6 +24,32 @@ Before getting started, ensure you have installed:
 
 ---
 
+## 🧭 Guided Setup (recommended)
+
+Rather than working through the sections below by hand, run the rollout wizard. It walks
+you through every step only a human can do — installs, browser logins, IAM grants, secret
+creation — captures the values, writes `.env.development`, and finishes by proving the
+rollout on both targets.
+
+```bash
+bash scripts/rollout-wizard.sh
+```
+
+Twelve stages: tooling → gcloud auth → **project guard** → APIs → Artifact Registry →
+Secret Manager → IAM → Cloud Build trigger → `.env.development` → Firestore emulator →
+prove local → prove Cloud. It is idempotent and re-runnable; stop with Ctrl-C at any
+point and values already saved are offered back as defaults.
+
+> ⚠️ Stage 3 refuses to continue unless `gcloud config get-value project` matches the
+> deploy project exactly, and stage 12 re-checks immediately before submitting the build.
+> See [`sre-reports/report-2026-06-22T03-52-30.md`](sre-reports/report-2026-06-22T03-52-30.md)
+> for the incident that guard exists to prevent.
+
+The manual instructions below remain accurate, and are the reference for anything the
+wizard skips.
+
+---
+
 ## 🚀 Local Development Quick Start
 
 ### 1. One-Command Setup
@@ -119,6 +145,7 @@ Deployments depend on two secrets stored in GCP Secret Manager under project `so
 * **API Route Specifications**: [`docs/API_ROUTES.md`](docs/API_ROUTES.md)
 * **Database & Firestore Schema**: [`docs/DATABASE_SCHEMA.md`](docs/DATABASE_SCHEMA.md)
 * **Cloud Build Pipeline**: [`cloudbuild.yaml`](cloudbuild.yaml)
+* **Rollout Wizard**: [`scripts/rollout-wizard.sh`](scripts/rollout-wizard.sh)
 * **Lessons Learned Log**: [`docs/LESSONS_LEARNED.md`](docs/LESSONS_LEARNED.md)
 
 ---
