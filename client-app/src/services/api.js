@@ -198,7 +198,9 @@ if (import.meta.env.DEV) {
 
 apiClient.addRequestInterceptor((url, options) => {
     const token    = localStorage.getItem('auth_token');
-    const demoRole = localStorage.getItem('demo_role') || localStorage.getItem('active_persona');
+    // DEV only. The x-demo-role header must never leave a production build:
+    // the server honours it whenever ALLOW_DEMO_MODE is set (see auth.js).
+    const demoRole = import.meta.env.DEV ? localStorage.getItem('demo_role') : null;
 
     const hasAuth = options.headers && (options.headers['Authorization'] || options.headers['authorization']);
     if (token && !hasAuth) {

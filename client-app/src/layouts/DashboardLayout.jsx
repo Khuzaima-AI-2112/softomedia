@@ -155,7 +155,7 @@ function DashboardLayout() {
                     </div>
                     <h2 className="text-lg font-bold leading-tight tracking-tight">AdManager</h2>
                     <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-2"></div>
-                    <PersonaSwitcher />
+                    {import.meta.env.DEV && <PersonaSwitcher />}
                 </div>
 
                 <div className="flex items-center gap-6">

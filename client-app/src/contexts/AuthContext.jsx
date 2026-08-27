@@ -9,7 +9,11 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const savedPersona = localStorage.getItem('active_persona');
+        // Persona is a development affordance only. In production the dashboard
+        // follows the role on the authenticated user, never a stored key.
+        const savedPersona = import.meta.env.DEV
+            ? localStorage.getItem('demo_role')
+            : null;
         const savedUser = localStorage.getItem('auth_user');
 
         if (savedUser) {
@@ -30,18 +34,24 @@ export const AuthProvider = ({ children }) => {
     const login = (userData, token) => {
         localStorage.setItem('auth_user', JSON.stringify(userData));
         localStorage.setItem('auth_token', token);
-        localStorage.setItem('active_persona', userData.role);
+        if (import.meta.env.DEV) {
+            localStorage.setItem('demo_role', userData.role);
+        }
         setUser(userData);
         setPersonaState(userData.role);
     };
 
     const setPersona = (type) => {
-        localStorage.setItem('active_persona', type);
-        localStorage.setItem('demo_role', type); // Sync role for backend bypass
+        // Persona switching is a development affordance. Outside DEV nothing is
+        // persisted and no demo credentials are minted, so the call reduces to
+        // local UI state.
+        if (import.meta.env.DEV) {
+            localStorage.setItem('demo_role', type);
 
-        // Ensure demo-token is set if no real token exists
-        if (!localStorage.getItem('auth_token')) {
-            localStorage.setItem('auth_token', 'demo-token');
+            // Ensure demo-token is set if no real token exists
+            if (!localStorage.getItem('auth_token')) {
+                localStorage.setItem('auth_token', 'demo-token');
+            }
         }
 
         // Sync user.role so role-based checks (e.g. isSuperAdmin in Overview)
@@ -60,7 +70,7 @@ export const AuthProvider = ({ children }) => {
     const logout = () => {
         localStorage.removeItem('auth_user');
         localStorage.removeItem('auth_token');
-        localStorage.removeItem('active_persona');
+        localStorage.removeItem('demo_role');
         setUser(null);
         // 'advertiser' is the canonical ROLE_HIERARCHY key (was 'brand' — stale)
         setPersonaState(ROLES.ADVERTISER);
