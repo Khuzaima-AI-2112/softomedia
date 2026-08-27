@@ -9,7 +9,7 @@ const ROLE_ROUTE = {
     admin: 'admin',
     advertiser: 'brand',
     retaileradmin: 'retailer',
-    techoperator: 'admin',
+    techoperator: 'techoperator',
 };
 
 const QUICK_LOGINS = [

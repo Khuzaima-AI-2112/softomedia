@@ -24,9 +24,13 @@ const ADMIN_NAV = [
     { to: '/dashboard/admin/ai-log', icon: 'smart_toy', label: 'AI Log' },
 ];
 
+// fix(mvp-nav): add My Campaigns and Performance — MVP §3.4 "track campaign status"
+// and "view basic campaign performance metrics" were built but unlinked.
 const BRAND_NAV = [
     { to: '/dashboard/brand', icon: 'dashboard', label: 'Dashboard', end: true, testId: 'nav-home' },
     { to: '/dashboard/brand/campaign/new', icon: 'add_circle', label: 'New Campaign' },
+    { to: '/dashboard/advertiser/campaigns', icon: 'sell', label: 'My Campaigns', testId: 'nav-campaigns' },
+    { to: '/dashboard/advertiser', icon: 'insights', label: 'Performance', end: true, testId: 'nav-reports' },
     { to: '/dashboard/advertiser/invoices', icon: 'receipt_long', label: 'Invoices' },
 ];
 
@@ -38,12 +42,20 @@ const RETAILER_NAV = [
     { to: '/dashboard/retailer/schedule-manager', icon: 'event_available', label: 'D-1 Preview' },
     { to: '/dashboard/retailer/loops', icon: 'subscriptions', label: 'Loops' },
     { to: '/dashboard/retailer/campaign-approvals', icon: 'approval', label: 'Campaign Approvals', testId: 'nav-approvals' },
+    // fix(mvp-nav): MVP §3.2 — communicate feedback or issues to Softomedia
+    { to: '/dashboard/tickets', icon: 'confirmation_number', label: 'Support Tickets', testId: 'nav-tickets' },
 ];
 
 // Task 4.6 — TechOpsDashboard is now the landing page entry; Health remains accessible
 const TECHOP_NAV = [
     { to: '/dashboard/techoperator', icon: 'monitor', label: 'Tech Ops', end: true, testId: 'nav-tech-ops' },
     { to: '/dashboard/techoperator/health', icon: 'monitor_heart', label: 'Health' },
+    // fix(mvp-nav): MVP §3.5 — register/provision screens and assign them to retailers
+    // and locations. ScreenManagement serves both; GET /api/screens admits techoperator
+    // (ROLE_HIERARCHY level 2), so the screen renders with data for this persona.
+    { to: '/dashboard/admin/screens', icon: 'tv', label: 'Screens', testId: 'nav-screens' },
+    // fix(mvp-nav): MVP §3.5 — incident tracking and resolution
+    { to: '/dashboard/tickets', icon: 'confirmation_number', label: 'Support Tickets', testId: 'nav-tickets' },
 ];
 
 function getNavItems(persona) {

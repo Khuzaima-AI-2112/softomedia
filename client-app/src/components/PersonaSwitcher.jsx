@@ -9,7 +9,7 @@ const PERSONAS = [
     { id: ROLES.ADMIN,         label: 'Admin',       icon: 'admin_panel_settings', color: 'bg-blue-500',    route: 'admin'               },
     { id: ROLES.ADVERTISER,    label: 'Brand',       icon: 'campaign',             color: 'bg-primary',     route: 'brand'               },
     { id: ROLES.RETAILERADMIN, label: 'Retailer',    icon: 'storefront',           color: 'bg-emerald-500', route: 'retailer'            },
-    { id: ROLES.TECHOPERATOR,  label: 'Tech Op',     icon: 'build',                color: 'bg-slate-600',   route: 'techoperator/health' },
+    { id: ROLES.TECHOPERATOR,  label: 'Tech Op',     icon: 'build',                color: 'bg-slate-600',   route: 'techoperator'        },
 ];
 
 const PersonaSwitcher = () => {
