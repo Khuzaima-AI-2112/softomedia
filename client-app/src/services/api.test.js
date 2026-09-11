@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+vi.mock('../firebase.js', () => ({ auth: { currentUser: null } }));
+
 import { apiClient, APIClient, APIError } from './api';
+import { auth } from '../firebase.js';
 
 describe('APIClient', () => {
     let client;
@@ -8,6 +11,7 @@ describe('APIClient', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.stubGlobal('fetch', vi.fn());
+        auth.currentUser = null;
         client = new APIClient(baseURL, { retryDelay: 1, timeout: 100 });
 
         // Mock localStorage
@@ -55,8 +59,8 @@ describe('APIClient', () => {
         expect(fetch).toHaveBeenCalledTimes(2);
     });
 
-    it('attaches auth token from localStorage if present', async () => {
-        localStorage.setItem('auth_token', 'fake-token');
+    it('attaches the current Firebase ID token if present', async () => {
+        auth.currentUser = { getIdToken: vi.fn().mockResolvedValue('firebase-token') };
 
         // We use the singleton instance here to test the interceptor
         fetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
@@ -65,7 +69,7 @@ describe('APIClient', () => {
 
         expect(fetch).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
             headers: expect.objectContaining({
-                'Authorization': 'Bearer fake-token'
+                'Authorization': 'Bearer firebase-token'
             })
         }));
     });

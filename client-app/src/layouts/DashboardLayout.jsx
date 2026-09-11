@@ -1,8 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Outlet, useLocation, useNavigate, NavLink } from 'react-router-dom';
-import PersonaSwitcher from '../components/PersonaSwitcher';
 import { useAuth } from '../contexts/AuthContext';
-import { ROLES } from '../constants/roles';
+import { dashboardRouteForRole, ROLES } from '../constants/roles';
 import ErrorBoundary from '../components/ErrorBoundary';
 import SafeWidgetLoader from '../components/SafeWidgetLoader';
 import NetworkErrorBanner from '../components/NetworkErrorBanner';
@@ -132,16 +131,18 @@ function DashboardLayout() {
     // Task 4.6 — techoperator now lands at /dashboard/techoperator (TechOpsDashboard)
     // Health screen remains accessible via nav but is no longer the default landing page.
     React.useEffect(() => {
-        if (!loading && persona && location.pathname === '/dashboard') {
-            let routePersona = persona;
-            if (persona === 'super_admin' || persona === ROLES.SUPERADMIN) routePersona = 'admin';
-            if (persona === ROLES.ADVERTISER) routePersona = 'brand';
-            
-            navigate(`/dashboard/${routePersona}`, { replace: true });
+        if (!loading && !user) {
+            navigate('/login', { replace: true });
+            return;
         }
-    }, [persona, loading, location.pathname, navigate]);
 
-    if (loading) return null;
+        if (!loading && persona && location.pathname === '/dashboard') {
+            const route = dashboardRouteForRole(persona);
+            if (route) navigate(`/dashboard/${route}`, { replace: true });
+        }
+    }, [persona, user, loading, location.pathname, navigate]);
+
+    if (loading || !user) return null;
 
     const avatarUrl = user?.avatarUrl || user?.photoURL || null;
     const avatarInitial = user?.name ? user.name[0].toUpperCase()
@@ -149,9 +150,9 @@ function DashboardLayout() {
             : persona ? persona[0].toUpperCase()
                 : '?';
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
         setAvatarOpen(false);
-        logout();
+        await logout();
         navigate('/login');
     };
 
@@ -166,8 +167,6 @@ function DashboardLayout() {
                         <span className="material-symbols-outlined text-[32px]">campaign</span>
                     </div>
                     <h2 className="text-lg font-bold leading-tight tracking-tight">AdManager</h2>
-                    <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-2"></div>
-                    <PersonaSwitcher />
                 </div>
 
                 <div className="flex items-center gap-6">

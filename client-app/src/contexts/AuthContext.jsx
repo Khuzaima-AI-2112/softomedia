@@ -1,73 +1,53 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { ROLES } from '../constants/roles';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../firebase';
+import { authAPI } from '../services/authAPI';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
-    const [persona, setPersonaState] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const savedPersona = localStorage.getItem('active_persona');
-        const savedUser = localStorage.getItem('auth_user');
+        return onAuthStateChanged(auth, async (firebaseUser) => {
+            if (!firebaseUser) {
+                setUser(null);
+                setLoading(false);
+                return;
+            }
 
-        if (savedUser) {
-            setUser(JSON.parse(savedUser));
-        }
-
-        if (savedPersona) {
-            setPersonaState(savedPersona);
-        } else if (savedUser) {
-            setPersonaState(JSON.parse(savedUser).role);
-        } else {
-            // 'advertiser' is the canonical ROLE_HIERARCHY key (was 'brand' — stale)
-            setPersonaState(ROLES.ADVERTISER);
-        }
-        setLoading(false);
+            try {
+                setUser(await authAPI.getProfile());
+            } catch {
+                await authAPI.logout();
+                setUser(null);
+            } finally {
+                setLoading(false);
+            }
+        });
     }, []);
 
-    const login = (userData, token) => {
-        localStorage.setItem('auth_user', JSON.stringify(userData));
-        localStorage.setItem('auth_token', token);
-        localStorage.setItem('active_persona', userData.role);
-        setUser(userData);
-        setPersonaState(userData.role);
-    };
-
-    const setPersona = (type) => {
-        localStorage.setItem('active_persona', type);
-        localStorage.setItem('demo_role', type); // Sync role for backend bypass
-
-        // Ensure demo-token is set if no real token exists
-        if (!localStorage.getItem('auth_token')) {
-            localStorage.setItem('auth_token', 'demo-token');
+    const login = async (email, password) => {
+        setLoading(true);
+        try {
+            const { user: profile } = await authAPI.login(email, password);
+            setUser(profile);
+            return profile;
+        } finally {
+            setLoading(false);
         }
-
-        // Sync user.role so role-based checks (e.g. isSuperAdmin in Overview)
-        // stay accurate when switching persona via PersonaSwitcher.
-        setUser(prev => prev ? { ...prev, role: type } : {
-            id: `demo-${type}`,
-            name: type.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase()),
-            email: `${type}@demo.softomedia.com`,
-            role: type,
-            linked_entity_id: `entity-${type}`
-        });
-
-        setPersonaState(type);
     };
 
-    const logout = () => {
-        localStorage.removeItem('auth_user');
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('active_persona');
+    const logout = async () => {
+        await authAPI.logout();
         setUser(null);
-        // 'advertiser' is the canonical ROLE_HIERARCHY key (was 'brand' — stale)
-        setPersonaState(ROLES.ADVERTISER);
     };
+
+    const persona = user?.role || null;
 
     return (
-        <AuthContext.Provider value={{ user, persona, loading, login, setPersona, logout }}>
+        <AuthContext.Provider value={{ user, persona, loading, login, logout }}>
             {children}
         </AuthContext.Provider>
     );

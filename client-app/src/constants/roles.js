@@ -9,6 +9,18 @@ export const ROLES = {
     ADVERTISER:     'advertiser',
 };
 
+export const DASHBOARD_ROUTE_BY_ROLE = Object.freeze({
+    [ROLES.SUPERADMIN]: 'admin',
+    [ROLES.ADMIN]: 'admin',
+    [ROLES.BRAND]: 'brand',
+    [ROLES.RETAILERADMIN]: 'retailer',
+    [ROLES.TECHOPERATOR]: 'techoperator',
+});
+
+export function dashboardRouteForRole(role) {
+    return DASHBOARD_ROUTE_BY_ROLE[normalizeRole(role)] || null;
+}
+
 /** Role hierarchy levels — single source, mirrors requireRole.js */
 export const ROLE_HIERARCHY = {
     [ROLES.SUPERADMIN]:     5,
@@ -16,7 +28,7 @@ export const ROLE_HIERARCHY = {
     [ROLES.CONTENTMANAGER]: 3,
     [ROLES.TECHOPERATOR]:   2,
     [ROLES.RETAILERADMIN]:  1,
-    [ROLES.BRAND]:          1,
+    [ROLES.BRAND]:          0,
     [ROLES.ADVERTISER]:     0,
 };
 

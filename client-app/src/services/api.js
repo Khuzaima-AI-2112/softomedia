@@ -2,6 +2,7 @@
 // Centralized API communication layer with error handling and retry logic
 
 import { API_URL } from '../config.js';
+import { auth } from '../firebase.js';
 
 /**
  * API Client Configuration
@@ -173,32 +174,8 @@ class APIClient {
 // Create singleton instance
 const apiClient = new APIClient();
 
-// ---------------------------------------------------------------------------
-// Phase 2 – Secure demo token seeding
-//
-// BEFORE: demo-token + role='superadmin' were seeded unconditionally in DEV,
-//         meaning any DEV page load silently gained super-admin API access.
-//
-// AFTER:
-//   • Token seeding is still DEV-only (import.meta.env.DEV guard kept).
-//   • The auto-seeded role is 'admin' (not 'superadmin').
-//   • Elevating to 'superadmin' requires the user to explicitly switch persona
-//     via the HamburgerMenu (which calls login() with the chosen role) — there
-//     is no longer a silent path to superadmin on page load.
-// ---------------------------------------------------------------------------
-if (import.meta.env.DEV) {
-    if (!localStorage.getItem('auth_token')) {
-        localStorage.setItem('auth_token', 'demo-token');
-    }
-    // Phase 2: default demo role is 'admin', NOT 'superadmin'
-    if (!localStorage.getItem('demo_role')) {
-        localStorage.setItem('demo_role', 'admin');
-    }
-}
-
-apiClient.addRequestInterceptor((url, options) => {
-    const token    = localStorage.getItem('auth_token');
-    const demoRole = localStorage.getItem('demo_role') || localStorage.getItem('active_persona');
+apiClient.addRequestInterceptor(async (url, options) => {
+    const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
 
     const hasAuth = options.headers && (options.headers['Authorization'] || options.headers['authorization']);
     if (token && !hasAuth) {
@@ -208,13 +185,6 @@ apiClient.addRequestInterceptor((url, options) => {
         };
     }
 
-    const hasDemoRole = options.headers && (options.headers['x-demo-role'] || options.headers['X-Demo-Role']);
-    if (demoRole && !hasDemoRole) {
-        options.headers = {
-            ...options.headers,
-            'x-demo-role': demoRole,
-        };
-    }
     return options;
 });
 

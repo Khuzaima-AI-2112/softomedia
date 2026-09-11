@@ -8,7 +8,13 @@ export const getFirestore = () => {
     if (db) return db;
 
     try {
-        const projectId = 'softomedia-live-2026';
+        const projectId = process.env.GOOGLE_CLOUD_PROJECT
+            || process.env.GCLOUD_PROJECT
+            || process.env.FIREBASE_PROJECT_ID;
+
+        if (!projectId) {
+            throw new Error('A Google Cloud project ID is required');
+        }
 
         const firestoreOptions = {
             projectId: projectId,

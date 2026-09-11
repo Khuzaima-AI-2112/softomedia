@@ -6,6 +6,9 @@ set -e
 cat > /usr/share/nginx/html/config.js <<EOF
 window.ENV = {
   VITE_API_URL: "${VITE_API_URL:-http://localhost:8080}",
+  VITE_FIREBASE_API_KEY: "${VITE_FIREBASE_API_KEY}",
+  VITE_FIREBASE_AUTH_DOMAIN: "${VITE_FIREBASE_AUTH_DOMAIN}",
+  VITE_FIREBASE_PROJECT_ID: "${VITE_FIREBASE_PROJECT_ID}",
   VITE_BUILD_ID: "${BUILD_ID:-development}"
 };
 EOF

@@ -1,41 +1,45 @@
 // Auth API Service
 // Authentication-related API calls
 
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { auth } from '../firebase.js';
 import apiClient from './api.js';
+
+let profileRequest = null;
 
 export const authAPI = {
     /**
-     * Login with email
+     * Login with Firebase email and password, then resolve the server profile.
      * @param {string} email - User email
-     * @returns {Promise<{token: string, user: object}>}
+     * @param {string} password - User password
+     * @returns {Promise<{credential: object, user: object}>}
      */
-    async login(email) {
-        const response = await apiClient.post('/api/auth/login', { email });
-
-        // Store token in localStorage
-        if (response.token) {
-            localStorage.setItem('auth_token', response.token);
-            localStorage.setItem('auth_user', JSON.stringify(response.user));
-        }
-
-        return response;
+    async login(email, password) {
+        const credential = await signInWithEmailAndPassword(auth, email, password);
+        const user = await this.getProfile();
+        return { credential, user };
     },
 
     /**
      * Logout
      */
-    logout() {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_user');
+    async logout() {
+        await signOut(auth);
     },
 
     /**
-     * Get current user from localStorage
-     * @returns {object|null}
+     * Resolve the authenticated Softomedia profile.
+     * @returns {Promise<object>}
      */
-    getCurrentUser() {
-        const userStr = localStorage.getItem('auth_user');
-        return userStr ? JSON.parse(userStr) : null;
+    async getProfile() {
+        if (!profileRequest) {
+            profileRequest = apiClient.get('/api/auth/me')
+                .then(response => response.user)
+                .finally(() => {
+                    profileRequest = null;
+                });
+        }
+        return profileRequest;
     },
 
     /**
@@ -43,6 +47,6 @@ export const authAPI = {
      * @returns {boolean}
      */
     isAuthenticated() {
-        return !!localStorage.getItem('auth_token');
+        return !!auth.currentUser;
     },
 };
