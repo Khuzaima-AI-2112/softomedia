@@ -7,6 +7,8 @@ export const DEMO_PERSONAS = Object.freeze([
     Object.freeze({ email: 'brand@demo.softomedia.test', name: 'Demo Brand', role: 'brand', linked_entity_id: 'demo-advertiser-bonvie' }),
     Object.freeze({ email: 'retaileradmin@demo.softomedia.test', name: 'Demo Retailer Administrator', role: 'retaileradmin', linked_entity_id: 'demo-retailer-freshmart' }),
     Object.freeze({ email: 'techoperator@demo.softomedia.test', name: 'Demo Technical Operator', role: 'techoperator', linked_entity_id: null }),
+    Object.freeze({ email: 'brand-secondary@demo.softomedia.test', name: 'Demo Secondary Brand', role: 'brand', linked_entity_id: 'demo-advertiser-secondary' }),
+    Object.freeze({ email: 'retaileradmin-secondary@demo.softomedia.test', name: 'Demo Secondary Retailer Administrator', role: 'retaileradmin', linked_entity_id: 'demo-retailer-secondary' }),
 ]);
 
 function activeProjectId() {

@@ -76,6 +76,34 @@ Run backend Jest unit tests:
 npm run test:unit
 ```
 
+### Reproducible Demo Baseline
+
+Provision the seven prepared Firebase accounts once, using a password supplied
+through a secure environment variable:
+
+```bash
+npm --prefix ad-server run provision:demo-personas
+```
+
+For each walkthrough, set `GOOGLE_CLOUD_PROJECT`, `DEMO_PROJECT_ID`, and
+`DEMO_ASSETS_BUCKET` to the dedicated demo resources, then run:
+
+```bash
+npm run reset:demo
+```
+
+The reset refuses a missing or mismatched project. It replaces only Firestore
+documents marked with the `phase-1-demo` reset scope and objects below the
+`phase-1-demo/` bucket prefix. Firebase accounts, user profiles, infrastructure,
+and unrecognized business records or storage objects are preserved.
+
+Run the complete reset contract against local Auth, Firestore, and Storage
+emulators with:
+
+```bash
+npm run test:demo-reset
+```
+
 ### End-to-End (E2E) Tests
 Run Playwright browser tests (ensure the backend server is running on `http://localhost:8080` first):
 ```bash

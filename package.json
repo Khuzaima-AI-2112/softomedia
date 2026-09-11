@@ -20,8 +20,10 @@
     "test:e2e:seed": "npx cross-env ALLOW_DEMO_MODE=true playwright test --grep @seed",
     "pretest:e2e": "node scripts/test-preflight.js",
     "test:rules": "firebase emulators:exec --project softomedia-demo --only firestore \"npx jest tests/firestore-rules/\"",
+    "test:demo-reset": "firebase emulators:exec --config firebase.json --project softomedia-demo --only auth,firestore,storage \"cd ad-server && node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand --coverage=false tests/demo-reset.integration.test.js\"",
     "lint": "node scripts/lint-tests.js && cd ad-server && npm run lint && cd ../client-app && npm run lint",
-    "db:seed": "cd ad-server && npm run seed"
+    "db:seed": "cd ad-server && npm run seed",
+    "reset:demo": "npm --prefix ad-server run reset:demo"
   },
   "keywords": [],
   "author": "",

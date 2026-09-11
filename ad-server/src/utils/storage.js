@@ -7,12 +7,20 @@ let storage;
  */
 export const getStorageClient = () => {
     if (!storage) {
+        const projectId = process.env.GOOGLE_CLOUD_PROJECT
+            || process.env.GCLOUD_PROJECT
+            || process.env.FIREBASE_PROJECT_ID;
+
         // Gates cloud resource initialization for local/test environments
-        if (!process.env.GOOGLE_APPLICATION_CREDENTIALS && process.env.NODE_ENV !== 'production') {
+        if (
+            !process.env.STORAGE_EMULATOR_HOST
+            && !process.env.GOOGLE_APPLICATION_CREDENTIALS
+            && process.env.NODE_ENV !== 'production'
+        ) {
             console.warn('[Storage] GOOGLE_APPLICATION_CREDENTIALS missing, storage client disabled');
             return null;
         }
-        storage = new Storage();
+        storage = new Storage({ projectId });
     }
     return storage;
 };

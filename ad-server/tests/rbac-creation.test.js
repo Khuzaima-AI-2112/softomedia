@@ -5,6 +5,9 @@ import { createTestApp, createMockAuthMiddleware } from './fixtures/test-app.js'
 // Load mocks before any app imports
 import './fixtures/mock-repos.js';
 
+// The first Firestore write can include emulator cold-start latency.
+jest.setTimeout(20_000);
+
 // Helper function to make requests as a specific role
 const postAsRole = async (role, route, payload) => {
     const { default: apiRouter } = await import('../src/api/index.js');

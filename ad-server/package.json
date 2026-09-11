@@ -9,6 +9,7 @@
         "dev": "nodemon index.js",
         "seed": "node seed.js",
         "provision:demo-personas": "node scripts/provision-demo-personas.js",
+        "reset:demo": "node scripts/reset-demo.js",
         "lint": "eslint . --ext .js",
         "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
         "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage --forceExit"
