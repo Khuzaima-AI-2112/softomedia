@@ -14,6 +14,16 @@ export function assertDedicatedDemoProject({ activeProjectId, expectedProjectId 
     }
 }
 
+export function assertDedicatedDemoBucket({ bucketName, expectedProjectId }) {
+    const recognizedBucketNames = new Set([
+        `${expectedProjectId}.appspot.com`,
+        `${expectedProjectId}.firebasestorage.app`,
+    ]);
+    if (!recognizedBucketNames.has(bucketName)) {
+        throw new Error(`Refusing to reset demo data in bucket ${bucketName || '(unset)'}`);
+    }
+}
+
 export async function resetDemoBaseline({
     firestore,
     storage,
@@ -23,6 +33,7 @@ export async function resetDemoBaseline({
     resetAt = new Date(),
 }) {
     assertDedicatedDemoProject({ activeProjectId, expectedProjectId });
+    assertDedicatedDemoBucket({ bucketName, expectedProjectId });
     if (!firestore || !storage) {
         throw new Error('Firestore and Cloud Storage clients are required for demo reset');
     }
@@ -55,12 +66,14 @@ export async function resetDemoBaseline({
     const [scopedObjects] = await bucket.getFiles({ prefix: DEMO_STORAGE_PREFIX });
     const baselineObjectNames = new Set(baseline.storageObjects.map(object => object.name));
 
-    await Promise.all(baseline.storageObjects.map(object =>
-        bucket.file(object.name).save(object.body, {
+    await Promise.all(baseline.storageObjects.map(async object => {
+        const file = bucket.file(object.name);
+        await file.save(object.body, {
             resumable: false,
             metadata: object.metadata,
-        })
-    ));
+        });
+        await file.makePublic();
+    }));
     await Promise.all(scopedObjects
         .filter(object => !baselineObjectNames.has(object.name))
         .map(object => object.delete()));

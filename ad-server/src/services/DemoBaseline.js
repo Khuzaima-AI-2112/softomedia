@@ -105,7 +105,6 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
             contactemail: 'brand@demo.softomedia.test',
             budget: 10000,
             status: 'active',
-            deleted_at: null,
         }, resetAtIso),
         record('advertisers', 'demo-advertiser-secondary', {
             name: 'Northstar Synthetic Brand',
@@ -113,21 +112,18 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
             contactemail: 'brand-secondary@demo.softomedia.test',
             budget: 8000,
             status: 'active',
-            deleted_at: null,
         }, resetAtIso),
         record('retailers', 'demo-retailer-freshmart', {
             name: 'FreshMart Synthetic Retailer',
             contact_email: 'retaileradmin@demo.softomedia.test',
             contract_start: isoDateDaysAfter(resetAt, -30),
             status: 'active',
-            deleted_at: null,
         }, resetAtIso),
         record('retailers', 'demo-retailer-secondary', {
             name: 'HarborCart Synthetic Retailer',
             contact_email: 'retaileradmin-secondary@demo.softomedia.test',
             contract_start: isoDateDaysAfter(resetAt, -30),
             status: 'active',
-            deleted_at: null,
         }, resetAtIso),
         record('stores', 'demo-store-mtl-north', {
             name: 'FreshMart North Synthetic Store',
@@ -221,6 +217,23 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
             start_date: isoDateDaysAfter(resetAt, 7),
             end_date: isoDateDaysAfter(resetAt, 21),
             budget: 1800,
+        }, resetAtIso),
+        record('loops', 'demo-loop-mtl-next-day-08', {
+            date: isoDateDaysAfter(resetAt, 1),
+            hour: 8,
+            retailer_id: 'demo-retailer-freshmart',
+            location_id: 'demo-location-mtl-entrance',
+            screen_id: 'demo-screen-north-1',
+            screen_ids: ['demo-screen-north-1'],
+            status: 'pending_approval',
+            version: 1,
+            generated_at: resetAtIso,
+            slots: Array.from({ length: 12 }, (_, position) => ({
+                position,
+                asset_id: mediaFixtures[position % mediaFixtures.length].document.id,
+                asset_name: mediaFixtures[position % mediaFixtures.length].document.data.title,
+                status: 'approved',
+            })),
         }, resetAtIso),
     ];
 

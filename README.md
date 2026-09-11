@@ -86,7 +86,7 @@ npm --prefix ad-server run provision:demo-personas
 ```
 
 For each walkthrough, set `GOOGLE_CLOUD_PROJECT`, `DEMO_PROJECT_ID`, and
-`DEMO_ASSETS_BUCKET` to the dedicated demo resources, then run:
+`DEMO_ASSETS_BUCKET` to that project's Firebase default bucket, then run:
 
 ```bash
 npm run reset:demo

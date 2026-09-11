@@ -49,7 +49,7 @@ afterAll(async () => {
 });
 
 async function readPersistedBaseline() {
-    const collections = ['advertisers', 'retailers', 'stores', 'locations', 'screens', 'media', 'campaigns'];
+    const collections = ['advertisers', 'retailers', 'stores', 'locations', 'screens', 'media', 'campaigns', 'loops'];
     const snapshots = await Promise.all(collections.map(collection =>
         firestore.collection(collection).where('demo_reset_scope', '==', DEMO_RESET_SCOPE).get()
     ));
@@ -85,6 +85,15 @@ describe('guarded demo reset', () => {
             bucketName,
             resetAt: new Date('2030-01-15T10:30:00.000Z'),
         })).rejects.toThrow('Refusing to reset demo data in project not-the-demo-project');
+
+        await expect(resetDemoBaseline({
+            firestore,
+            storage,
+            activeProjectId: projectId,
+            expectedProjectId: projectId,
+            bucketName: 'unrelated-live-project.appspot.com',
+            resetAt: new Date('2030-01-15T10:30:00.000Z'),
+        })).rejects.toThrow('Refusing to reset demo data in bucket unrelated-live-project.appspot.com');
 
         expect((await document.get()).data()).toEqual({
             demo_reset_scope: DEMO_RESET_SCOPE,
@@ -125,7 +134,7 @@ describe('guarded demo reset', () => {
             projectId,
             bucketName,
             resetAt: '2030-01-15T10:30:00.000Z',
-            documentsWritten: 18,
+            documentsWritten: 19,
             storageObjectsWritten: 4,
         });
         expect((await staleDemoDocument.get()).exists).toBe(false);
@@ -138,13 +147,14 @@ describe('guarded demo reset', () => {
         expect((await staleDemoObject.exists())[0]).toBe(false);
         expect((await unrelatedObject.download())[0].toString()).toBe('preserve');
 
-        const [retailers, stores, locations, screens, media, campaigns] = await Promise.all([
+        const [retailers, stores, locations, screens, media, campaigns, loops] = await Promise.all([
             firestore.collection('retailers').where('demo_reset_scope', '==', DEMO_RESET_SCOPE).get(),
             firestore.collection('stores').where('demo_reset_scope', '==', DEMO_RESET_SCOPE).get(),
             firestore.collection('locations').where('demo_reset_scope', '==', DEMO_RESET_SCOPE).get(),
             firestore.collection('screens').where('demo_reset_scope', '==', DEMO_RESET_SCOPE).get(),
             firestore.collection('media').where('demo_reset_scope', '==', DEMO_RESET_SCOPE).get(),
             firestore.collection('campaigns').where('demo_reset_scope', '==', DEMO_RESET_SCOPE).get(),
+            firestore.collection('loops').where('demo_reset_scope', '==', DEMO_RESET_SCOPE).get(),
         ]);
 
         expect(retailers.size).toBe(2);
@@ -176,6 +186,7 @@ describe('guarded demo reset', () => {
                 endDate: '2030-02-05',
             },
         ]);
+        expect(loops.docs.map(document => document.data().date)).toEqual(['2030-01-16']);
 
         const [objects] = await bucket.getFiles({ prefix: DEMO_STORAGE_PREFIX });
         expect(objects.map(object => object.name).sort()).toEqual([
@@ -263,7 +274,7 @@ describe('guarded demo reset', () => {
         });
 
         expect(stdout).toContain('"projectId": "softomedia-demo"');
-        expect(stdout).toContain('"documentsWritten": 18');
+        expect(stdout).toContain('"documentsWritten": 19');
         expect((await firestore.collection('campaigns').doc('demo-command-drift').get()).exists).toBe(false);
     });
 });
