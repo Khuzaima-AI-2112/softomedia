@@ -81,6 +81,7 @@ const ScreenManagement        = lazy(() => import('./pages/admin/ScreenManagemen
 const LoopManagement          = lazy(() => import('./pages/admin/LoopManagement'));
 const LoopBuilder             = lazy(() => import('./pages/admin/LoopBuilder'));
 const UserManagement          = lazy(() => import('./pages/admin/UserManagement'));
+const OrganizationManagement  = lazy(() => import('./pages/admin/OrganizationManagement'));
 const BusinessHoursManagement = lazy(() => import('./pages/admin/BusinessHoursManagement'));
 const NetworkMap              = lazy(() => import('./pages/admin/NetworkMap'));
 const AILog                   = lazy(() => import('./pages/admin/AILog'));
@@ -144,6 +145,7 @@ function App() {
                             <Route path="admin/loops"            element={<LoopManagement />} />
                             <Route path="admin/loops/:id"        element={<LoopBuilder />} />
                             <Route path="admin/users"            element={<UserManagement />} />
+                            <Route path="admin/organizations"    element={<OrganizationManagement />} />
                             <Route path="admin/hours"            element={<BusinessHoursManagement />} />
                             <Route path="admin/map"              element={<NetworkMap />} />
                             <Route path="admin/ai-log"           element={<AILog />} />

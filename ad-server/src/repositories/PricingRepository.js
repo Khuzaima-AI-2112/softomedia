@@ -8,6 +8,7 @@ const DEFAULT_PRICING = {
     schemaVersion: 1,
     baseCPM: 15.00,
     currency: 'USD',
+    allocation: { paid: 70, retailer: 20, internal: 10 },
     slotDuration: 5,
     slotsPerLoop: 12,
     trafficTiers: {
@@ -35,6 +36,7 @@ export class PricingRepositoryClass extends BaseRepository {
         normalized.schemaVersion = data.schemaVersion || data.schema_version || 1;
         normalized.baseCPM = data.baseCPM || data.base_cpm || DEFAULT_PRICING.baseCPM;
         normalized.currency = data.currency || data.currency || DEFAULT_PRICING.currency;
+        normalized.allocation = data.allocation || DEFAULT_PRICING.allocation;
         normalized.slotDuration = data.slotDuration || data.slot_duration || DEFAULT_PRICING.slotDuration;
         normalized.slotsPerLoop = data.slotsPerLoop || data.slots_per_loop || DEFAULT_PRICING.slotsPerLoop;
 
@@ -81,6 +83,12 @@ export class PricingRepositoryClass extends BaseRepository {
      */
     async updateConfig(updates, clearOverridesOnBaseCPMChange = true) {
         const existing = await this.getConfig();
+        const finalConfig = this._buildUpdatedConfig(existing, updates, clearOverridesOnBaseCPMChange);
+        const result = await this.update('global', finalConfig);
+        return this._normalizeConfig(result); // Return normalized to ensure UI gets camelCase
+    }
+
+    _buildUpdatedConfig(existing, updates, clearOverridesOnBaseCPMChange = true) {
 
         // 1. Map any incoming snake_case updates to camelCase
         const normalizedUpdates = { ...updates };
@@ -111,8 +119,37 @@ export class PricingRepositoryClass extends BaseRepository {
             if (finalConfig[key] !== undefined) delete finalConfig[key];
         });
 
-        const result = await this.update('global', finalConfig);
-        return this._normalizeConfig(result); // Return normalized to ensure UI gets camelCase
+        return finalConfig;
+    }
+
+    /** Persist a pricing change with its accepted-change audit record. */
+    async updateConfigWithAudit(updates, auditRepository, auditEntry) {
+        const existing = await this.getConfig();
+        const finalConfig = this._buildUpdatedConfig(existing, updates);
+
+        if (this.db && auditRepository.db === this.db) {
+            const audit = auditRepository.buildRecord(auditEntry);
+            const now = new Date().toISOString();
+            const pricingData = { ...finalConfig, id: 'global', updated_at: now };
+            const auditData = { ...audit, created_at: now, updated_at: now };
+
+            await this.db.runTransaction(async (transaction) => {
+                transaction.set(this.collection.doc('global'), pricingData, { merge: true });
+                transaction.create(auditRepository.collection.doc(audit.id), auditData);
+            });
+            return this._normalizeConfig(pricingData);
+        }
+
+        // Memory mode follows the same all-or-nothing public outcome: an audit
+        // failure happens before the pricing write, and a pricing failure removes
+        // the just-created audit record.
+        const audit = await auditRepository.record(auditEntry);
+        try {
+            return await this.updateConfig(updates);
+        } catch (error) {
+            await auditRepository.delete(audit.id);
+            throw error;
+        }
     }
 
     /**

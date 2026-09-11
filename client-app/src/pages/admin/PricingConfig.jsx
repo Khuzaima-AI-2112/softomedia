@@ -5,7 +5,7 @@ import apiService from '../../services/ApiService';
 
 /**
  * PricingConfig — S15-3
- * Admin-only page to view and update CPM rate config and slot allocation.
+ * Super Administrator page to view and update global CPM and slot allocation.
  * Route: /dashboard/admin/pricing-config
  */
 export default function PricingConfig() {
@@ -19,16 +19,16 @@ export default function PricingConfig() {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        if (user && user.role !== 'admin' && user.role !== 'superadmin') return;
+        if (user && user.role !== 'superadmin') return;
         apiService.getPricingConfig()
             .then(data => {
                 setConfig(data);
                 setForm({
-                    cpm_rates: { ...(data.cpm_rates ?? {}) },
+                    baseCPM: data.baseCPM ?? 0,
                     allocation: {
-                        paid: data.allocation?.paid ?? 100,
-                        retailer: data.allocation?.retailer ?? 0,
-                        internal: data.allocation?.internal ?? 0,
+                        paid: data.allocation?.paid ?? 70,
+                        retailer: data.allocation?.retailer ?? 20,
+                        internal: data.allocation?.internal ?? 10,
                     },
                 });
             })
@@ -36,8 +36,8 @@ export default function PricingConfig() {
             .finally(() => setLoading(false));
     }, [user]);
 
-    // Role guard — non-admin sees nothing
-    if (user && user.role !== 'admin' && user.role !== 'superadmin') {
+    // Role guard — platform governance belongs to the Super Administrator.
+    if (user && user.role !== 'superadmin') {
         return <Navigate to="/dashboard" replace />;
     }
 
@@ -46,8 +46,8 @@ export default function PricingConfig() {
         : 0;
     const allocationValid = allocationSum === 100;
 
-    const handleCpmChange = (key, value) => {
-        setForm(f => ({ ...f, cpm_rates: { ...f.cpm_rates, [key]: parseFloat(value) || 0 } }));
+    const handleCpmChange = (value) => {
+        setForm(f => ({ ...f, baseCPM: parseFloat(value) || 0 }));
         setSuccess(false);
     };
 
@@ -84,15 +84,13 @@ export default function PricingConfig() {
         );
     }
 
-    const cpmKeys = form?.cpm_rates ? Object.keys(form.cpm_rates) : [];
-
     return (
         <div data-testid="pricing-config" className="space-y-8">
             {/* Header */}
             <div>
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Pricing Configuration</h1>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    Manage CPM rates by screen type and campaign slot allocation.
+                    Manage the global CPM rate and campaign slot allocation.
                 </p>
             </div>
 
@@ -101,38 +99,12 @@ export default function PricingConfig() {
                 {/* CPM Rates */}
                 <div data-testid="pricing-tier" className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6">
                     <h2 className="text-base font-semibold text-slate-800 dark:text-slate-200 mb-4">
-                        CPM Rates by Screen Type
+                        Global CPM Rate
                     </h2>
-                    {cpmKeys.length === 0 ? (
-                        <p className="text-sm text-slate-400">No screen type rates configured.</p>
-                    ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {cpmKeys.map(key => (
-                                <div key={key}>
-                                    <label
-                                        htmlFor={`cpm-${key}`}
-                                        className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1"
-                                    >
-                                        {key}
-                                    </label>
-                                    <div className="flex items-center gap-1">
-                                        <span className="text-slate-400 text-sm">$</span>
-                                        <input
-                                            id={`cpm-${key}`}
-                                            data-testid="input-cpm-rate"
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            value={form.cpm_rates[key]}
-                                            onChange={e => handleCpmChange(key, e.target.value)}
-                                            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                                        />
-                                        <span className="text-slate-400 text-xs whitespace-nowrap">/ 1 000</span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                    <div className="max-w-xs">
+                        <label htmlFor="global-cpm" className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">CPM</label>
+                        <input id="global-cpm" data-testid="input-cpm-rate" type="number" step="0.01" min="0" value={form.baseCPM} onChange={e => handleCpmChange(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                    </div>
                 </div>
 
                 {/* Slot Allocation */}

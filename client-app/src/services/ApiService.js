@@ -26,6 +26,26 @@ class ApiService {
     }
 
     // ============================================
+    // PLATFORM GOVERNANCE (Super Administrator)
+    // ============================================
+
+    async getDemoOrganizations() {
+        return apiClient.get('/api/platform/organizations');
+    }
+
+    async createDemoOrganization(data) {
+        return apiClient.post('/api/platform/organizations', data);
+    }
+
+    async updateDemoOrganization(id, data) {
+        return apiClient.patch(`/api/platform/organizations/${id}`, data);
+    }
+
+    async getPlatformAuditRecords() {
+        return apiClient.get('/api/platform/audit');
+    }
+
+    // ============================================
     // RETAILERS
     // ============================================
 
@@ -315,8 +335,8 @@ class ApiService {
     // ============================================
 
     /**
-     * Get current CPM pricing configuration — admin only.
-     * Backend: GET /api/pricing/config (authenticate + authorize(['admin','superadmin'])).
+     * Get current CPM pricing configuration — Super Administrator only.
+     * Backend: GET /api/pricing/config (authenticate + requireSuperAdmin).
      * Was previously wired to the public /api/pricing root stub; corrected in S15.
      *
      * @returns {Promise<object>} Pricing config document
@@ -326,8 +346,8 @@ class ApiService {
     }
 
     /**
-     * Update CPM pricing configuration — admin only.
-     * Backend: PUT /api/pricing/config (authenticate + authorize(['admin','superadmin'])).
+     * Update CPM pricing configuration — Super Administrator only.
+     * Backend: PUT /api/pricing/config (authenticate + requireSuperAdmin).
      * Also validates allocation sum server-side; client enforces the same rule.
      *
      * @param {object} data - { cpm_rates: {}, allocation: { paid, retailer, internal } }

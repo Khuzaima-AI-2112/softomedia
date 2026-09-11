@@ -3,7 +3,9 @@
 
 import express from 'express';
 import PricingRepository from '../repositories/PricingRepository.js';
-import { authenticate, authorize } from '../middleware/auth.js';
+import { platformAuditRepository } from '../repositories/index.js';
+import { authenticate } from '../middleware/auth.js';
+import { requirePlatformGovernance } from '../middleware/requireRole.js';
 
 const router = express.Router();
 
@@ -33,10 +35,10 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /api/pricing/config
- * Get current pricing configuration — admin only.
+ * Get current pricing configuration — Super Administrator only.
  * SEC-S15-5: was public; hardened in S15.
  */
-router.get('/config', authenticate, authorize(['admin', 'superadmin']), async (req, res) => {
+router.get('/config', authenticate, requirePlatformGovernance, async (req, res) => {
     try {
         const config = await PricingRepository.getConfig();
         res.json(config);
@@ -48,10 +50,10 @@ router.get('/config', authenticate, authorize(['admin', 'superadmin']), async (r
 
 /**
  * PUT /api/pricing/config
- * Update pricing configuration — admin only.
+ * Update pricing configuration — Super Administrator only.
  * SEC-S15-6: was authenticate-only; role guard added in S15.
  */
-router.put('/config', authenticate, authorize(['admin', 'superadmin']), async (req, res) => {
+router.put('/config', authenticate, requirePlatformGovernance, async (req, res) => {
     try {
         // Validate allocation sum if provided
         if (req.body.allocation) {
@@ -60,7 +62,12 @@ router.put('/config', authenticate, authorize(['admin', 'superadmin']), async (r
                 return res.status(400).json({ error: 'Allocation must sum to 100' });
             }
         }
-        const config = await PricingRepository.updateConfig(req.body);
+        const config = await PricingRepository.updateConfigWithAudit(req.body, platformAuditRepository, {
+            action: 'pricing_config_updated',
+            actor_id: req.user.id || req.user.uid,
+            actor_role: req.user.role,
+            changes: req.body,
+        });
         res.json(config);
     } catch (error) {
         console.error('Failed to update pricing config:', error);

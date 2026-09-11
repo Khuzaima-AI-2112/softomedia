@@ -9,6 +9,14 @@ export const ROLES = {
     ADVERTISER:     'advertiser',
 };
 
+export const CANONICAL_ROLES = Object.freeze([
+    ROLES.SUPERADMIN,
+    ROLES.ADMIN,
+    ROLES.BRAND,
+    ROLES.RETAILERADMIN,
+    ROLES.TECHOPERATOR,
+]);
+
 export const DASHBOARD_ROUTE_BY_ROLE = Object.freeze({
     [ROLES.SUPERADMIN]: 'admin',
     [ROLES.ADMIN]: 'admin',

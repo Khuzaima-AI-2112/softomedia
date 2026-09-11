@@ -25,6 +25,7 @@ import invoicesRouter from './invoices.js';
 import ticketsRouter from './tickets.js';
 import analyticsRouter from './analytics.js';
 import debugRouter from './debug.js';
+import platformRouter from './platform.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -74,5 +75,6 @@ router.use('/impressions', authenticate, impressionsRouter);
 router.use('/invoices', authenticate, invoicesRouter);
 router.use('/tickets', authenticate, ticketsRouter);
 router.use('/analytics', authenticate, analyticsRouter);
+router.use('/platform', authenticate, platformRouter);
 
 export default router;

@@ -16,6 +16,7 @@ const ADMIN_NAV = [
     { to: '/dashboard/admin/loops', icon: 'subscriptions', label: 'Loops' },
     { to: '/dashboard/admin/loop-analytics', icon: 'analytics', label: 'Loop Analytics', testId: 'nav-reports' },
     { to: '/dashboard/admin/users', icon: 'group', label: 'Users' },
+    { to: '/dashboard/admin/organizations', icon: 'domain', label: 'Organizations' },
     { to: '/dashboard/admin/hours', icon: 'schedule', label: 'Business Hours' },
     { to: '/dashboard/admin/pricing', icon: 'payments', label: 'Pricing' },
     { to: '/dashboard/admin/pricing-config', icon: 'tune', label: 'Pricing Config' },

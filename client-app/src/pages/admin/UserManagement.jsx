@@ -5,15 +5,15 @@ import StatusBadge from '../../components/StatusBadge';
 import DataTable from '../../components/DataTable';
 import apiService from '../../services/ApiService';
 import { useAuth } from '../../contexts/AuthContext';
-import { Trash2, Pencil } from 'lucide-react';
-import { ROLES as CANONICAL_ROLES } from '../../constants/roles';
+import { Pencil } from 'lucide-react';
+import { ROLES as ROLE_NAMES } from '../../constants/roles';
 
 const ROLES = [
-    { value: CANONICAL_ROLES.SUPERADMIN, label: 'Super Admin', color: 'text-purple-500', icon: 'shield_person' },
-    { value: CANONICAL_ROLES.CONTENTMANAGER, label: 'Content Manager', color: 'text-blue-500', icon: 'edit_note' },
-    { value: CANONICAL_ROLES.TECHOPERATOR, label: 'Tech Operator', color: 'text-amber-500', icon: 'engineering' },
-    { value: CANONICAL_ROLES.RETAILERADMIN, label: 'Retailer Admin', color: 'text-emerald-500', icon: 'storefront' },
-    { value: CANONICAL_ROLES.ADVERTISER, label: 'Advertiser', color: 'text-rose-500', icon: 'campaign' }
+    { value: ROLE_NAMES.SUPERADMIN, label: 'Super Administrator', color: 'text-purple-500', icon: 'shield_person' },
+    { value: ROLE_NAMES.ADMIN, label: 'Admin', color: 'text-blue-500', icon: 'edit_note' },
+    { value: ROLE_NAMES.TECHOPERATOR, label: 'Technical Operator', color: 'text-amber-500', icon: 'engineering' },
+    { value: ROLE_NAMES.RETAILERADMIN, label: 'Retailer Administrator', color: 'text-emerald-500', icon: 'storefront' },
+    { value: ROLE_NAMES.BRAND, label: 'Brand', color: 'text-rose-500', icon: 'campaign' }
 ];
 
 function UserManagement() {
@@ -23,7 +23,7 @@ function UserManagement() {
     // Phase 3: gate entire page behind superadmin.
     // Guard behind loading so we never redirect during the auth hydration
     // window when user is still null and isSuperAdmin would be a false negative.
-    const isSuperAdmin = user?.role === CANONICAL_ROLES.SUPERADMIN;
+    const isSuperAdmin = user?.role === ROLE_NAMES.SUPERADMIN;
 
     const [users, setUsers] = useState([]);
     const [retailers, setRetailers] = useState([]);
@@ -31,7 +31,7 @@ function UserManagement() {
     const [dataLoading, setDataLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [formData, setFormData] = useState({
-        name: '', email: '', role: CANONICAL_ROLES.ADVERTISER, linkedentityid: ''
+        name: '', email: '', role: ROLE_NAMES.BRAND, linkedentityid: ''
     });
     const [editingUserId, setEditingUserId] = useState(null);
     const [filterRole, setFilterRole] = useState('all');
@@ -70,7 +70,7 @@ function UserManagement() {
 
     const openCreateModal = () => {
         setEditingUserId(null);
-        setFormData({ name: '', email: '', role: CANONICAL_ROLES.ADVERTISER, linkedentityid: '' });
+        setFormData({ name: '', email: '', role: ROLE_NAMES.BRAND, linkedentityid: '' });
         setModalError('');
         setShowModal(true);
     };
@@ -80,7 +80,7 @@ function UserManagement() {
         setFormData({
             name: u.name || '',
             email: u.email || '',
-            role: u.role || CANONICAL_ROLES.ADVERTISER,
+            role: u.role || ROLE_NAMES.BRAND,
             linkedentityid: u.linkedentityid || ''
         });
         setModalError('');
@@ -110,14 +110,14 @@ function UserManagement() {
         }
     };
 
-    const handleDelete = async (userId) => {
-        if (!window.confirm('Are you sure you want to delete this user?')) return;
+    const changeUserStatus = async (targetUser) => {
+        const status = targetUser.status === 'inactive' ? 'active' : 'inactive';
         try {
-            await apiService.deleteUser(userId);
-            setSuccessMessage('User deleted successfully.');
+            await apiService.updateUser(targetUser.id, { status });
+            setSuccessMessage(`User ${status === 'inactive' ? 'deactivated' : 'reactivated'} successfully.`);
             loadData();
         } catch (err) {
-            setPageError(err?.message || 'Failed to delete user.');
+            setPageError(err?.message || 'Failed to update user status.');
         }
     };
 
@@ -126,13 +126,10 @@ function UserManagement() {
         : users.filter(u => u.role === filterRole);
 
     const linkedEntityOptions = () => {
-        if (formData.role === CANONICAL_ROLES.RETAILERADMIN) return retailers;
-        if (formData.role === CANONICAL_ROLES.ADVERTISER) return advertisers;
+        if (formData.role === ROLE_NAMES.RETAILERADMIN) return retailers;
+        if (formData.role === ROLE_NAMES.BRAND) return advertisers;
         return [];
     };
-
-    const getRoleLabel = (roleValue) =>
-        ROLES.find(r => r.value === roleValue)?.label || roleValue;
 
     // NOTE: DataTable calls col.render(value, row) — the full row object is
     // always the SECOND argument. Use (_value, row) for columns that need
@@ -170,11 +167,11 @@ function UserManagement() {
                         <Pencil size={16} />
                     </button>
                     <button
-                        onClick={() => handleDelete(row.id)}
+                        onClick={() => changeUserStatus(row)}
                         className="p-1 text-red-400 hover:text-red-300 transition-colors"
-                        title="Delete user"
+                        title={row.status === 'inactive' ? 'Reactivate user' : 'Deactivate user'}
                     >
-                        <Trash2 size={16} />
+                        {row.status === 'inactive' ? 'Reactivate' : 'Deactivate'}
                     </button>
                 </div>
             )

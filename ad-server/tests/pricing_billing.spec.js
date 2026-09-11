@@ -14,7 +14,7 @@ import request    from 'supertest';
 import express    from 'express';
 import pricingRouter  from '../src/api/pricing.js';
 import invoicesRouter from '../src/api/invoices.js';
-import { authenticate, authorize } from '../src/middleware/auth.js';
+import { authenticate } from '../src/middleware/auth.js';
 
 // ---- Minimal express app used by all tests ----
 // Matches the structure in index.js: authenticate is applied at the router level.
@@ -36,18 +36,18 @@ const makeToken = (payload) =>
     jwt.sign(payload, TEST_JWT_SECRET, { expiresIn: '1h' });
 
 const adminToken      = makeToken({ id: 'admin-1',      role: 'admin',      email: 'admin@test.com' });
+const superadminToken = makeToken({ id: 'superadmin-1', role: 'superadmin', email: 'superadmin@test.com' });
 const advertiserToken = makeToken({ id: 'adv-1',        role: 'advertiser', email: 'adv@test.com', linked_entity_id: 'adv-entity-1' });
-const anonToken       = '';   // no token — unauthenticated
 
 // ===========================================================================
 // S15-1  Pricing route hardening
 // ===========================================================================
 
 describe('S15-1 — GET /api/pricing/config', () => {
-    it('returns 200 for admin', async () => {
+    it('returns 200 for Super Administrator', async () => {
         const res = await request(app)
             .get('/api/pricing/config')
-            .set('Authorization', `Bearer ${adminToken}`);
+            .set('Authorization', `Bearer ${superadminToken}`);
         // Either 200 (config found) or a 5xx if Firestore is unavailable —
         // we only assert that the role guard didn’t 401/403.
         expect([200, 500]).toContain(res.status);
@@ -63,6 +63,13 @@ describe('S15-1 — GET /api/pricing/config', () => {
         const res = await request(app)
             .get('/api/pricing/config')
             .set('Authorization', `Bearer ${advertiserToken}`);
+        expect(res.status).toBe(403);
+    });
+
+    it('returns 403 for Admin', async () => {
+        const res = await request(app)
+            .get('/api/pricing/config')
+            .set('Authorization', `Bearer ${adminToken}`);
         expect(res.status).toBe(403);
     });
 });
@@ -91,7 +98,7 @@ describe('S15-1 — PUT /api/pricing/config', () => {
     it('returns 400 when allocation does not sum to 100', async () => {
         const res = await request(app)
             .put('/api/pricing/config')
-            .set('Authorization', `Bearer ${adminToken}`)
+            .set('Authorization', `Bearer ${superadminToken}`)
             .send({ allocation: { paid: 50, retailer: 10, internal: 10 } });
         expect(res.status).toBe(400);
         expect(res.body.error).toMatch(/100/);

@@ -14,6 +14,14 @@ import { ROLES, ROLE_HIERARCHY, normalizeRole } from '../constants/roles.js';
 
 export { ROLES, ROLE_HIERARCHY, normalizeRole };
 
+export const PERMISSIONS = Object.freeze({
+    PLATFORM_GOVERNANCE: 'platform.governance',
+});
+
+const ROLE_PERMISSIONS = Object.freeze({
+    [ROLES.SUPERADMIN]: Object.freeze([PERMISSIONS.PLATFORM_GOVERNANCE]),
+});
+
 /**
  * requireRole(minRole)
  * Middleware that allows requests where req.user.role >= minRole
@@ -52,4 +60,32 @@ export function requireRole(minRole) {
 
 /** Convenience shorthand */
 export const requireSuperAdmin = requireRole(ROLES.SUPERADMIN);
+
+/**
+ * Require a named action grant instead of inferring authority from rank.
+ * `requiredRole` preserves the established denial response for existing API consumers.
+ */
+export function requirePermission(permission, requiredRole = permission) {
+    return (req, res, next) => {
+        if (!req.user) {
+            return res.status(500).json({ error: 'Misconfigured route: authentication middleware missing' });
+        }
+
+        const role = normalizeRole(req.user.role);
+        if (!ROLE_PERMISSIONS[role]?.includes(permission)) {
+            return res.status(403).json({
+                error: 'Forbidden',
+                required: requiredRole,
+                actual: role || 'unauthenticated',
+            });
+        }
+        req.user.role = role;
+        next();
+    };
+}
+
+export const requirePlatformGovernance = requirePermission(
+    PERMISSIONS.PLATFORM_GOVERNANCE,
+    ROLES.SUPERADMIN,
+);
 export const requireAdmin      = requireRole(ROLES.ADMIN);

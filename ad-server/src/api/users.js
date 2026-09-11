@@ -1,8 +1,8 @@
 import express from 'express';
 import { userRepository } from '../repositories/index.js';
 import logger from '../utils/logger.js';
-import { requireSuperAdmin } from '../middleware/requireRole.js';
-import { ROLES } from '../constants/roles.js';
+import { requirePlatformGovernance } from '../middleware/requireRole.js';
+import { CANONICAL_ROLES } from '../constants/roles.js';
 
 const router = express.Router();
 
@@ -12,7 +12,7 @@ const router = express.Router();
 // users whose role normalises to 'superadmin'
 // can list, create, update or delete accounts.
 // ─────────────────────────────────────────────
-router.use(requireSuperAdmin);
+router.use(requirePlatformGovernance);
 
 /**
  * GET /api/users
@@ -51,15 +51,9 @@ router.post('/', async (req, res) => {
             }
         }
 
-        const allowedRoles = [ROLES.SUPERADMIN, ROLES.CONTENTMANAGER, ROLES.TECHOPERATOR, ROLES.RETAILERADMIN, ROLES.ADVERTISER];
+        const allowedRoles = CANONICAL_ROLES;
         if (!role || typeof role !== 'string' || !allowedRoles.includes(role)) {
             errors.push(`Role is required and must be one of: ${allowedRoles.join(', ')}`);
-        }
-
-        if (role === ROLES.ADVERTISER || role === ROLES.RETAILERADMIN) {
-            if (!linkedentityid || typeof linkedentityid !== 'string') {
-                errors.push('Linked entity ID is required when role is advertiser or retaileradmin');
-            }
         }
 
         if (errors.length > 0) {
@@ -114,7 +108,7 @@ router.put('/:id', async (req, res) => {
             }
         }
 
-        const allowedRoles = [ROLES.SUPERADMIN, ROLES.CONTENTMANAGER, ROLES.TECHOPERATOR, ROLES.RETAILERADMIN, ROLES.ADVERTISER];
+        const allowedRoles = CANONICAL_ROLES;
         if (role !== undefined && !allowedRoles.includes(role)) {
             errors.push(`Role must be one of: ${allowedRoles.join(', ')}`);
         }
@@ -157,7 +151,7 @@ router.patch('/:id', async (req, res) => {
 
         const { name, email, role, linkedentityid, status } = req.body;
         const errors = [];
-        const allowedRoles    = [ROLES.SUPERADMIN, ROLES.CONTENTMANAGER, ROLES.TECHOPERATOR, ROLES.RETAILERADMIN, ROLES.ADVERTISER];
+        const allowedRoles    = CANONICAL_ROLES;
         const allowedStatuses = ['active', 'inactive'];
 
         if (name     !== undefined && (typeof name !== 'string' || name.trim().length < 1)) errors.push('Name must be a non-empty string');
