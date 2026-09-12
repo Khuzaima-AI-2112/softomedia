@@ -28,8 +28,8 @@ function BusinessHoursManagement() {
     const [showSpecialModal, setShowSpecialModal] = useState(false);
     const [selectedDate, setSelectedDate] = useState(null);
     const [specialFormData, setSpecialFormData] = useState({
-        open_time: '09:00',
-        close_time: '18:00',
+        open_time: '08:00',
+        close_time: '22:00',
         is_closed: false,
         reason: ''
     });
@@ -73,8 +73,8 @@ function BusinessHoursManagement() {
                 const existing = weekly.find(w => parseInt(w.day_of_week) === day.id);
                 return existing || {
                     day_of_week: day.id,
-                    open_time: '09:00',
-                    close_time: '18:00',
+                    open_time: '08:00',
+                    close_time: '22:00',
                     is_closed: false
                 };
             }).sort((a, b) => a.day_of_week - b.day_of_week);
@@ -121,8 +121,8 @@ function BusinessHoursManagement() {
         const existing = specialHours.find(h => h.date === dateStr);
         if (existing) {
             setSpecialFormData({
-                open_time: existing.open_time || '09:00',
-                close_time: existing.close_time || '18:00',
+                open_time: existing.open_time || '08:00',
+                close_time: existing.close_time || '22:00',
                 is_closed: existing.is_closed || false,
                 reason: existing.reason || ''
             });
@@ -131,8 +131,8 @@ function BusinessHoursManagement() {
             const dayOfWeek = date.getDay();
             const dayDefault = weeklyHours.find(w => parseInt(w.day_of_week) === dayOfWeek);
             setSpecialFormData({
-                open_time: dayDefault?.open_time || '09:00',
-                close_time: dayDefault?.close_time || '18:00',
+                open_time: dayDefault?.open_time || '08:00',
+                close_time: dayDefault?.close_time || '22:00',
                 is_closed: dayDefault?.is_closed || false,
                 reason: ''
             });
@@ -232,7 +232,7 @@ function BusinessHoursManagement() {
                                 <div>
                                     <p className="font-semibold text-sm leading-tight">{store.name}</p>
                                     <p className={`text-[10px] ${selectedStore?.id === store.id ? 'text-white/70' : 'text-slate-400'}`}>
-                                        {store.city}
+                                        {store.city}{store.time_zone ? ` · ${store.time_zone}` : ''}
                                     </p>
                                 </div>
                             </button>

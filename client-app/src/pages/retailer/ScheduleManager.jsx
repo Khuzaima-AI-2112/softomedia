@@ -3,12 +3,9 @@ import GlassCard from '../../components/GlassCard';
 import LoopPreview from '../../components/LoopPreview';
 import apiClient from '../../services/api';
 
-// Task 3.2: resolve timezone from location record, fall back to browser
+// Store time zone is projected onto each location by GET /api/locations.
 function resolveTimezone(location) {
-    // Note: backend location schema may lack a `timezone` field.
-    // If missing for all locations, open a tracking issue against ad-server
-    // to add timezone to the location data model.
-    return location?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return location?.time_zone || location?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
 // Task 3.1 + 3.6: build the D-1 date string and cutoff state

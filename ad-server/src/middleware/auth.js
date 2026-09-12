@@ -21,7 +21,9 @@ function legacyDemoIdentity(req) {
     const requestedRole = req.headers['x-demo-role'] || ROLES.ADMIN;
     const role = toCanonicalRole(requestedRole);
     if (!role) return null;
-    const organizationId = DEMO_LINKED_ENTITY_OVERRIDES[requestedRole] ?? `entity-${role}`;
+    const organizationId = req.headers['x-demo-retailer-id']
+        || DEMO_LINKED_ENTITY_OVERRIDES[requestedRole]
+        || `entity-${role}`;
     return {
         role,
         email: `demo-${role}@example.com`,

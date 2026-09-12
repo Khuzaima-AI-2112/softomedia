@@ -1,94 +1,129 @@
 import express from 'express';
 import { locationRepository } from '../repositories/index.js';
+import StoreRepository from '../repositories/StoreRepository.js';
 import { loopRepository, LOOP_STATUS } from '../repositories/LoopRepository.js';
-import { requireRole } from '../middleware/requireRole.js';
+import { normalizeRole, ROLES } from '../constants/roles.js';
+import {
+    canManageAnyRetailer,
+    canManageRetailer,
+    denyStoreAccess,
+    findManagedStore,
+    retailerIdFor,
+} from '../middleware/storeManagement.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
 
+async function includeStoreTimeZones(locations) {
+    return Promise.all(locations.map(async location => {
+        const store = location.store_id ? await StoreRepository.findById(location.store_id) : null;
+        return { ...location, time_zone: store?.time_zone || null };
+    }));
+}
+
 router.get('/', async (req, res) => {
     try {
-        const locations = await locationRepository.findAll();
-        res.json(locations);
+        const storeId = req.query.store_id || req.query.storeId;
+        if (storeId) {
+            const store = await findManagedStore(req, res, storeId);
+            if (!store) return;
+            return res.json(await includeStoreTimeZones(
+                await locationRepository.findAll({ where: [['store_id', '==', store.id]] }),
+            ));
+        }
+
+        if (canManageAnyRetailer(req.user)) {
+            return res.json(await includeStoreTimeZones(await locationRepository.findAll()));
+        }
+
+        const retailerId = retailerIdFor(req.user);
+        if (!retailerId) return denyStoreAccess(res);
+        return res.json(await includeStoreTimeZones(
+            await locationRepository.findAll({ where: [['retailer_id', '==', retailerId]] }),
+        ));
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        return res.status(500).json({ error: 'Failed to fetch locations' });
     }
 });
 
 router.post('/', async (req, res) => {
     try {
+        const { name, store_id } = req.body;
+        if (!name || !store_id) return res.status(400).json({ error: 'name and store_id are required' });
+        const store = await findManagedStore(req, res, store_id);
+        if (!store) return;
+
         const id = req.body.id || `loc_${Date.now()}`;
-        await locationRepository.create(id, req.body);
-        const added = await locationRepository.findById(id);
-        res.status(201).json(added);
+        await locationRepository.create(id, {
+            ...req.body,
+            name,
+            store_id: store.id,
+            retailer_id: store.retailer_id,
+        });
+        return res.status(201).json(await locationRepository.findById(id));
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        return res.status(500).json({ error: 'Failed to create location' });
     }
 });
 
 router.delete('/:id', async (req, res) => {
     try {
-        await locationRepository.delete(req.params.id);
-        res.status(204).end();
+        const location = await locationRepository.findById(req.params.id);
+        if (!location || !canManageRetailer(req.user, location.retailer_id)) return denyStoreAccess(res);
+        await locationRepository.delete(location.id);
+        return res.status(204).end();
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        return res.status(500).json({ error: 'Failed to delete location' });
+    }
+});
+
+async function findManagedLocation(req, res) {
+    const location = await locationRepository.findById(req.params.id);
+    if (!location || !canManageRetailer(req.user, location.retailer_id)) {
+        denyStoreAccess(res);
+        return null;
+    }
+    return location;
+}
+
+router.get('/:id/loops', async (req, res) => {
+    try {
+        const location = await findManagedLocation(req, res);
+        if (!location) return;
+        const where = [['location_id', '==', location.id]];
+        if (req.query.date) where.push(['date', '==', req.query.date]);
+        if (req.query.status) where.push(['status', '==', req.query.status]);
+        return res.json(await loopRepository.findAll({ where }));
+    } catch (error) {
+        logger.error('[Locations API] GET /:id/loops failed', { locationId: req.params.id, error: error.message });
+        return res.status(500).json({ error: 'Failed to fetch loops for location' });
+    }
+});
+
+router.post('/:id/loops/approve-all', async (req, res) => {
+    try {
+        const location = await findManagedLocation(req, res);
+        if (!location) return;
+        if (normalizeRole(req.user.role) !== ROLES.RETAILERADMIN) return denyStoreAccess(res);
+
+        const where = [
+            ['location_id', '==', location.id],
+            ['status', '==', LOOP_STATUS.PENDING_APPROVAL],
+        ];
+        if (req.body.date) where.push(['date', '==', req.body.date]);
+        const pendingLoops = await loopRepository.findAll({ where });
+        if (pendingLoops.length === 0) return res.json({ approved: 0, message: 'No pending loops found for this location' });
+
+        await Promise.all(pendingLoops.map(loop => loopRepository.update(loop.id, {
+            status: LOOP_STATUS.APPROVED,
+            approved_at: new Date().toISOString(),
+            approved_by: req.user?.uid || req.user?.id || null,
+        })));
+        return res.json({ approved: pendingLoops.length });
+    } catch (error) {
+        logger.error('[Locations API] POST /:id/loops/approve-all failed', { locationId: req.params.id, error: error.message });
+        return res.status(500).json({ error: 'Failed to bulk approve loops' });
     }
 });
 
 export default router;
-
-// --- Nested Loop Routes for Locations ---
-
-router.get('/:id/loops', requireRole('retaileradmin'), async (req, res) => {
-    try {
-        const locationId = req.params.id;
-        const { date, status } = req.query;
-
-        const where = [['location_id', '==', locationId]];
-        if (date)   where.push(['date',   '==', date]);
-        if (status) where.push(['status', '==', status]);
-
-        const loops = await loopRepository.findAll({ where });
-
-        logger.info('[Locations API] GET /:id/loops', { locationId, date, status, count: loops.length });
-        res.json(loops);
-    } catch (error) {
-        logger.error('[Locations API] GET /:id/loops failed', { locationId: req.params.id, error: error.message });
-        res.status(500).json({ error: 'Failed to fetch loops for location' });
-    }
-});
-
-router.post('/:id/loops/approve-all', requireRole('retaileradmin'), async (req, res) => {
-    try {
-        const locationId = req.params.id;
-        const { date } = req.body;
-
-        const where = [
-            ['location_id', '==', locationId],
-            ['status', '==', LOOP_STATUS.PENDING_APPROVAL],
-        ];
-        if (date) where.push(['date', '==', date]);
-
-        const pendingLoops = await loopRepository.findAll({ where });
-
-        if (pendingLoops.length === 0) {
-            return res.json({ approved: 0, message: 'No pending loops found for this location' });
-        }
-
-        const userId = req.user?.uid || null;
-        const approvalPromises = pendingLoops.map(loop =>
-            loopRepository.update(loop.id, {
-                status: LOOP_STATUS.APPROVED,
-                approved_at: new Date().toISOString(),
-                approved_by: userId,
-            })
-        );
-        await Promise.all(approvalPromises);
-
-        logger.info('[Locations API] Bulk approve-all', { locationId, date, count: pendingLoops.length, userId });
-        res.json({ approved: pendingLoops.length });
-    } catch (error) {
-        logger.error('[Locations API] POST /:id/loops/approve-all failed', { locationId: req.params.id, error: error.message });
-        res.status(500).json({ error: 'Failed to bulk approve loops' });
-    }
-});

@@ -162,6 +162,7 @@ function App() {
                             <Route path="retailer/schedule"           element={<ScheduleCalendar />} />
                             <Route path="retailer/schedule-history"   element={<ScheduleHistory />} />
                             <Route path="retailer/schedule-manager"   element={<ScheduleManager />} />
+                            <Route path="retailer/hours"              element={<BusinessHoursManagement />} />
                             <Route path="retailer/loops"              element={<RetailerLoops />} />
                             <Route path="retailer/campaign-approvals" element={<CampaignApprovals />} />
 

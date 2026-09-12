@@ -1,142 +1,146 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import GlassCard from './GlassCard';
-import StatusBadge from './StatusBadge';
 import apiService from '../services/ApiService';
 import { useAuth } from '../contexts/AuthContext';
 
+const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
 function LocationManager() {
     const { user } = useAuth();
+    const [stores, setStores] = useState([]);
     const [locations, setLocations] = useState([]);
-    const [isAdding, setIsAdding] = useState(false);
-    const [newLocation, setNewLocation] = useState({ name: '', store_profile: 'standard' });
+    const [newStore, setNewStore] = useState({ name: '', time_zone: browserTimeZone });
+    const [newLocation, setNewLocation] = useState({ name: '', store_id: '' });
+    const [showStoreForm, setShowStoreForm] = useState(false);
+    const [showLocationForm, setShowLocationForm] = useState(false);
+    const [message, setMessage] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [addError, setAddError] = useState('');
 
-    useEffect(() => {
-        fetchLocations();
-    }, []);
-
-    const fetchLocations = async () => {
+    const loadManagedRecords = async () => {
+        setLoading(true);
         try {
-            const data = await apiService.getLocations();
-            setLocations(data);
+            const [storeData, locationData] = await Promise.all([
+                apiService.getStores(),
+                apiService.getLocations(),
+            ]);
+            setStores(storeData);
+            setLocations(locationData);
+            setNewLocation(current => ({
+                ...current,
+                store_id: current.store_id || storeData[0]?.id || '',
+            }));
         } catch (error) {
-            console.error('Failed to fetch locations:', error);
+            setMessage({ type: 'error', text: 'Unable to load your stores and locations.' });
         } finally {
             setLoading(false);
         }
     };
 
-    const handleAdd = async (e) => {
-        e.preventDefault();
-        setAddError('');
+    useEffect(() => {
+        loadManagedRecords();
+    }, []);
+
+    const addStore = async (event) => {
+        event.preventDefault();
+        const retailerId = user?.linked_entity_id || user?.linkedentityid || user?.retailer_id;
+        if (!retailerId) {
+            setMessage({ type: 'error', text: 'Your account is not linked to a retailer.' });
+            return;
+        }
+
         try {
-            // S11-4: inject retailer_id from auth context so POST /api/stores
-            // receives the required field and never returns a 400.
-            const added = await apiService.createLocation({
-                ...newLocation,
-                retailer_id: user?.retailer_id,
-            });
-            setLocations([...locations, added]);
-            setIsAdding(false);
-            setNewLocation({ name: '', store_profile: 'standard' });
+            const store = await apiService.createStore({ ...newStore, retailer_id: retailerId });
+            setStores(current => [...current, store]);
+            setNewLocation(current => ({ ...current, store_id: current.store_id || store.id }));
+            setNewStore({ name: '', time_zone: browserTimeZone });
+            setShowStoreForm(false);
+            setMessage({ type: 'success', text: `${store.name} was created with 08:00–22:00 hours every day.` });
         } catch (error) {
-            console.error('Failed to add location:', error);
-            const msg = error?.response?.data?.error || error?.message || 'Failed to add location';
-            setAddError(msg);
+            setMessage({ type: 'error', text: error?.response?.data?.error || 'Unable to create the store.' });
         }
     };
 
-    if (loading) return <div className="animate-pulse h-40 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>;
+    const addLocation = async (event) => {
+        event.preventDefault();
+        try {
+            const location = await apiService.createLocation(newLocation);
+            setLocations(current => [...current, location]);
+            setNewLocation(current => ({ ...current, name: '' }));
+            setShowLocationForm(false);
+            setMessage({ type: 'success', text: `${location.name} was added to the selected store.` });
+        } catch (error) {
+            setMessage({ type: 'error', text: error?.response?.data?.error || 'Unable to create the location.' });
+        }
+    };
+
+    if (loading) return <div className="animate-pulse h-40 bg-slate-200 dark:bg-slate-700 rounded-xl" />;
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white">Store Locations</h3>
-                <button
-                    onClick={() => { setIsAdding(!isAdding); setAddError(''); }}
-                    className="flex items-center gap-2 text-sm font-bold text-primary hover:text-primary-hover transition-colors"
-                >
-                    <span className="material-symbols-outlined text-[18px]">{isAdding ? 'close' : 'add_circle'}</span>
-                    {isAdding ? 'Cancel' : 'Add Location'}
-                </button>
+        <section data-testid="retailer-store-manager" className="space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">Your Stores and Locations</h2>
+                    <p className="text-sm text-slate-500">Store time zones determine schedule and approval timing.</p>
+                </div>
+                <div className="flex gap-2">
+                    <button data-testid="add-store-button" onClick={() => setShowStoreForm(current => !current)} className="px-3 py-2 rounded-lg bg-primary text-white font-bold text-sm">
+                        {showStoreForm ? 'Cancel' : 'Add Store'}
+                    </button>
+                    <button data-testid="add-location-button" onClick={() => setShowLocationForm(current => !current)} disabled={!stores.length} className="px-3 py-2 rounded-lg border border-primary text-primary font-bold text-sm disabled:opacity-50">
+                        {showLocationForm ? 'Cancel' : 'Add Location'}
+                    </button>
+                </div>
             </div>
 
-            {isAdding && (
-                <GlassCard className="border-2 border-primary/20">
-                    {/* S11-4: data-testid added for falsifiable ACs */}
-                    <form data-testid="add-location-form" onSubmit={handleAdd} className="flex flex-col md:flex-row gap-4 items-end">
-                        <div className="flex-1 space-y-1">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Store Name</label>
-                            <input
-                                type="text"
-                                value={newLocation.name}
-                                onChange={(e) => setNewLocation({ ...newLocation, name: e.target.value })}
-                                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                                placeholder="e.g. Downtown Flagship"
-                                required
-                            />
-                        </div>
-                        <div className="w-full md:w-48 space-y-1">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Profile</label>
-                            <select
-                                value={newLocation.store_profile}
-                                onChange={(e) => setNewLocation({ ...newLocation, store_profile: e.target.value })}
-                                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                            >
-                                <option value="standard">Standard</option>
-                                <option value="flagship">Flagship</option>
-                                <option value="compact">Compact</option>
-                            </select>
-                        </div>
-                        <button
-                            type="submit"
-                            data-testid="save-location-btn"
-                            className="px-6 py-2 bg-primary text-white font-bold rounded-lg hover:bg-primary-hover transition-all shadow-lg shadow-primary/20"
-                        >
-                            Save
-                        </button>
+            {message && <p role="status" className={message.type === 'error' ? 'text-sm text-red-600' : 'text-sm text-emerald-600'}>{message.text}</p>}
+
+            {showStoreForm && (
+                <GlassCard>
+                    <form data-testid="add-store-form" onSubmit={addStore} className="grid gap-3 md:grid-cols-3 md:items-end">
+                        <label className="text-sm font-medium">Store name
+                            <input data-testid="store-name-input" required value={newStore.name} onChange={event => setNewStore(current => ({ ...current, name: event.target.value }))} className="mt-1 w-full rounded border p-2 text-slate-900" />
+                        </label>
+                        <label className="text-sm font-medium">IANA time zone
+                            <input data-testid="store-time-zone-input" required value={newStore.time_zone} onChange={event => setNewStore(current => ({ ...current, time_zone: event.target.value }))} className="mt-1 w-full rounded border p-2 text-slate-900" placeholder="America/Toronto" />
+                        </label>
+                        <button type="submit" className="rounded bg-primary px-4 py-2 font-bold text-white">Create Store</button>
                     </form>
-                    {addError && (
-                        <p data-testid="add-location-error" className="mt-2 text-sm text-red-500">{addError}</p>
-                    )}
                 </GlassCard>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {locations.length > 0 ? locations.map(loc => (
-                    <GlassCard key={loc.id} className="group hover:border-primary/30 cursor-pointer transition-all">
-                        <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="size-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                                    <span className="material-symbols-outlined">location_on</span>
-                                </div>
-                                <div>
-                                    <p className="font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">{loc.name}</p>
-                                    <p className="text-[11px] text-slate-500 uppercase font-bold tracking-tight">{loc.store_profile} Profile</p>
-                                </div>
-                            </div>
-                            <StatusBadge status="Active" />
-                        </div>
-                        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center text-[11px] text-slate-500">
-                            <span className="flex items-center gap-1">
-                                <span className="material-symbols-outlined text-[14px]">display_settings</span>
-                                {loc.screen_count || 0} Screens Active
-                            </span>
-                            <span className="flex items-center gap-1">
-                                <span className="material-symbols-outlined text-[14px]">history</span>
-                                {loc.last_sync || 'Never'}
-                            </span>
-                        </div>
-                    </GlassCard>
-                )) : (
-                    <div className="col-span-2 text-center py-12 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700">
-                        <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">map</span>
-                        <p className="text-slate-500">No locations configured yet.</p>
-                    </div>
-                )}
+            {showLocationForm && (
+                <GlassCard>
+                    <form data-testid="add-location-form" onSubmit={addLocation} className="grid gap-3 md:grid-cols-3 md:items-end">
+                        <label className="text-sm font-medium">Location name
+                            <input data-testid="location-name-input" required value={newLocation.name} onChange={event => setNewLocation(current => ({ ...current, name: event.target.value }))} className="mt-1 w-full rounded border p-2 text-slate-900" />
+                        </label>
+                        <label className="text-sm font-medium">Store
+                            <select data-testid="location-store-select" value={newLocation.store_id} onChange={event => setNewLocation(current => ({ ...current, store_id: event.target.value }))} className="mt-1 w-full rounded border p-2 text-slate-900">
+                                {stores.map(store => <option key={store.id} value={store.id}>{store.name}</option>)}
+                            </select>
+                        </label>
+                        <button type="submit" className="rounded bg-primary px-4 py-2 font-bold text-white">Create Location</button>
+                    </form>
+                </GlassCard>
+            )}
+
+            <div className="grid gap-4 md:grid-cols-2">
+                {stores.map(store => {
+                    const storeLocations = locations.filter(location => location.store_id === store.id);
+                    return (
+                        <GlassCard key={store.id} data-testid={`store-card-${store.id}`}>
+                            <h3 className="font-bold text-slate-900 dark:text-white">{store.name}</h3>
+                            <p data-testid={`store-time-zone-${store.id}`} className="mt-1 text-sm text-slate-500">Time zone: {store.time_zone}</p>
+                            <p className="mt-1 text-xs text-slate-500">Standard hours: 08:00–22:00 daily unless changed.</p>
+                            <ul className="mt-3 space-y-1 text-sm text-slate-700 dark:text-slate-300">
+                                {storeLocations.map(location => <li key={location.id}>• {location.name}</li>)}
+                                {!storeLocations.length && <li className="text-slate-500">No locations configured.</li>}
+                            </ul>
+                        </GlassCard>
+                    );
+                })}
             </div>
-        </div>
+        </section>
     );
 }
 

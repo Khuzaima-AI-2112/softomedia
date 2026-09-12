@@ -152,6 +152,23 @@ class ApiService {
     }
 
     // ============================================
+    // LOCATIONS
+    // ============================================
+
+    async getLocations(params = {}) {
+        const query = new URLSearchParams(params).toString();
+        return apiClient.get(`/api/locations${query ? '?' + query : ''}`);
+    }
+
+    async createLocation(data) {
+        return apiClient.post('/api/locations', data);
+    }
+
+    async deleteLocation(id) {
+        return apiClient.delete(`/api/locations/${id}`);
+    }
+
+    // ============================================
     // SCREENS
     // ============================================
 

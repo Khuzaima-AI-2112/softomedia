@@ -40,6 +40,7 @@ const RETAILER_NAV = [
     { to: '/dashboard/retailer/schedule', icon: 'calendar_month', label: 'Schedule', testId: 'nav-calendar' },
     { to: '/dashboard/retailer/schedule-history', icon: 'history', label: 'Schedule History' },
     { to: '/dashboard/retailer/schedule-manager', icon: 'event_available', label: 'D-1 Preview' },
+    { to: '/dashboard/retailer/hours', icon: 'schedule', label: 'Store Hours', testId: 'nav-store-hours' },
     { to: '/dashboard/retailer/loops', icon: 'subscriptions', label: 'Loops' },
     { to: '/dashboard/retailer/campaign-approvals', icon: 'approval', label: 'Campaign Approvals', testId: 'nav-approvals' },
     // fix(mvp-nav): MVP §3.2 — communicate feedback or issues to Softomedia
