@@ -150,6 +150,16 @@ class APIClient {
         });
     }
 
+    async postForm(endpoint, formData, options = {}) {
+        return this.request(endpoint, {
+            ...options,
+            method: 'POST',
+            body: formData,
+            // The browser supplies Content-Type with the generated multipart boundary.
+            headers: options.headers || {},
+        });
+    }
+
     async put(endpoint, data, options = {}) {
         return this.request(endpoint, {
             ...options,

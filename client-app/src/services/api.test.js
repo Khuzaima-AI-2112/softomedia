@@ -74,6 +74,20 @@ describe('APIClient', () => {
         }));
     });
 
+    it('uploads FormData without overriding the browser multipart boundary', async () => {
+        fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'ast_1' }) });
+        const form = new FormData();
+        form.append('title', 'Creative');
+
+        await client.postForm('/assets/upload', form);
+
+        expect(fetch).toHaveBeenCalledWith(`${baseURL}/assets/upload`, expect.objectContaining({
+            method: 'POST',
+            body: form,
+            headers: {},
+        }));
+    });
+
     it.skip('handles request timeout', async () => {
         fetch.mockImplementationOnce((url, options) => {
             return new Promise((resolve, reject) => {

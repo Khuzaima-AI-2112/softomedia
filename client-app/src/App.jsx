@@ -88,6 +88,7 @@ const AILog                   = lazy(() => import('./pages/admin/AILog'));
 const CPMCalendar             = lazy(() => import('./pages/admin/CPMCalendar'));
 const LoopAnalytics           = lazy(() => import('./pages/admin/LoopAnalytics'));
 const PricingConfig           = lazy(() => import('./pages/admin/PricingConfig'));  // Sprint 15
+const MediaLibrary            = lazy(() => import('./pages/admin/MediaLibrary'));
 
 // ── Brand pages ───────────────────────────────────────────────────────────────────────────
 const BrandOverview  = lazy(() => import('./pages/brand/BrandDashboard'));
@@ -152,6 +153,7 @@ function App() {
                             <Route path="admin/pricing"          element={<CPMCalendar />} />
                             <Route path="admin/loop-analytics"   element={<LoopAnalytics />} />
                             <Route path="admin/pricing-config"   element={<PricingConfig />} />   {/* Sprint 15 */}
+                            <Route path="admin/media"            element={<MediaLibrary />} />
 
                             {/* Brand */}
                             <Route path="brand"              element={<BrandOverview />} />

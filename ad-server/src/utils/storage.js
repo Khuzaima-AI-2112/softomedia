@@ -1,23 +1,20 @@
-﻿import { Storage } from '@google-cloud/storage';
+import { Storage } from '@google-cloud/storage';
+import fs from 'fs';
+import path from 'path';
 
 let storage;
 
-/**
- * Get or initialize GCS storage client
- */
 export const getStorageClient = () => {
     if (!storage) {
         const projectId = process.env.GOOGLE_CLOUD_PROJECT
             || process.env.GCLOUD_PROJECT
             || process.env.FIREBASE_PROJECT_ID;
 
-        // Gates cloud resource initialization for local/test environments
         if (
             !process.env.STORAGE_EMULATOR_HOST
             && !process.env.GOOGLE_APPLICATION_CREDENTIALS
             && process.env.NODE_ENV !== 'production'
         ) {
-            console.warn('[Storage] GOOGLE_APPLICATION_CREDENTIALS missing, storage client disabled');
             return null;
         }
         storage = new Storage({ projectId });
@@ -25,41 +22,78 @@ export const getStorageClient = () => {
     return storage;
 };
 
-/**
- * Upload a file to GCS
- * @param {string} localPath - Path to local file
- * @param {string} destination - Destination path in bucket
- * @param {string} bucketName - Target bucket name
- */
-export const uploadFile = async (localPath, destination, bucketName = 'softomedia-live-2026-assets') => {
+function assetsBucketName() {
+    const projectId = process.env.GOOGLE_CLOUD_PROJECT
+        || process.env.GCLOUD_PROJECT
+        || process.env.FIREBASE_PROJECT_ID;
+    return process.env.DEMO_ASSETS_BUCKET
+        || process.env.GCS_BUCKET_NAME
+        || (projectId ? `${projectId}.firebasestorage.app` : null);
+}
+
+function publicObjectUrl(bucketName, destination) {
+    if (process.env.STORAGE_EMULATOR_HOST) {
+        const origin = process.env.STORAGE_EMULATOR_HOST.replace(/\/$/, '');
+        return `${origin}/v0/b/${bucketName}/o/${encodeURIComponent(destination)}?alt=media`;
+    }
+    return `https://storage.googleapis.com/${bucketName}/${destination}`;
+}
+
+export async function uploadMediaObject({ destination, buffer, contentType, metadata = {} }) {
     const client = getStorageClient();
-    if (!client) {
-        const normalizedPath = localPath.replace(/\\/g, '/');
-        return {
-            url: `http://localhost:8080/${normalizedPath}`, // Fallback for local dev
-            storage_path: localPath
-        };
+    const bucketName = assetsBucketName();
+    if (!client || !bucketName) {
+        const filename = path.basename(destination);
+        const localPath = path.resolve('assets', filename);
+        await fs.promises.mkdir(path.dirname(localPath), { recursive: true });
+        await fs.promises.writeFile(localPath, buffer);
+        return { url: `/assets/${filename}`, storage_path: localPath };
     }
 
-    try {
-        const bucket = client.bucket(bucketName);
-        const [file] = await bucket.upload(localPath, {
-            destination: destination,
-            metadata: {
-                cacheControl: 'public, max-age=3600',
-            },
+    const file = client.bucket(bucketName).file(destination);
+    await file.save(buffer, {
+        resumable: false,
+        metadata: {
+            contentType,
+            cacheControl: 'public, max-age=3600',
+            metadata,
+        },
+    });
+    await file.makePublic();
+    return {
+        url: publicObjectUrl(bucketName, destination),
+        storage_path: `gs://${bucketName}/${destination}`,
+    };
+}
+
+export async function deleteMediaObject(storagePath) {
+    if (storagePath.startsWith('gs://')) {
+        const remainder = storagePath.slice('gs://'.length);
+        const slash = remainder.indexOf('/');
+        const bucketName = remainder.slice(0, slash);
+        const destination = remainder.slice(slash + 1);
+        const client = getStorageClient();
+        if (!client) throw new Error('Storage client is unavailable for cleanup');
+        await client.bucket(bucketName).file(destination).delete({ ignoreNotFound: true });
+        return;
+    }
+    await fs.promises.rm(storagePath, { force: true });
+}
+
+/** Legacy path-based upload retained for existing callers. */
+export const uploadFile = async (localPath, destination, bucketName = assetsBucketName()) => {
+    const client = getStorageClient();
+    if (client && bucketName) {
+        const [file] = await client.bucket(bucketName).upload(localPath, {
+            destination,
+            metadata: { cacheControl: 'public, max-age=3600' },
         });
-
-        // Make the file publicly readable for simpler MVP access
-        // In production, we'd use signed URLs
         await file.makePublic();
-
         return {
-            url: `https://storage.googleapis.com/${bucketName}/${destination}`,
-            storage_path: `gs://${bucketName}/${destination}`
+            url: publicObjectUrl(bucketName, destination),
+            storage_path: `gs://${bucketName}/${destination}`,
         };
-    } catch (error) {
-        console.error('[Storage] Upload failed:', error);
-        throw error;
     }
+    const normalizedPath = localPath.replace(/\\/g, '/');
+    return { url: `http://localhost:8080/${normalizedPath}`, storage_path: localPath };
 };

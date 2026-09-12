@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const mediaEmulatorTest = process.env.MEDIA_EMULATOR_TEST === 'true';
+
 /**
  * See https://playwright.dev/docs/test-configuration.
  *
@@ -108,10 +110,10 @@ export default defineConfig({
 
     webServer: [
         {
-            command: 'npm run dev',
+            command: mediaEmulatorTest ? 'npx kill-port 8080 && npm run dev' : 'npm run dev',
             cwd: './ad-server',
             url: 'http://localhost:8080/health',
-            reuseExistingServer: !process.env.CI,
+            reuseExistingServer: !process.env.CI && !mediaEmulatorTest,
             timeout: 120_000,
             env: {
                 ALLOW_DEMO_MODE: 'true'
@@ -120,7 +122,7 @@ export default defineConfig({
         {
             command: 'npx kill-port 5173 && npm run dev --prefix client-app',
             url: 'http://localhost:5173',
-            reuseExistingServer: true,
+            reuseExistingServer: !mediaEmulatorTest,
             timeout: 180_000,
             env: {
                 ALLOW_DEMO_MODE: 'true'

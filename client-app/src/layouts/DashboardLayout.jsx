@@ -12,6 +12,7 @@ const ADMIN_NAV = [
     { to: '/dashboard/admin/retailers', icon: 'storefront', label: 'Retailers' },
     { to: '/dashboard/admin/advertisers', icon: 'campaign', label: 'Advertisers' },
     { to: '/dashboard/admin/campaigns', icon: 'sell', label: 'Campaigns', testId: 'nav-campaigns' },
+    { to: '/dashboard/admin/media', icon: 'perm_media', label: 'Media', testId: 'nav-media' },
     { to: '/dashboard/admin/screens', icon: 'tv', label: 'Screens' },
     { to: '/dashboard/admin/loops', icon: 'subscriptions', label: 'Loops' },
     { to: '/dashboard/admin/loop-analytics', icon: 'analytics', label: 'Loop Analytics', testId: 'nav-reports' },

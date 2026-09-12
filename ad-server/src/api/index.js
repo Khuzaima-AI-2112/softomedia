@@ -34,7 +34,6 @@ const router = express.Router();
 router.use('/auth', authRouter);
 router.use('/debug', debugRouter);
 router.use('/health', healthRouter);
-router.use('/assets', assetsRouter);
 // Note: 'playlist' (singular) is the Player endpoint, 'playlists' (plural) is the Admin CRUD
 router.use('/playlist', playlistRouter);
 router.use('/playlists', playlistsRouter);
@@ -45,6 +44,7 @@ router.use('/campaigns', campaignsRouter);
 router.use('/retailers', retailersRouter);
 router.use('/advertisers', advertisersRouter);
 router.use('/screens', screensRouter);
+router.use('/assets', authenticate, assetsRouter);
 
 // --- Observability: UI error reporting (public — fires from ErrorBoundary
 //     before/during auth failures, so must not require authentication) ---

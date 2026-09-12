@@ -327,6 +327,10 @@ class ApiService {
         return apiClient.get('/api/assets');
     }
 
+    async uploadAsset(formData) {
+        return apiClient.postForm('/api/assets/upload', formData);
+    }
+
     // ============================================
     // BUSINESS HOURS
     // ============================================

@@ -88,8 +88,8 @@ test.describe('Global Playlist Feature', () => {
 
             const res = await request.post(`${API_BASE}/api/assets/upload`, {
                 headers: {
-                    // Note: Playwright handles the boundary for multipart automatically 
-                    // when passing 'multipart' property
+                    Authorization: 'Bearer demo-token',
+                    'x-demo-role': 'admin',
                 },
                 multipart: {
                     file: {
@@ -98,7 +98,10 @@ test.describe('Global Playlist Feature', () => {
                         buffer: fileBuffer,
                     },
                     duration: '5',
-                    file_type: 'image/png'
+                    title: 'TDD test banner',
+                    category: 'internal',
+                    owner_type: 'platform',
+                    approval_status: 'approved',
                 }
             });
 

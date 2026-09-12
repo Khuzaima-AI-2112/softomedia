@@ -19,8 +19,11 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 export const auth = getAuth(firebaseApp);
 
-if (import.meta.env.VITE_FIREBASE_AUTH_EMULATOR_URL) {
-    connectAuthEmulator(auth, import.meta.env.VITE_FIREBASE_AUTH_EMULATOR_URL, {
+const authEmulatorUrl = runtimeConfig.VITE_FIREBASE_AUTH_EMULATOR_URL
+    || import.meta.env.VITE_FIREBASE_AUTH_EMULATOR_URL;
+
+if (authEmulatorUrl) {
+    connectAuthEmulator(auth, authEmulatorUrl, {
         disableWarnings: true,
     });
 }

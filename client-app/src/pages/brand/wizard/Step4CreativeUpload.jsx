@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 import GlassCard from '../../../components/GlassCard';
+import apiService from '../../../services/ApiService';
 
 // Demo creative URLs for quick selection
 const DEMO_CREATIVES = [
@@ -20,6 +21,11 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
     const [selectedCreative, setSelectedCreative] = useState(data.creativeUrl || '');
     const [customUrl, setCustomUrl] = useState('');
     const [error, setError] = useState('');
+    const [creativeTitle, setCreativeTitle] = useState('');
+    const [creativeFile, setCreativeFile] = useState(null);
+    const [creativeAssetId, setCreativeAssetId] = useState(data.creativeAssetId || null);
+    const [uploading, setUploading] = useState(false);
+    const [uploadSuccess, setUploadSuccess] = useState('');
 
     const handleSelectDemo = (url) => {
         setSelectedCreative(url);
@@ -36,12 +42,40 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
         setError('');
     };
 
+    const handleFileUpload = async () => {
+        setError('');
+        setUploadSuccess('');
+        if (!creativeTitle.trim() || !creativeFile) {
+            setError('Enter a creative title and choose a file');
+            return;
+        }
+
+        const payload = new FormData();
+        payload.append('file', creativeFile);
+        payload.append('title', creativeTitle.trim());
+        payload.append('category', 'paid');
+        payload.append('duration', '5');
+
+        setUploading(true);
+        try {
+            const asset = await apiService.uploadAsset(payload);
+            setSelectedCreative(asset.url);
+            setCreativeAssetId(asset.id);
+            setCustomUrl('');
+            setUploadSuccess('Creative uploaded successfully.');
+        } catch (err) {
+            setError(err.message || 'Creative could not be uploaded');
+        } finally {
+            setUploading(false);
+        }
+    };
+
     const handleContinue = () => {
         if (!selectedCreative) {
             setError('Please select or upload a creative');
             return;
         }
-        updateData({ creativeUrl: selectedCreative });
+        updateData({ creativeUrl: selectedCreative, ...(creativeAssetId ? { creativeAssetId } : {}) });
         onNext();
     };
 
@@ -87,6 +121,27 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
                         <p className="text-xs text-slate-500">Coming soon</p>
                     </div>
                 </div>
+            </GlassCard>
+
+            <GlassCard>
+                <h3 className="font-bold text-lg mb-4">Upload your creative</h3>
+                <div className="grid gap-3 md:grid-cols-2">
+                    <label className="text-sm font-medium">
+                        Creative title
+                        <input value={creativeTitle} onChange={event => setCreativeTitle(event.target.value)}
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-800" />
+                    </label>
+                    <label className="text-sm font-medium">
+                        Creative file
+                        <input type="file" accept=".png,.jpg,.jpeg,.mp4" onChange={event => setCreativeFile(event.target.files?.[0] || null)}
+                            className="mt-1 block w-full rounded-xl border border-dashed border-slate-300 p-3 dark:border-slate-600" />
+                    </label>
+                </div>
+                <button type="button" onClick={handleFileUpload} disabled={uploading}
+                    className="mt-4 rounded-xl bg-primary px-5 py-3 font-semibold text-white disabled:opacity-60">
+                    {uploading ? 'Uploading…' : 'Upload creative'}
+                </button>
+                {uploadSuccess && <p role="status" className="mt-2 text-sm text-emerald-600">{uploadSuccess}</p>}
             </GlassCard>
 
             {/* Demo Creatives */}
