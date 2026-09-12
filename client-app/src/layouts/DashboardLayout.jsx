@@ -3,7 +3,6 @@ import { Outlet, useLocation, useNavigate, NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { dashboardRouteForRole, ROLES } from '../constants/roles';
 import ErrorBoundary from '../components/ErrorBoundary';
-import SafeWidgetLoader from '../components/SafeWidgetLoader';
 import NetworkErrorBanner from '../components/NetworkErrorBanner';
 
 // ── Role-aware sidebar nav items ───────────────────────────────────────────────
@@ -238,8 +237,6 @@ function DashboardLayout() {
                 </main>
             </div>
 
-            {/* AI Assistant (Ghost Layer) */}
-            <SafeWidgetLoader />
         </div>
     );
 }

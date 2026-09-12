@@ -1,11 +1,77 @@
 import express from 'express';
-import { campaignRepository, loopRepository } from '../repositories/index.js';
+import {
+    campaignRepository,
+    impressionRepository,
+    locationRepository,
+    loopRepository,
+    mediaRepository,
+    retailerRepository,
+    screenRepository,
+    StoreRepository,
+} from '../repositories/index.js';
 import { campaignService } from '../services/CampaignService.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/requireRole.js';
-import { ROLES, ROLE_HIERARCHY } from '../constants/roles.js';
+import { ROLES, ROLE_HIERARCHY, normalizeRole } from '../constants/roles.js';
 
 const router = express.Router();
+
+function isBrand(user) {
+    return normalizeRole(user?.role) === ROLES.BRAND;
+}
+
+function brandIdFor(user) {
+    return user?.linked_entity_id || user?.organization_id || null;
+}
+
+function denyBrandAccess(res) {
+    return res.status(403).json({ error: 'Forbidden' });
+}
+
+async function validateBrandSubmission(body, ownerId) {
+    if (!body.media_id) {
+        return { error: 'A persisted paid creative is required', status: 400 };
+    }
+    const media = await mediaRepository.findById(body.media_id);
+    if (!media || media.category !== 'paid' || media.owner_type !== 'brand' || media.owner_id !== ownerId) {
+        return { error: 'The selected creative is unavailable', status: 403 };
+    }
+
+    if (!Array.isArray(body.inventory_selection) || body.inventory_selection.length === 0) {
+        return { error: 'At least one Bookable Inventory selection is required', status: 400 };
+    }
+
+    for (const selection of body.inventory_selection) {
+        const [retailer, store, location, screen] = await Promise.all([
+            retailerRepository.findById(selection.retailer_id),
+            StoreRepository.findById(selection.store_id),
+            locationRepository.findById(selection.location_id),
+            screenRepository.findById(selection.screen_id),
+        ]);
+        const valid = retailer
+            && retailer.status === 'active'
+            && !retailer.deleted_at
+            && store
+            && store.status !== 'inactive'
+            && !store.deleted_at
+            && location
+            && location.status !== 'inactive'
+            && !location.deleted_at
+            && screen
+            && screen.status !== 'inactive'
+            && !screen.deleted_at
+            && store.retailer_id === selection.retailer_id
+            && location.store_id === store.id
+            && location.retailer_id === selection.retailer_id
+            && screen.store_id === store.id
+            && screen.location_id === location.id
+            && screen.retailer_id === selection.retailer_id
+            && screen.bookable !== false;
+        if (!valid) return { error: 'The selected Bookable Inventory is unavailable', status: 400 };
+    }
+
+    return { media };
+}
 
 /**
  * VALID_TRANSITIONS — ordered state machine for campaign status.
@@ -56,10 +122,11 @@ router.get('/', async (req, res) => {
         let campaigns;
 
         // Advertiser-scoped path — show only the caller's own campaigns
-        if (req.user?.role === ROLES.ADVERTISER) {
-            const where = [['advertiser_id', '==', req.user.linked_entity_id]];
-            if (status) where.push(['status', '==', status.toLowerCase()]);
-            campaigns = await campaignRepository.findAll({ where });
+        if (isBrand(req.user)) {
+            campaigns = await campaignRepository.findByBrandId(
+                brandIdFor(req.user),
+                status?.toLowerCase(),
+            );
         } else if (advertiserId) {
             campaigns = await campaignRepository.findAll({
                 where: [['advertiser_id', '==', advertiserId]]
@@ -94,8 +161,8 @@ router.get('/:id', async (req, res) => {
 
         // Ownership guard for advertiser role
         if (
-            req.user?.role === ROLES.ADVERTISER &&
-            campaign.advertiser_id !== req.user.linked_entity_id
+            isBrand(req.user) &&
+            !campaignRepository.isOwnedByBrand(campaign, brandIdFor(req.user))
         ) {
             return res.status(403).json({ error: 'Forbidden' });
         }
@@ -180,12 +247,27 @@ router.post('/', authenticate, requireRole(ROLES.ADVERTISER), async (req, res) =
         // T1: Determine if the caller is admin-tier
         const callerLevel = ROLE_HIERARCHY[req.user?.role] ?? -1;
         const isAdminTier = callerLevel >= ROLE_HIERARCHY[ROLES.ADMIN]; // 4+
+        const brandCaller = isBrand(req.user);
+        const brandOwnerId = brandIdFor(req.user);
+
+        if (brandCaller && !brandOwnerId) {
+            return res.status(403).json({ error: 'Brand account has no organization assignment' });
+        }
 
         // T1: Admin-tier callers must explicitly supply advertiser_id
         if (isAdminTier && !req.body.advertiser_id) {
             return res.status(400).json({
                 error: 'advertiser_id is required when creating a campaign as admin or superadmin',
             });
+        }
+
+        let brandMedia = null;
+        if (brandCaller) {
+            const validation = await validateBrandSubmission(req.body, brandOwnerId);
+            if (validation.error) {
+                return res.status(validation.status).json({ error: validation.error });
+            }
+            brandMedia = validation.media;
         }
 
         // Task 2A: Full-Capacity Inventory Blocking
@@ -211,18 +293,32 @@ router.post('/', authenticate, requireRole(ROLES.ADVERTISER), async (req, res) =
             }
         }
 
-        const id = req.body.id || `cmp_${Date.now()}`;
+        const id = brandCaller ? `cmp_${Date.now()}` : (req.body.id || `cmp_${Date.now()}`);
+        const submittedData = brandCaller ? {
+            name: req.body.name,
+            media_id: req.body.media_id,
+            creative_url: brandMedia.url,
+            creative_mime_type: brandMedia.mime_type,
+            creative_duration: brandMedia.duration,
+            start_date: req.body.start_date,
+            end_date: req.body.end_date,
+            budget: req.body.budget,
+            inventory_selection: req.body.inventory_selection,
+            selected_slots: Array.isArray(req.body.selected_slots) ? req.body.selected_slots : [],
+        } : req.body;
         const campaignData = {
-            ...req.body,
+            ...submittedData,
             // T5: Role-tier stamping — admin tier uses body value (validated
             // above); all other roles get JWT-stamped value only (body ignored).
-            advertiser_id: isAdminTier
-                ? req.body.advertiser_id
-                : (req.user.linked_entity_id ?? null),
-            status: req.body.status || 'pending_approval',
+            ...(brandCaller ? {} : {
+                advertiser_id: isAdminTier ? req.body.advertiser_id : brandOwnerId,
+            }),
+            status: brandCaller ? 'pending_approval' : (req.body.status || 'pending_approval'),
             created_at: new Date().toISOString()
         };
-        const campaign = await campaignRepository.create(id, campaignData);
+        const campaign = brandCaller
+            ? await campaignRepository.createForBrand(id, campaignData, brandOwnerId)
+            : await campaignRepository.create(id, campaignData);
         res.status(201).json(campaign);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -250,6 +346,14 @@ router.post('/:id/book', authenticate, async (req, res) => {
         const campaign = await campaignRepository.findById(id);
         if (!campaign) {
             return res.status(404).json({ error: 'Campaign not found' });
+        }
+        if (isBrand(req.user)) {
+            if (!campaignRepository.isOwnedByBrand(campaign, brandIdFor(req.user))) {
+                return denyBrandAccess(res);
+            }
+            return res.status(403).json({
+                error: 'Campaign slot allocation requires Retailer Approval',
+            });
         }
 
         const loopMap = new Map();
@@ -379,10 +483,33 @@ router.put('/:id', authenticate, async (req, res) => {
         if (!campaign) {
             return res.status(404).json({ error: 'Campaign not found' });
         }
-        const updated = await campaignRepository.update(id, req.body);
+        if (isBrand(req.user) && !campaignRepository.isOwnedByBrand(campaign, brandIdFor(req.user))) {
+            return denyBrandAccess(res);
+        }
+        const updateData = isBrand(req.user) ? {
+            name: req.body.name ?? campaign.name,
+            start_date: req.body.start_date ?? campaign.start_date,
+            end_date: req.body.end_date ?? campaign.end_date,
+            budget: req.body.budget ?? campaign.budget,
+        } : req.body;
+        const updated = await campaignRepository.update(id, updateData);
         res.json(updated);
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+router.get('/:id/proofs-of-play', async (req, res) => {
+    try {
+        const campaign = await campaignRepository.findById(req.params.id);
+        if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+        if (isBrand(req.user) && !campaignRepository.isOwnedByBrand(campaign, brandIdFor(req.user))) {
+            return denyBrandAccess(res);
+        }
+        const proofs = await impressionRepository.findProofsOfPlayByCampaign(campaign.id);
+        return res.json(proofs);
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
     }
 });
 

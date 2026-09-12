@@ -273,6 +273,10 @@ class ApiService {
     // CAMPAIGNS
     // ============================================
 
+    async getBookableInventory() {
+        return apiClient.get('/api/inventory');
+    }
+
     async getCampaigns(params = {}) {
         const query = new URLSearchParams(params).toString();
         return apiClient.get(`/api/campaigns${query ? '?' + query : ''}`);
@@ -280,6 +284,10 @@ class ApiService {
 
     async getCampaign(id) {
         return apiClient.get(`/api/campaigns/${id}`);
+    }
+
+    async getCampaignProofsOfPlay(id) {
+        return apiClient.get(`/api/campaigns/${id}/proofs-of-play`);
     }
 
     async createCampaign(data) {

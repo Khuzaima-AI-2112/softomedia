@@ -1,6 +1,18 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const mediaEmulatorTest = process.env.MEDIA_EMULATOR_TEST === 'true';
+const emulatorEnv = mediaEmulatorTest ? {
+    NODE_ENV: 'test',
+    GOOGLE_CLOUD_PROJECT: process.env.GOOGLE_CLOUD_PROJECT,
+    FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,
+    DEMO_PROJECT_ID: process.env.DEMO_PROJECT_ID,
+    DEMO_ASSETS_BUCKET: process.env.DEMO_ASSETS_BUCKET,
+    FIRESTORE_EMULATOR_HOST: process.env.FIRESTORE_EMULATOR_HOST,
+    STORAGE_EMULATOR_HOST: process.env.STORAGE_EMULATOR_HOST,
+    FIREBASE_AUTH_EMULATOR_HOST: process.env.FIREBASE_AUTH_EMULATOR_HOST,
+    VITE_FIREBASE_PROJECT_ID: process.env.VITE_FIREBASE_PROJECT_ID,
+    VITE_FIREBASE_AUTH_EMULATOR_URL: process.env.VITE_FIREBASE_AUTH_EMULATOR_URL,
+} : {};
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -116,6 +128,7 @@ export default defineConfig({
             reuseExistingServer: !process.env.CI && !mediaEmulatorTest,
             timeout: 120_000,
             env: {
+                ...emulatorEnv,
                 ALLOW_DEMO_MODE: 'true'
             }
         },
@@ -125,6 +138,7 @@ export default defineConfig({
             reuseExistingServer: !mediaEmulatorTest,
             timeout: 180_000,
             env: {
+                ...emulatorEnv,
                 ALLOW_DEMO_MODE: 'true'
             }
         },

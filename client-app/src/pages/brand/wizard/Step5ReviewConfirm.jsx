@@ -245,7 +245,7 @@ function Step5ReviewConfirm({ data, onConfirm, submitting, onPrev }) {
                         </div>
 
                         {/* Actions */}
-                        <div className="space-y-3">
+                        <div className="relative space-y-3">
                             <button
                                 onClick={() => {
                                     if (!termsAgreed) {

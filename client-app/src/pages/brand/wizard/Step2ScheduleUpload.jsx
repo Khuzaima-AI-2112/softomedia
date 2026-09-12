@@ -150,7 +150,7 @@ const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
             </GlassCard>
 
             {/* Navigation */}
-            <div className="fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-[#111722] border-t border-slate-200 dark:border-slate-800 shadow-[0_-4px_20px_rgba(0,0,0,0.15)]">
+            <div className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-[#111722] border-t border-slate-200 dark:border-slate-800 shadow-[0_-4px_20px_rgba(0,0,0,0.15)]">
                 <div className="max-w-[1440px] mx-auto px-10 py-4 flex items-center justify-between">
                     <button
                         onClick={onPrev}

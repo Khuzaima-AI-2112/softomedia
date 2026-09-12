@@ -70,6 +70,7 @@ if (process.env.NODE_ENV !== 'production') {
  *   - campaign_id  {string} REQUIRED
  *   - asset_id     {string} optional
  *   - loop_id      {string} optional
+ *   - slot_position {number} required for loop Proof of Play records
  *   - played_at    {string} optional ISO 8601; defaults to server time
  *
  * Returns 201 { status: 'recorded', impression_id } on success.
@@ -77,7 +78,7 @@ if (process.env.NODE_ENV !== 'production') {
  * Returns 429 with Retry-After header when rate limit exceeded.
  */
 router.post('/impression', impressionLimiter, async (req, res) => {
-    const { screen_id, campaign_id, asset_id, loop_id, played_at } = req.body;
+    const { screen_id, campaign_id, asset_id, loop_id, slot_position, played_at } = req.body;
 
     if (!screen_id || !campaign_id) {
         return res.status(400).json({
@@ -95,6 +96,7 @@ router.post('/impression', impressionLimiter, async (req, res) => {
         campaign_id,
         asset_id:  asset_id  || null,
         loop_id:   loop_id   || null,
+        slot_position: Number.isInteger(slot_position) ? slot_position : null,
         played_at: recorded_at,
     });
 
@@ -107,6 +109,7 @@ router.post('/impression', impressionLimiter, async (req, res) => {
             campaign_id,
             asset_id:  asset_id  || null,
             loop_id:   loop_id   || null,
+            slot_position: Number.isInteger(slot_position) ? slot_position : null,
             played_at: recorded_at
         }),
         (async () => {

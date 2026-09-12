@@ -24,25 +24,28 @@ const BrandDashboard = () => {
     const loadData = async () => {
         try {
             setLoading(true);
-            await pricingService.init();
-
             // Get campaigns for this advertiser (demo: use ALL for now, or filter if backend supports it)
-            const [allCampaigns, allScreens] = await Promise.all([
+            const [allCampaigns, inventory] = await Promise.all([
                 apiService.getCampaigns(),
-                apiService.getScreens()
+                apiService.getBookableInventory()
             ]);
 
-            setCampaigns(allCampaigns);
+            pricingService.configureBookableInventory(inventory.items);
+            const campaignsWithProofs = await Promise.all(allCampaigns.map(async campaign => ({
+                ...campaign,
+                proofs_of_play: await apiService.getCampaignProofsOfPlay(campaign.id),
+            })));
+            setCampaigns(campaignsWithProofs);
 
             // Calculate stats (case-insensitive for robustness)
-            const liveCampaigns = allCampaigns.filter(c => c.status?.toLowerCase() === 'live');
-            const totalSpent = allCampaigns.reduce((sum, c) => sum + (c.spent || 0), 0);
-            const totalImpressions = allCampaigns.reduce((sum, c) => sum + (c.impressions || 0), 0);
-            const onlineScreens = allScreens.filter(s => s.status?.toLowerCase() === 'online' || s.status === 'ACTIVE').length;
+            const liveCampaigns = campaignsWithProofs.filter(c => c.status?.toLowerCase() === 'live');
+            const totalSpent = campaignsWithProofs.reduce((sum, c) => sum + (c.spent || 0), 0);
+            const totalImpressions = campaignsWithProofs.reduce((sum, c) => sum + c.proofs_of_play.length, 0);
+            const availableScreens = inventory.items.filter(item => item.availability.bookable).length;
 
             setStats({
                 active: liveCampaigns.length,
-                screens: onlineScreens,
+                screens: availableScreens,
                 impressions: totalImpressions,
                 spent: totalSpent
             });
@@ -73,9 +76,10 @@ const BrandDashboard = () => {
             header: 'Preview',
             render: (cmp) => (
                 <div className="relative w-16 h-10 rounded-md overflow-hidden bg-slate-200 dark:bg-slate-700 ring-1 ring-slate-200 dark:ring-slate-700">
-                    <div
-                        className="absolute inset-0 bg-cover bg-center"
-                        style={{ backgroundImage: `url("${cmp.creative_url}")` }}
+                    <img
+                        className="absolute inset-0 size-full object-cover"
+                        src={cmp.creative_url}
+                        alt={`${cmp.name} creative`}
                     />
                 </div>
             )
@@ -83,13 +87,29 @@ const BrandDashboard = () => {
         {
             header: 'Status',
             render: (cmp) => (
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${cmp.status === 'live' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' :
+                <span data-testid="campaign-status" className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${cmp.status === 'live' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' :
                     cmp.status === 'scheduled' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800' :
                         cmp.status === 'pending_approval' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800' :
                             'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
                     }`}>
                     {cmp.status === 'live' && <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>}
-                    {cmp.status === 'live' ? 'Live' : cmp.status === 'scheduled' ? 'Scheduled' : cmp.status === 'pending_approval' ? 'Pending' : 'Ended'}
+                    {cmp.status === 'live' ? 'Live' : cmp.status === 'scheduled' ? 'Scheduled' : cmp.status === 'pending_approval' ? 'Pending' : cmp.status === 'approved' ? 'Approved' : cmp.status === 'rejected' ? 'Rejected' : cmp.status === 'completed' ? 'Completed' : cmp.status}
+                </span>
+            )
+        },
+        {
+            header: 'Placement',
+            render: (cmp) => (
+                <span className="text-sm font-medium">
+                    {(cmp.inventory_selection || []).map(item => item.screen_id).join(', ') || 'Pending'}
+                </span>
+            )
+        },
+        {
+            header: 'Proof of Play',
+            render: (cmp) => (
+                <span className="text-sm font-medium">
+                    {cmp.proofs_of_play?.length || 0} Proofs of Play
                 </span>
             )
         },

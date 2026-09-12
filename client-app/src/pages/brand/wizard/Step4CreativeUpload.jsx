@@ -71,11 +71,11 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
     };
 
     const handleContinue = () => {
-        if (!selectedCreative) {
-            setError('Please select or upload a creative');
+        if (!creativeAssetId) {
+            setError('Upload a creative so it can be persisted with the Campaign');
             return;
         }
-        updateData({ creativeUrl: selectedCreative, ...(creativeAssetId ? { creativeAssetId } : {}) });
+        updateData({ creativeUrl: selectedCreative, creativeAssetId });
         onNext();
     };
 
@@ -148,7 +148,7 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
             <GlassCard>
                 <h3 className="font-bold text-lg mb-4">Select Demo Creative</h3>
                 <p className="text-sm text-slate-500 mb-4">
-                    Choose from our demo creatives for testing purposes
+                    Preview examples only. Upload your own creative above before continuing.
                 </p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     {DEMO_CREATIVES.map(creative => (
@@ -234,7 +234,7 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
             )}
 
             {/* Navigation */}
-            <div className="flex justify-between pt-4">
+            <div className="relative flex justify-between pt-4">
                 <button
                     onClick={onPrev}
                     className="px-6 py-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium transition-colors flex items-center gap-2"
@@ -244,7 +244,7 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
                 </button>
                 <button
                     onClick={handleContinue}
-                    disabled={!selectedCreative}
+                    disabled={!creativeAssetId}
                     data-testid="wizard-next-step"
                     className="px-8 py-3 rounded-xl bg-primary text-white font-bold shadow-lg shadow-primary/25 hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
                 >

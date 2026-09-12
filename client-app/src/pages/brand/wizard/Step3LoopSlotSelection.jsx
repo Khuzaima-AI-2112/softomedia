@@ -75,33 +75,9 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
 
             setBusinessHoursRange(newRange);
 
-            const hoursList = [];
-            if (!newRange.is_closed) {
-                for (let h = newRange.start; h < newRange.end; h++) {
-                    hoursList.push(h);
-                }
-            }
-
-            const allLoops = [];
-            (data.selectedScreens || []).forEach(screenId => {
-                hoursList.forEach(hour => {
-                    const existingLoop = activeLoops.find(l => l.screen_id === screenId && l.hour === hour);
-                    if (existingLoop) {
-                        allLoops.push(existingLoop);
-                    } else {
-                        allLoops.push({
-                            id: `loop_${screenId}_${selectedDate}_${hour}`,
-                            screen_id: screenId,
-                            date: selectedDate,
-                            hour,
-                            slots: Array(12).fill({ status: 'available' }),
-                            totalSlots: 12,
-                            bookedSlots: 0
-                        });
-                    }
-                });
-            });
-            setLoops(allLoops);
+            // Only show allocation records that actually exist. Screen-level
+            // Campaign submission can continue while final slots await review.
+            setLoops(activeLoops);
 
         } catch (error) {
             console.error('[Diagnostic] Failed to load loops:', error);
@@ -323,7 +299,7 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
                 </div>
             )}
 
-            <div className="sticky bottom-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-lg border-t p-4 -mx-4">
+            <div className="sticky bottom-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-lg border-t p-4 -mx-4">
                 <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
                     <PriceSummary
                         totalPrice={totals.totalCost}
@@ -334,11 +310,10 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
                         <button onClick={onPrev} className="px-6 py-3 rounded-xl border">Back</button>
                         <button
                             onClick={handleContinue}
-                            disabled={selections.length === 0 || !hasRealInventory}
                             data-testid="step-3-next-btn"
-                            className="px-8 py-3 rounded-xl bg-primary text-white font-bold disabled:opacity-50"
+                            className="px-8 py-3 rounded-xl bg-primary text-white font-bold"
                         >
-                            Continue
+                            {selections.length === 0 ? 'Continue with selected screens' : 'Continue'}
                         </button>
                     </div>
                 </div>

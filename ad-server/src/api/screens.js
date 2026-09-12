@@ -119,7 +119,7 @@ router.post('/', authenticate, requireRole('admin'), async (req, res) => {
  * Sprint 11 — S11-8:
  *   - techoperator (level 2) and above: full unfiltered list.
  *   - retaileradmin (level 1): list filtered to their own retailer_id from JWT.
- *   - brand (level 1): full list (needed for campaign wizard store/screen selection).
+ *   - brand (level 1): denied; Brands use the sanitized Bookable Inventory API.
  *   - Unauthenticated or insufficient role: 403.
  *
  * fix: brand role was missing from ROLE_HIERARCHY entirely, causing 403 on
@@ -141,16 +141,7 @@ router.get('/', authenticate, async (req, res) => {
             return res.json(screens);
         }
 
-        if (userLevel === retailerLevel) {
-            if (role === ROLES.BRAND) {
-                // brand — sees all screens so campaign wizard can show available inventory
-                const storeId = req.query.store_id || req.query.storeId || req.query.storeid;
-                const screens = storeId
-                    ? await screenRepository.findByLocation(storeId)
-                    : await screenRepository.findAll();
-                return res.json(screens);
-            }
-
+        if (userLevel === retailerLevel && role === ROLES.RETAILERADMIN) {
             // retaileradmin — scoped to their own retailer_id from the auth token
             const retailerId = req.user.linkedentityid || req.user.retailer_id;
             if (!retailerId) {

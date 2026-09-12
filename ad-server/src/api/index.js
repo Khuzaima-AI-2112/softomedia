@@ -26,6 +26,7 @@ import ticketsRouter from './tickets.js';
 import analyticsRouter from './analytics.js';
 import debugRouter from './debug.js';
 import platformRouter from './platform.js';
+import inventoryRouter from './inventory.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -40,11 +41,12 @@ router.use('/playlists', playlistsRouter);
 router.use('/telemetry', telemetryRouter);
 router.use('/stores', storesRouter);
 router.use('/pricing', pricingRouter);
-router.use('/campaigns', campaignsRouter);
+router.use('/campaigns', authenticate, campaignsRouter);
 router.use('/retailers', retailersRouter);
 router.use('/advertisers', advertisersRouter);
 router.use('/screens', screensRouter);
 router.use('/assets', authenticate, assetsRouter);
+router.use('/inventory', inventoryRouter);
 
 // --- Observability: UI error reporting (public — fires from ErrorBoundary
 //     before/during auth failures, so must not require authentication) ---

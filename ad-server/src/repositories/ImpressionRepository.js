@@ -31,6 +31,23 @@ export class ImpressionRepository extends BaseRepository {
         });
     }
 
+    async findProofsOfPlayByCampaign(campaignId) {
+        const records = await this.findByCampaign(campaignId);
+        return records
+            .filter(record => record.asset_id && record.screen_id && record.loop_id
+                && Number.isInteger(record.slot_position)
+                && (record.played_at || record.timestamp))
+            .map(record => ({
+                id: record.proof_of_play_id || record.impression_id || record.id,
+                campaign_id: record.campaign_id,
+                asset_id: record.asset_id,
+                screen_id: record.screen_id,
+                loop_id: record.loop_id,
+                slot_position: record.slot_position,
+                played_at: record.played_at || record.timestamp,
+            }));
+    }
+
     /**
      * Find impressions by location
      * @param {string} locationId 

@@ -74,7 +74,7 @@ class TelemetryService {
      *
      * @param {object} impression
      *   Required: screen_id, campaign_id
-     *   Optional: asset_id, loop_id, played_at
+     *   Optional: asset_id, loop_id, slot_position, played_at
      */
     trackImpression(impression) {
         const record = {
@@ -87,6 +87,7 @@ class TelemetryService {
         const campaign_id = record.campaign_id || record.campaignId;
         const asset_id = record.asset_id || record.assetId || record.mediaId;
         const loop_id = record.loop_id || record.loopId;
+        const slot_position = record.slot_position ?? record.slotPosition;
 
         // ── Layer 1: real-time per-impression POST ────────────────────────────
         // Fire-and-forget — player must never await this.
@@ -101,6 +102,7 @@ class TelemetryService {
                 campaign_id,
                 asset_id:    asset_id  || null,
                 loop_id:     loop_id   || null,
+                slot_position: Number.isInteger(slot_position) ? slot_position : null,
                 played_at:   record.played_at
             })
         }).catch(err => {

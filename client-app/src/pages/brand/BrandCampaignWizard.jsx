@@ -7,7 +7,6 @@ import Step4CreativeUpload from './wizard/Step4CreativeUpload';
 import Step5ReviewConfirm from './wizard/Step5ReviewConfirm';
 import GlassCard from '../../components/GlassCard';
 import apiService from '../../services/ApiService';
-import { useAuth } from '../../contexts/AuthContext';
 
 const STEPS = [
     { id: 1, name: 'Location', icon: 'location_on', description: 'Select stores & screens' },
@@ -19,7 +18,6 @@ const STEPS = [
 
 const BrandCampaignWizard = () => {
     const navigate = useNavigate();
-    const { user } = useAuth();
     // Bug #27 fix: track in-flight submission to prevent double-fire
     const [submitting, setSubmitting] = useState(false);
     const [currentStep, setCurrentStep] = useState(1);
@@ -28,6 +26,7 @@ const BrandCampaignWizard = () => {
         selectedRetailers: [],
         selectedStores: [],
         selectedScreens: [],
+        selectedInventory: [],
         // Step 2: Schedule
         campaignName: '',
         dateRange: {
@@ -39,6 +38,7 @@ const BrandCampaignWizard = () => {
         selectedSlots: [],
         // Step 4: Creative
         creativeUrl: '',
+        creativeAssetId: null,
         creativeDuration: 5,
         // Totals (calculated)
         totalCost: 0,
@@ -63,46 +63,21 @@ const BrandCampaignWizard = () => {
         // Bug #27 fix: prevent double-submission
         if (submitting) return;
 
-        // R7 fix: defence-in-depth guard — linked_entity_id must be present.
-        // For non-admin roles the server stamps from the JWT, but if the auth
-        // context is missing it we surface a clear UX error rather than
-        // submitting a broken payload.
-        const advertiserId = user?.linked_entity_id;
-        if (!advertiserId) {
-            alert('Your advertiser account could not be verified. Please log out and log back in.');
-            return;
-        }
-
         setSubmitting(true);
         try {
             const campaignData = {
-                // R7 fix: use authenticated user's linked_entity_id, not a hardcoded seed value
-                advertiser_id: advertiserId,
                 name: wizardData.campaignName || 'New Campaign',
+                media_id: wizardData.creativeAssetId,
                 creative_url: wizardData.creativeUrl,
                 duration: wizardData.creativeDuration,
                 start_date: wizardData.dateRange.start,
                 end_date: wizardData.dateRange.end,
                 budget: wizardData.budget,
-                // S8-6: was 'pending' — must be 'pending_approval' so the
-                // approval queue (CampaignApprovalList) and backend POST
-                // handler both recognise it correctly.
-                status: 'pending_approval'
+                inventory_selection: wizardData.selectedInventory,
+                selected_slots: wizardData.selectedSlots,
             };
 
-            const campaign = await apiService.createCampaign(campaignData);
-
-            // Bug #27 fix: only call bookSlots when there are slots to book
-            if (wizardData.selectedSlots.length > 0) {
-                const slotMappings = wizardData.selectedSlots.map(slot => ({
-                    loopId: slot.loopId,
-                    slotIndex: slot.slotIndex,
-                    creativeUrl: wizardData.creativeUrl,
-                    // R7 fix: match campaign advertiser_id
-                    advertiser_id: advertiserId
-                }));
-                await apiService.bookSlots(campaign.id, slotMappings);
-            }
+            await apiService.createCampaign(campaignData);
 
             navigate('/dashboard/brand');
         } catch (error) {

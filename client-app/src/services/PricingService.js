@@ -7,6 +7,33 @@ class PricingService {
         this.stores = [];
     }
 
+    configureBookableInventory(items = []) {
+        const firstPrice = items[0]?.booking_price;
+        const trafficTiers = Object.fromEntries((firstPrice?.traffic_tiers || []).map(tier => [
+            tier.id,
+            { label: tier.label, multiplier: tier.multiplier, hours: tier.hours },
+        ]));
+        this.config = {
+            baseCPM: firstPrice?.base || 2.50,
+            trafficTiers,
+            dateOverrides: Object.fromEntries(Object.entries(firstPrice?.date_overrides || {})
+                .map(([date, override]) => [date, {
+                    multiplier: override.multiplier,
+                    hourlyTiers: override.hourly_tiers,
+                }])),
+            screenOverrides: Object.fromEntries(items.map(item => [
+                item.screen.id,
+                { baseCPM: item.booking_price.base },
+            ])),
+        };
+        this.screens = items.map(item => ({
+            ...item.screen,
+            store_id: item.store.id,
+            retailer_id: item.retailer.id,
+        }));
+        this.stores = [...new Map(items.map(item => [item.store.id, item.store])).values()];
+    }
+
     /**
      * Initialize PricingService with data from backend
      * @param {boolean} forceRefresh - If true, re-fetches all data even if already initialized

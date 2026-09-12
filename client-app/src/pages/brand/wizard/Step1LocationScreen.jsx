@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import apiService from '../../../services/ApiService';
+import pricingService from '../../../services/PricingService';
 
 const Step1LocationScreen = ({ data, updateData, onNext }) => {
     const [searchQuery, setSearchQuery] = useState('');
@@ -16,14 +17,23 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
     const loadData = async () => {
         try {
             setLoading(true);
-            const [retailersData, storesData, screensData] = await Promise.all([
-                apiService.getRetailers(),
-                apiService.getStores(),
-                apiService.getScreens()
-            ]);
-            setRetailers(retailersData);
-            setStores(storesData);
-            setScreens(screensData);
+            const response = await apiService.getBookableInventory();
+            const items = response.items || [];
+            pricingService.configureBookableInventory(items);
+            setRetailers([...new Map(items.map(item => [item.retailer.id, item.retailer])).values()]);
+            setStores([...new Map(items.map(item => [item.store.id, {
+                ...item.store,
+                retailer_id: item.retailer.id,
+            }])).values()]);
+            setScreens(items.map(item => ({
+                ...item.screen,
+                retailer_id: item.retailer.id,
+                store_id: item.store.id,
+                location_id: item.location.id,
+                location_name: item.location.name,
+                availability: item.availability,
+                booking_price: item.booking_price,
+            })));
 
         } catch (error) {
             console.error('[Diagnostic] Failed to load wizard data:', error);
@@ -44,7 +54,7 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
 
     // Get screens for selected stores
     const getStoreScreens = (storeId) => {
-        return screens.filter(s => s.store_id === storeId && s.status === 'online');
+        return screens.filter(s => s.store_id === storeId && s.availability.bookable);
     };
 
     const handleStoreSelect = (storeId) => {
@@ -55,7 +65,8 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
                 selectedScreens: (data.selectedScreens || []).filter(sid => {
                     const screen = screens.find(s => s.id === sid);
                     return screen && screen.store_id !== storeId;
-                })
+                }),
+                selectedInventory: (data.selectedInventory || []).filter(item => item.store_id !== storeId),
             });
         } else {
             updateData({
@@ -66,10 +77,22 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
 
     const toggleScreen = (screenId) => {
         const current = data.selectedScreens || [];
+        const screen = screens.find(item => item.id === screenId);
         if (current.includes(screenId)) {
-            updateData({ selectedScreens: current.filter(id => id !== screenId) });
+            updateData({
+                selectedScreens: current.filter(id => id !== screenId),
+                selectedInventory: (data.selectedInventory || []).filter(item => item.screen_id !== screenId),
+            });
         } else {
-            updateData({ selectedScreens: [...current, screenId] });
+            updateData({
+                selectedScreens: [...current, screenId],
+                selectedInventory: [...(data.selectedInventory || []), {
+                    retailer_id: screen.retailer_id,
+                    store_id: screen.store_id,
+                    location_id: screen.location_id,
+                    screen_id: screen.id,
+                }],
+            });
         }
     };
 
@@ -84,7 +107,7 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
     // Get all screens for selected stores
     const activeScreens = useMemo(() => {
         const selectedStoreIds = data.selectedStores || [];
-        return screens.filter(s => selectedStoreIds.includes(s.store_id) && s.status === 'online');
+        return screens.filter(s => selectedStoreIds.includes(s.store_id) && s.availability.bookable);
     }, [screens, data.selectedStores]);
 
     const selectedScreenCount = (data.selectedScreens || []).length;
@@ -226,10 +249,13 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
                                     <div className="flex justify-between items-start mb-1">
                                         <h3 className="font-bold text-sm">{scr.name}</h3>
                                     </div>
-                                    <p className="text-xs text-slate-500 mb-2">{store?.name}</p>
+                                    <p className="text-xs text-slate-500">{store?.name}</p>
+                                    <p className="text-xs text-slate-500 mb-2">{scr.location_name}</p>
                                     <div className="mt-auto flex justify-between items-center pt-2 border-t border-slate-100 dark:border-slate-700">
                                         <span className="text-xs text-slate-400">{scr.orientation}</span>
-                                        <span className="text-[10px] font-bold text-emerald-500 uppercase">Online</span>
+                                        <span className="text-xs font-bold text-emerald-600">
+                                            ${Number(scr.booking_price.base).toFixed(2)} {scr.booking_price.unit}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -251,7 +277,7 @@ const Step1LocationScreen = ({ data, updateData, onNext }) => {
             </section>
 
             {/* Sticky Footer */}
-            <footer className="fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-[#111722] border-t border-slate-200 dark:border-slate-800 shadow-[0_-4px_20px_rgba(0,0,0,0.15)]">
+            <footer className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-[#111722] border-t border-slate-200 dark:border-slate-800 shadow-[0_-4px_20px_rgba(0,0,0,0.15)]">
                 <div className="max-w-[1440px] mx-auto px-10 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-6">
                         <div className="flex flex-col">
