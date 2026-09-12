@@ -1,7 +1,13 @@
 import express from 'express';
-import { screenRepository, impressionRepository } from '../repositories/index.js';
+import { screenRepository, impressionRepository, locationRepository } from '../repositories/index.js';
+import StoreRepository from '../repositories/StoreRepository.js';
 import { authenticate } from '../middleware/auth.js';
-import { requireRole, ROLE_HIERARCHY, normalizeRole } from '../middleware/requireRole.js';
+import {
+    requireRole,
+    requireScreenManagement,
+    ROLE_HIERARCHY,
+    normalizeRole,
+} from '../middleware/requireRole.js';
 import { ROLES } from '../constants/roles.js';
 
 const router = express.Router();
@@ -69,29 +75,35 @@ router.post('/register', authenticate, async (req, res) => {
 
 /**
  * POST /api/screens
- * Admin UI registration of a new screen.
- * Requires admin (level 4) or above — intentionally stricter than /register
- * because this path is called from the management UI, not from a device.
- *
- * fix: authenticate-only guard was insufficient — any authenticated user
- *   including advertiser (level 0) could create screens. requireRole('admin')
- *   added to match the admin-only UI that calls this endpoint.
+ * Management UI registration of a new screen.
+ * Requires explicit Screen-management permission, granted to Technical
+ * Operators and platform administrators but not commercial personas.
  */
-router.post('/', authenticate, requireRole('admin'), async (req, res) => {
+router.post('/', authenticate, requireScreenManagement, async (req, res) => {
     try {
-        const { screen_id, resolution, user_agent, retailer_id, store_id } = req.body;
-        if (!screen_id) return res.status(400).json({ error: 'screen_id required' });
+        const { screen_id, resolution, user_agent, store_id, location_id } = req.body;
+        if (!screen_id || !store_id || !location_id) {
+            return res.status(400).json({ error: 'screen_id, store_id, and location_id are required' });
+        }
+
+        const [store, location] = await Promise.all([
+            StoreRepository.findById(store_id),
+            locationRepository.findById(location_id),
+        ]);
+        if (!store || !location || location.store_id !== store.id) {
+            return res.status(400).json({ error: 'Location must belong to the selected Store' });
+        }
 
         const screenData = {
             screen_id,
-            resolution,
-            user_agent,
-            status: 'ONLINE',
-            last_seen: new Date().toISOString()
+            retailer_id: store.retailer_id,
+            store_id: store.id,
+            location_id: location.id,
+            status: 'OFFLINE',
+            last_seen: null,
         };
-
-        if (retailer_id) screenData.retailer_id = retailer_id;
-        if (store_id) screenData.location_id = store_id;
+        if (resolution) screenData.resolution = resolution;
+        if (user_agent) screenData.user_agent = user_agent;
 
         const screen = await screenRepository.create(screen_id, screenData);
         res.status(201).json(screen);
@@ -221,11 +233,9 @@ router.get('/:id/logs', authenticate, requireRole('techoperator'), async (req, r
  * DELETE /api/screens/:id
  * Remove a screen from the network.
  *
- * fix: authenticate-only guard was insufficient — any authenticated user
- *   could delete any screen. requireRole('techoperator') added as the
- *   minimum sensible level for destructive network operations.
+ * Requires explicit Screen-management permission.
  */
-router.delete('/:id', authenticate, requireRole('techoperator'), async (req, res) => {
+router.delete('/:id', authenticate, requireScreenManagement, async (req, res) => {
     try {
         await screenRepository.delete(req.params.id);
         res.status(204).send();
@@ -250,7 +260,7 @@ router.delete('/:id', authenticate, requireRole('techoperator'), async (req, res
  *   - Response 409: change rejected due to active/upcoming campaigns
  *       { error: 'SCREEN_STATUS_CHANGE_REJECTED_ACTIVE_CAMPAIGNS', message: string }
  */
-router.patch('/:id/status', authenticate,
+router.patch('/:id/status', authenticate, requireScreenManagement,
     async (req, res) => {
         try {
             const { status } = req.body;

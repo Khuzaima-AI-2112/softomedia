@@ -27,7 +27,7 @@ import { loopRepository, BUSINESS_HOURS, LOOP_STATUS } from '../repositories/Loo
 import { loopGenerationService } from '../services/LoopGenerationService.js';
 import { BusinessHoursService } from '../services/BusinessHoursService.js';
 import { authenticate } from '../middleware/auth.js';
-import { requireRole } from '../middleware/requireRole.js';
+import { requireCampaignApproval, requireRole } from '../middleware/requireRole.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -227,7 +227,7 @@ router.post('/generate', authenticate, async (req, res) => {
  *
  * S13-2 AC-1, AC-3, AC-5
  */
-router.post('/:loopId/reject', authenticate, requireRole('retaileradmin'), async (req, res) => {
+router.post('/:loopId/reject', authenticate, requireCampaignApproval, async (req, res) => {
     try {
         const { loopId } = req.params;
         const { reason } = req.body;
@@ -262,7 +262,7 @@ router.post('/:loopId/reject', authenticate, requireRole('retaileradmin'), async
  * userId is derived exclusively from the authenticated token — no anonymous fallback.
  * Requires authentication.
  */
-router.patch('/:id/approve', authenticate, async (req, res) => {
+router.patch('/:id/approve', authenticate, requireCampaignApproval, async (req, res) => {
     try {
         const userId = req.user?.uid || req.user?.id;
         if (!userId) {
@@ -286,7 +286,7 @@ router.patch('/:id/approve', authenticate, async (req, res) => {
  * Body: { reason }
  * Requires authentication.
  */
-router.patch('/:id/slots/:position/reject', authenticate, async (req, res) => {
+router.patch('/:id/slots/:position/reject', authenticate, requireCampaignApproval, async (req, res) => {
     try {
         const { id } = req.params;
         const position = parseInt(req.params.position, 10);

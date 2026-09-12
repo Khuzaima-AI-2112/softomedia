@@ -214,6 +214,14 @@ class ApiService {
         return apiClient.delete(`/api/screens/${id}`);
     }
 
+    async getScreenStatus() {
+        return apiClient.get('/api/monitoring/status');
+    }
+
+    async getOperationalHealth() {
+        return apiClient.get('/api/monitoring/health');
+    }
+
     // ============================================
     // LOOPS
     // ============================================

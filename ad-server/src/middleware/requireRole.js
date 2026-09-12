@@ -16,10 +16,22 @@ export { ROLES, ROLE_HIERARCHY, normalizeRole };
 
 export const PERMISSIONS = Object.freeze({
     PLATFORM_GOVERNANCE: 'platform.governance',
+    SCREEN_MANAGEMENT: 'screens.manage',
+    CAMPAIGN_APPROVAL: 'campaigns.approve',
 });
 
 const ROLE_PERMISSIONS = Object.freeze({
-    [ROLES.SUPERADMIN]: Object.freeze([PERMISSIONS.PLATFORM_GOVERNANCE]),
+    [ROLES.SUPERADMIN]: Object.freeze([
+        PERMISSIONS.PLATFORM_GOVERNANCE,
+        PERMISSIONS.SCREEN_MANAGEMENT,
+        PERMISSIONS.CAMPAIGN_APPROVAL,
+    ]),
+    [ROLES.ADMIN]: Object.freeze([
+        PERMISSIONS.SCREEN_MANAGEMENT,
+        PERMISSIONS.CAMPAIGN_APPROVAL,
+    ]),
+    [ROLES.TECHOPERATOR]: Object.freeze([PERMISSIONS.SCREEN_MANAGEMENT]),
+    [ROLES.RETAILERADMIN]: Object.freeze([PERMISSIONS.CAMPAIGN_APPROVAL]),
 });
 
 /**
@@ -87,5 +99,13 @@ export function requirePermission(permission, requiredRole = permission) {
 export const requirePlatformGovernance = requirePermission(
     PERMISSIONS.PLATFORM_GOVERNANCE,
     ROLES.SUPERADMIN,
+);
+export const requireScreenManagement = requirePermission(
+    PERMISSIONS.SCREEN_MANAGEMENT,
+    ROLES.TECHOPERATOR,
+);
+export const requireCampaignApproval = requirePermission(
+    PERMISSIONS.CAMPAIGN_APPROVAL,
+    ROLES.RETAILERADMIN,
 );
 export const requireAdmin      = requireRole(ROLES.ADMIN);

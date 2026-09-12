@@ -15,6 +15,7 @@ function ScreenManagement() {
     const [screens, setScreens] = useState([]);
     const [retailers, setRetailers] = useState([]);
     const [stores, setStores] = useState([]);
+    const [locations, setLocations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [pageError, setPageError] = useState('');
     const [togglingIds, setTogglingIds] = useState(new Set());
@@ -25,6 +26,7 @@ function ScreenManagement() {
         user_agent: 'Manual Admin Entry',
         retailer_id: '',
         store_id: '',
+        location_id: '',
     });
 
     const { toasts, addToast, removeToast } = useToasts();
@@ -33,14 +35,16 @@ function ScreenManagement() {
         setLoading(true);
         setPageError('');
         try {
-            const [screensData, retailersData, storesData] = await Promise.all([
+            const [screensData, retailersData, storesData, locationsData] = await Promise.all([
                 apiService.getScreens(),
                 apiService.getRetailers(),
                 apiService.getStores(),
+                apiService.getLocations(),
             ]);
             setScreens(screensData || []);
             setRetailers(retailersData || []);
             setStores(storesData || []);
+            setLocations(locationsData || []);
         } catch (error) {
             console.error('Failed to load screen data:', error);
             setPageError('Failed to load screens. Please refresh.');
@@ -160,6 +164,7 @@ function ScreenManagement() {
                 user_agent: 'Manual Admin Entry',
                 retailer_id: '',
                 store_id: '',
+                location_id: '',
             });
             await loadData();
             addToast('Screen registered successfully.', 'success');
@@ -181,10 +186,12 @@ function ScreenManagement() {
 
     const getStoreName = useCallback((screen) => {
         const store = stores.find(s => s.id === screen.store_id);
+        const location = locations.find(item => item.id === screen.location_id);
         const retailer = retailers.find(r => r.id === screen.retailer_id);
+        if (location && store) return `${location.name} — ${store.name}`;
         if (store) return `${store.name}${retailer ? ` — ${retailer.name}` : ''}`;
         return screen.location_id || 'Unassigned';
-    }, [stores, retailers]);
+    }, [stores, locations, retailers]);
 
     return (
         <>
@@ -340,7 +347,12 @@ function ScreenManagement() {
                                             data-testid="select-screen-retailer"
                                             className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
                                             value={newScreen.retailer_id}
-                                            onChange={e => setNewScreen({ ...newScreen, retailer_id: e.target.value, store_id: '' })}
+                                            onChange={e => setNewScreen({
+                                                ...newScreen,
+                                                retailer_id: e.target.value,
+                                                store_id: '',
+                                                location_id: '',
+                                            })}
                                         >
                                             <option value="">Select Retailer…</option>
                                             {retailers.map(r => (
@@ -355,7 +367,11 @@ function ScreenManagement() {
                                             data-testid="select-screen-store"
                                             className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
                                             value={newScreen.store_id}
-                                            onChange={e => setNewScreen({ ...newScreen, store_id: e.target.value })}
+                                            onChange={e => setNewScreen({
+                                                ...newScreen,
+                                                store_id: e.target.value,
+                                                location_id: '',
+                                            })}
                                             disabled={!newScreen.retailer_id}
                                         >
                                             <option value="">Select Store…</option>
@@ -366,6 +382,25 @@ function ScreenManagement() {
                                                 ))}
                                         </select>
                                     </div>
+                                </div>
+                                <div>
+                                    <label htmlFor="screen-location" className="block text-sm font-medium mb-1">Location</label>
+                                    <select
+                                        id="screen-location"
+                                        required
+                                        data-testid="select-screen-location"
+                                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
+                                        value={newScreen.location_id}
+                                        onChange={e => setNewScreen({ ...newScreen, location_id: e.target.value })}
+                                        disabled={!newScreen.store_id}
+                                    >
+                                        <option value="">Select Location…</option>
+                                        {locations
+                                            .filter(location => location.store_id === newScreen.store_id)
+                                            .map(location => (
+                                                <option key={location.id} value={location.id}>{location.name}</option>
+                                            ))}
+                                    </select>
                                 </div>
                                 <div>
                                     <label htmlFor="screen-resolution" className="block text-sm font-medium mb-1">Resolution</label>
