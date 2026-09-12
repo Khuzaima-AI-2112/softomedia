@@ -4,8 +4,10 @@ import { createTestApp } from './fixtures/test-app.js';
 
 const storedMedia = new Map();
 const storedObjects = new Map();
+let durableMetadataAvailable = true;
 
 const mediaRepository = {
+    isDurable: () => durableMetadataAvailable,
     async create(id, data) {
         if (data.title === 'Metadata failure') throw new Error('Firestore unavailable');
         const record = { id, ...data };
@@ -15,21 +17,24 @@ const mediaRepository = {
     async findAll() {
         return [...storedMedia.values()];
     },
+    async findAllDurable() {
+        return [...storedMedia.values()];
+    },
 };
 
 jest.unstable_mockModule('../src/repositories/index.js', () => ({ mediaRepository }));
 jest.unstable_mockModule('../src/utils/storage.js', () => ({
     async uploadMediaObject({ destination, buffer, contentType }) {
-        if (buffer.toString() === 'storage failure') throw new Error('Storage unavailable');
+        if (buffer.toString().includes('storage failure')) throw new Error('Storage unavailable');
         storedObjects.set(destination, { buffer, contentType });
         return {
             storage_path: `gs://softomedia-demo.firebasestorage.app/${destination}`,
             url: `http://127.0.0.1:9199/v0/b/softomedia-demo.firebasestorage.app/o/${encodeURIComponent(destination)}?alt=media`,
+            object_ref: { kind: 'gcs', bucketName: 'softomedia-demo.firebasestorage.app', destination },
         };
     },
-    async deleteMediaObject(storagePath) {
-        const destination = storagePath.split('/').slice(3).join('/');
-        storedObjects.delete(destination);
+    async deleteMediaObject(objectReference) {
+        storedObjects.delete(objectReference.destination);
     },
 }));
 
@@ -52,7 +57,10 @@ function appAs(role, linkedEntityId = `entity-${role}`) {
 function upload(app, fields = {}, filename = 'creative.png') {
     let pending = request(app).post('/api/assets/upload');
     for (const [key, value] of Object.entries(fields)) pending = pending.field(key, value);
-    return pending.attach('file', Buffer.from('real image bytes'), {
+    const bytes = filename.endsWith('.mp4')
+        ? Buffer.concat([Buffer.alloc(4), Buffer.from('ftypisom')])
+        : Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...Buffer.from('image')]);
+    return pending.attach('file', bytes, {
         filename,
         contentType: filename.endsWith('.mp4') ? 'video/mp4' : 'image/png',
     });
@@ -68,6 +76,7 @@ describe('classified media API', () => {
     beforeEach(() => {
         storedMedia.clear();
         storedObjects.clear();
+        durableMetadataAvailable = true;
     });
 
     it.each([
@@ -100,7 +109,7 @@ describe('classified media API', () => {
         });
         expect(response.body.id).toMatch(/^ast_/);
         expect(response.body.storage_path).toContain(response.body.id);
-        expect(response.body.size_bytes).toBe(16);
+        expect(response.body.size_bytes).toBe(13);
     });
 
     it('lets Brand use the same upload contract while enforcing Brand ownership', async () => {
@@ -172,9 +181,40 @@ describe('classified media API', () => {
             owner_type: 'platform',
             approval_status: 'approved',
             duration: '5',
-        }, 'storage failure');
+        }, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...Buffer.from('storage failure')]));
 
         expect(response.status).toBe(500);
+        expect(response.body.error).toMatch(/no success was recorded/i);
+        expect(storedObjects.size).toBe(0);
+        expect(storedMedia.size).toBe(0);
+    });
+
+    it('rejects bytes that do not match the declared media type', async () => {
+        const response = await uploadBytes(appAs('admin'), {
+            title: 'Disguised executable',
+            category: 'internal',
+            owner_type: 'platform',
+            approval_status: 'approved',
+            duration: '5',
+        }, 'not a png');
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toMatch(/invalid file type/i);
+        expect(storedObjects.size).toBe(0);
+        expect(storedMedia.size).toBe(0);
+    });
+
+    it('does not store an object or report success when durable metadata is unavailable', async () => {
+        durableMetadataAvailable = false;
+        const response = await upload(appAs('admin'), {
+            title: 'Cannot persist',
+            category: 'internal',
+            owner_type: 'platform',
+            approval_status: 'approved',
+            duration: '5',
+        });
+
+        expect(response.status).toBe(503);
         expect(response.body.error).toMatch(/no success was recorded/i);
         expect(storedObjects.size).toBe(0);
         expect(storedMedia.size).toBe(0);

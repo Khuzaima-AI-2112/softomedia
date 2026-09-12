@@ -16,10 +16,11 @@ const ACCEPTED_FILES = new Map([
     ['.mp4', 'video/mp4'],
 ]);
 const PLATFORM_MEDIA_ROLES = new Set([ROLES.ADMIN, ROLES.SUPERADMIN]);
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+    limits: { fileSize: 5 * 1024 * 1024, fieldSize: 2 * 1024 * 1024, files: 1 },
 });
 
 function receiveFile(req, res, next) {
@@ -32,7 +33,7 @@ function receiveFile(req, res, next) {
     });
 }
 
-function uploadIdentity(req, category) {
+function resolveUploadMetadata(req, category) {
     const role = normalizeRole(req.user?.role);
     if (PLATFORM_MEDIA_ROLES.has(role)) {
         return {
@@ -51,33 +52,50 @@ function uploadIdentity(req, category) {
     return null;
 }
 
+function hasExpectedSignature(file, extension) {
+    if (extension === '.png') {
+        return file.buffer.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE);
+    }
+    if (extension === '.jpg' || extension === '.jpeg') {
+        return file.buffer.length >= 3
+            && file.buffer[0] === 0xff
+            && file.buffer[1] === 0xd8
+            && file.buffer[2] === 0xff;
+    }
+    if (extension === '.mp4') {
+        return file.buffer.length >= 8 && file.buffer.subarray(4, 8).toString('ascii') === 'ftyp';
+    }
+    return false;
+}
+
 function validateMetadata(req, file) {
     const title = req.body.title?.trim();
     const category = req.body.category?.trim().toLowerCase();
     if (!file) return { error: 'No file uploaded' };
-    const expectedMimeType = ACCEPTED_FILES.get(path.extname(file.originalname).toLowerCase());
-    if (!expectedMimeType || expectedMimeType !== file.mimetype) {
+    const extension = path.extname(file.originalname).toLowerCase();
+    const expectedMimeType = ACCEPTED_FILES.get(extension);
+    if (!expectedMimeType || expectedMimeType !== file.mimetype || !hasExpectedSignature(file, extension)) {
         return { error: 'Invalid file type. Allowed: .png, .jpg, .jpeg, .mp4' };
     }
     if (!title) return { error: 'Media title is required' };
     if (!CATEGORIES.has(category)) return { error: 'Media category must be paid, retailer, internal, or fallback' };
 
-    const identity = uploadIdentity(req, category);
-    if (!identity) return { status: 403, error: 'This persona cannot upload media in the selected category' };
-    if (!APPROVAL_STATES.has(identity.approvalStatus)) return { error: 'Approval status is required' };
+    const uploadMetadata = resolveUploadMetadata(req, category);
+    if (!uploadMetadata) return { status: 403, error: 'This role cannot upload media in the selected category' };
+    if (!APPROVAL_STATES.has(uploadMetadata.approvalStatus)) return { error: 'Approval status is required' };
 
     const expectedOwnerType = category === 'paid'
         ? 'brand'
         : category === 'retailer'
             ? 'retailer'
             : 'platform';
-    if (identity.ownerType !== expectedOwnerType) {
+    if (uploadMetadata.ownerType !== expectedOwnerType) {
         return { error: `${category} media must use ${expectedOwnerType} ownership` };
     }
-    if ((expectedOwnerType === 'brand' || expectedOwnerType === 'retailer') && !identity.ownerId) {
+    if ((expectedOwnerType === 'brand' || expectedOwnerType === 'retailer') && !uploadMetadata.ownerId) {
         return { error: `Owner ID is required for ${category} media` };
     }
-    if (expectedOwnerType === 'platform' && identity.ownerId) {
+    if (expectedOwnerType === 'platform' && uploadMetadata.ownerId) {
         return { error: `${category} media cannot have an organization owner` };
     }
 
@@ -89,18 +107,21 @@ function validateMetadata(req, file) {
         return { error: 'Asset duration must be exactly 5 seconds' };
     }
 
-    return { title, category, duration, ...identity };
+    return { title, category, duration, ...uploadMetadata };
 }
 
 router.get('/', async (req, res) => {
     try {
         const role = normalizeRole(req.user?.role);
-        const assets = await mediaRepository.findAll();
+        if (!PLATFORM_MEDIA_ROLES.has(role) && role !== ROLES.BRAND) return res.json([]);
+        if (!mediaRepository.isDurable()) {
+            return res.status(503).json({ error: 'Persistent media metadata is unavailable' });
+        }
+        const assets = await mediaRepository.findAllDurable();
         if (role === ROLES.BRAND) {
             const ownerId = req.user.linked_entity_id || req.user.organization_id;
             return res.json(assets.filter(asset => asset.owner_type === 'brand' && asset.owner_id === ownerId));
         }
-        if (!PLATFORM_MEDIA_ROLES.has(role)) return res.json([]);
         return res.json(assets);
     } catch {
         return res.status(500).json({ error: 'Media could not be loaded' });
@@ -110,6 +131,9 @@ router.get('/', async (req, res) => {
 router.post('/upload', receiveFile, async (req, res) => {
     const metadata = validateMetadata(req, req.file);
     if (metadata.error) return res.status(metadata.status || 400).json({ error: metadata.error });
+    if (!mediaRepository.isDurable()) {
+        return res.status(503).json({ error: 'Persistent media metadata is unavailable; no success was recorded' });
+    }
 
     const id = `ast_${randomUUID()}`;
     const extension = path.extname(req.file.originalname).toLowerCase();
@@ -146,7 +170,7 @@ router.post('/upload', receiveFile, async (req, res) => {
     } catch (error) {
         if (storedObject?.storage_path) {
             try {
-                await deleteMediaObject(storedObject.storage_path);
+                await deleteMediaObject(storedObject.object_ref);
             } catch (cleanupError) {
                 console.error('[Media] Failed to clean up object after metadata failure', cleanupError);
             }

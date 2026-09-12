@@ -1,14 +1,16 @@
 import { Storage } from '@google-cloud/storage';
-import fs from 'fs';
-import path from 'path';
 
 let storage;
 
+function activeProjectId() {
+    return process.env.GOOGLE_CLOUD_PROJECT
+        || process.env.GCLOUD_PROJECT
+        || process.env.FIREBASE_PROJECT_ID;
+}
+
 export const getStorageClient = () => {
     if (!storage) {
-        const projectId = process.env.GOOGLE_CLOUD_PROJECT
-            || process.env.GCLOUD_PROJECT
-            || process.env.FIREBASE_PROJECT_ID;
+        const projectId = activeProjectId();
 
         if (
             !process.env.STORAGE_EMULATOR_HOST
@@ -23,9 +25,7 @@ export const getStorageClient = () => {
 };
 
 function assetsBucketName() {
-    const projectId = process.env.GOOGLE_CLOUD_PROJECT
-        || process.env.GCLOUD_PROJECT
-        || process.env.FIREBASE_PROJECT_ID;
+    const projectId = activeProjectId();
     return process.env.DEMO_ASSETS_BUCKET
         || process.env.GCS_BUCKET_NAME
         || (projectId ? `${projectId}.firebasestorage.app` : null);
@@ -43,41 +43,47 @@ export async function uploadMediaObject({ destination, buffer, contentType, meta
     const client = getStorageClient();
     const bucketName = assetsBucketName();
     if (!client || !bucketName) {
-        const filename = path.basename(destination);
-        const localPath = path.resolve('assets', filename);
-        await fs.promises.mkdir(path.dirname(localPath), { recursive: true });
-        await fs.promises.writeFile(localPath, buffer);
-        return { url: `/assets/${filename}`, storage_path: localPath };
+        throw new Error('Persistent media storage is unavailable');
     }
 
     const file = client.bucket(bucketName).file(destination);
-    await file.save(buffer, {
-        resumable: false,
-        metadata: {
-            contentType,
-            cacheControl: 'public, max-age=3600',
-            metadata,
-        },
-    });
-    await file.makePublic();
+    let objectCreated = false;
+    try {
+        await file.save(buffer, {
+            resumable: false,
+            metadata: {
+                contentType,
+                cacheControl: 'public, max-age=3600',
+                metadata,
+            },
+        });
+        objectCreated = true;
+        await file.makePublic();
+    } catch (error) {
+        if (objectCreated) {
+            try {
+                await file.delete({ ignoreNotFound: true });
+            } catch (cleanupError) {
+                throw new AggregateError([error, cleanupError], 'Storage upload and cleanup both failed');
+            }
+        }
+        throw error;
+    }
     return {
         url: publicObjectUrl(bucketName, destination),
         storage_path: `gs://${bucketName}/${destination}`,
+        object_ref: { kind: 'gcs', bucketName, destination },
     };
 }
 
-export async function deleteMediaObject(storagePath) {
-    if (storagePath.startsWith('gs://')) {
-        const remainder = storagePath.slice('gs://'.length);
-        const slash = remainder.indexOf('/');
-        const bucketName = remainder.slice(0, slash);
-        const destination = remainder.slice(slash + 1);
+export async function deleteMediaObject(objectReference) {
+    if (objectReference.kind === 'gcs') {
         const client = getStorageClient();
         if (!client) throw new Error('Storage client is unavailable for cleanup');
-        await client.bucket(bucketName).file(destination).delete({ ignoreNotFound: true });
+        await client.bucket(objectReference.bucketName).file(objectReference.destination).delete({ ignoreNotFound: true });
         return;
     }
-    await fs.promises.rm(storagePath, { force: true });
+    throw new Error('Unsupported media object reference');
 }
 
 /** Legacy path-based upload retained for existing callers. */

@@ -81,35 +81,4 @@ test.describe('Global Playlist Feature', () => {
         });
     });
 
-    test.describe('3. Asset Upload', () => {
-        test('Can upload a real file via API', async ({ request }) => {
-            // Create a small buffer representing a PNG file
-            const fileBuffer = Buffer.from('fake-png-content');
-
-            const res = await request.post(`${API_BASE}/api/assets/upload`, {
-                headers: {
-                    Authorization: 'Bearer demo-token',
-                    'x-demo-role': 'admin',
-                },
-                multipart: {
-                    file: {
-                        name: 'tdd-test-banner.png',
-                        mimeType: 'image/png',
-                        buffer: fileBuffer,
-                    },
-                    duration: '5',
-                    title: 'TDD test banner',
-                    category: 'internal',
-                    owner_type: 'platform',
-                    approval_status: 'approved',
-                }
-            });
-
-            expect(res.ok()).toBeTruthy();
-            const data = await res.json();
-            expect(data.filename).toBe('tdd-test-banner.png');
-            expect(data.status).toBe('ready');
-            expect(data.url).toContain('/assets/');
-        });
-    });
 });

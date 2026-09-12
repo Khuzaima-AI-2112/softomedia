@@ -1,10 +1,26 @@
 import request from 'supertest';
 import path from 'path';
 import fs from 'fs';
+import { jest } from '@jest/globals';
 import { createTestApp } from './fixtures/test-app.js';
-import './fixtures/mock-repos.js';
 
-const { default: apiRouter } = await import('../src/api/index.js');
+const mediaRepository = {
+    isDurable: () => true,
+    findAllDurable: async () => [],
+    create: async (id, data) => ({ id, ...data }),
+};
+
+jest.unstable_mockModule('../src/repositories/index.js', () => ({ mediaRepository }));
+jest.unstable_mockModule('../src/utils/storage.js', () => ({
+    uploadMediaObject: async ({ destination }) => ({
+        storage_path: `gs://test-bucket/${destination}`,
+        url: `https://storage.test/${destination}`,
+        object_ref: { kind: 'gcs', bucketName: 'test-bucket', destination },
+    }),
+    deleteMediaObject: async () => {},
+}));
+
+const { default: assetsRouter } = await import('../src/api/assets.js');
 
 const roles = {
     ADVERTISER: 'advertiser',
@@ -12,13 +28,14 @@ const roles = {
 };
 
 const reqAs = (role, method, route) => {
-    const app = createTestApp(apiRouter, '/api', {
+    const app = createTestApp(assetsRouter, '/api/assets', {
         middleware: [
-            (req, res, next) => {
-                req.headers['authorization'] = 'Bearer demo-token';
-                req.headers['x-demo-role'] = role;
-                req.headers['x-demo-user-id'] = `${role}_user_123`;
-                req.headers['x-demo-retailer-id'] = 'test_retailer_id';
+            (req, _res, next) => {
+                req.user = {
+                    id: `${role}_user_123`,
+                    role,
+                    linked_entity_id: 'test_brand_id',
+                };
                 next();
             }
         ]
@@ -37,8 +54,14 @@ describe('4.4 Content Specifications & Compliance', () => {
         dummyVideoPath = path.join(process.cwd(), 'dummy.mp4');
         dummyGifPath = path.join(process.cwd(), 'dummy.gif');
 
-        fs.writeFileSync(dummyImagePath, 'dummy image data');
-        fs.writeFileSync(dummyVideoPath, 'dummy video data');
+        fs.writeFileSync(dummyImagePath, Buffer.from([
+            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+            ...Buffer.from('image data'),
+        ]));
+        fs.writeFileSync(dummyVideoPath, Buffer.concat([
+            Buffer.alloc(4),
+            Buffer.from('ftypisom'),
+        ]));
         fs.writeFileSync(dummyGifPath, 'dummy gif data');
     });
 
