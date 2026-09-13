@@ -17,28 +17,34 @@ test.describe('Loop Playback - Sprint 4', () => {
             });
         });
 
-        // Mock loops endpoint with approved loop
-        await page.route('**/api/loops**', route => {
+        // Mock the Screen-scoped playback contract with an approved loop
+        await page.route('**/api/screens/*/playback-loop', route => {
             const currentHour = new Date().getHours();
-            const loops = [{
-                id: `2026-01-02_${currentHour}_loc_downtown`,
-                date: new Date().toISOString().split('T')[0],
-                hour: currentHour,
-                status: 'APPROVED',
-                slots: Array.from({ length: 12 }, (_, i) => ({
-                    position: i,
-                    asset_id: `test_asset_${i}`,
-                    asset_name: `Test Ad ${i + 1}`,
-                    url: `https://placehold.co/1920x1080/3b82f6/white?text=Slot+${i + 1}`,
-                    duration: 5,
-                    status: 'APPROVED'
-                }))
-            }];
+            const slots = Array.from({ length: 12 }, (_, i) => ({
+                position: i,
+                asset_id: `test_asset_${i}`,
+                asset_name: `Test Ad ${i + 1}`,
+                campaign_id: `test_campaign_${i}`,
+                content_kind: 'campaign',
+                presentation_type: 'campaign',
+                counts_as_delivery: true,
+                url: `https://placehold.co/1920x1080/3b82f6/white?text=Slot+${i + 1}`,
+                duration: 5,
+                status: 'approved'
+            }));
 
             route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                json: { loops, business_hours: { start: 8, end: 22 } }
+                json: {
+                    screen_id: 'test_screen',
+                    connectivity_status: 'ONLINE',
+                    schedule_status: 'approved',
+                    playback_mode: 'approved_schedule',
+                    loop_id: `2026-01-02_${currentHour}_store_downtown`,
+                hour: currentHour,
+                    slots,
+                }
             });
         });
 
@@ -113,20 +119,38 @@ test.describe('Loop Playback - Sprint 4', () => {
         await expect(page.locator('[data-testid="ad-debug-overlay"]')).toBeVisible();
     });
 
-    test('Player falls back to playlist when no approved loop', async ({ page }) => {
-        // Override loops mock to return no approved loops
-        await page.route('**/api/loops**', route => {
+    test('Player shows a Holding Slide when no approved schedule exists', async ({ page }) => {
+        await page.unroute('**/api/screens/*/playback-loop');
+        await page.route('**/api/screens/*/playback-loop', route => {
             route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                json: { loops: [], business_hours: { start: 8, end: 22 } }
+                json: {
+                    screen_id: 'test_screen',
+                    connectivity_status: 'ONLINE',
+                    schedule_status: 'No approved schedule',
+                    playback_mode: 'holding_slide',
+                    loop_id: null,
+                    slots: [],
+                }
             });
         });
 
         await page.goto('/player?screen_id=test_screen');
 
-        // Should still show content from playlist fallback
-        await expect(page.locator('[data-testid="ad-frame"]')).toBeVisible({ timeout: 15000 });
+        await expect(page.getByTestId('holding-slide')).toContainText('No approved schedule');
+        await expect(page.getByTestId('player-container')).toHaveAttribute('data-connectivity-status', 'ONLINE');
+    });
+
+    test('Player stops Campaign delivery when a schedule refresh fails', async ({ page }) => {
+        await page.goto('/player?screen_id=test_screen');
+        await expect(page.getByTestId('campaign-presentation')).toBeVisible();
+
+        await page.unroute('**/api/screens/*/playback-loop');
+        await page.route('**/api/screens/*/playback-loop', route => route.abort('failed'));
+
+        await expect(page.getByTestId('fallback-mode-banner')).toBeVisible({ timeout: 15000 });
+        await expect(page.getByTestId('campaign-presentation')).toHaveCount(0);
     });
 
     test('Player sends telemetry', async ({ page }) => {

@@ -4,35 +4,43 @@ import { API_URL } from '../config.js'
 import apiClient from '../services/api.js'
 import { telemetryService } from '../services/TelemetryService.js'
 
-// Business hours configuration for loop playback
-const BUSINESS_HOURS = { START: 8, END: 22 };
-
-// Get current hour in business hours context
-const getCurrentHour = () => new Date().getHours();
-
-// Check if current time is within business hours
-const isBusinessHours = () => {
-    const hour = getCurrentHour();
-    return hour >= BUSINESS_HOURS.START && hour < BUSINESS_HOURS.END;
-};
-
-// Get today's date in YYYY-MM-DD format
-const getTodayDate = () => new Date().toISOString().split('T')[0];
-
-// Sprint 7 — Task 7.4: Offline fallback slots (Softomedia branded, no network dependency)
-const FALLBACK_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1920' height='1080' viewBox='0 0 1920 1080'%3E%3Crect width='1920' height='1080' fill='%230f172a'/%3E%3Ctext x='50%25' y='45%25' font-family='sans-serif' font-size='72' font-weight='bold' fill='%2338bdf8' text-anchor='middle' dominant-baseline='middle'%3ESoftoMedia%3C/text%3E%3Ctext x='50%25' y='58%25' font-family='sans-serif' font-size='32' fill='%2394a3b8' text-anchor='middle' dominant-baseline='middle'%3EBroadcast Network%3C/text%3E%3C/svg%3E`;
+// Neutral, local Holding Slide: available without a media or network dependency.
+const HOLDING_SLIDE_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1920' height='1080' viewBox='0 0 1920 1080'%3E%3Crect width='1920' height='1080' fill='%230f172a'/%3E%3Ctext x='50%25' y='45%25' font-family='sans-serif' font-size='72' font-weight='bold' fill='%2338bdf8' text-anchor='middle' dominant-baseline='middle'%3ESoftoMedia%3C/text%3E%3Ctext x='50%25' y='58%25' font-family='sans-serif' font-size='32' fill='%2394a3b8' text-anchor='middle' dominant-baseline='middle'%3EBroadcast Network%3C/text%3E%3C/svg%3E`;
 
 const FALLBACK_SLOTS = Array.from({ length: 12 }, (_, i) => ({
     id: `fallback-${i}`,
-    url: FALLBACK_SVG,
+    url: HOLDING_SLIDE_SVG,
     duration: 5,
     type: 'image',
     asset_id: `fallback-${i}`,
     asset_name: 'SoftoMedia Fallback',
+    presentation_type: 'offline_fallback',
+    counts_as_delivery: false,
 }));
+
+const HOLDING_SLIDE_SLOTS = [{
+    id: 'holding-slide',
+    url: HOLDING_SLIDE_SVG,
+    duration: 60,
+    type: 'image',
+    asset_id: 'holding-slide',
+    asset_name: 'SoftoMedia Holding Slide',
+    presentation_type: 'holding_slide',
+    counts_as_delivery: false,
+}];
 
 // Sprint 7 — Task 7.2: Retry delays (ms) — 2s, 4s, 8s, 16s, 30s
 const RETRY_DELAYS = [2000, 4000, 8000, 16000, 30000];
+const PLAYBACK_MODE = Object.freeze({
+    APPROVED_SCHEDULE: 'approved_schedule',
+    HOLDING_SLIDE: 'holding_slide',
+});
+const PRESENTATION_TYPE = Object.freeze({
+    CAMPAIGN: 'campaign',
+    FALLBACK: 'fallback',
+    HOLDING_SLIDE: 'holding_slide',
+    OFFLINE_FALLBACK: 'offline_fallback',
+});
 
 function Player() {
     const [searchParams] = useSearchParams()
@@ -42,88 +50,79 @@ function Player() {
     const [retryAttempt, setRetryAttempt] = useState(0) // Task 7.2: retry counter
 
     // Loop-based playback state
-    const [playbackMode, setPlaybackMode] = useState('playlist') // 'loop' | 'playlist'
+    const [playbackMode, setPlaybackMode] = useState(null)
     const [currentLoop, setCurrentLoop] = useState(null)
-    const [currentHour, setCurrentHour] = useState(getCurrentHour())
+    const [scheduleStatus, setScheduleStatus] = useState('unknown')
+    const [connectivityStatus, setConnectivityStatus] = useState('unknown')
 
-    // Playlist fallback state
-    const [playlist, setPlaylist] = useState([])
-    const [playlistMeta, setPlaylistMeta] = useState({ source: 'unknown', id: null })
-    const [currentAdIndex, setCurrentAdIndex] = useState(0)
     const [currentSlotIndex, setCurrentSlotIndex] = useState(0)
 
     // Task 7.1: guard against React 18 StrictMode double-fire
     const hasInitialized = useRef(false);
     // Task 7.2: ref to hold retry timeout so we can cancel on unmount
     const retryTimeoutRef = useRef(null);
+    const activeLoopKeyRef = useRef(null);
 
     // Fetch loop for current hour
     // Task 7.3: scoped by hour + status server-side for efficiency
     const fetchCurrentLoop = useCallback(async (screenId) => {
-        if (!isBusinessHours()) {
-
-            return null;
-        }
-
         try {
-            const date = getTodayDate();
-            const hour = getCurrentHour();
-            // FIXME: confirm 'APPROVED' case matches LoopRepository status enum
-            const data = await apiClient.get(`/api/loops?date=${date}&hour=${hour}&status=APPROVED`);
-
-            // Server already filters by hour + status — take first result
-            const loop = (data.loops || [])[0] ?? null;
-
-            if (loop && loop.slots && loop.slots.length > 0) {
-
-                return loop;
-            }
+            return await apiClient.get(`/api/screens/${screenId}/playback-loop`);
         } catch (e) {
             console.error('[Player] Loop fetch failed', e);
         }
         return null;
     }, []);
 
-    // ── Effect A: Hour change detection (sets state only — no registration) ──────
+    const applyPlayback = useCallback((playback) => {
+        if (!playback) return false;
+        setScheduleStatus(playback.schedule_status);
+        setConnectivityStatus(playback.connectivity_status);
+
+        let nextLoop;
+        if (playback.playback_mode === PLAYBACK_MODE.APPROVED_SCHEDULE && playback.slots?.length > 0) {
+            nextLoop = { id: playback.loop_id, hour: playback.hour, slots: playback.slots };
+        } else if (playback.playback_mode === PLAYBACK_MODE.HOLDING_SLIDE) {
+            nextLoop = { id: 'holding-slide', hour: playback.hour, slots: HOLDING_SLIDE_SLOTS };
+        } else {
+            return false;
+        }
+        const nextLoopKey = `${nextLoop.id}:${nextLoop.hour}`;
+        if (activeLoopKeyRef.current !== nextLoopKey) setCurrentSlotIndex(0);
+        activeLoopKeyRef.current = nextLoopKey;
+        setCurrentLoop(nextLoop);
+        setPlaybackMode('loop');
+        return true;
+    }, []);
+
+    const applyOfflineFallback = useCallback(() => {
+        activeLoopKeyRef.current = 'offline-fallback';
+        setCurrentLoop({ id: 'offline-fallback', hour: null, slots: FALLBACK_SLOTS });
+        setPlaybackMode('loop');
+        setScheduleStatus('unavailable');
+        setConnectivityStatus('offline');
+        setCurrentSlotIndex(0);
+        setStatus('playing');
+    }, []);
+
+    // Poll the server-selected Store-local hour without re-registering the Screen.
+    // A failed refresh immediately stops any stale Campaign delivery claim.
     useEffect(() => {
-        const checkHourChange = () => {
-            const newHour = getCurrentHour();
-            if (newHour !== currentHour) {
-
-                setCurrentHour(newHour);
-                setCurrentSlotIndex(0); // Reset to first slot
-            }
-        };
-
-        const interval = setInterval(checkHourChange, 10000); // Check every 10s
-        return () => clearInterval(interval);
-    }, [currentHour]);
-
-    // ── Effect B: Switch loop on hour change (no registration call) ──────────────
-    // Task 7.1: Separated from initializePlayer so hour changes never re-register.
-    useEffect(() => {
-        // Only switch if already playing in loop mode — don't fire before init
         if (!screenId || status !== 'playing' || playbackMode !== 'loop') return;
 
+        let cancelled = false;
+        const refreshPlayback = async () => {
+            const playback = await fetchCurrentLoop(screenId);
+            if (!cancelled && !applyPlayback(playback)) applyOfflineFallback();
+        };
+        const interval = setInterval(refreshPlayback, 10000);
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+        };
+    }, [screenId, status, playbackMode, fetchCurrentLoop, applyPlayback, applyOfflineFallback]);
 
-        fetchCurrentLoop(screenId).then((loop) => {
-            if (loop) {
-                setCurrentLoop(loop);
-                setCurrentSlotIndex(0);
-
-            } else {
-                // No approved loop for new hour — fall back to playlist
-
-            }
-        });
-    }, [currentHour]); // eslint-disable-line react-hooks/exhaustive-deps
-    // ^^ Intentionally excludes fetchCurrentLoop (stable [] useCallback) and
-    //    screenId/status/playbackMode to avoid double-fire. This effect is
-    //    solely triggered by hour transitions.
-
-    // ── Effect C: One-time initialization (registration + first loop/playlist) ───
-    // Task 7.1: dep array is [searchParams] only — currentHour removed to prevent
-    //           re-registration on every hour tick.
+    // One-time initialization (registration + first loop/playlist).
     // Task 7.2: wraps network calls in exponential-backoff retry (max 5 attempts).
     useEffect(() => {
         // StrictMode guard: only run once per mount
@@ -184,48 +183,16 @@ function Player() {
                     }
 
 
-                    // Step 2: Try to load loop for current hour (Business Hours)
-                    // Task 7.3: fetch scoped server-side by hour + status
-                    if (isBusinessHours()) {
-
-                        const date = getTodayDate();
-                        const hour = getCurrentHour();
-                        // FIXME: confirm 'APPROVED' case matches LoopRepository status enum
-                        const loopData = await apiClient.get(`/api/loops?date=${date}&hour=${hour}&status=approved`, {
-                            headers
-                        });
-
-                        // Server filters by hour + status — take first result
-                        const loop = (loopData.loops || [])[0] ?? null;
-
-                        if (loop && loop.slots?.length > 0) {
-
-                            setCurrentLoop(loop);
-                            setPlaybackMode('loop');
-                            setStatus('playing');
-                            setRetryAttempt(0);
-
-                            return; // Successfully initialized with loop
-                        }
-                    }
-
-                    // Step 3: Fallback to Playlist if no loop
-
-                    const playData = await apiClient.get(`/api/playlist/${id}`, { headers });
-
-                    if (playData.playlist?.length > 0) {
-                        setPlaylist(playData.playlist);
-                        setPlaylistMeta({ source: playData.source || 'assigned', id: playData.playlist_id || playData.id });
-                        setPlaybackMode('playlist');
-                        setStatus('playing');
-                        setRetryAttempt(0);
-
-                    } else {
+                    // Step 2: Load only the approved schedule selected for this
+                    // Screen assignment and Store-local hour by the public endpoint.
+                    const playback = await apiClient.get(`/api/screens/${id}/playback-loop`, { headers });
+                    if (!applyPlayback(playback)) {
                         setStatus('no_content');
-
+                        return;
                     }
-
-                    return; // Success — exit retry loop
+                    setStatus('playing');
+                    setRetryAttempt(0);
+                    return;
 
                 } catch (err) {
                     console.error(`[Player] Initialization attempt ${attempt + 1} failed:`, err.message);
@@ -241,9 +208,7 @@ function Player() {
 
             // Task 7.4: All retries exhausted — engage offline fallback loop
             console.warn('[Player] All retry attempts failed. Engaging offline fallback loop.');
-            setCurrentLoop({ id: 'fallback', hour: null, slots: FALLBACK_SLOTS });
-            setPlaybackMode('loop');
-            setStatus('playing');
+            applyOfflineFallback();
             setRetryAttempt(0);
         };
 
@@ -253,7 +218,7 @@ function Player() {
             // Task 7.2: cancel any pending retry timeout on unmount
             if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
         };
-    }, [searchParams]); // Task 7.1: currentHour intentionally removed — see Effect B
+    }, [searchParams, applyPlayback, applyOfflineFallback]);
 
     // --- SRE: White-Box Observability & Transport ---
     const logTelemetryEvent = (type, payload) => {
@@ -298,33 +263,6 @@ function Player() {
         return () => clearInterval(interval);
     }, [screenId]);
 
-    // Playback Loop (Playlist Mode)
-    useEffect(() => {
-        if (status !== 'playing' || playbackMode !== 'playlist' || !playlist || playlist.length === 0) return;
-
-        const currentAd = playlist[currentAdIndex];
-        const duration = (currentAd.duration || 5) * 1000;
-
-        const recordImpression = (ad) => {
-            telemetryService.trackImpression({
-                screenId,
-                campaignId: ad.campaign_id || ad.id,
-                mediaId: ad.media_id || ad.id,
-                duration: ad.duration,
-                source: playlistMeta.source,
-                playlistId: playlistMeta.id
-            });
-        };
-
-        recordImpression(currentAd);
-
-        const timer = setTimeout(() => {
-            setCurrentAdIndex((prev) => (prev + 1) % playlist.length);
-        }, duration);
-
-        return () => clearTimeout(timer);
-    }, [status, playbackMode, playlist, currentAdIndex, screenId, playlistMeta]);
-
     // Loop Slot Playback (Loop Mode)
     useEffect(() => {
         if (status !== 'playing' || playbackMode !== 'loop' || !currentLoop) return;
@@ -335,8 +273,9 @@ function Player() {
         const currentSlot = slots[currentSlotIndex];
         const duration = (currentSlot?.duration || 5) * 1000;
 
-        // Skip telemetry for fallback slots
-        if (currentLoop.id !== 'fallback') {
+        // Only Campaign presentation establishes delivery. Holding Slides,
+        // fallback, and category media remain observable but produce no claim.
+        if (currentSlot?.counts_as_delivery === true && currentSlot?.campaign_id) {
             telemetryService.trackImpression({
                 screenId,
                 campaignId: currentSlot?.campaign_id,
@@ -369,9 +308,17 @@ function Player() {
         if (playbackMode === 'loop' && currentLoop) {
             const slot = currentLoop.slots?.[currentSlotIndex];
             if (slot?.asset_id) {
+                const presentationType = slot.presentation_type
+                    || (currentLoop.id === 'holding-slide' ? PRESENTATION_TYPE.HOLDING_SLIDE
+                        : currentLoop.id === 'offline-fallback' ? PRESENTATION_TYPE.OFFLINE_FALLBACK
+                            : PRESENTATION_TYPE.CAMPAIGN);
                 // Task V3: validate slot URL before inject — block non-HTTPS and dangerous schemes
                 let assetUrl = slot.url || `${API_URL}/api/assets/${slot.asset_id}`;
-                if (assetUrl.startsWith('javascript:') || assetUrl.startsWith('data:') && currentLoop.id !== 'fallback') {
+                const permitsEmbeddedAsset = [
+                    PRESENTATION_TYPE.HOLDING_SLIDE,
+                    PRESENTATION_TYPE.OFFLINE_FALLBACK,
+                ].includes(presentationType);
+                if (assetUrl.startsWith('javascript:') || assetUrl.startsWith('data:') && !permitsEmbeddedAsset) {
                     console.error('[Player][V3] Blocked dangerous slot URL scheme:', assetUrl.substring(0, 30));
                     return null;
                 }
@@ -391,25 +338,11 @@ function Player() {
                     title: slot.asset_name || `Slot ${currentSlotIndex + 1}`,
                     duration: slot.duration || 5,
                     isLoop: true,
-                    isFallback: currentLoop.id === 'fallback',
+                    presentationType,
                     loopHour: currentLoop.hour,
                     slotPosition: currentSlotIndex
                 };
             }
-        }
-
-        if (playlist && playlist[currentAdIndex]) {
-            let assetUrl = playlist[currentAdIndex].url || `${API_URL}/api/assets/${playlist[currentAdIndex].media_id}`;
-            if (!assetUrl.startsWith('http')) {
-                assetUrl = `${API_URL}/api/assets/${playlist[currentAdIndex].media_id}`;
-            }
-
-            return {
-                ...playlist[currentAdIndex],
-                url: assetUrl,
-                isLoop: false,
-                isFallback: false
-            };
         }
 
         return null;
@@ -422,6 +355,8 @@ function Player() {
             <div
                 data-testid="player-container"
                 data-status={status}
+                data-schedule-status={scheduleStatus}
+                data-connectivity-status={connectivityStatus}
                 style={{ width: '100vw', height: '100vh', backgroundColor: 'black', overflow: 'hidden' }}
             >
                 <img
@@ -448,9 +383,9 @@ function Player() {
                 )}
 
                 {/* Loop mode indicator */}
-                {activeContent.isLoop && !activeContent.isFallback && (
+                {activeContent.presentationType === PRESENTATION_TYPE.CAMPAIGN && (
                     <div
-                        data-testid="loop-indicator"
+                        data-testid="campaign-presentation"
                         style={{
                             position: 'absolute',
                             top: 10,
@@ -468,9 +403,9 @@ function Player() {
                 )}
 
                 {/* Task 7.4: Fallback mode banner */}
-                {activeContent.isFallback && (
+                {activeContent.presentationType === PRESENTATION_TYPE.FALLBACK && (
                     <div
-                        data-testid="fallback-mode-banner"
+                        data-testid="fallback-presentation"
                         style={{
                             position: 'absolute',
                             top: 10,
@@ -483,7 +418,19 @@ function Player() {
                             fontWeight: 'bold'
                         }}
                     >
+                        FALLBACK CONTENT • Reserved {currentLoop?.slots?.[currentSlotIndex]?.allocated_category || 'category'} position
+                    </div>
+                )}
+
+                {activeContent.presentationType === PRESENTATION_TYPE.OFFLINE_FALLBACK && (
+                    <div data-testid="fallback-mode-banner" style={{ position: 'absolute', top: 10, left: 10, color: 'white' }}>
                         ⚠ OFFLINE — Fallback Content
+                    </div>
+                )}
+
+                {activeContent.presentationType === PRESENTATION_TYPE.HOLDING_SLIDE && (
+                    <div data-testid="holding-slide" style={{ position: 'absolute', top: 10, left: 10, color: 'white' }}>
+                        No approved schedule
                     </div>
                 )}
             </div>
@@ -494,6 +441,8 @@ function Player() {
         <div
             data-testid="player-container"
             data-status={status}
+            data-schedule-status={scheduleStatus}
+            data-connectivity-status={connectivityStatus}
             style={{
                 display: 'flex',
                 justifyContent: 'center',
@@ -518,7 +467,7 @@ function Player() {
                     {status === 'loading_playlist' && <span style={{ color: '#60a5fa' }}>Loading Content...</span>}
                     {status === 'no_content' && <span data-testid="error-screen-not-found" style={{ color: '#9ca3af' }}>No ads scheduled.</span>}
                     {status === 'offline' && <span style={{ color: '#ef4444' }}>● Offline</span>}
-                    {status === 'error' && <span data-testid="player-error" style={{ color: '#ef4444' }}>Error occurred.</span>}
+                    {status === 'error' && <span data-testid="player-error" style={{ color: '#ef4444' }}>{playerError || 'Error occurred.'}</span>}
                 </div>
 
                 <div style={{

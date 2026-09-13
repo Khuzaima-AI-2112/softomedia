@@ -91,6 +91,8 @@ describe('five-loop Allocation Window', () => {
             title: 'Approved neutral fallback',
             category: 'fallback',
             content_kind: 'neutral_fallback',
+            owner_type: 'platform',
+            owner_id: null,
             approval_status: 'approved',
             eligible_for_playback: true,
             status: 'ready',

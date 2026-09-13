@@ -11,6 +11,10 @@ import { dailyScheduleRepository } from '../repositories/DailyScheduleRepository
 import { mediaRepository } from '../repositories/MediaRepository.js';
 import { BusinessHoursService } from './BusinessHoursService.js';
 import logger from '../utils/logger.js';
+import {
+    isApprovedFallbackAsset,
+    isApprovedPlaybackAsset,
+} from './PlaybackEligibility.js';
 
 // Slot configuration
 export const SLOT_CONFIG = {
@@ -223,7 +227,7 @@ export class LoopGenerationService {
                 const asset = mediaById.get(campaign.media_id || campaign.asset_id);
                 return matchesTarget
                     && this.isDateInRange(targetDate, campaign.start_date, campaign.end_date)
-                    && this.isApprovedPlaybackAsset(asset);
+                    && isApprovedPlaybackAsset(asset);
             }).map(campaign => {
                 const asset = mediaById.get(campaign.media_id || campaign.asset_id);
                 return {
@@ -240,7 +244,7 @@ export class LoopGenerationService {
                 const correctOwner = category === 'retailer'
                     ? asset.owner_type === 'retailer' && asset.owner_id === retailerId
                     : category === 'internal' && asset.owner_type === 'platform';
-                return this.isApprovedPlaybackAsset(asset) && correctOwner;
+                return isApprovedPlaybackAsset(asset) && correctOwner;
             }).map(asset => ({
                 id: `media:${asset.id}`,
                 type: asset.category.toLowerCase(),
@@ -262,21 +266,8 @@ export class LoopGenerationService {
             where: [['category', '==', 'fallback']]
         });
         return assets
-            .filter(asset =>
-                asset.content_kind === 'neutral_fallback'
-                && asset.status !== 'rejected'
-                && (asset.eligible_for_playback === true
-                    || asset.approval_status === 'approved'
-                    || asset.status === 'approved')
-            )
+            .filter(isApprovedFallbackAsset)
             .sort((a, b) => a.id.localeCompare(b.id))[0] || null;
-    }
-
-    isApprovedPlaybackAsset(asset) {
-        return Boolean(asset) && asset.status !== 'rejected'
-            && (asset.eligible_for_playback === true
-                || asset.approval_status === 'approved'
-                || asset.status === 'approved');
     }
 
     /**
