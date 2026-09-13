@@ -88,6 +88,45 @@ test.describe('Retailer Validation - Sprint 3', () => {
                 route.continue();
             }
         });
+
+        await page.route('**/api/stores', route => route.fulfill({
+            status: 200,
+            json: [{ id: 'store_demo', name: 'Demo Store', retailer_id: 'ret_demo', time_zone: 'America/Toronto' }],
+        }));
+        await page.route('**/api/loops/review/**', route => {
+            const loops = [];
+            for (let hour = 8; hour < 22; hour++) {
+                loops.push({
+                    id: `2026-01-03_${hour}_loc_downtown`,
+                    date: '2026-01-03',
+                    hour,
+                    retailer_id: 'ret_demo',
+                    store_id: 'store_demo',
+                    status: hour < 12 ? 'approved' : 'pending_approval',
+                    slots: Array.from({ length: 12 }, (_, i) => ({
+                        position: i,
+                        asset_id: `mock_asset_${i}`,
+                        asset_name: `Mock Asset ${i}`,
+                        asset_thumbnail: '📦',
+                        duration: 5,
+                        status: 'pending',
+                    })),
+                });
+            }
+            route.fulfill({
+                status: 200,
+                json: {
+                    store: { id: 'store_demo', name: 'Demo Store', time_zone: 'America/Toronto' },
+                    approval_window: {
+                        state: 'open',
+                        effective_deadline: '2030-01-02T23:00:00.000Z',
+                        normal_deadline: '2030-01-02T23:00:00.000Z',
+                        first_broadcast: '2030-01-03T13:00:00.000Z',
+                    },
+                    loops,
+                },
+            });
+        });
     });
 
     test('Retailer sees Schedule Calendar', async ({ retailerPage: page }) => {
@@ -95,7 +134,7 @@ test.describe('Retailer Validation - Sprint 3', () => {
         
         
         await page.goto('/dashboard/retailer/schedule');
-        await expect(page.getByText("Tomorrow's Broadcast Schedule")).toBeVisible();
+        await expect(page.getByRole('heading', { name: "Tomorrow's Broadcast Schedule" })).toBeVisible();
     });
 
     test('Retailer sees 14-hour timeline', async ({ retailerPage: page }) => {
@@ -156,11 +195,10 @@ test.describe('Retailer Validation - Sprint 3', () => {
         // Confirm reject
         await page.locator('[data-testid="confirm-reject-btn"]').click();
 
-        // Replacement picker should appear
-        await expect(page.locator('[data-testid="replacement-picker"]')).toBeVisible({ timeout: 5000 });
+        await expect(page.getByText('Replacement requested from Admin')).toBeVisible();
     });
 
-    test('Retailer can select replacement for rejected slot', async ({ retailerPage: page }) => {
+    test('Retailer cannot select an Admin-owned replacement', async ({ retailerPage: page }) => {
         await page.goto('/dashboard/retailer/schedule');
 
         await page.locator('[data-testid="schedule-hour-14"]').click();
@@ -168,11 +206,8 @@ test.describe('Retailer Validation - Sprint 3', () => {
         await page.locator('[data-testid="rejection-reason-select"]').selectOption('competitor');
         await page.locator('[data-testid="confirm-reject-btn"]').click();
 
-        // Wait for replacement picker
-        await expect(page.locator('[data-testid="replacement-picker"]')).toBeVisible({ timeout: 5000 });
-
-        // Select replacement
-        await page.locator('[data-testid="replacement-replace_001"]').click();
+        await expect(page.getByText('Replacement requested from Admin')).toBeVisible();
+        await expect(page.locator('[data-testid="replacement-picker"]')).toHaveCount(0);
     });
 
     test('Retailer can approve all pending loops', async ({ retailerPage: page }) => {

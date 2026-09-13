@@ -6,17 +6,16 @@ import apiService from '../../services/ApiService';
 import { ToastContainer, useToasts } from '../../components/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 
-// Roles that are allowed to edit and approve loops.
+// Only Admin corrects requested content; approval belongs to Retailer Administrator.
 // Operations staff (and any other role not in this list) get read-only access.
-const EDITOR_ROLES = ['loop_editor', 'super_admin', 'admin'];
+const EDITOR_ROLES = ['admin'];
 
-const getSlotStyle = (slot, attempted) => {
+const getSlotStyle = (slot) => {
     if (!slot?.asset_id) {
-        if (attempted) return 'border-red-500 bg-red-50 dark:bg-red-900/20 ring-2 ring-red-400';
         return 'border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50';
     }
-    if (slot.status === 'REJECTED') return 'border-red-400 bg-red-50 dark:bg-red-900/20';
-    if (slot.status === 'REPLACED') return 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20';
+    if (slot.status?.toLowerCase() === 'rejected') return 'border-red-400 bg-red-50 dark:bg-red-900/20';
+    if (slot.status?.toLowerCase() === 'replaced') return 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20';
     return 'border-primary/50 bg-primary/5';
 };
 
@@ -36,11 +35,11 @@ function LoopBuilder() {
     const [selectedSlot, setSelectedSlot] = useState(null);
     const [showAssetPicker, setShowAssetPicker] = useState(false);
 
-    // attempted: true after the user clicks Approve with empty slots — triggers error state UI
-    const [attempted, setAttempted] = useState(false);
-
-    // showConfirm: controls the two-step approval confirmation dialog
-    const [showConfirm, setShowConfirm] = useState(false);
+    const [approvalWindow, setApprovalWindow] = useState(null);
+    const [storeTimeZone, setStoreTimeZone] = useState(null);
+    const [showReopen, setShowReopen] = useState(false);
+    const [reopenReason, setReopenReason] = useState('');
+    const [reopenExpiry, setReopenExpiry] = useState('');
 
     const { toasts, addToast, removeToast } = useToasts();
 
@@ -53,6 +52,11 @@ function LoopBuilder() {
             ]);
             setLoop(loopData);
             setAssets(assetsData || []);
+            if (loopData.store_id && loopData.date) {
+                const review = await apiService.getScheduleReview(loopData.store_id, loopData.date);
+                setApprovalWindow(review.approval_window);
+                setStoreTimeZone(review.store?.time_zone || null);
+            }
         } catch (error) {
             console.error('Failed to load loop data:', error);
             addToast('Failed to load loop data. Please refresh.', 'error');
@@ -86,9 +90,6 @@ function LoopBuilder() {
         setLoop({ ...loop, slots: newSlots });
         setShowAssetPicker(false);
         setSelectedSlot(null);
-        // Clear attempted error state since the user just filled a slot
-        setAttempted(false);
-
         try {
             // The API returns the full loop object, which may have a new id
             // if the loop was APPROVED and was cloned into a new draft version.
@@ -105,28 +106,21 @@ function LoopBuilder() {
         }
     };
 
-    // Step 1 of approval: validate slots, then open the confirmation dialog.
-    const handleApproveClick = () => {
-        const emptySlots = (loop?.slots || []).filter(s => !s?.asset_id);
-        if (emptySlots.length > 0) {
-            setAttempted(true);
-            addToast(`${emptySlots.length} slot(s) are empty. Fill all slots before approving.`, 'error');
-            return;
-        }
-        setShowConfirm(true);
-    };
-
-    // Step 2 of approval: user confirmed in the dialog — call the API.
-    const handleApproveConfirm = async () => {
-        setShowConfirm(false);
+    const handleReopen = async () => {
+        if (!reopenReason.trim() || !reopenExpiry) return;
         setSaving(true);
         try {
-            await apiService.approveLoop(loop.id);
-            await loadData();
-            addToast('Loop approved successfully.', 'success');
+            const reopened = await apiService.reopenApprovalWindow(loop.store_id, loop.date, {
+                reason: reopenReason,
+                expires_at: reopenExpiry,
+            });
+            setApprovalWindow(reopened);
+            setShowReopen(false);
+            setReopenReason('');
+            setReopenExpiry('');
+            addToast('Approval Window reopened for Retailer Administrator review.', 'success');
         } catch (error) {
-            console.error('Failed to approve loop:', error);
-            const message = error?.response?.data?.error || error?.message || 'Failed to approve loop.';
+            const message = error?.message || 'Failed to reopen Approval Window.';
             addToast(message, 'error');
         } finally {
             setSaving(false);
@@ -138,11 +132,6 @@ function LoopBuilder() {
         const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
         return `${displayHour}:00 ${period}`;
     };
-
-    const allSlotsFilled = (loop?.slots || []).length === 12 &&
-        (loop?.slots || []).every(s => s?.asset_id);
-
-    const screenCount = loop?.screen_count ?? loop?.screen_ids?.length ?? 1;
 
     if (loading) {
         return (
@@ -194,12 +183,12 @@ function LoopBuilder() {
                             Loop Builder — {formatHour(loop.hour)}
                         </h1>
                         <StatusBadge status={
-                            loop.status === 'APPROVED' ? 'Active' :
-                            loop.status === 'PENDING_APPROVAL' ? 'Warning' : 'Offline'
+                            loop.status?.toLowerCase() === 'approved' ? 'Active' :
+                            loop.status?.toLowerCase() === 'pending_approval' ? 'Warning' : 'Offline'
                         } />
                         {loop.version > 1 && (
                             <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                                v{loop.version} — {loop.status === 'PENDING_APPROVAL' ? 'Pending Approval' : loop.status}
+                                v{loop.version} — {loop.status?.toLowerCase() === 'pending_approval' ? 'Pending Approval' : loop.status}
                             </span>
                         )}
                     </div>
@@ -209,24 +198,37 @@ function LoopBuilder() {
                         })} • 12 slots × 5 seconds = 60 second loop
                     </p>
                 </div>
-                <div className="flex items-center gap-3">
-                    {loop.status !== 'APPROVED' && !isReadOnly && (
-                        <button
-                            onClick={handleApproveClick}
-                            disabled={saving || !allSlotsFilled}
-                            title={!allSlotsFilled ? 'Fill all 12 slots before approving' : 'Approve this loop'}
-                            aria-label={saving ? 'Approving loop...' : 'Approve all slots in this loop'}
-                            className="px-4 py-2 bg-emerald-500 text-white rounded-lg font-medium shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                            data-testid="approve-loop-btn"
-                        >
-                            <span className="material-symbols-outlined text-[20px]">
-                                {saving ? 'progress_activity' : 'check_circle'}
-                            </span>
-                            {saving ? 'Approving...' : 'Approve Loop'}
-                        </button>
-                    )}
-                </div>
             </div>
+
+            {approvalWindow && (
+                <GlassCard>
+                    <div className="flex items-center justify-between gap-4">
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-slate-500">Approval Window</p>
+                            <p className="font-bold capitalize" data-testid="approval-window-state">
+                                {approvalWindow.state.replace('_', ' ').replace(/^./, value => value.toUpperCase())}
+                            </p>
+                            <p className="text-sm text-slate-500">
+                                {new Date(approvalWindow.effective_deadline).toLocaleString('en-US', {
+                                    timeZone: storeTimeZone || undefined,
+                                    year: 'numeric', month: 'short', day: 'numeric',
+                                    hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+                                })}
+                            </p>
+                        </div>
+                        {approvalWindow.state === 'expired' && ['admin', 'superadmin'].includes(user?.role) && (
+                            <button
+                                type="button"
+                                data-testid="reopen-approval-window"
+                                onClick={() => setShowReopen(true)}
+                                className="px-4 py-2 bg-primary text-white rounded-lg font-medium"
+                            >
+                                Reopen for Retailer Administrator
+                            </button>
+                        )}
+                    </div>
+                </GlassCard>
+            )}
 
             {/* 12-Slot Grid */}
             <GlassCard>
@@ -244,8 +246,6 @@ function LoopBuilder() {
                     {Array.from({ length: 12 }).map((_, position) => {
                         const slot = loop.slots?.[position] || {};
                         const asset = assets.find(a => a.id === slot.asset_id);
-                        const showEmptyError = attempted && !slot?.asset_id;
-
                         return (
                             <button
                                 key={position}
@@ -255,7 +255,7 @@ function LoopBuilder() {
                                     ? `Slot ${position + 1}: ${slot.asset_name || asset?.filename || slot.asset_id}${isReadOnly ? '' : ' — click to replace'}`
                                     : `Slot ${position + 1}: empty${isReadOnly ? '' : ' — click to add asset'}`
                                 }
-                                className={`relative p-4 rounded-xl border-2 transition-all ${isReadOnly ? 'cursor-default' : 'hover:shadow-md hover:scale-105'} ${getSlotStyle(slot, showEmptyError)}`}
+                                className={`relative p-4 rounded-xl border-2 transition-all ${isReadOnly ? 'cursor-default' : 'hover:shadow-md hover:scale-105'} ${getSlotStyle(slot)}`}
                                 data-testid={`slot-${position}`}
                             >
                                 <div className="absolute -top-2 -left-2 w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center">
@@ -270,15 +270,18 @@ function LoopBuilder() {
                                             <span className="text-xs font-medium text-slate-700 dark:text-slate-300 text-center line-clamp-1">
                                                 {slot.asset_name || asset?.filename || slot.asset_id}
                                             </span>
-                                            {slot.status === 'REJECTED' && (
+                                            {slot.status?.toLowerCase() === 'rejected' && (
                                                 <span className="text-[10px] text-red-500 font-bold mt-1">REJECTED</span>
+                                            )}
+                                            {slot.rejection_reason && (
+                                                <span className="text-[10px] text-red-600 mt-1">{slot.rejection_reason}</span>
                                             )}
                                         </>
                                     ) : (
                                         <>
-                                            <span className={`material-symbols-outlined text-2xl ${showEmptyError ? 'text-red-400' : 'text-slate-400'}`}>{showEmptyError ? 'error' : 'add_circle'}</span>
-                                            <span className={`text-xs mt-1 ${showEmptyError ? 'text-red-500 font-semibold' : 'text-slate-400'}`}>
-                                                {showEmptyError ? 'Required' : 'Add Asset'}
+                                            <span className="material-symbols-outlined text-2xl text-slate-400">add_circle</span>
+                                            <span className="text-xs mt-1 text-slate-400">
+                                                Add Asset
                                             </span>
                                         </>
                                     )}
@@ -360,39 +363,42 @@ function LoopBuilder() {
                 </div>
             )}
 
-            {/* Two-step Approval Confirmation Dialog */}
-            {showConfirm && (
+            {showReopen && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
                     <div className="bg-white dark:bg-surface-dark rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6">
-                        <div className="flex items-start gap-4 mb-6">
-                            <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center flex-shrink-0">
-                                <span className="material-symbols-outlined text-emerald-600 text-[20px]">check_circle</span>
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-lg text-slate-900 dark:text-white mb-1">
-                                    Confirm Loop Approval
-                                </h3>
-                                <p className="text-sm text-slate-600 dark:text-slate-400">
-                                    You are activating this loop across{' '}
-                                    <strong>{screenCount} screen{screenCount !== 1 ? 's' : ''}</strong>.
-                                    Once approved, this loop will go live on the next broadcast cycle.
-                                </p>
-                            </div>
-                        </div>
+                        <h3 className="font-bold text-lg mb-2">Reopen Approval Window</h3>
+                        <p className="text-sm text-slate-500 mb-4">This restores Retailer Administrator review access and does not approve content.</p>
+                        <label className="block text-sm font-medium mb-1" htmlFor="reopen-reason">Reason</label>
+                        <textarea
+                            id="reopen-reason"
+                            data-testid="reopen-reason"
+                            value={reopenReason}
+                            onChange={event => setReopenReason(event.target.value)}
+                            className="w-full p-2 border rounded-lg mb-4 dark:bg-slate-800"
+                        />
+                        <label className="block text-sm font-medium mb-1" htmlFor="reopen-expiry">Store-local expiry</label>
+                        <input
+                            id="reopen-expiry"
+                            type="datetime-local"
+                            data-testid="reopen-expiry"
+                            value={reopenExpiry}
+                            onChange={event => setReopenExpiry(event.target.value)}
+                            className="w-full p-2 border rounded-lg mb-6 dark:bg-slate-800"
+                        />
                         <div className="flex items-center gap-3 justify-end">
                             <button
-                                onClick={() => setShowConfirm(false)}
+                                onClick={() => setShowReopen(false)}
                                 className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
-                                onClick={handleApproveConfirm}
-                                className="px-4 py-2 rounded-lg text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors flex items-center gap-2"
-                                data-testid="approve-confirm-btn"
+                                onClick={handleReopen}
+                                disabled={saving || !reopenReason.trim() || !reopenExpiry}
+                                className="px-4 py-2 rounded-lg text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors disabled:opacity-50"
+                                data-testid="confirm-reopen"
                             >
-                                <span className="material-symbols-outlined text-[16px]">check</span>
-                                Yes, approve loop
+                                {saving ? 'Reopening...' : 'Reopen Window'}
                             </button>
                         </div>
                     </div>

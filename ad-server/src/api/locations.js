@@ -3,6 +3,7 @@ import { locationRepository } from '../repositories/index.js';
 import StoreRepository from '../repositories/StoreRepository.js';
 import { loopRepository, LOOP_STATUS } from '../repositories/LoopRepository.js';
 import { normalizeRole, ROLES } from '../constants/roles.js';
+import { approvalWindowService, ApprovalWindowError } from '../services/ApprovalWindowService.js';
 import {
     canManageAnyRetailer,
     canManageRetailer,
@@ -114,13 +115,21 @@ router.post('/:id/loops/approve-all', async (req, res) => {
         const pendingLoops = await loopRepository.findAll({ where });
         if (pendingLoops.length === 0) return res.json({ approved: 0, message: 'No pending loops found for this location' });
 
-        await Promise.all(pendingLoops.map(loop => loopRepository.update(loop.id, {
-            status: LOOP_STATUS.APPROVED,
-            approved_at: new Date().toISOString(),
-            approved_by: req.user?.uid || req.user?.id || null,
-        })));
+        const store = await StoreRepository.findById(location.store_id);
+        const dates = [...new Set(pendingLoops.map(loop => loop.date))];
+        await Promise.all(dates.map(date => approvalWindowService.assertOpen(
+            { id: location.store_id, time_zone: location.time_zone || store?.time_zone },
+            date,
+        )));
+        await Promise.all(pendingLoops.map(loop => loopRepository.approveLoop(
+            loop.id,
+            req.user?.uid || req.user?.id || null,
+        )));
         return res.json({ approved: pendingLoops.length });
     } catch (error) {
+        if (error instanceof ApprovalWindowError) {
+            return res.status(error.status).json({ error: error.message });
+        }
         logger.error('[Locations API] POST /:id/loops/approve-all failed', { locationId: req.params.id, error: error.message });
         return res.status(500).json({ error: 'Failed to bulk approve loops' });
     }

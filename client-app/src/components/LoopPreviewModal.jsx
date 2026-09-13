@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import StatusBadge from './StatusBadge';
-import { API_URL } from '../config';
+import apiClient from '../services/api';
 
 // Rejection reasons dropdown options
 const REJECTION_REASONS = [
@@ -17,14 +17,6 @@ const REJECTION_REASONS = [
     { value: 'other', label: 'Other' }
 ];
 
-// 🔶 Mock replacement assets (in production, fetch from API)
-const REPLACEMENT_ASSETS = [
-    { id: 'replace_001', name: 'Generic Promo A', thumbnail: '🎯' },
-    { id: 'replace_002', name: 'Store Announcement', thumbnail: '📢' },
-    { id: 'replace_003', name: 'Holiday Special', thumbnail: '🎄' },
-    { id: 'replace_004', name: 'Clearance Sale', thumbnail: '🏷️' },
-];
-
 // Format hour
 const formatHour = (hour) => {
     const period = hour >= 12 ? 'PM' : 'AM';
@@ -32,12 +24,12 @@ const formatHour = (hour) => {
     return `${displayHour}:00 ${period}`;
 };
 
-function LoopPreviewModal({ loop, onClose, onRefresh }) {
+function LoopPreviewModal({ loop, onClose, onRefresh, approvalOpen = true }) {
     const [slots, setSlots] = useState(loop.slots || []);
     const [rejectingSlot, setRejectingSlot] = useState(null);
     const [rejectionReason, setRejectionReason] = useState('');
-    const [replacingSlot, setReplacingSlot] = useState(null);
     const [saving, setSaving] = useState(false);
+    const [actionError, setActionError] = useState('');
 
     const handleRejectSlot = async (position) => {
         if (!rejectionReason) {
@@ -46,46 +38,18 @@ function LoopPreviewModal({ loop, onClose, onRefresh }) {
         }
 
         setSaving(true);
+        setActionError('');
         try {
-            // eslint-disable-next-line no-restricted-syntax
-            const res = await fetch(`${API_URL}/api/loops/${loop.id}/slots/${position}/reject`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reason: rejectionReason })
+            const updated = await apiClient.patch(`/api/loops/${loop.id}/slots/${position}/reject`, {
+                reason: rejectionReason,
             });
-
-            if (res.ok) {
-                const updated = await res.json();
-                setSlots(updated.slots);
-                setRejectingSlot(null);
-                setRejectionReason('');
-                // Immediately show replacement picker
-                setReplacingSlot(position);
-            }
+            setSlots(updated.slots);
+            setRejectingSlot(null);
+            setRejectionReason('');
+            onRefresh?.();
         } catch (error) {
             console.error('Failed to reject slot:', error);
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const handleReplaceSlot = async (position, assetId) => {
-        setSaving(true);
-        try {
-            // eslint-disable-next-line no-restricted-syntax
-            const res = await fetch(`${API_URL}/api/loops/${loop.id}/slots/${position}/replace`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ assetId })
-            });
-
-            if (res.ok) {
-                const updated = await res.json();
-                setSlots(updated.slots);
-                setReplacingSlot(null);
-            }
-        } catch (error) {
-            console.error('Failed to replace slot:', error);
+            setActionError(error.message || 'Failed to request replacement');
         } finally {
             setSaving(false);
         }
@@ -93,27 +57,21 @@ function LoopPreviewModal({ loop, onClose, onRefresh }) {
 
     const handleApproveLoop = async () => {
         setSaving(true);
+        setActionError('');
         try {
-            // eslint-disable-next-line no-restricted-syntax
-            const res = await fetch(`${API_URL}/api/loops/${loop.id}/approve`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: 'retailer_demo' })
-            });
-
-            if (res.ok) {
-                onRefresh?.();
-                onClose();
-            }
+            await apiClient.patch(`/api/loops/${loop.id}/approve`);
+            onRefresh?.();
+            onClose();
         } catch (error) {
             console.error('Failed to approve loop:', error);
+            setActionError(error.message || 'Failed to approve loop');
         } finally {
             setSaving(false);
         }
     };
 
-    const rejectedCount = slots.filter(s => s.status === 'REJECTED').length;
-    const canApprove = rejectedCount === 0;
+    const rejectedCount = slots.filter(s => s.status?.toLowerCase() === 'rejected').length;
+    const canApprove = approvalOpen && rejectedCount === 0;
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -135,8 +93,8 @@ function LoopPreviewModal({ loop, onClose, onRefresh }) {
                     </div>
                     <div className="flex items-center gap-3">
                         <StatusBadge status={
-                            loop.status === 'APPROVED' ? 'Active' :
-                                loop.status === 'PENDING_APPROVAL' ? 'Warning' : 'Offline'
+                            loop.status?.toLowerCase() === 'approved' ? 'Active' :
+                                loop.status?.toLowerCase() === 'pending_approval' ? 'Warning' : 'Offline'
                         } />
                         <button
                             onClick={onClose}
@@ -153,9 +111,9 @@ function LoopPreviewModal({ loop, onClose, onRefresh }) {
                         {slots.map((slot, position) => (
                             <div
                                 key={position}
-                                className={`relative p-4 rounded-xl border-2 ${slot.status === 'REJECTED'
+                                className={`relative p-4 rounded-xl border-2 ${slot.status?.toLowerCase() === 'rejected'
                                         ? 'border-red-400 bg-red-50 dark:bg-red-900/20'
-                                        : slot.status === 'REPLACED'
+                                        : slot.status?.toLowerCase() === 'replaced'
                                             ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20'
                                             : 'border-slate-200 dark:border-slate-700'
                                     }`}
@@ -177,20 +135,14 @@ function LoopPreviewModal({ loop, onClose, onRefresh }) {
                                 </div>
 
                                 {/* Status & Actions */}
-                                {slot.status === 'REJECTED' ? (
+                                {slot.status?.toLowerCase() === 'rejected' ? (
                                     <div className="text-center">
                                         <span className="text-xs text-red-500 font-bold block mb-2">
                                             REJECTED: {slot.rejection_reason}
                                         </span>
-                                        <button
-                                            onClick={() => setReplacingSlot(position)}
-                                            className="text-xs px-3 py-1.5 bg-primary text-white rounded-lg font-medium"
-                                            data-testid={`replace-btn-${position}`}
-                                        >
-                                            Select Replacement
-                                        </button>
+                                        <span className="text-xs text-slate-500">Replacement requested from Admin</span>
                                     </div>
-                                ) : slot.status === 'REPLACED' ? (
+                                ) : slot.status?.toLowerCase() === 'replaced' ? (
                                     <div className="text-center">
                                         <span className="text-xs text-emerald-600 font-bold">✓ REPLACED</span>
                                     </div>
@@ -198,6 +150,7 @@ function LoopPreviewModal({ loop, onClose, onRefresh }) {
                                     <div className="flex gap-2">
                                         <button
                                             onClick={() => setRejectingSlot(position)}
+                                            disabled={!approvalOpen}
                                             className="flex-1 text-xs px-2 py-1.5 bg-red-100 text-red-600 rounded-lg font-medium hover:bg-red-200 transition-colors"
                                             data-testid={`reject-btn-${position}`}
                                         >
@@ -242,6 +195,12 @@ function LoopPreviewModal({ loop, onClose, onRefresh }) {
                     </div>
                 </div>
 
+                {actionError && (
+                    <div role="alert" className="px-6 py-3 bg-red-50 text-red-700" data-testid="approval-action-error">
+                        {actionError}
+                    </div>
+                )}
+
                 {/* Rejection Reason Modal */}
                 {rejectingSlot !== null && (
                     <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
@@ -284,38 +243,6 @@ function LoopPreviewModal({ loop, onClose, onRefresh }) {
                     </div>
                 )}
 
-                {/* Replacement Picker Modal */}
-                {replacingSlot !== null && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
-                        <div className="bg-white dark:bg-surface-dark rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl">
-                            <h4 className="font-bold text-lg mb-4">
-                                Select Replacement for Slot {replacingSlot + 1}
-                            </h4>
-                            <p className="text-sm text-slate-500 mb-4">
-                                Choose an approved asset to replace the rejected ad:
-                            </p>
-                            <div className="grid grid-cols-2 gap-3 mb-4" data-testid="replacement-picker">
-                                {REPLACEMENT_ASSETS.map(asset => (
-                                    <button
-                                        key={asset.id}
-                                        onClick={() => handleReplaceSlot(replacingSlot, asset.id)}
-                                        className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary hover:shadow-lg transition-all text-center"
-                                        data-testid={`replacement-${asset.id}`}
-                                    >
-                                        <span className="text-3xl block mb-2">{asset.thumbnail}</span>
-                                        <span className="text-sm font-medium">{asset.name}</span>
-                                    </button>
-                                ))}
-                            </div>
-                            <button
-                                onClick={() => setReplacingSlot(null)}
-                                className="w-full px-4 py-2 text-slate-600 font-medium border border-slate-200 rounded-lg"
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     );

@@ -18,6 +18,7 @@ export const BUSINESS_HOURS = {
 // Uppercase property names are preserved as the import API for existing callers.
 export const LOOP_STATUS = Object.freeze({
     get PENDING_APPROVAL() { return 'pending_approval'; },
+    get REPLACEMENT_REQUESTED() { return 'replacement_requested'; },
     get APPROVED() { return 'approved'; },
     get REJECTED() { return 'rejected'; },
     get LIVE() { return 'live'; },
@@ -160,7 +161,7 @@ export class LoopRepository extends BaseRepository {
      * @param {string} reason - Rejection reason
      * @returns {Promise<object>}
      */
-    async rejectSlot(loopId, position, reason) {
+    async rejectSlot(loopId, position, reason, userId = null) {
         const loop = await this.findById(loopId);
         if (!loop) throw new Error(`Loop ${loopId} not found`);
 
@@ -173,15 +174,22 @@ export class LoopRepository extends BaseRepository {
             ...slots[position],
             status: SLOT_STATUS.REJECTED,
             rejection_reason: reason,
-            rejected_at: new Date().toISOString()
+            rejected_at: new Date().toISOString(),
+            rejected_by: userId,
         };
 
-        const result = await this.update(loopId, { slots });
+        const result = await this.update(loopId, {
+            slots,
+            status: LOOP_STATUS.REPLACEMENT_REQUESTED,
+            approved_at: null,
+            approved_by: null,
+        });
 
         await schedulingAuditRepository.logAction('slot_rejected', {
             entity_id: loopId,
             slot_index: position,
             reason: reason,
+            user_id: userId,
             timestamp: new Date().toISOString()
         });
 
@@ -251,7 +259,16 @@ export class LoopRepository extends BaseRepository {
             replaced_at: new Date().toISOString()
         };
 
-        const result = await this.update(loopId, { slots });
+        const returningToReview = loop.status === LOOP_STATUS.REPLACEMENT_REQUESTED
+            || loop.status === LOOP_STATUS.REJECTED;
+        const result = await this.update(loopId, {
+            slots,
+            ...(returningToReview ? {
+                status: LOOP_STATUS.PENDING_APPROVAL,
+                approved_at: null,
+                approved_by: null,
+            } : {}),
+        });
 
         await schedulingAuditRepository.logAction('slot_replaced', {
             entity_id: loopId,

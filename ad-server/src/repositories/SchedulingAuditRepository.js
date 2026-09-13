@@ -1,5 +1,7 @@
 ﻿import { BaseRepository } from './BaseRepository.js';
 
+import { randomUUID } from 'node:crypto';
+
 export class SchedulingAuditRepository extends BaseRepository {
     constructor() {
         super('scheduling_audits');
@@ -9,7 +11,7 @@ export class SchedulingAuditRepository extends BaseRepository {
      * Log a scheduling action
      */
     async logAction(action, metadata) {
-        const id = `audit_${Date.now()}`;
+        const id = `audit_${Date.now()}_${randomUUID()}`;
         return this.create(id, {
             action,
             ...metadata,

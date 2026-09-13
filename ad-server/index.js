@@ -66,7 +66,7 @@ const corsOptions = {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-demo-role'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-demo-role', 'x-demo-retailer-id'],
 };
 
 // Handle CORS pre-flight for ALL routes

@@ -73,6 +73,7 @@ describe('POST /api/loops/generate Allocation Window', () => {
         const persisted = await request(app)
             .get('/api/loops?date=2030-01-05&store_id=store-1')
             .set(auth);
+        expect(persisted.status).toBe(200);
         expect(persisted.body.loops.flatMap(loop => loop.slots)).toEqual(firstSlots);
 
         const regenerated = await request(app).post('/api/loops/generate').set(auth).send(body);

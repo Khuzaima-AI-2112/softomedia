@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase';
 import { authAPI } from '../services/authAPI';
+import { getDevelopmentIdentity } from '../services/developmentIdentity';
 
 const AuthContext = createContext(null);
 
@@ -12,7 +13,7 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         return onAuthStateChanged(auth, async (firebaseUser) => {
             if (!firebaseUser) {
-                setUser(null);
+                setUser(getDevelopmentIdentity());
                 setLoading(false);
                 return;
             }

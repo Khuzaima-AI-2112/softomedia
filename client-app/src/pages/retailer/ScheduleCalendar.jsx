@@ -1,12 +1,12 @@
 /**
  * Schedule Calendar Page
- * Retailer interface for previewing and approving tomorrow's broadcast schedule
+ * Retailer Administrator interface for previewing and approving tomorrow's broadcast schedule
  * Business Hours: 8am - 10pm (14 loops per day)
  *
  * Sprint 11 — S11-5: data-testid="schedule-calendar-container" added to root div.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import LoopPreviewModal from '../../components/LoopPreviewModal';
@@ -20,9 +20,9 @@ const BUSINESS_HOURS = {
 };
 
 // Generate business hours array
-const getBusinessHours = () => {
+const getBusinessHours = (start = BUSINESS_HOURS.START, end = BUSINESS_HOURS.END) => {
     const hours = [];
-    for (let h = BUSINESS_HOURS.START; h < BUSINESS_HOURS.END; h++) {
+    for (let h = start; h < end; h++) {
         hours.push(h);
     }
     return hours;
@@ -37,24 +37,40 @@ const formatHour = (hour) => {
 
 // Get status styling
 const getStatusStyle = (status) => {
-    switch (status) {
-        case 'APPROVED': return 'bg-emerald-500/10 border-emerald-500 text-emerald-600';
-        case 'PENDING_APPROVAL': return 'bg-amber-500/10 border-amber-500 text-amber-600';
-        case 'REJECTED': return 'bg-red-500/10 border-red-500 text-red-600';
+    switch (status?.toLowerCase()) {
+        case 'approved': return 'bg-emerald-500/10 border-emerald-500 text-emerald-600';
+        case 'pending_approval': return 'bg-amber-500/10 border-amber-500 text-amber-600';
+        case 'replacement_requested':
+        case 'rejected': return 'bg-red-500/10 border-red-500 text-red-600';
         default: return 'bg-slate-100 border-slate-300 text-slate-500';
     }
+};
+
+const tomorrowInTimeZone = (timeZone) => {
+    const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).formatToParts(new Date()).filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
+    const tomorrow = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day) + 1));
+    return tomorrow.toISOString().slice(0, 10);
 };
 
 function ScheduleCalendar() {
     const { persona } = useAuth();
     // Get tomorrow's date
-    const [targetDate] = useState(() => {
+    const [targetDate, setTargetDate] = useState(() => {
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         return tomorrow.toISOString().split('T')[0];
     });
 
     const [loops, setLoops] = useState([]);
+    const [stores, setStores] = useState([]);
+    const [selectedStore, setSelectedStore] = useState(null);
+    const [approvalWindow, setApprovalWindow] = useState(null);
+    const [actionError, setActionError] = useState('');
     const [loading, setLoading] = useState(true);
     const [selectedLoop, setSelectedLoop] = useState(null);
     const [approving, setApproving] = useState(false);
@@ -70,23 +86,51 @@ function ScheduleCalendar() {
     const [overrideError, setOverrideError] = useState('');
     const [hasMockOverride, setHasMockOverride] = useState(false);
 
-    const businessHours = getBusinessHours();
+    const loopHours = loops.map(loop => loop.hour);
+    const businessHours = loopHours.length > 0
+        ? getBusinessHours(Math.min(...loopHours), Math.max(...loopHours) + 1)
+        : getBusinessHours();
 
     useEffect(() => {
-        fetchLoops();
-    }, [targetDate, persona]);
+        let active = true;
+        const fetchStores = async () => {
+            setLoading(true);
+            try {
+                const nextStores = await apiClient.get('/api/stores');
+                if (!active) return;
+                setStores(nextStores || []);
+                const firstStore = nextStores?.[0] || null;
+                setSelectedStore(firstStore);
+                if (firstStore?.time_zone) setTargetDate(tomorrowInTimeZone(firstStore.time_zone));
+            } catch (error) {
+                if (active) setActionError(error.message || 'Failed to load Stores');
+            } finally {
+                if (active) setLoading(false);
+            }
+        };
+        fetchStores();
+        return () => { active = false; };
+    }, [persona]);
 
-    const fetchLoops = async () => {
+    const fetchLoops = useCallback(async () => {
+        if (!selectedStore) return;
         setLoading(true);
+        setActionError('');
         try {
-            const data = await apiClient.get(`/api/loops?date=${targetDate}`);
+            const data = await apiClient.get(`/api/loops/review/${selectedStore.id}/${targetDate}`);
             setLoops(data.loops || []);
+            setApprovalWindow(data.approval_window || null);
         } catch (error) {
             console.error('Failed to fetch schedule:', error);
+            setActionError(error.message || 'Failed to fetch schedule');
         } finally {
             setLoading(false);
         }
-    };
+    }, [selectedStore, targetDate]);
+
+    useEffect(() => {
+        fetchLoops();
+    }, [fetchLoops]);
 
     const getLoopForHour = (hour) => {
         return loops.find(l => l.hour === hour) || null;
@@ -94,17 +138,17 @@ function ScheduleCalendar() {
 
     const handleApproveAll = async () => {
         setApproving(true);
+        setActionError('');
         try {
             // Approve all pending loops
-            const pending = loops.filter(l => l.status === 'PENDING_APPROVAL');
+            const pending = loops.filter(l => l.status?.toLowerCase() === 'pending_approval');
             for (const loop of pending) {
-                await apiClient.patch(`/api/loops/${loop.id}/approve`, {
-                    userId: 'retailer_demo' // 🔶 TODO: Get from auth
-                });
+                await apiClient.patch(`/api/loops/${loop.id}/approve`);
             }
             await fetchLoops();
         } catch (error) {
             console.error('Failed to approve loops:', error);
+            setActionError(error.message || 'Failed to approve loops');
         } finally {
             setApproving(false);
         }
@@ -140,9 +184,21 @@ function ScheduleCalendar() {
         fetchLoops(); // Refresh after potential changes
     };
 
-    const pendingCount = loops.filter(l => l.status === 'PENDING_APPROVAL').length;
-    const approvedCount = loops.filter(l => l.status === 'APPROVED').length;
-    const rejectedCount = loops.filter(l => l.status === 'REJECTED').length;
+    const pendingCount = loops.filter(l => l.status?.toLowerCase() === 'pending_approval').length;
+    const approvedCount = loops.filter(l => l.status?.toLowerCase() === 'approved').length;
+    const rejectedCount = loops.filter(l => ['rejected', 'replacement_requested'].includes(l.status?.toLowerCase())).length;
+    const approvalOpen = approvalWindow?.state === 'open';
+    const deadlineLabel = approvalWindow && selectedStore?.time_zone
+        ? new Date(approvalWindow.effective_deadline).toLocaleString('en-US', {
+            timeZone: selectedStore.time_zone,
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            timeZoneName: 'short',
+        })
+        : null;
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500" data-testid="schedule-calendar">
@@ -164,6 +220,21 @@ function ScheduleCalendar() {
                     </p>
                 </div>
                 <div className="flex gap-2">
+                    {stores.length > 0 && (
+                        <select
+                            aria-label="Store"
+                            data-testid="schedule-store-select"
+                            value={selectedStore?.id || ''}
+                            onChange={(event) => {
+                                const store = stores.find(candidate => candidate.id === event.target.value) || null;
+                                setSelectedStore(store);
+                                if (store?.time_zone) setTargetDate(tomorrowInTimeZone(store.time_zone));
+                            }}
+                            className="px-4 py-2 border rounded-xl bg-white dark:bg-slate-800"
+                        >
+                            {stores.map(store => <option key={store.id} value={store.id}>{store.name}</option>)}
+                        </select>
+                    )}
                     <button
                         data-testid="btn-add-schedule-override"
                         onClick={() => setShowOverrideModal(true)}
@@ -171,7 +242,7 @@ function ScheduleCalendar() {
                     >
                         Add Override
                     </button>
-                    {pendingCount > 0 && (
+                    {pendingCount > 0 && approvalOpen && (
                         <button
                             onClick={handleApproveAll}
                             disabled={approving}
@@ -184,6 +255,31 @@ function ScheduleCalendar() {
                     )}
                 </div>
             </div>
+
+            {selectedStore && (
+                <div className="rounded-xl border border-primary/20 bg-primary/5 p-4" data-testid="approval-window-summary">
+                    <p className="font-semibold">{selectedStore.name}</p>
+                    <p data-testid="store-time-zone" className="text-sm text-slate-600 dark:text-slate-300">
+                        Store time zone: {selectedStore.time_zone}
+                    </p>
+                    {deadlineLabel && (
+                        <p data-testid="approval-deadline" className="text-sm text-slate-600 dark:text-slate-300">
+                            Approval deadline: {deadlineLabel}
+                        </p>
+                    )}
+                    {!approvalOpen && approvalWindow && (
+                        <p className="mt-2 text-sm font-semibold text-red-600" data-testid="approval-window-closed">
+                            Approval window closed
+                        </p>
+                    )}
+                </div>
+            )}
+
+            {actionError && (
+                <div role="alert" data-testid="schedule-action-error" className="rounded-xl bg-red-50 p-4 text-red-700">
+                    {actionError}
+                </div>
+            )}
 
             {/* Status Summary */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -237,7 +333,7 @@ function ScheduleCalendar() {
                     <div className="space-y-2" data-testid="schedule-timeline">
                         {businessHours.map(hour => {
                             const loop = getLoopForHour(hour);
-                            const rejectedSlots = loop?.slots?.filter(s => s.status === 'REJECTED').length || 0;
+                            const rejectedSlots = loop?.slots?.filter(s => s.status?.toLowerCase() === 'rejected').length || 0;
 
                             return (
                                 <button
@@ -290,8 +386,8 @@ function ScheduleCalendar() {
                                                     </span>
                                                 )}
                                                 <StatusBadge status={
-                                                    loop.status === 'APPROVED' ? 'Active' :
-                                                        loop.status === 'PENDING_APPROVAL' ? 'Warning' : 'Offline'
+                                                    loop.status?.toLowerCase() === 'approved' ? 'Active' :
+                                                        loop.status?.toLowerCase() === 'pending_approval' ? 'Warning' : 'Offline'
                                                 } />
                                             </div>
                                         )}
@@ -332,6 +428,7 @@ function ScheduleCalendar() {
                     loop={selectedLoop}
                     onClose={handleModalClose}
                     onRefresh={fetchLoops}
+                    approvalOpen={approvalOpen}
                 />
             )}
 

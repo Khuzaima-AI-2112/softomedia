@@ -26,11 +26,47 @@ import express from 'express';
 import { loopRepository, LOOP_STATUS } from '../repositories/LoopRepository.js';
 import { loopGenerationService } from '../services/LoopGenerationService.js';
 import { BusinessHoursService } from '../services/BusinessHoursService.js';
+import { approvalWindowService, ApprovalWindowError } from '../services/ApprovalWindowService.js';
+import StoreRepository from '../repositories/StoreRepository.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { canManageRetailer, denyStoreAccess, retailerIdFor } from '../middleware/storeManagement.js';
+import { normalizeRole, ROLES } from '../constants/roles.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
+
+function actorFor(user) {
+    return {
+        id: user?.uid || user?.id,
+        role: normalizeRole(user?.role),
+    };
+}
+
+async function findAuthorizedLoop(req, res, allowedRoles) {
+    if (req.user && !allowedRoles.includes(normalizeRole(req.user.role))) {
+        denyStoreAccess(res);
+        return null;
+    }
+    const loop = await loopRepository.findById(req.params.id || req.params.loopId);
+    if (!loop) {
+        res.status(404).json({ error: 'Loop not found' });
+        return null;
+    }
+    if (req.user && !canManageRetailer(req.user, loop.retailer_id)) {
+        denyStoreAccess(res);
+        return null;
+    }
+    return loop;
+}
+
+function sendApprovalError(res, error, fallback) {
+    if (error instanceof ApprovalWindowError) {
+        return res.status(error.status).json({ error: error.message });
+    }
+    logger.error(fallback, { error: error.message });
+    return res.status(500).json({ error: 'Approval operation failed' });
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET routes — static-segment paths MUST precede /:id wildcard
@@ -49,6 +85,21 @@ router.get('/', async (req, res) => {
         const effectiveScreenId = screen_id || screenid || null;
 
         let loops;
+        const role = normalizeRole(req.user?.role);
+        const ownRetailerId = retailerIdFor(req.user);
+        if (req.user && ![ROLES.RETAILERADMIN, ROLES.ADMIN, ROLES.SUPERADMIN].includes(role)) {
+            return denyStoreAccess(res);
+        }
+        if (role === ROLES.RETAILERADMIN && retailer_id && retailer_id !== ownRetailerId) {
+            return denyStoreAccess(res);
+        }
+        if (store_id) {
+            const store = await StoreRepository.findById(store_id);
+            if (role === ROLES.RETAILERADMIN
+                && (!store || !canManageRetailer(req.user, store.retailer_id))) {
+                return denyStoreAccess(res);
+            }
+        }
         if (date) {
             loops = await loopRepository.findByDate(date);
             if (store_id) loops = loops.filter(l => l.store_id === store_id);
@@ -62,6 +113,9 @@ router.get('/', async (req, res) => {
             if (effectiveScreenId) where.push(['screen_id', '==', effectiveScreenId]);
             if (status) where.push(['status', '==', status]);
             loops = await loopRepository.findAll({ where });
+        }
+        if (role === ROLES.RETAILERADMIN) {
+            loops = loops.filter(loop => loop.retailer_id === ownRetailerId);
         }
 
         // Determine dynamic business hours for UI
@@ -92,6 +146,29 @@ router.get('/', async (req, res) => {
     }
 });
 
+/** Store-scoped review read model used by Retailer Administrator and administrators. */
+router.get('/review/:storeId/:date', async (req, res) => {
+    try {
+        const store = await StoreRepository.findById(req.params.storeId);
+        if (!store || !canManageRetailer(req.user, store.retailer_id)) return denyStoreAccess(res);
+        const loops = await loopRepository.findAll({
+            where: [
+                ['store_id', '==', store.id],
+                ['date', '==', req.params.date],
+            ],
+        });
+        loops.sort((a, b) => a.hour - b.hour);
+        return res.json({
+            store: { id: store.id, name: store.name, time_zone: store.time_zone },
+            broadcast_date: req.params.date,
+            approval_window: await approvalWindowService.describe(store, req.params.date),
+            loops,
+        });
+    } catch (error) {
+        return sendApprovalError(res, error, '[Loops API] GET review failed');
+    }
+});
+
 /**
  * GET /api/loops/pending/:retailerId
  * Get all pending loops for retailer validation.
@@ -105,6 +182,7 @@ router.get('/', async (req, res) => {
  */
 router.get('/pending/:retailerId', authenticate, requireRole('retaileradmin'), async (req, res) => {
     try {
+        if (req.params.retailerId !== retailerIdFor(req.user)) return denyStoreAccess(res);
         const loops = await loopRepository.findPendingByRetailer(req.params.retailerId);
         res.json({ loops, count: loops.length });
     } catch (error) {
@@ -121,10 +199,8 @@ router.get('/pending/:retailerId', authenticate, requireRole('retaileradmin'), a
  */
 router.get('/:id', async (req, res) => {
     try {
-        const loop = await loopRepository.findById(req.params.id);
-        if (!loop) {
-            return res.status(404).json({ error: 'Loop not found' });
-        }
+        const loop = await findAuthorizedLoop(req, res, [ROLES.RETAILERADMIN, ROLES.ADMIN, ROLES.SUPERADMIN]);
+        if (!loop) return;
         res.json({
             ...loop,
             screen_count: loop.screen_ids?.length ?? 1
@@ -214,11 +290,21 @@ router.post('/generate', authenticate, async (req, res) => {
     }
 });
 
-/**
-        res.json({ approved: pendingLoops.length });
+/** Reopen an expired Store-local Approval Window without approving content. */
+router.post('/review/:storeId/:date/reopen', async (req, res) => {
+    try {
+        const role = normalizeRole(req.user?.role);
+        if (![ROLES.ADMIN, ROLES.SUPERADMIN].includes(role)) return denyStoreAccess(res);
+        const store = await StoreRepository.findById(req.params.storeId);
+        if (!store || !canManageRetailer(req.user, store.retailer_id)) return denyStoreAccess(res);
+        const approvalWindow = await approvalWindowService.reopen(store, req.params.date, {
+            reason: req.body.reason,
+            expiresAt: req.body.expires_at,
+            actor: actorFor(req.user),
+        });
+        return res.json(approvalWindow);
     } catch (error) {
-        logger.error('[Loops API] POST /locations/:locationId/loops/approve-all failed', { locationId: req.params.locationId, error: error.message });
-        res.status(500).json({ error: 'Failed to bulk approve loops' });
+        return sendApprovalError(res, error, '[Loops API] POST review reopen failed');
     }
 });
 
@@ -236,16 +322,17 @@ router.post('/generate', authenticate, async (req, res) => {
 router.post('/:loopId/reject', authenticate, requireRole('retaileradmin'), async (req, res) => {
     try {
         const { loopId } = req.params;
-        const { reason } = req.body;
-
-        const loop = await loopRepository.findById(loopId);
-        if (!loop) {
-            return res.status(404).json({ error: 'Loop not found' });
-        }
+        const reason = req.body.reason?.trim();
+        if (!reason) return res.status(400).json({ error: 'Rejection reason is required' });
+        const loop = await findAuthorizedLoop(req, res, [ROLES.RETAILERADMIN]);
+        if (!loop) return;
+        const store = await StoreRepository.findById(loop.store_id);
+        if (!store) return res.status(409).json({ error: 'Loop is not assigned to a Store' });
+        await approvalWindowService.assertOpen(store, loop.date);
 
         const updated = await loopRepository.update(loopId, {
             status: LOOP_STATUS.REJECTED,
-            rejection_reason: reason || null,
+            rejection_reason: reason,
             rejected_at: new Date().toISOString(),
             rejected_by: req.user?.uid || null,
         });
@@ -253,8 +340,7 @@ router.post('/:loopId/reject', authenticate, requireRole('retaileradmin'), async
         logger.info('[Loops API] Loop rejected', { loopId, reason, userId: req.user?.uid });
         res.json(updated);
     } catch (error) {
-        logger.error('[Loops API] POST /:loopId/reject failed', { loopId: req.params.loopId, error: error.message });
-        res.status(500).json({ error: 'Failed to reject loop' });
+        return sendApprovalError(res, error, '[Loops API] POST /:loopId/reject failed');
     }
 });
 
@@ -270,16 +356,22 @@ router.post('/:loopId/reject', authenticate, requireRole('retaileradmin'), async
  */
 router.patch('/:id/approve', authenticate, async (req, res) => {
     try {
+        const loop = await findAuthorizedLoop(req, res, [ROLES.RETAILERADMIN]);
+        if (!loop) return;
         const userId = req.user?.uid || req.user?.id;
         if (!userId) {
             return res.status(401).json({ error: 'Authenticated user required' });
         }
 
+        const store = await StoreRepository.findById(loop.store_id);
+        if (!store) return res.status(409).json({ error: 'Loop is not assigned to a Store' });
+        await approvalWindowService.assertOpen(store, loop.date);
         const updated = await loopRepository.approveLoop(req.params.id, userId);
 
         logger.info('[Loops API] Loop approved', { loopId: req.params.id, userId });
         res.json(updated);
     } catch (error) {
+        if (error instanceof ApprovalWindowError) return sendApprovalError(res, error, '[Loops API] PATCH approve failed');
         logger.error('[Loops API] PATCH /:id/approve failed', { error: error.message });
         const status = error.message.includes('cannot be approved') ? 400 : 500;
         res.status(status).json({ error: error.message });
@@ -296,19 +388,23 @@ router.patch('/:id/slots/:position/reject', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
         const position = parseInt(req.params.position, 10);
-        const { reason } = req.body;
+        const reason = req.body.reason?.trim();
 
         if (!reason) {
             return res.status(400).json({ error: 'Rejection reason is required' });
         }
+        const loop = await findAuthorizedLoop(req, res, [ROLES.RETAILERADMIN]);
+        if (!loop) return;
+        const store = await StoreRepository.findById(loop.store_id);
+        if (!store) return res.status(409).json({ error: 'Loop is not assigned to a Store' });
+        await approvalWindowService.assertOpen(store, loop.date);
 
-        const updated = await loopRepository.rejectSlot(id, position, reason);
+        const updated = await loopRepository.rejectSlot(id, position, reason, actorFor(req.user).id);
 
         logger.info('[Loops API] Slot rejected', { loopId: id, position, reason });
         res.json(updated);
     } catch (error) {
-        logger.error('[Loops API] PATCH /:id/slots/:position/reject failed', { error: error.message });
-        res.status(500).json({ error: 'Failed to reject slot' });
+        return sendApprovalError(res, error, '[Loops API] PATCH slot reject failed');
     }
 });
 
@@ -331,6 +427,8 @@ router.patch('/:id/slots/:position/replace', authenticate, async (req, res) => {
         if (!assetId) {
             return res.status(400).json({ error: 'Replacement assetId is required' });
         }
+        const loop = await findAuthorizedLoop(req, res, [ROLES.ADMIN]);
+        if (!loop) return;
 
         const updated = await loopRepository.replaceSlot(id, position, assetId, userId);
 
