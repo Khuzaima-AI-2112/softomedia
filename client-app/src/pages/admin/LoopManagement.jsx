@@ -7,9 +7,9 @@ import { ToastContainer, useToasts } from '../../components/Toast';
 
 const BUSINESS_HOURS = { START: 8, END: 22 };
 
-const getBusinessHours = () => {
+const getBusinessHours = (start = BUSINESS_HOURS.START, end = BUSINESS_HOURS.END) => {
     const hours = [];
-    for (let h = BUSINESS_HOURS.START; h < BUSINESS_HOURS.END; h++) hours.push(h);
+    for (let h = start; h < end; h++) hours.push(h);
     return hours;
 };
 
@@ -37,6 +37,7 @@ function LoopManagement() {
         return tomorrow.toISOString().split('T')[0];
     });
     const [loops, setLoops] = useState([]);
+    const [businessHours, setBusinessHours] = useState(() => getBusinessHours());
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
 
@@ -48,20 +49,30 @@ function LoopManagement() {
     });
 
     const { toasts, addToast, removeToast } = useToasts();
-    const businessHours = getBusinessHours();
-
     const fetchLoops = useCallback(async () => {
         setLoading(true);
         try {
             const data = await apiService.getLoopsByDate(targetDate);
-            setLoops(data?.loops || []);
+            const nextLoops = data?.loops || [];
+            setLoops(nextLoops);
+            const generatedHours = [...new Set(nextLoops.map(loop => loop.hour))].sort((a, b) => a - b);
+            if (generatedHours.length > 0) {
+                setBusinessHours(generatedHours);
+            } else if (data?.business_hours?.is_closed) {
+                setBusinessHours([]);
+            } else {
+                setBusinessHours(getBusinessHours(
+                    data?.business_hours?.start ?? BUSINESS_HOURS.START,
+                    data?.business_hours?.end ?? BUSINESS_HOURS.END
+                ));
+            }
         } catch (error) {
             console.error('Failed to fetch loops:', error);
             addToast('Failed to load loops. Please refresh.', 'error');
         } finally {
             setLoading(false);
         }
-    }, [targetDate]);
+    }, [addToast, targetDate]);
 
     useEffect(() => {
         fetchLoops();
@@ -77,15 +88,12 @@ function LoopManagement() {
                 return;
             }
 
-            // Fire loop generation for all stores simultaneously
+            // Generate persisted Daily Schedules for all Stores simultaneously.
             await Promise.all(stores.map(store =>
                 apiService.generateLoops({
                     targetDate,
                     retailerId: store.retailer_id || 'ret_demo',
-                    locationId: store.id,
-                    mock: true
-                }).catch(err => {
-                    console.error(`Failed generating for store ${store.id}:`, err);
+                    locationId: store.id
                 })
             ));
 
@@ -131,6 +139,14 @@ function LoopManagement() {
     };
 
     const unapprovedHours = !loading ? getUnapprovedUpcomingHours() : [];
+    const slots = loops.flatMap(loop => loop.slots || []);
+    const allocationCounts = slots.reduce((counts, slot) => {
+        const category = slot.allocated_category;
+        if (category) counts[category] = (counts[category] || 0) + 1;
+        return counts;
+    }, { paid: 0, retailer: 0, internal: 0 });
+    const campaignContentCount = slots.filter(slot => slot.content_kind === 'campaign' && !slot.is_fallback).length;
+    const fallbackContentCount = slots.filter(slot => slot.content_kind === 'fallback' || slot.is_fallback).length;
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -220,6 +236,24 @@ function LoopManagement() {
                     </p>
                 </GlassCard>
             </div>
+
+            {slots.length > 0 && (
+                <GlassCard>
+                    <div data-testid="allocation-summary" className="space-y-3">
+                        <div>
+                            <h2 className="font-bold text-lg text-slate-900 dark:text-white">Allocation Window report</h2>
+                            <p className="text-sm text-slate-500">Reserved positions remain assigned to their accepted category.</p>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+                            <div><span className="text-slate-500">Paid</span><strong className="block text-xl">{allocationCounts.paid}</strong></div>
+                            <div><span className="text-slate-500">Retailer</span><strong className="block text-xl">{allocationCounts.retailer}</strong></div>
+                            <div><span className="text-slate-500">Internal</span><strong className="block text-xl">{allocationCounts.internal}</strong></div>
+                            <div><span className="text-slate-500">Campaign content</span><strong className="block text-xl">{campaignContentCount}</strong></div>
+                            <div><span className="text-slate-500">Fallback content</span><strong className="block text-xl">{fallbackContentCount}</strong></div>
+                        </div>
+                    </div>
+                </GlassCard>
+            )}
 
             {/* 14-Hour Grid */}
             <GlassCard>

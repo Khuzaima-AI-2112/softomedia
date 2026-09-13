@@ -7,6 +7,8 @@
 
 import { loopRepository, BUSINESS_HOURS, LOOP_STATUS } from '../repositories/LoopRepository.js';
 import { campaignRepository } from '../repositories/CampaignRepository.js';
+import { dailyScheduleRepository } from '../repositories/DailyScheduleRepository.js';
+import { mediaRepository } from '../repositories/MediaRepository.js';
 import { BusinessHoursService } from './BusinessHoursService.js';
 import logger from '../utils/logger.js';
 
@@ -23,6 +25,13 @@ export const CAMPAIGN_PRIORITY = {
     RETAILER: 2,    // Retailer-owned promotions
     INTERNAL: 3     // Softomedia internal/filler
 };
+
+// Repeating ten-position cadence. Six repetitions form a five-loop
+// Allocation Window (60 positions) with the exact accepted 70/20/10 split.
+export const ALLOCATION_SEQUENCE = Object.freeze([
+    'paid', 'paid', 'retailer', 'paid', 'paid',
+    'internal', 'paid', 'paid', 'retailer', 'paid'
+]);
 
 export class LoopGenerationService {
     /**
@@ -55,21 +64,62 @@ export class LoopGenerationService {
             isClosed: effectiveHours?.is_closed
         });
 
+        const existingSchedule = await dailyScheduleRepository.findByLocationAndDate(locationId, targetDate);
+        const previousSchedule = existingSchedule
+            ? null
+            : await dailyScheduleRepository.findLatestBefore(locationId, targetDate);
+        const sequenceStart = existingSchedule?.sequence_start_position
+            ?? previousSchedule?.sequence_end_position
+            ?? 0;
+
         if (effectiveHours?.is_closed) {
+            await dailyScheduleRepository.save(locationId, targetDate, {
+                retailer_id: retailerId,
+                is_closed: true,
+                operating_hours: [],
+                loop_ids: [],
+                sequence_start_position: sequenceStart,
+                sequence_end_position: sequenceStart,
+            });
             return [];
         }
 
         // Get available campaigns for this retailer/location
         const campaigns = await this.getAvailableCampaigns(retailerId, locationId, targetDate);
+        const availableCategories = new Set(campaigns.map(campaign => campaign.type));
+        const needsFallback = ['paid', 'retailer', 'internal']
+            .some(category => !availableCategories.has(category));
+        const fallback = needsFallback ? await this.getApprovedFallbackAsset() : null;
+        if (needsFallback && !fallback) {
+            throw new Error('An approved neutral fallback asset is required for unoccupied reserved positions');
+        }
 
         // Generate loop for each business hour (PARALLELIZED)
         const hourPromises = [];
         for (let hour = startHour; hour < endHour; hour++) {
-            hourPromises.push(this.generateHourlyLoop(targetDate, hour, retailerId, locationId, campaigns));
+            const hourOffset = (hour - startHour) * SLOT_CONFIG.SLOTS_PER_LOOP;
+            hourPromises.push(this.generateHourlyLoop(
+                targetDate,
+                hour,
+                retailerId,
+                locationId,
+                campaigns,
+                sequenceStart + hourOffset,
+                fallback
+            ));
         }
 
         const generatedLoops = await Promise.all(hourPromises);
         loops.push(...generatedLoops);
+
+        await dailyScheduleRepository.save(locationId, targetDate, {
+            retailer_id: retailerId,
+            is_closed: false,
+            operating_hours: loops.map(loop => loop.hour),
+            loop_ids: loops.map(loop => loop.id),
+            sequence_start_position: sequenceStart,
+            sequence_end_position: sequenceStart + loops.length * SLOT_CONFIG.SLOTS_PER_LOOP,
+        });
 
         logger.info(`[LoopGeneration] Generated ${loops.length} loops for ${targetDate}`);
         return loops;
@@ -78,20 +128,24 @@ export class LoopGenerationService {
     /**
      * Generate a single hourly loop
      */
-    async generateHourlyLoop(date, hour, retailerId, locationId, campaigns) {
+    async generateHourlyLoop(date, hour, retailerId, locationId, campaigns, sequenceStart = 0, fallback = null) {
         const loopId = `${date}_${hour}_${locationId}`;
 
         // Build 12 slots using priority algorithm
-        const slots = this.buildSlots(campaigns);
+        const slots = this.buildSlots(campaigns, { sequenceStart, fallback });
 
-        const loop = await loopRepository.create(loopId, {
+        const data = {
             date,
             hour,
             retailer_id: retailerId,
             location_id: locationId,
             status: LOOP_STATUS.PENDING_APPROVAL,
             slots
-        });
+        };
+        const existing = await loopRepository.findById(loopId);
+        const loop = existing
+            ? await loopRepository.update(loopId, data)
+            : await loopRepository.create(loopId, data);
 
         return loop;
     }
@@ -101,32 +155,36 @@ export class LoopGenerationService {
      * @param {Array} campaigns - Available campaigns
      * @returns {Array} 12 slots
      */
-    buildSlots(campaigns) {
-        const slots = [];
+    buildSlots(campaigns, { sequenceStart = 0, fallback = null } = {}) {
+        const byCategory = new Map(['paid', 'retailer', 'internal'].map(category => [
+            category,
+            this.prioritizeCampaigns(campaigns).filter(campaign =>
+                campaign.type?.toLowerCase() === category
+            )
+        ]));
+        const categoryIndexes = { paid: 0, retailer: 0, internal: 0 };
 
-        // Sort campaigns by priority
-        const sorted = this.prioritizeCampaigns(campaigns);
+        return Array.from({ length: SLOT_CONFIG.SLOTS_PER_LOOP }, (_, position) => {
+            const sequencePosition = sequenceStart + position;
+            const allocatedCategory = ALLOCATION_SEQUENCE[sequencePosition % ALLOCATION_SEQUENCE.length];
+            const eligible = byCategory.get(allocatedCategory);
+            const campaign = eligible.length > 0
+                ? eligible[categoryIndexes[allocatedCategory]++ % eligible.length]
+                : null;
 
-        // Fill 12 slots with fallback logic if no campaigns exist
-        let campaignIndex = 0;
-        for (let position = 0; position < SLOT_CONFIG.SLOTS_PER_LOOP; position++) {
-            // Cycle through campaigns if we have fewer than 12
-            const campaign = sorted.length > 0 ? sorted[campaignIndex % sorted.length] : null;
-
-            slots.push({
+            return {
                 position,
-                asset_id: campaign?.asset_id || 'fallback_softomedia_filler_asset_id',
-                campaign_id: campaign?.id || 'sys_fallback_campaign',
+                allocation_sequence_position: sequencePosition,
+                allocated_category: allocatedCategory,
+                asset_id: campaign?.asset_id || fallback?.id || null,
+                asset_name: campaign?.asset_name || fallback?.title || fallback?.filename || null,
+                campaign_id: campaign?.id || null,
+                content_kind: campaign ? 'campaign' : 'fallback',
+                is_fallback: !campaign,
                 duration: SLOT_CONFIG.SLOT_DURATION_SECONDS,
                 status: 'PENDING'
-            });
-
-            if (sorted.length > 0) {
-                campaignIndex++;
-            }
-        }
-
-        return slots;
+            };
+        });
     }
 
     /**
@@ -150,17 +208,49 @@ export class LoopGenerationService {
                 where: [['status', '==', 'approved']]
             });
 
-            // Filter by retailer/location assignment and date range
+            const media = await mediaRepository.findAll();
+            const mediaById = new Map(media.map(asset => [asset.id, asset]));
+
+            // Filter by retailer/location assignment and date range, then adapt
+            // legacy and Phase-1 Campaign shapes to the scheduler's one contract.
             return campaigns.filter(c => {
-                const matchesRetailer = !c.retailer_id || c.retailer_id === retailerId;
-                const matchesLocation = !c.location_id || c.location_id === locationId || c.location_id === 'ALL';
+                const selections = Array.isArray(c.inventory_selection) ? c.inventory_selection : [];
+                const matchesSelection = selections.some(selection =>
+                    selection.retailer_id === retailerId
+                    && [selection.store_id, selection.location_id, selection.id].includes(locationId)
+                );
+                const matchesRetailer = matchesSelection || !c.retailer_id || c.retailer_id === retailerId;
+                const matchesLocation = matchesSelection || !c.location_id || c.location_id === locationId || c.location_id === 'ALL';
                 const inDateRange = this.isDateInRange(targetDate, c.start_date, c.end_date);
                 return matchesRetailer && matchesLocation && inDateRange;
-            });
+            }).map(campaign => {
+                const asset = mediaById.get(campaign.media_id || campaign.asset_id);
+                return {
+                    ...campaign,
+                    type: (campaign.type || campaign.category || asset?.category || 'paid').toLowerCase(),
+                    asset_id: campaign.asset_id || campaign.media_id || asset?.id || null,
+                    asset_name: campaign.asset_name || asset?.title || asset?.filename || null,
+                };
+            }).filter(campaign => campaign.asset_id);
         } catch (error) {
             logger.error('[LoopGeneration] Failed to fetch campaigns', { error: error.message });
             return [];
         }
+    }
+
+    async getApprovedFallbackAsset() {
+        const assets = await mediaRepository.findAll({
+            where: [['category', '==', 'fallback']]
+        });
+        return assets
+            .filter(asset =>
+                asset.content_kind === 'neutral_fallback'
+                && asset.status !== 'rejected'
+                && (asset.eligible_for_playback === true
+                    || asset.approval_status === 'approved'
+                    || asset.status === 'approved')
+            )
+            .sort((a, b) => a.id.localeCompare(b.id))[0] || null;
     }
 
     /**

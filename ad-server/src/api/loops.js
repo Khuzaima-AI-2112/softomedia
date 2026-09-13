@@ -23,7 +23,7 @@
  */
 
 import express from 'express';
-import { loopRepository, BUSINESS_HOURS, LOOP_STATUS } from '../repositories/LoopRepository.js';
+import { loopRepository, LOOP_STATUS } from '../repositories/LoopRepository.js';
 import { loopGenerationService } from '../services/LoopGenerationService.js';
 import { BusinessHoursService } from '../services/BusinessHoursService.js';
 import { authenticate } from '../middleware/auth.js';
@@ -194,12 +194,20 @@ router.post('/generate', authenticate, async (req, res) => {
             }
         }
 
+        const effectiveHours = await BusinessHoursService.getEffectiveHours(locationId, targetDate);
+        const isClosed = Boolean(effectiveHours?.is_closed);
+        const startHour = isClosed ? null : parseInt(effectiveHours.open_time.split(':')[0], 10);
+        let endHour = isClosed ? null : parseInt(effectiveHours.close_time.split(':')[0], 10);
+        if (endHour === 0) endHour = 24;
+
         res.status(201).json({
             message: `Generated ${loops.length} loops for ${targetDate}`,
             loops,
             business_hours: {
-                start: BUSINESS_HOURS.START,
-                end: BUSINESS_HOURS.END
+                start: startHour,
+                end: endHour,
+                is_closed: isClosed,
+                total_loops: loops.length,
             }
         });
     } catch (error) {
