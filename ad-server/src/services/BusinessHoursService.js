@@ -3,6 +3,17 @@ import BusinessHoursRepository from '../repositories/BusinessHoursRepository.js'
 import SpecialHoursRepository from '../repositories/SpecialHoursRepository.js';
 
 class BusinessHoursServiceClass {
+    getOperatingHourRange(effectiveHours) {
+        if (effectiveHours?.is_closed) {
+            return { start: null, end: null, is_closed: true, total_loops: 0 };
+        }
+
+        const start = parseInt(effectiveHours.open_time.split(':')[0], 10);
+        let end = parseInt(effectiveHours.close_time.split(':')[0], 10);
+        if (end === 0) end = 24;
+        return { start, end, is_closed: false, total_loops: end - start };
+    }
+
     /**
      * Get effective hours for a store on a given date
      * @param {string} storeId 

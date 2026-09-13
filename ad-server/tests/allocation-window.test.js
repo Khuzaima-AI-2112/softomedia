@@ -50,18 +50,18 @@ describe('five-loop Allocation Window', () => {
             { id: 'retailer-1', type: 'retailer', asset_id: 'retailer-asset' },
             { id: 'internal-1', type: 'internal', asset_id: 'internal-asset' },
         ];
-        jest.spyOn(BusinessHoursService, 'getEffectiveHours').mockImplementation(async (_locationId, date) => {
+        jest.spyOn(BusinessHoursService, 'getEffectiveHours').mockImplementation(async (_storeId, date) => {
             if (date === '2030-01-02') return { is_closed: true };
             if (date === '2030-01-01') return { is_closed: false, open_time: '08:00', close_time: '10:00' };
             return { is_closed: false, open_time: '08:00', close_time: '11:00' };
         });
-        jest.spyOn(service, 'getAvailableCampaigns').mockResolvedValue(campaigns);
+        jest.spyOn(service, 'getAvailableContent').mockResolvedValue(campaigns);
 
         const firstDay = await service.generateDailyLoops('2030-01-01', 'retailer-1', 'store-1');
         expect(firstDay.map(loop => loop.slots[0].allocation_sequence_position)).toEqual([0, 12]);
 
         const reloadedService = new LoopGenerationService();
-        jest.spyOn(reloadedService, 'getAvailableCampaigns').mockResolvedValue(campaigns);
+        jest.spyOn(reloadedService, 'getAvailableContent').mockResolvedValue(campaigns);
         expect(await reloadedService.generateDailyLoops('2030-01-02', 'retailer-1', 'store-1')).toEqual([]);
 
         const thirdDay = await reloadedService.generateDailyLoops('2030-01-03', 'retailer-1', 'store-1');
@@ -79,7 +79,7 @@ describe('five-loop Allocation Window', () => {
             asset_id: 'paid-asset',
             status: 'approved',
             retailer_id: 'retailer-1',
-            location_id: 'store-1',
+            store_id: 'store-1',
             start_date: '2030-01-01',
             end_date: '2030-01-31',
         });
@@ -101,6 +101,44 @@ describe('five-loop Allocation Window', () => {
             campaign_id: null,
             content_kind: 'fallback',
             is_fallback: true,
+        });
+    });
+
+    test('uses eligible category media and excludes Campaigns selected for another Store', async () => {
+        await mediaRepository.create('local-paid', {
+            category: 'paid', approval_status: 'approved', eligible_for_playback: true,
+            owner_type: 'brand', owner_id: 'brand-1', status: 'ready',
+        });
+        await mediaRepository.create('other-paid', {
+            category: 'paid', approval_status: 'approved', eligible_for_playback: true,
+            owner_type: 'brand', owner_id: 'brand-2', status: 'ready',
+        });
+        await mediaRepository.create('retailer-media', {
+            category: 'retailer', approval_status: 'approved', eligible_for_playback: true,
+            owner_type: 'retailer', owner_id: 'retailer-1', status: 'ready',
+        });
+        await mediaRepository.create('internal-media', {
+            category: 'internal', approval_status: 'approved', eligible_for_playback: true,
+            owner_type: 'platform', owner_id: null, status: 'ready',
+        });
+        await campaignRepository.create('local-campaign', {
+            media_id: 'local-paid', status: 'approved',
+            start_date: '2030-01-01', end_date: '2030-01-31',
+            inventory_selection: [{ retailer_id: 'retailer-1', store_id: 'store-1' }],
+        });
+        await campaignRepository.create('other-campaign', {
+            media_id: 'other-paid', status: 'approved',
+            start_date: '2030-01-01', end_date: '2030-01-31',
+            inventory_selection: [{ retailer_id: 'retailer-2', store_id: 'store-2' }],
+        });
+
+        const content = await service.getAvailableContent('retailer-1', 'store-1', '2030-01-04');
+
+        expect(content.map(item => item.asset_id).sort()).toEqual([
+            'internal-media', 'local-paid', 'retailer-media'
+        ]);
+        expect(content.find(item => item.asset_id === 'retailer-media')).toMatchObject({
+            type: 'retailer', campaign_id: null,
         });
     });
 });

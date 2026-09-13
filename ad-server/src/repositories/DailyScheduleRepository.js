@@ -5,28 +5,28 @@ export class DailyScheduleRepository extends BaseRepository {
         super('daily_schedules');
     }
 
-    idFor(locationId, date) {
-        return `${locationId}_${date}`;
+    idFor(storeId, date) {
+        return `${storeId}_${date}`;
     }
 
-    findByLocationAndDate(locationId, date) {
-        return this.findById(this.idFor(locationId, date));
+    findByStoreAndDate(storeId, date) {
+        return this.findById(this.idFor(storeId, date));
     }
 
-    async findLatestBefore(locationId, date) {
+    async findLatestBefore(storeId, date) {
         const schedules = await this.findAll({
-            where: [['location_id', '==', locationId]],
+            where: [['store_id', '==', storeId]],
         });
         return schedules
             .filter(schedule => schedule.date < date)
             .sort((a, b) => b.date.localeCompare(a.date))[0] || null;
     }
 
-    async save(locationId, date, data) {
-        const id = this.idFor(locationId, date);
+    async save(storeId, date, data) {
+        const id = this.idFor(storeId, date);
         const document = {
             ...data,
-            location_id: locationId,
+            store_id: storeId,
             date,
         };
         const existing = await this.findById(id);

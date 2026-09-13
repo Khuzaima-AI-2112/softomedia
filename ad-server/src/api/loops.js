@@ -39,11 +39,11 @@ const router = express.Router();
 /**
  * GET /api/loops
  * List loops with optional filters
- * Query params: date, retailer_id, location_id, screen_id, screenid, status
+ * Query params: date, retailer_id, store_id, location_id, screen_id, screenid, status
  */
 router.get('/', async (req, res) => {
     try {
-        const { date, retailer_id, location_id, screen_id, screenid, status } = req.query;
+        const { date, retailer_id, store_id, location_id, screen_id, screenid, status } = req.query;
 
         // Normalise — accept both ?screen_id= and ?screenid= from any caller
         const effectiveScreenId = screen_id || screenid || null;
@@ -51,11 +51,13 @@ router.get('/', async (req, res) => {
         let loops;
         if (date) {
             loops = await loopRepository.findByDate(date);
+            if (store_id) loops = loops.filter(l => l.store_id === store_id);
             if (location_id) loops = loops.filter(l => l.location_id === location_id);
             if (effectiveScreenId) loops = loops.filter(l => l.screen_id === effectiveScreenId);
         } else {
             const where = [];
             if (retailer_id) where.push(['retailer_id', '==', retailer_id]);
+            if (store_id) where.push(['store_id', '==', store_id]);
             if (location_id) where.push(['location_id', '==', location_id]);
             if (effectiveScreenId) where.push(['screen_id', '==', effectiveScreenId]);
             if (status) where.push(['status', '==', status]);
@@ -67,15 +69,12 @@ router.get('/', async (req, res) => {
         let endHour = 22;
         let isClosed = false;
 
-        if (date && location_id) {
-            const effective = await BusinessHoursService.getEffectiveHours(location_id, date);
-            if (effective.is_closed) {
-                isClosed = true;
-            } else {
-                startHour = parseInt(effective.open_time.split(':')[0], 10);
-                endHour = parseInt(effective.close_time.split(':')[0], 10);
-                if (endHour === 0) endHour = 24;
-            }
+        if (date && store_id) {
+            const effective = await BusinessHoursService.getEffectiveHours(store_id, date);
+            const operatingHours = BusinessHoursService.getOperatingHourRange(effective);
+            isClosed = operatingHours.is_closed;
+            startHour = operatingHours.start;
+            endHour = operatingHours.end;
         }
 
         res.json({
@@ -161,26 +160,26 @@ router.post('/', authenticate, requireRole('superadmin'), async (req, res) => {
 /**
  * POST /api/loops/generate
  * Trigger D-1 loop generation
- * Body: { targetDate, retailerId, locationId }
+ * Body: { targetDate, retailerId, storeId }
  * Requires authentication (defence-in-depth — router is also behind authenticate).
  */
 router.post('/generate', authenticate, async (req, res) => {
     try {
-        const { targetDate, retailerId, locationId, mock } = req.body;
+        const { targetDate, retailerId, storeId, mock } = req.body;
 
-        if (!targetDate || !retailerId || !locationId) {
+        if (!targetDate || !retailerId || !storeId) {
             return res.status(400).json({
-                error: 'Missing required fields: targetDate, retailerId, locationId'
+                error: 'Missing required fields: targetDate, retailerId, storeId'
             });
         }
 
-        logger.info('[Loops API] Generating loops', { targetDate, retailerId, locationId, mock });
+        logger.info('[Loops API] Generating loops', { targetDate, retailerId, storeId, mock });
 
         let loops;
         if (mock) {
-            loops = await loopGenerationService.generateMockLoops(targetDate, retailerId, locationId);
+            loops = await loopGenerationService.generateMockLoops(targetDate, retailerId, storeId);
         } else {
-            loops = await loopGenerationService.generateDailyLoops(targetDate, retailerId, locationId);
+            loops = await loopGenerationService.generateDailyLoops(targetDate, retailerId, storeId);
         }
 
         // Strict 12-Ad Loop Capacity & 60s Limit Validation (MVP Rule 4.1)
@@ -194,19 +193,16 @@ router.post('/generate', authenticate, async (req, res) => {
             }
         }
 
-        const effectiveHours = await BusinessHoursService.getEffectiveHours(locationId, targetDate);
-        const isClosed = Boolean(effectiveHours?.is_closed);
-        const startHour = isClosed ? null : parseInt(effectiveHours.open_time.split(':')[0], 10);
-        let endHour = isClosed ? null : parseInt(effectiveHours.close_time.split(':')[0], 10);
-        if (endHour === 0) endHour = 24;
+        const effectiveHours = await BusinessHoursService.getEffectiveHours(storeId, targetDate);
+        const operatingHours = BusinessHoursService.getOperatingHourRange(effectiveHours);
 
         res.status(201).json({
             message: `Generated ${loops.length} loops for ${targetDate}`,
             loops,
             business_hours: {
-                start: startHour,
-                end: endHour,
-                is_closed: isClosed,
+                start: operatingHours.start,
+                end: operatingHours.end,
+                is_closed: operatingHours.is_closed,
                 total_loops: loops.length,
             }
         });

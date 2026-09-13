@@ -1,6 +1,7 @@
 import {
     userRepository,
     locationRepository,
+    StoreRepository,
     adRepository,
     retailerRepository,
     screenRepository,
@@ -55,18 +56,25 @@ export async function seedDatabase() {
             await createIfAbsent(userRepository, user.id, user);
         }
 
-        // 2. Seed Retailers & Locations
+        // 2. Seed Retailer, Store & Location
         await createIfAbsent(retailerRepository, 'ent_costco', { name: 'Costco Wholesale' });
+        await createIfAbsent(StoreRepository, 'store_downtown_01', {
+            name: 'Downtown Flagship',
+            retailer_id: 'ent_costco',
+            location_ids: ['loc_downtown_01'],
+            status: 'active'
+        });
         await createIfAbsent(locationRepository, 'loc_downtown_01', {
             id: 'loc_downtown_01',
             name: 'Downtown Flagship',
             retailer_id: 'ent_costco',
+            store_id: 'store_downtown_01',
             screen_ids: ['demo-screen-01', 'demo-screen-02']
         });
 
         // 2b. Seed Screens
-        await createIfAbsent(screenRepository, 'demo-screen-01', { name: 'Main Entrance Kiosk A', location_id: 'loc_downtown_01', status: 'online' });
-        await createIfAbsent(screenRepository, 'demo-screen-02', { name: 'Checkout Screen 05', location_id: 'loc_downtown_01', status: 'online' });
+        await createIfAbsent(screenRepository, 'demo-screen-01', { name: 'Main Entrance Kiosk A', store_id: 'store_downtown_01', location_id: 'loc_downtown_01', status: 'online' });
+        await createIfAbsent(screenRepository, 'demo-screen-02', { name: 'Checkout Screen 05', store_id: 'store_downtown_01', location_id: 'loc_downtown_01', status: 'online' });
 
         // 4. Seed Mock Ads
         await createIfAbsent(adRepository, 'ad_nike_001', {
@@ -128,6 +136,7 @@ export async function seedDatabase() {
 
         logger.info('Database seeding complete.', {
             users: users.length,
+            stores: 1,
             locations: 1,
             screens: 2,
             ads: 8
@@ -138,7 +147,7 @@ export async function seedDatabase() {
         const currentTargetHour = new Date().getHours();
 
         logger.info(`Generating loops for ${currentTargetDate} to support Demo Player...`);
-        const generatedLoops = await loopGenerationService.generateDailyLoops(currentTargetDate, 'ent_costco', 'loc_downtown_01');
+        const generatedLoops = await loopGenerationService.generateDailyLoops(currentTargetDate, 'ent_costco', 'store_downtown_01');
 
         // Approve the loop for the current hour so Demo Player functions immediately
         const currentHourLoops = generatedLoops.filter(l => l.hour === currentTargetHour);

@@ -38,42 +38,34 @@ export class LoopGenerationService {
      * Generate all loops for a target date (D-1 scheduling)
      * @param {string} targetDate - Format: YYYY-MM-DD
      * @param {string} retailerId - Target retailer
-     * @param {string} locationId - Target location (store_id)
+     * @param {string} storeId - Target Store
      * @returns {Promise<Array>} Generated loops
      */
-    async generateDailyLoops(targetDate, retailerId, locationId) {
+    async generateDailyLoops(targetDate, retailerId, storeId) {
         const loops = [];
 
-        // Fetch effective hours for this store/date
-        const effectiveHours = await BusinessHoursService.getEffectiveHours(locationId, targetDate);
-
-        let startHour = 8;
-        let endHour = 22;
-
-        if (effectiveHours && !effectiveHours.is_closed) {
-            startHour = parseInt(effectiveHours.open_time.split(':')[0], 10);
-            endHour = parseInt(effectiveHours.close_time.split(':')[0], 10);
-            // Handle case where closing is at 00:00 or later
-            if (endHour === 0) endHour = 24;
-        }
+        const effectiveHours = await BusinessHoursService.getEffectiveHours(storeId, targetDate);
+        const operatingHours = BusinessHoursService.getOperatingHourRange(effectiveHours);
+        const startHour = operatingHours.start;
+        const endHour = operatingHours.end;
 
         logger.info(`[LoopGeneration] Starting D-1 generation for ${targetDate}`, {
             retailerId,
-            locationId,
-            range: `${startHour}:00 - ${endHour}:00`,
+            storeId,
+            range: operatingHours.is_closed ? 'closed' : `${startHour}:00 - ${endHour}:00`,
             isClosed: effectiveHours?.is_closed
         });
 
-        const existingSchedule = await dailyScheduleRepository.findByLocationAndDate(locationId, targetDate);
+        const existingSchedule = await dailyScheduleRepository.findByStoreAndDate(storeId, targetDate);
         const previousSchedule = existingSchedule
             ? null
-            : await dailyScheduleRepository.findLatestBefore(locationId, targetDate);
+            : await dailyScheduleRepository.findLatestBefore(storeId, targetDate);
         const sequenceStart = existingSchedule?.sequence_start_position
             ?? previousSchedule?.sequence_end_position
             ?? 0;
 
         if (effectiveHours?.is_closed) {
-            await dailyScheduleRepository.save(locationId, targetDate, {
+            await dailyScheduleRepository.save(storeId, targetDate, {
                 retailer_id: retailerId,
                 is_closed: true,
                 operating_hours: [],
@@ -84,9 +76,8 @@ export class LoopGenerationService {
             return [];
         }
 
-        // Get available campaigns for this retailer/location
-        const campaigns = await this.getAvailableCampaigns(retailerId, locationId, targetDate);
-        const availableCategories = new Set(campaigns.map(campaign => campaign.type));
+        const content = await this.getAvailableContent(retailerId, storeId, targetDate);
+        const availableCategories = new Set(content.map(item => item.type));
         const needsFallback = ['paid', 'retailer', 'internal']
             .some(category => !availableCategories.has(category));
         const fallback = needsFallback ? await this.getApprovedFallbackAsset() : null;
@@ -102,8 +93,8 @@ export class LoopGenerationService {
                 targetDate,
                 hour,
                 retailerId,
-                locationId,
-                campaigns,
+                storeId,
+                content,
                 sequenceStart + hourOffset,
                 fallback
             ));
@@ -112,7 +103,7 @@ export class LoopGenerationService {
         const generatedLoops = await Promise.all(hourPromises);
         loops.push(...generatedLoops);
 
-        await dailyScheduleRepository.save(locationId, targetDate, {
+        await dailyScheduleRepository.save(storeId, targetDate, {
             retailer_id: retailerId,
             is_closed: false,
             operating_hours: loops.map(loop => loop.hour),
@@ -128,17 +119,17 @@ export class LoopGenerationService {
     /**
      * Generate a single hourly loop
      */
-    async generateHourlyLoop(date, hour, retailerId, locationId, campaigns, sequenceStart = 0, fallback = null) {
-        const loopId = `${date}_${hour}_${locationId}`;
+    async generateHourlyLoop(date, hour, retailerId, storeId, content, sequenceStart = 0, fallback = null) {
+        const loopId = `${date}_${hour}_${storeId}`;
 
         // Build 12 slots using priority algorithm
-        const slots = this.buildSlots(campaigns, { sequenceStart, fallback });
+        const slots = this.buildSlots(content, { sequenceStart, fallback });
 
         const data = {
             date,
             hour,
             retailer_id: retailerId,
-            location_id: locationId,
+            store_id: storeId,
             status: LOOP_STATUS.PENDING_APPROVAL,
             slots
         };
@@ -151,15 +142,16 @@ export class LoopGenerationService {
     }
 
     /**
-     * Build 12 slots for a loop using campaign priority
-     * @param {Array} campaigns - Available campaigns
+     * Build 12 slots from eligible Campaign and category-media content.
+     * @param {Array} content - Eligible content
      * @returns {Array} 12 slots
      */
-    buildSlots(campaigns, { sequenceStart = 0, fallback = null } = {}) {
+    buildSlots(content, { sequenceStart = 0, fallback = null } = {}) {
+        const prioritized = this.prioritizeContent(content);
         const byCategory = new Map(['paid', 'retailer', 'internal'].map(category => [
             category,
-            this.prioritizeCampaigns(campaigns).filter(campaign =>
-                campaign.type?.toLowerCase() === category
+            prioritized.filter(item =>
+                item.type?.toLowerCase() === category
             )
         ]));
         const categoryIndexes = { paid: 0, retailer: 0, internal: 0 };
@@ -168,7 +160,7 @@ export class LoopGenerationService {
             const sequencePosition = sequenceStart + position;
             const allocatedCategory = ALLOCATION_SEQUENCE[sequencePosition % ALLOCATION_SEQUENCE.length];
             const eligible = byCategory.get(allocatedCategory);
-            const campaign = eligible.length > 0
+            const item = eligible.length > 0
                 ? eligible[categoryIndexes[allocatedCategory]++ % eligible.length]
                 : null;
 
@@ -176,11 +168,11 @@ export class LoopGenerationService {
                 position,
                 allocation_sequence_position: sequencePosition,
                 allocated_category: allocatedCategory,
-                asset_id: campaign?.asset_id || fallback?.id || null,
-                asset_name: campaign?.asset_name || fallback?.title || fallback?.filename || null,
-                campaign_id: campaign?.id || null,
-                content_kind: campaign ? 'campaign' : 'fallback',
-                is_fallback: !campaign,
+                asset_id: item?.asset_id || fallback?.id || null,
+                asset_name: item?.asset_name || fallback?.title || fallback?.filename || null,
+                campaign_id: item?.campaign_id ?? null,
+                content_kind: item?.content_kind || (item ? 'campaign' : 'fallback'),
+                is_fallback: !item,
                 duration: SLOT_CONFIG.SLOT_DURATION_SECONDS,
                 status: 'PENDING'
             };
@@ -188,10 +180,10 @@ export class LoopGenerationService {
     }
 
     /**
-     * Sort campaigns by priority (Paid > Retailer > Internal)
+     * Sort eligible content by allocation category priority.
      */
-    prioritizeCampaigns(campaigns) {
-        return [...campaigns].sort((a, b) => {
+    prioritizeContent(content) {
+        return [...content].sort((a, b) => {
             const priorityA = CAMPAIGN_PRIORITY[a.type?.toUpperCase()] || 99;
             const priorityB = CAMPAIGN_PRIORITY[b.type?.toUpperCase()] || 99;
             return priorityA - priorityB;
@@ -199,11 +191,10 @@ export class LoopGenerationService {
     }
 
     /**
-     * Get campaigns available for a retailer/location on a date
+     * Get eligible Campaign and category-media content for a Store and date.
      */
-    async getAvailableCampaigns(retailerId, locationId, targetDate) {
+    async getAvailableContent(retailerId, storeId, targetDate) {
         try {
-            // Get approved campaigns that are active on the target date
             const campaigns = await campaignRepository.findAll({
                 where: [['status', '==', 'approved']]
             });
@@ -211,18 +202,18 @@ export class LoopGenerationService {
             const media = await mediaRepository.findAll();
             const mediaById = new Map(media.map(asset => [asset.id, asset]));
 
-            // Filter by retailer/location assignment and date range, then adapt
-            // legacy and Phase-1 Campaign shapes to the scheduler's one contract.
-            return campaigns.filter(c => {
-                const selections = Array.isArray(c.inventory_selection) ? c.inventory_selection : [];
-                const matchesSelection = selections.some(selection =>
-                    selection.retailer_id === retailerId
-                    && [selection.store_id, selection.location_id, selection.id].includes(locationId)
-                );
-                const matchesRetailer = matchesSelection || !c.retailer_id || c.retailer_id === retailerId;
-                const matchesLocation = matchesSelection || !c.location_id || c.location_id === locationId || c.location_id === 'ALL';
-                const inDateRange = this.isDateInRange(targetDate, c.start_date, c.end_date);
-                return matchesRetailer && matchesLocation && inDateRange;
+            const eligibleCampaigns = campaigns.filter(campaign => {
+                const selections = Array.isArray(campaign.inventory_selection)
+                    ? campaign.inventory_selection
+                    : [];
+                const matchesTarget = selections.length > 0
+                    ? selections.some(selection =>
+                        selection.retailer_id === retailerId && selection.store_id === storeId
+                    )
+                    : (!campaign.retailer_id || campaign.retailer_id === retailerId)
+                        && (!campaign.store_id || campaign.store_id === storeId || campaign.store_id === 'ALL');
+                return matchesTarget
+                    && this.isDateInRange(targetDate, campaign.start_date, campaign.end_date);
             }).map(campaign => {
                 const asset = mediaById.get(campaign.media_id || campaign.asset_id);
                 return {
@@ -230,10 +221,31 @@ export class LoopGenerationService {
                     type: (campaign.type || campaign.category || asset?.category || 'paid').toLowerCase(),
                     asset_id: campaign.asset_id || campaign.media_id || asset?.id || null,
                     asset_name: campaign.asset_name || asset?.title || asset?.filename || null,
+                    campaign_id: campaign.id,
                 };
             }).filter(campaign => campaign.asset_id);
+
+            const categoryMedia = media.filter(asset => {
+                const category = asset.category?.toLowerCase();
+                const approved = asset.eligible_for_playback === true
+                    || asset.approval_status === 'approved'
+                    || asset.status === 'approved';
+                const correctOwner = category === 'retailer'
+                    ? asset.owner_type === 'retailer' && asset.owner_id === retailerId
+                    : category === 'internal' && asset.owner_type === 'platform';
+                return approved && correctOwner;
+            }).map(asset => ({
+                id: `media:${asset.id}`,
+                type: asset.category.toLowerCase(),
+                asset_id: asset.id,
+                asset_name: asset.title || asset.filename || null,
+                campaign_id: null,
+                content_kind: 'campaign',
+            }));
+
+            return [...eligibleCampaigns, ...categoryMedia];
         } catch (error) {
-            logger.error('[LoopGeneration] Failed to fetch campaigns', { error: error.message });
+            logger.error('[LoopGeneration] Failed to fetch eligible content', { error: error.message });
             return [];
         }
     }
@@ -264,11 +276,11 @@ export class LoopGenerationService {
     /**
      * Quick generation for testing - creates mock loops without campaign data
      */
-    async generateMockLoops(targetDate, retailerId, locationId) {
+    async generateMockLoops(targetDate, retailerId, storeId) {
         const loops = [];
 
         for (let hour = BUSINESS_HOURS.START; hour < BUSINESS_HOURS.END; hour++) {
-            const loopId = `${targetDate}_${hour}_${locationId}`;
+            const loopId = `${targetDate}_${hour}_${storeId}`;
             const mockImages = [
                 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1920&q=80',
                 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1920&q=80',
@@ -288,7 +300,7 @@ export class LoopGenerationService {
                 date: targetDate,
                 hour,
                 retailer_id: retailerId,
-                location_id: locationId,
+                store_id: storeId,
                 status: LOOP_STATUS.PENDING_APPROVAL,
                 slots
             });

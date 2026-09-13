@@ -93,7 +93,7 @@ function LoopManagement() {
                 apiService.generateLoops({
                     targetDate,
                     retailerId: store.retailer_id || 'ret_demo',
-                    locationId: store.id
+                    storeId: store.id
                 })
             ));
 

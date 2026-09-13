@@ -1,16 +1,24 @@
 const { test, expect } = require('@playwright/test');
 
 function buildAllocationLoops() {
-    const sequence = ['paid', 'paid', 'retailer', 'paid', 'paid', 'internal', 'paid', 'paid', 'retailer', 'paid'];
+    // Independent worked example: per-hour distributions total 42/12/6.
+    const categoriesByLoop = [
+        'pprppipprppp',
+        'rppipprppprp',
+        'pipprppprppi',
+        'pprppprppipp',
+        'rppprppipprp',
+    ];
+    const categoryName = { p: 'paid', r: 'retailer', i: 'internal' };
     return Array.from({ length: 5 }, (_, loopIndex) => ({
         id: `2030-01-02_${8 + loopIndex}_store-1`,
         date: '2030-01-02',
         hour: 8 + loopIndex,
         retailer_id: 'retailer-1',
-        location_id: 'store-1',
+        store_id: 'store-1',
         status: 'pending_approval',
         slots: Array.from({ length: 12 }, (_, position) => {
-            const allocated_category = sequence[(loopIndex * 12 + position) % sequence.length];
+            const allocated_category = categoryName[categoriesByLoop[loopIndex][position]];
             const is_fallback = allocated_category === 'internal' && position % 2 === 1;
             return {
                 position,

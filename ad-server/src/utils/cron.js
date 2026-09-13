@@ -28,15 +28,15 @@ export const initCronJobs = () => {
             for (const store of stores) {
                 if (store.status !== 'active') continue;
 
-                // We extract retailer_id directly from the store/location document
+                // We extract retailer_id directly from the Store document.
                 const retailerId = store.retailer_id || 'system_unassigned';
-                const locationId = store.id;
+                const storeId = store.id;
 
                 try {
-                    const generated = await loopGenerationService.generateDailyLoops(targetDate, retailerId, locationId);
+                    const generated = await loopGenerationService.generateDailyLoops(targetDate, retailerId, storeId);
                     totalLoopsGenerated += (generated?.length || 0);
                 } catch (storeGenError) {
-                    logger.error(`[Cron] Generation failed for location ${locationId}`, { error: storeGenError.message });
+                    logger.error(`[Cron] Generation failed for Store ${storeId}`, { error: storeGenError.message });
                     // Continue generating other stores even if one specific store crashes
                 }
             }
