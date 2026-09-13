@@ -176,10 +176,15 @@ router.post('/generate', authenticate, async (req, res) => {
         logger.info('[Loops API] Generating loops', { targetDate, retailerId, storeId, mock });
 
         let loops;
+        let operatingHours;
         if (mock) {
             loops = await loopGenerationService.generateMockLoops(targetDate, retailerId, storeId);
+            const effectiveHours = await BusinessHoursService.getEffectiveHours(storeId, targetDate);
+            operatingHours = BusinessHoursService.getOperatingHourRange(effectiveHours);
         } else {
-            loops = await loopGenerationService.generateDailyLoops(targetDate, retailerId, storeId);
+            const schedule = await loopGenerationService.generateDailySchedule(targetDate, retailerId, storeId);
+            loops = schedule.loops;
+            operatingHours = schedule.operatingHours;
         }
 
         // Strict 12-Ad Loop Capacity & 60s Limit Validation (MVP Rule 4.1)
@@ -192,9 +197,6 @@ router.post('/generate', authenticate, async (req, res) => {
                 return res.status(400).json({ error: `Invariant Violation: Loop ${loop.id} duration is ${totalDuration}s instead of the strict 60s.` });
             }
         }
-
-        const effectiveHours = await BusinessHoursService.getEffectiveHours(storeId, targetDate);
-        const operatingHours = BusinessHoursService.getOperatingHourRange(effectiveHours);
 
         res.status(201).json({
             message: `Generated ${loops.length} loops for ${targetDate}`,

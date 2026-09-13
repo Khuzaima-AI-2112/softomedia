@@ -146,6 +146,7 @@ function LoopManagement() {
         return counts;
     }, { paid: 0, retailer: 0, internal: 0 });
     const campaignContentCount = slots.filter(slot => slot.content_kind === 'campaign' && !slot.is_fallback).length;
+    const mediaContentCount = slots.filter(slot => slot.content_kind === 'media' && !slot.is_fallback).length;
     const fallbackContentCount = slots.filter(slot => slot.content_kind === 'fallback' || slot.is_fallback).length;
 
     return (
@@ -249,6 +250,7 @@ function LoopManagement() {
                             <div><span className="text-slate-500">Retailer</span><strong className="block text-xl">{allocationCounts.retailer}</strong></div>
                             <div><span className="text-slate-500">Internal</span><strong className="block text-xl">{allocationCounts.internal}</strong></div>
                             <div><span className="text-slate-500">Campaign content</span><strong className="block text-xl">{campaignContentCount}</strong></div>
+                            <div><span className="text-slate-500">Media content</span><strong className="block text-xl">{mediaContentCount}</strong></div>
                             <div><span className="text-slate-500">Fallback content</span><strong className="block text-xl">{fallbackContentCount}</strong></div>
                         </div>
                     </div>

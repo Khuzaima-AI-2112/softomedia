@@ -8,9 +8,13 @@ class BusinessHoursServiceClass {
             return { start: null, end: null, is_closed: true, total_loops: 0 };
         }
 
-        const start = parseInt(effectiveHours.open_time.split(':')[0], 10);
-        let end = parseInt(effectiveHours.close_time.split(':')[0], 10);
-        if (end === 0) end = 24;
+        const toMinutes = value => {
+            const [hours, minutes] = value.split(':').map(Number);
+            return hours * 60 + minutes;
+        };
+        const start = Math.ceil(toMinutes(effectiveHours.open_time) / 60);
+        const closeMinutes = toMinutes(effectiveHours.close_time);
+        const end = closeMinutes === 0 ? 24 : Math.floor(closeMinutes / 60);
         return { start, end, is_closed: false, total_loops: end - start };
     }
 

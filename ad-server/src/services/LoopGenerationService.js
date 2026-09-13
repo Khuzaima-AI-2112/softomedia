@@ -42,6 +42,14 @@ export class LoopGenerationService {
      * @returns {Promise<Array>} Generated loops
      */
     async generateDailyLoops(targetDate, retailerId, storeId) {
+        const schedule = await this.generateDailySchedule(targetDate, retailerId, storeId);
+        return schedule.loops;
+    }
+
+    /**
+     * Generate loops together with the exact operating-hours decision used.
+     */
+    async generateDailySchedule(targetDate, retailerId, storeId) {
         const loops = [];
 
         const effectiveHours = await BusinessHoursService.getEffectiveHours(storeId, targetDate);
@@ -73,7 +81,7 @@ export class LoopGenerationService {
                 sequence_start_position: sequenceStart,
                 sequence_end_position: sequenceStart,
             });
-            return [];
+            return { loops, operatingHours };
         }
 
         const content = await this.getAvailableContent(retailerId, storeId, targetDate);
@@ -113,7 +121,7 @@ export class LoopGenerationService {
         });
 
         logger.info(`[LoopGeneration] Generated ${loops.length} loops for ${targetDate}`);
-        return loops;
+        return { loops, operatingHours };
     }
 
     /**
@@ -212,8 +220,10 @@ export class LoopGenerationService {
                     )
                     : (!campaign.retailer_id || campaign.retailer_id === retailerId)
                         && (!campaign.store_id || campaign.store_id === storeId || campaign.store_id === 'ALL');
+                const asset = mediaById.get(campaign.media_id || campaign.asset_id);
                 return matchesTarget
-                    && this.isDateInRange(targetDate, campaign.start_date, campaign.end_date);
+                    && this.isDateInRange(targetDate, campaign.start_date, campaign.end_date)
+                    && this.isApprovedPlaybackAsset(asset);
             }).map(campaign => {
                 const asset = mediaById.get(campaign.media_id || campaign.asset_id);
                 return {
@@ -227,20 +237,17 @@ export class LoopGenerationService {
 
             const categoryMedia = media.filter(asset => {
                 const category = asset.category?.toLowerCase();
-                const approved = asset.eligible_for_playback === true
-                    || asset.approval_status === 'approved'
-                    || asset.status === 'approved';
                 const correctOwner = category === 'retailer'
                     ? asset.owner_type === 'retailer' && asset.owner_id === retailerId
                     : category === 'internal' && asset.owner_type === 'platform';
-                return approved && correctOwner;
+                return this.isApprovedPlaybackAsset(asset) && correctOwner;
             }).map(asset => ({
                 id: `media:${asset.id}`,
                 type: asset.category.toLowerCase(),
                 asset_id: asset.id,
                 asset_name: asset.title || asset.filename || null,
                 campaign_id: null,
-                content_kind: 'campaign',
+                content_kind: 'media',
             }));
 
             return [...eligibleCampaigns, ...categoryMedia];
@@ -263,6 +270,13 @@ export class LoopGenerationService {
                     || asset.status === 'approved')
             )
             .sort((a, b) => a.id.localeCompare(b.id))[0] || null;
+    }
+
+    isApprovedPlaybackAsset(asset) {
+        return Boolean(asset) && asset.status !== 'rejected'
+            && (asset.eligible_for_playback === true
+                || asset.approval_status === 'approved'
+                || asset.status === 'approved');
     }
 
     /**

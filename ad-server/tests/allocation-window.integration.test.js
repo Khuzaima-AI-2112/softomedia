@@ -28,6 +28,10 @@ describe('POST /api/loops/generate Allocation Window', () => {
             close_time: '13:00',
         });
         for (const category of ['paid', 'retailer', 'internal']) {
+            await mediaRepository.create(`${category}-asset`, {
+                category, approval_status: 'approved', eligible_for_playback: true,
+                owner_type: 'brand', owner_id: 'brand-1', status: 'ready',
+            });
             await campaignRepository.create(`${category}-campaign`, {
                 type: category,
                 asset_id: `${category}-asset`,
@@ -87,10 +91,18 @@ describe('POST /api/loops/generate Allocation Window', () => {
             inventory_selection: [{ retailer_id: 'retailer-1', store_id: 'store-1' }],
             start_date: '2030-01-01', end_date: '2030-01-31',
         });
+        await mediaRepository.create('local-paid-asset', {
+            category: 'paid', approval_status: 'approved', eligible_for_playback: true,
+            owner_type: 'brand', owner_id: 'brand-1', status: 'ready',
+        });
         await campaignRepository.create('other-store-paid', {
             type: 'paid', asset_id: 'other-store-asset', status: 'approved',
             inventory_selection: [{ retailer_id: 'retailer-2', store_id: 'store-2' }],
             start_date: '2030-01-01', end_date: '2030-01-31',
+        });
+        await mediaRepository.create('other-store-asset', {
+            category: 'paid', approval_status: 'approved', eligible_for_playback: true,
+            owner_type: 'brand', owner_id: 'brand-2', status: 'ready',
         });
         await mediaRepository.create('retailer-media', {
             title: 'Retailer promotion', category: 'retailer', content_kind: 'campaign',
@@ -112,7 +124,7 @@ describe('POST /api/loops/generate Allocation Window', () => {
         const firstSlots = firstDay.body.loops.flatMap(loop => loop.slots);
         expect(firstSlots.some(slot => slot.asset_id === 'other-store-asset')).toBe(false);
         expect(firstSlots.find(slot => slot.allocated_category === 'retailer')).toMatchObject({
-            asset_id: 'retailer-media', content_kind: 'campaign', is_fallback: false,
+            asset_id: 'retailer-media', campaign_id: null, content_kind: 'media', is_fallback: false,
         });
         expect(firstSlots.find(slot => slot.allocated_category === 'internal')).toMatchObject({
             asset_id: 'fallback-media', content_kind: 'fallback', is_fallback: true,

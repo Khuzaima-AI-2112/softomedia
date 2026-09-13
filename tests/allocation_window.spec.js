@@ -20,13 +20,14 @@ function buildAllocationLoops() {
         slots: Array.from({ length: 12 }, (_, position) => {
             const allocated_category = categoryName[categoriesByLoop[loopIndex][position]];
             const is_fallback = allocated_category === 'internal' && position % 2 === 1;
+            const is_media = allocated_category === 'retailer';
             return {
                 position,
                 duration: 5,
                 allocated_category,
                 asset_id: is_fallback ? 'fallback-asset' : `${allocated_category}-asset`,
-                campaign_id: is_fallback ? null : `${allocated_category}-campaign`,
-                content_kind: is_fallback ? 'fallback' : 'campaign',
+                campaign_id: is_fallback || is_media ? null : `${allocated_category}-campaign`,
+                content_kind: is_fallback ? 'fallback' : is_media ? 'media' : 'campaign',
                 is_fallback,
                 status: 'pending',
             };
@@ -137,6 +138,7 @@ test('Admin generates and reports a deterministic five-loop Allocation Window', 
     await expect(summary).toContainText('Retailer12');
     await expect(summary).toContainText('Internal6');
     await expect(summary).toContainText(/Campaign content/i);
+    await expect(summary).toContainText(/Media content/i);
     await expect(summary).toContainText(/Fallback content/i);
     await expect(page.getByTestId('loop-hour-12')).toBeVisible();
     await expect(page.getByTestId('loop-hour-13')).not.toBeVisible();

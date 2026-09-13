@@ -83,6 +83,10 @@ describe('five-loop Allocation Window', () => {
             start_date: '2030-01-01',
             end_date: '2030-01-31',
         });
+        await mediaRepository.create('paid-asset', {
+            category: 'paid', approval_status: 'approved', eligible_for_playback: true,
+            owner_type: 'brand', owner_id: 'brand-1', status: 'ready',
+        });
         await mediaRepository.create('fallback-asset', {
             title: 'Approved neutral fallback',
             category: 'fallback',
@@ -131,6 +135,11 @@ describe('five-loop Allocation Window', () => {
             start_date: '2030-01-01', end_date: '2030-01-31',
             inventory_selection: [{ retailer_id: 'retailer-2', store_id: 'store-2' }],
         });
+        await campaignRepository.create('missing-media-campaign', {
+            media_id: 'missing-media', status: 'approved',
+            start_date: '2030-01-01', end_date: '2030-01-31',
+            inventory_selection: [{ retailer_id: 'retailer-1', store_id: 'store-1' }],
+        });
 
         const content = await service.getAvailableContent('retailer-1', 'store-1', '2030-01-04');
 
@@ -138,7 +147,14 @@ describe('five-loop Allocation Window', () => {
             'internal-media', 'local-paid', 'retailer-media'
         ]);
         expect(content.find(item => item.asset_id === 'retailer-media')).toMatchObject({
-            type: 'retailer', campaign_id: null,
+            type: 'retailer', campaign_id: null, content_kind: 'media',
         });
+        expect(content.some(item => item.asset_id === 'missing-media')).toBe(false);
+    });
+
+    test('generates only whole hourly loops inside minute-level operating hours', () => {
+        expect(BusinessHoursService.getOperatingHourRange({
+            is_closed: false, open_time: '08:30', close_time: '22:30',
+        })).toEqual({ start: 9, end: 22, is_closed: false, total_loops: 13 });
     });
 });
