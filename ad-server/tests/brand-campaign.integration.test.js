@@ -28,6 +28,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
     const createdObjectNames = [];
     const createdProofOfPlayIds = [];
     const createdLoopIds = [];
+    const createdScheduleIds = [];
 
     beforeAll(async () => {
         ({ default: request } = await import('supertest'));
@@ -60,6 +61,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
         await Promise.all(createdMediaIds.map(id => firestore.collection('media').doc(id).delete()));
         await Promise.all(createdProofOfPlayIds.map(id => firestore.collection('impressions').doc(id).delete()));
         await Promise.all(createdLoopIds.map(id => firestore.collection('loops').doc(id).delete()));
+        await Promise.all(createdScheduleIds.map(id => firestore.collection('daily_schedules').doc(id).delete()));
         const bucket = storage.bucket(process.env.DEMO_ASSETS_BUCKET);
         await Promise.all(createdObjectNames.map(name => bucket.file(name).delete({ ignoreNotFound: true })));
         await firestore?.terminate();
@@ -246,12 +248,43 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
         const afterBookingAttempt = await firestore.collection('campaigns').doc(creation.body.id).get();
         expect(afterBookingAttempt.data().status).toBe('pending_approval');
 
+        // Stand in for Retailer approval (#9) and Allocation Window generation (#8): Proof of Play
+        // is accepted only for an approved Campaign that the Screen is scheduled to present at the
+        // supplied time, and never for a future presentation, so anchor the fixture to the real clock.
+        const { storeLocalDateAndHour } = await import('../src/services/PlaybackService.js');
+        const presentationStartedAt = new Date(Date.now() - 1_000);
+        const proofStore = await firestore.collection('stores').doc('demo-store-phoenix').get();
+        const broadcast = storeLocalDateAndHour(presentationStartedAt, proofStore.data().time_zone);
+        await firestore.collection('media').doc(upload.body.id).update({
+            approval_status: 'approved',
+            eligible_for_playback: true,
+        });
+        await firestore.collection('campaigns').doc(creation.body.id).update({
+            status: 'approved',
+            start_date: broadcast.date,
+            end_date: broadcast.date,
+        });
+
         const proofLoopId = `brand-proof-loop-${Date.now()}`;
         const proofEventId = `brand-proof-event-${Date.now()}`;
+        const proofScheduleId = `demo-store-phoenix_${broadcast.date}`;
         createdLoopIds.push(proofLoopId);
+        createdScheduleIds.push(proofScheduleId);
+        await firestore.collection('daily_schedules').doc(proofScheduleId).set({
+            id: proofScheduleId,
+            retailer_id: 'demo-retailer-secondary',
+            store_id: 'demo-store-phoenix',
+            date: broadcast.date,
+            operating_hours: [broadcast.hour],
+            loop_ids: [proofLoopId],
+        });
         await firestore.collection('loops').doc(proofLoopId).set({
             id: proofLoopId,
             status: 'approved',
+            retailer_id: 'demo-retailer-secondary',
+            store_id: 'demo-store-phoenix',
+            date: broadcast.date,
+            hour: broadcast.hour,
             screen_ids: ['demo-screen-secondary-1'],
             slots: [{
                 position: 2,
@@ -273,7 +306,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
                 location_id: 'demo-location-phoenix-entrance',
                 loop_id: proofLoopId,
                 slot_position: 2,
-                presentation_started_at: '2030-01-16T12:00:00.000Z',
+                presentation_started_at: presentationStartedAt.toISOString(),
                 intended_duration_seconds: 5,
             });
         expect(telemetry.status).toBe(201);
