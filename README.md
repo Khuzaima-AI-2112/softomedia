@@ -132,9 +132,10 @@ Cloud Build Trigger (softomedia-live-2026)
 ```
 
 ### Key Secret Dependencies (GCP Secret Manager)
-Deployments depend on two secrets stored in GCP Secret Manager under project `softomedia-live-2026`:
+Deployments depend on one secret stored in GCP Secret Manager under project `softomedia-live-2026`:
 1. `JWT_SECRET`: Signing key for authentication tokens.
-2. `GEMINI_API_KEY`: Key for AI generation capabilities.
+
+The AI service and its `GEMINI_API_KEY` secret were removed in Phase 1 (issue #12).
 
 > 🔒 **Security Policy**: Never commit `.env` or production secrets to Git. Secret Manager injects runtime secrets into Cloud Run containers dynamically during Step 5 of Cloud Build.
 

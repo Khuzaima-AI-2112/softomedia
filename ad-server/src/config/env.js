@@ -4,7 +4,6 @@ const envSchema = z.object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     PORT: z.string().default('8080'),
     JWT_SECRET: z.string().min(1, 'JWT_SECRET is required'),
-    GEMINI_API_KEY: z.string().optional(),
     ALLOW_DEMO_MODE: z.preprocess(val => val === 'true', z.boolean()).default(false)
 });
 

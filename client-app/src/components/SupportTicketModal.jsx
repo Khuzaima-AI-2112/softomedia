@@ -1,104 +1,101 @@
 import { useState } from 'react';
-import { API_URL } from '../config';
+import { supportTicketAPI } from '../services/supportTicketAPI';
+import { SUPPORT_TICKET_CATEGORIES } from '../constants/supportTickets';
 
+/**
+ * SupportTicketModal — a Retailer Administrator reports an operational issue.
+ * Success is reported only after the backend persists the ticket.
+ */
 function SupportTicketModal({ onClose, onTicketCreated }) {
-    const [step, setStep] = useState('selection');
-    const [issueType, setIssueType] = useState('');
+    const [subject, setSubject] = useState('');
+    const [category, setCategory] = useState(SUPPORT_TICKET_CATEGORIES[0].value);
+    const [description, setDescription] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState(null);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const handleSubmit = async (event) => {
+        event.preventDefault();
         setSubmitting(true);
-        const subject = e.target.querySelector('[data-testid="ticket-subject-input"]')?.value || 'Support Request';
+        setError(null);
         try {
-            // POST to ghost-api tickets endpoint (demo-mode stub, 404s in production gracefully)
-            // eslint-disable-next-line no-restricted-syntax
-            const res = await fetch(`${API_URL.replace('/api', '')}/ghost-api/tickets`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ subject, issueType }),
-            });
-            if (res.ok && onTicketCreated) {
-                const ticket = await res.json();
-                onTicketCreated(ticket);
-            }
-        } catch (_err) {
-            // Non-blocking — modal still shows success screen
-        } finally {
+            const ticket = await supportTicketAPI.create({ subject, category, description });
+            onTicketCreated?.(ticket);
+        } catch (err) {
+            setError(err.message);
             setSubmitting(false);
-            setStep('success');
         }
     };
 
     return (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
-            <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '1rem', width: '100%', maxWidth: '500px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
-                {step === 'selection' && (
-                    <>
-                        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>Report Unit Issue</h2>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            {[
-                                { id: 'wifi', label: 'Wi-Fi / Network Connection Failure', icon: 'wifi_off' },
-                                { id: 'power', label: 'Power / Display Hardware Failure', icon: 'power_off' },
-                                { id: 'sync', label: 'Ad Sync Inconsistency', icon: 'sync_problem' },
-                            ].map(option => (
-                                <button
-                                    key={option.id}
-                                    onClick={() => { setIssueType(option.label); setStep('form'); }}
-                                    style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', border: '1px solid #e5e7eb', borderRadius: '0.75rem', backgroundColor: 'white', cursor: 'pointer', textAlign: 'left' }}
-                                    onMouseEnter={(e) => e.target.style.borderColor = '#6366f1'}
-                                    onMouseLeave={(e) => e.target.style.borderColor = '#e5e7eb'}
-                                >
-                                    <span className="material-symbols-outlined" style={{ color: '#6b7280' }}>{option.icon}</span>
-                                    <span style={{ fontWeight: '500' }}>{option.label}</span>
-                                </button>
-                            ))}
-                        </div>
-                        <button onClick={onClose} style={{ marginTop: '2rem', width: '100%', padding: '0.75rem', color: '#6b7280', border: 'none', background: 'none', cursor: 'pointer' }} data-testid="btn-modal-close">Cancel</button>
-                    </>
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 p-4">
+            <form
+                data-testid="modal-support-ticket"
+                onSubmit={handleSubmit}
+                className="w-full max-w-lg rounded-2xl bg-white dark:bg-slate-800 p-8 shadow-xl"
+            >
+                <h2 className="text-xl font-bold mb-6">Report an issue</h2>
+
+                <label htmlFor="ticket-subject" className="block text-sm font-medium mb-1">Subject</label>
+                <input
+                    id="ticket-subject"
+                    data-testid="ticket-subject-input"
+                    type="text"
+                    required
+                    maxLength={120}
+                    value={subject}
+                    onChange={(event) => setSubject(event.target.value)}
+                    placeholder="E.g., Checkout screen offline"
+                    className="w-full mb-4 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-900 p-3 outline-none"
+                />
+
+                <label htmlFor="ticket-category" className="block text-sm font-medium mb-1">Category</label>
+                <select
+                    id="ticket-category"
+                    data-testid="ticket-category-select"
+                    value={category}
+                    onChange={(event) => setCategory(event.target.value)}
+                    className="w-full mb-4 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-900 p-3 outline-none"
+                >
+                    {SUPPORT_TICKET_CATEGORIES.map(option => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                </select>
+
+                <label htmlFor="ticket-description" className="block text-sm font-medium mb-1">Description</label>
+                <textarea
+                    id="ticket-description"
+                    data-testid="ticket-description-input"
+                    required
+                    maxLength={2000}
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    placeholder="Describe what you see on the screen..."
+                    className="w-full min-h-[100px] rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-900 p-3 outline-none"
+                />
+
+                {error && (
+                    <p role="alert" className="mt-4 text-sm text-red-600">{error}</p>
                 )}
 
-                {step === 'form' && (
-                    <form onSubmit={handleSubmit}>
-                        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>Issue Details</h2>
-                        <p style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '1.5rem' }}>Type: {issueType}</p>
-
-                        <div style={{ marginBottom: '1.5rem' }}>
-                            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem' }}>Subject</label>
-                            <input
-                                data-testid="ticket-subject-input"
-                                type="text"
-                                required
-                                placeholder="E.g., Screen 4 Offline"
-                                style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #d1d5db', marginBottom: '1rem', outline: 'none' }}
-                            />
-                            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem' }}>Observation Notes</label>
-                            <textarea
-                                data-testid="ticket-notes-input"
-                                required
-                                placeholder="Describe what you see on the screen..."
-                                style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #d1d5db', minHeight: '100px', outline: 'none' }}
-                            />
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '1rem' }}>
-                            <button type="button" onClick={() => setStep('selection')} style={{ flex: 1, padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #d1d5db', background: 'white', cursor: 'pointer' }}>Back</button>
-                            <button data-testid="btn-submit-ticket" type="submit" disabled={submitting} style={{ flex: 1, padding: '0.75rem', borderRadius: '0.5rem', backgroundColor: '#6366f1', color: 'white', border: 'none', fontWeight: 'bold', cursor: submitting ? 'wait' : 'pointer', opacity: submitting ? 0.7 : 1 }}>{submitting ? 'Submitting…' : 'Submit Ticket'}</button>
-                        </div>
-                    </form>
-                )}
-
-                {step === 'success' && (
-                    <div style={{ textAlign: 'center', padding: '1rem 0' }}>
-                        <div style={{ width: '64px', height: '64px', backgroundColor: '#def7ec', color: '#03543f', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: '32px' }}>check_circle</span>
-                        </div>
-                        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>Ticket Received</h2>
-                        <p style={{ color: '#6b7280', marginBottom: '2rem' }}>A technician has been notified for Northside Market (Aisle 4).</p>
-                        <button onClick={onClose} style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', backgroundColor: '#111827', color: 'white', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}>Return to Dashboard</button>
-                    </div>
-                )}
-            </div>
+                <div className="mt-6 flex gap-3">
+                    <button
+                        type="button"
+                        data-testid="btn-modal-close"
+                        onClick={onClose}
+                        className="flex-1 rounded-lg border border-slate-300 dark:border-slate-600 p-3"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        data-testid="btn-submit-ticket"
+                        disabled={submitting}
+                        className="flex-1 rounded-lg bg-primary p-3 font-bold text-white disabled:opacity-60"
+                    >
+                        {submitting ? 'Submitting…' : 'Submit ticket'}
+                    </button>
+                </div>
+            </form>
         </div>
     );
 }

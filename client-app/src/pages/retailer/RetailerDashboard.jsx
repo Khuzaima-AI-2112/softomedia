@@ -22,6 +22,7 @@ import apiService from '../../services/ApiService';
 function RetailerDashboard() {
     const [isSyncActive, setIsSyncActive] = useState(true);
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+    const [supportNotice, setSupportNotice] = useState('');
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({
         stores: 0,
@@ -88,6 +89,12 @@ function RetailerDashboard() {
                     </button>
                 </div>
             </div>
+
+            {supportNotice && (
+                <p role="status" className="text-sm text-emerald-700">
+                    {supportNotice} <Link to="/dashboard/tickets" className="underline">View Support Tickets</Link>
+                </p>
+            )}
 
             {/* Quick Actions */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -189,7 +196,15 @@ function RetailerDashboard() {
 
             <LocationManager />
 
-            {isSupportModalOpen && <SupportTicketModal onClose={() => setIsSupportModalOpen(false)} />}
+            {isSupportModalOpen && (
+                <SupportTicketModal
+                    onClose={() => setIsSupportModalOpen(false)}
+                    onTicketCreated={() => {
+                        setIsSupportModalOpen(false);
+                        setSupportNotice('Support Ticket submitted.');
+                    }}
+                />
+            )}
         </div>
     );
 }

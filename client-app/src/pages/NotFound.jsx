@@ -1,38 +1,11 @@
-import { useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import apiClient from '../services/api';
 
 /**
  * NotFound — rendered by the App.jsx catch-all <Route path="*">.
- *
- * Two jobs:
- *  1. Show a clear, navigable 404 page so users are never stuck on
- *     a blank white screen.
- *  2. POST a broken_route entry to /api/ai-log so every unmatched
- *     path is captured and visible in Admin → AI Log.
- *
- * The log POST is fire-and-forget: if it fails (e.g. user is offline)
- * we silently swallow the error so the 404 UI still renders cleanly.
+ * Shows a clear, navigable 404 page so users are never stuck on a blank white screen.
  */
 function NotFound() {
     const location = useLocation();
-
-    useEffect(() => {
-        apiClient
-            .post('/api/ai-log', {
-                event_type: 'broken_route',
-                prompt: `404: unmatched route visited — "${location.pathname}"`,
-                response: null,
-                metadata: {
-                    path: location.pathname,
-                    search: location.search,
-                    referrer: document.referrer || null,
-                    user_agent: navigator.userAgent,
-                    timestamp: new Date().toISOString(),
-                },
-            })
-            .catch(() => { /* intentionally silent */ });
-    }, [location.pathname, location.search]);
 
     return (
         <div
@@ -71,9 +44,6 @@ function NotFound() {
                 The URL <code style={{ fontFamily: 'monospace', fontSize: '0.875rem', backgroundColor: '#f1f5f9', padding: '0.125rem 0.375rem', borderRadius: '0.25rem' }}>{location.pathname}</code> doesn&apos;t match any known route.
             </p>
 
-            <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '2rem' }}>
-                This has been logged and will appear in <strong>Admin → AI Log</strong>.
-            </p>
 
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
                 <Link

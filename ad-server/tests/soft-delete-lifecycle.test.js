@@ -9,7 +9,7 @@
  *   - DELETE /api/advertisers/:id → same lifecycle
  *   - PATCH /api/advertisers/:id  → cannot overwrite deleted_at (S21-2 / SEC-S21-1)
  *
- * Mocking strategy mirrors ghost-api.test.js:
+ * Mocking strategy:
  *   Firestore and auth middleware are mocked via jest.unstable_mockModule.
  *   No live database connection required.
  */

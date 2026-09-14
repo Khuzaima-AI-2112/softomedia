@@ -24,7 +24,7 @@
  *   pages/admin/UserManagement.jsx       ✅
  *   pages/admin/BusinessHoursManagement.jsx ✅
  *   pages/admin/NetworkMap.jsx           ✅
- *   pages/admin/AILog.jsx                ✅
+ *   pages/admin/AILog.jsx                ❌  deleted — AI service removed (ADR 0003)
  *   pages/admin/CPMCalendar.jsx          ✅  (served at /dashboard/admin/pricing)
  *   pages/admin/LoopAnalytics.jsx        ✅  (served at /dashboard/admin/loop-analytics)
  *   pages/admin/PricingConfig.jsx        ✅  (served at /dashboard/admin/pricing-config) Sprint 15
@@ -84,7 +84,6 @@ const UserManagement          = lazy(() => import('./pages/admin/UserManagement'
 const OrganizationManagement  = lazy(() => import('./pages/admin/OrganizationManagement'));
 const BusinessHoursManagement = lazy(() => import('./pages/admin/BusinessHoursManagement'));
 const NetworkMap              = lazy(() => import('./pages/admin/NetworkMap'));
-const AILog                   = lazy(() => import('./pages/admin/AILog'));
 const CPMCalendar             = lazy(() => import('./pages/admin/CPMCalendar'));
 const LoopAnalytics           = lazy(() => import('./pages/admin/LoopAnalytics'));
 const PricingConfig           = lazy(() => import('./pages/admin/PricingConfig'));  // Sprint 15
@@ -149,7 +148,6 @@ function App() {
                             <Route path="admin/organizations"    element={<OrganizationManagement />} />
                             <Route path="admin/hours"            element={<BusinessHoursManagement />} />
                             <Route path="admin/map"              element={<NetworkMap />} />
-                            <Route path="admin/ai-log"           element={<AILog />} />
                             <Route path="admin/pricing"          element={<CPMCalendar />} />
                             <Route path="admin/loop-analytics"   element={<LoopAnalytics />} />
                             <Route path="admin/pricing-config"   element={<PricingConfig />} />   {/* Sprint 15 */}

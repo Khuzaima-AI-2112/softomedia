@@ -21,7 +21,12 @@ const ADMIN_NAV = [
     { to: '/dashboard/admin/pricing', icon: 'payments', label: 'Pricing' },
     { to: '/dashboard/admin/pricing-config', icon: 'tune', label: 'Pricing Config' },
     { to: '/dashboard/admin/map', icon: 'map', label: 'Network Map' },
-    { to: '/dashboard/admin/ai-log', icon: 'smart_toy', label: 'AI Log' },
+];
+
+// Super Administrators manage every Support Ticket; Admin has no ticket access in Phase 1.
+const SUPERADMIN_NAV = [
+    ...ADMIN_NAV,
+    { to: '/dashboard/tickets', icon: 'confirmation_number', label: 'Support Tickets', testId: 'nav-tickets' },
 ];
 
 // fix(mvp-nav): add My Campaigns and Performance — MVP §3.4 "track campaign status"
@@ -61,7 +66,8 @@ const TECHOP_NAV = [
 
 function getNavItems(persona) {
     if (!persona) return [];
-    if (persona === ROLES.ADMIN || persona === ROLES.SUPERADMIN || persona === 'super_admin') return ADMIN_NAV;
+    if (persona === ROLES.SUPERADMIN || persona === 'super_admin') return SUPERADMIN_NAV;
+    if (persona === ROLES.ADMIN) return ADMIN_NAV;
     if (persona === ROLES.ADVERTISER || persona === ROLES.BRAND) return BRAND_NAV;
     if (persona === ROLES.RETAILERADMIN) return RETAILER_NAV;
     if (persona === ROLES.TECHOPERATOR) return TECHOP_NAV;

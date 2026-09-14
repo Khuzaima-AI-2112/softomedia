@@ -110,10 +110,6 @@ initCronJobs();
 // Domain API Routes
 app.use('/api', apiRouter);
 
-// [Security] Isolated AI Ghost API
-import ghostRouter from './routes/ghost-api.js';
-app.use('/ghost-api', ghostRouter);
-
 // Serve assets with caching (1 hour)
 app.use('/assets', cacheControl(3600), express.static('assets'));
 
