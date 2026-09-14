@@ -16,11 +16,24 @@ export { ROLES, ROLE_HIERARCHY, normalizeRole };
 
 export const PERMISSIONS = Object.freeze({
     PLATFORM_GOVERNANCE: 'platform.governance',
+    PROOF_OF_PLAY_SUBMIT: 'proof_of_play.submit',
+    PROOF_OF_PLAY_VIEW_NETWORK: 'proof_of_play.view_network',
 });
 
 const ROLE_PERMISSIONS = Object.freeze({
-    [ROLES.SUPERADMIN]: Object.freeze([PERMISSIONS.PLATFORM_GOVERNANCE]),
+    [ROLES.SUPERADMIN]: Object.freeze([
+        PERMISSIONS.PLATFORM_GOVERNANCE,
+        PERMISSIONS.PROOF_OF_PLAY_SUBMIT,
+        PERMISSIONS.PROOF_OF_PLAY_VIEW_NETWORK,
+    ]),
 });
+
+export function userHasPermission(user, permission) {
+    const role = normalizeRole(user?.role);
+    return Array.isArray(user?.permissions) && user.permissions.includes(permission)
+        || ROLE_PERMISSIONS[role]?.includes(permission)
+        || false;
+}
 
 /**
  * requireRole(minRole)
@@ -72,7 +85,7 @@ export function requirePermission(permission, requiredRole = permission) {
         }
 
         const role = normalizeRole(req.user.role);
-        if (!ROLE_PERMISSIONS[role]?.includes(permission)) {
+        if (!userHasPermission(req.user, permission)) {
             return res.status(403).json({
                 error: 'Forbidden',
                 required: requiredRole,
@@ -87,5 +100,13 @@ export function requirePermission(permission, requiredRole = permission) {
 export const requirePlatformGovernance = requirePermission(
     PERMISSIONS.PLATFORM_GOVERNANCE,
     ROLES.SUPERADMIN,
+);
+export const requireProofOfPlaySubmission = requirePermission(
+    PERMISSIONS.PROOF_OF_PLAY_SUBMIT,
+    ROLES.TECHOPERATOR,
+);
+export const requireNetworkProofOfPlayView = requirePermission(
+    PERMISSIONS.PROOF_OF_PLAY_VIEW_NETWORK,
+    ROLES.TECHOPERATOR,
 );
 export const requireAdmin      = requireRole(ROLES.ADMIN);

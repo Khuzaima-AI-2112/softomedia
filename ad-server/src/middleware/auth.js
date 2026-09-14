@@ -3,6 +3,7 @@ import logger from '../utils/logger.js';
 import { ROLES, toCanonicalRole } from '../constants/roles.js';
 import { authService } from '../services/AuthService.js';
 import { getFirebaseAuth } from '../utils/firebaseAuth.js';
+import { PERMISSIONS } from './requireRole.js';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -30,6 +31,10 @@ function legacyDemoIdentity(req) {
         id: `demo-${role}`,
         linked_entity_id: organizationId,
         organization_id: organizationId,
+        permissions: role === ROLES.TECHOPERATOR ? [
+            PERMISSIONS.PROOF_OF_PLAY_SUBMIT,
+            PERMISSIONS.PROOF_OF_PLAY_VIEW_NETWORK,
+        ] : [],
     };
 }
 

@@ -1,4 +1,5 @@
 import { API_URL } from '../config';
+import apiClient from './api.js';
 
 const STORAGE_KEY = 'softomedia_impression_buffer';
 const BATCH_SIZE_THRESHOLD = 50;            // Upload when we have this many items
@@ -74,41 +75,36 @@ class TelemetryService {
      *
      * @param {object} impression
      *   Required: screen_id, campaign_id
-     *   Optional: asset_id, loop_id, slot_position, played_at
+     *   Required: event_id (generated here), location_id, asset_id, loop_id,
+     *   slot_position, presentation_started_at, intended_duration_seconds
      */
     trackImpression(impression) {
         const record = {
             ...impression,
-            played_at: impression.played_at || new Date().toISOString(),
-            uuid: crypto.randomUUID()
+            presentation_started_at: impression.presentation_started_at || new Date().toISOString(),
+            event_id: impression.event_id || crypto.randomUUID()
         };
 
         const screen_id = record.screen_id || record.screenId;
         const campaign_id = record.campaign_id || record.campaignId;
         const asset_id = record.asset_id || record.assetId || record.mediaId;
         const loop_id = record.loop_id || record.loopId;
+        const location_id = record.location_id || record.locationId;
         const slot_position = record.slot_position ?? record.slotPosition;
+        const intended_duration_seconds = record.intended_duration_seconds ?? record.duration;
 
-        // ── Layer 1: real-time per-impression POST ────────────────────────────
-        // Fire-and-forget — player must never await this.
-        // The server handler (telemetry.js) validates screen_id + campaign_id,
-        // persists to Firestore, and increments campaign.play_count.
-        // eslint-disable-next-line no-restricted-syntax
-        fetch(`${API_URL}/api/telemetry/impression`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                screen_id,
-                campaign_id,
-                asset_id:    asset_id  || null,
-                loop_id:     loop_id   || null,
-                slot_position: Number.isInteger(slot_position) ? slot_position : null,
-                played_at:   record.played_at
-            })
-        }).catch(err => {
-            // Network failure — batch layer below will catch it on next sync
-            console.warn('[Telemetry] Real-time impression POST failed (will retry via batch):', err.message);
-        });
+        const proofOfPlay = {
+            event_id: record.event_id,
+            screen_id,
+            location_id,
+            loop_id,
+            slot_position,
+            campaign_id,
+            asset_id,
+            presentation_started_at: record.presentation_started_at,
+            intended_duration_seconds,
+        };
+        this.submitProofOfPlay(proofOfPlay, record.authToken);
 
         // ── Layer 2: local buffer for batch fallback ──────────────────────────
         this.buffer.push(record);
@@ -119,6 +115,44 @@ class TelemetryService {
         if (window.__TELEMETRY_LOG__) {
             window.__TELEMETRY_LOG__.push({ type: 'IMPRESSION_QUEUED', payload: record });
         }
+    }
+
+    async submitProofOfPlay(proofOfPlay, authToken, attempt = 0) {
+        try {
+            await apiClient.post('/api/telemetry/impression', proofOfPlay, {
+                ...(authToken ? { headers: { Authorization: `Bearer ${authToken}` } } : {}),
+            });
+        } catch (error) {
+            const retryDelays = [1000, 5000, 15000];
+            const retryable = !error.status || [408, 429, 500, 502, 503, 504].includes(error.status);
+            if (retryable && attempt < retryDelays.length) {
+                setTimeout(() => this.submitProofOfPlay(proofOfPlay, authToken, attempt + 1), retryDelays[attempt]);
+                return;
+            }
+            console.warn('[Telemetry] Proof of Play submission failed; local buffer preserved:', error.message);
+        }
+    }
+
+    trackPlaybackObservation(observation) {
+        const record = {
+            ...observation,
+            event_id: observation.event_id || crypto.randomUUID(),
+            presentation_started_at: observation.presentation_started_at || new Date().toISOString(),
+        };
+        const payload = {
+            event_id: record.event_id,
+            screen_id: record.screenId,
+            location_id: record.locationId,
+            loop_id: record.loopId,
+            slot_position: record.slotPosition,
+            asset_id: record.assetId,
+            presentation_type: record.presentationType,
+            presentation_started_at: record.presentation_started_at,
+            intended_duration_seconds: record.duration,
+        };
+        apiClient.post('/api/telemetry/playback-observation', payload, {
+            ...(record.authToken ? { headers: { Authorization: `Bearer ${record.authToken}` } } : {}),
+        }).catch(error => console.warn('[Telemetry] Playback observation failed:', error.message));
     }
 
     async checkUploadCriteria() {

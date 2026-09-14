@@ -2,7 +2,11 @@ import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
 import { impressionLimiter } from '../middleware/rateLimiter.js';
-import { impressionRepository, campaignRepository } from '../repositories/index.js';
+import { proofOfPlayService, ProofOfPlayError } from '../services/ProofOfPlayService.js';
+import { playbackObservationService } from '../services/PlaybackObservationService.js';
+import { PresentationEventError } from '../services/PresentationEventValidation.js';
+import { authenticate } from '../middleware/auth.js';
+import { requireProofOfPlaySubmission } from '../middleware/requireRole.js';
 
 const router = express.Router();
 
@@ -61,75 +65,50 @@ if (process.env.NODE_ENV !== 'production') {
  * Receives a single real-time impression event from the Player.
  *
  * Sprint 9 — Task 9.3: impressionLimiter applied (100 req/min per IP).
- * Sprint 10 — sprintWRAPUP item 4: persist impression to Firestore and
- *   increment campaign play_count. Errors in persistence are logged but
- *   do NOT fail the 201 response — the player must not stall on a DB error.
+ * Issue #11: persist a caller-identified Proof of Play and increment the
+ * Campaign delivery counter in one atomic transaction.
  *
  * Body:
- *   - screen_id    {string} REQUIRED
- *   - campaign_id  {string} REQUIRED
- *   - asset_id     {string} optional
- *   - loop_id      {string} optional
- *   - slot_position {number} required for loop Proof of Play records
- *   - played_at    {string} optional ISO 8601; defaults to server time
+ *   - event_id, screen_id, location_id, loop_id, campaign_id, asset_id
+ *   - slot_position, presentation_started_at, intended_duration_seconds
  *
- * Returns 201 { status: 'recorded', impression_id } on success.
- * Returns 400 if screen_id or campaign_id are missing.
+ * Returns 201 { status: 'recorded', event_id } on first persistence.
+ * Returns 200 { status: 'duplicate', event_id } for an idempotent retry.
  * Returns 429 with Retry-After header when rate limit exceeded.
  */
-router.post('/impression', impressionLimiter, async (req, res) => {
-    const { screen_id, campaign_id, asset_id, loop_id, slot_position, played_at } = req.body;
-
-    if (!screen_id || !campaign_id) {
-        return res.status(400).json({
-            error: 'screen_id and campaign_id are required'
+router.post('/impression', authenticate, requireProofOfPlaySubmission, impressionLimiter, async (req, res) => {
+    try {
+        const result = await proofOfPlayService.record(req.body);
+        logger.info('Proof of Play', {
+            type: 'proof_of_play',
+            event_id: result.event.event_id,
+            status: result.status,
         });
+        const response = { status: result.status, event_id: result.event.event_id };
+        return res.status(result.status === 'recorded' ? 201 : 200).json(response);
+    } catch (error) {
+        if (error instanceof ProofOfPlayError) {
+            return res.status(error.status).json({ error: error.message, ...error.details });
+        }
+        logger.error('Proof of Play persistence failed', { error: error.message });
+        return res.status(503).json({ error: 'Proof of Play could not be persisted' });
     }
+});
 
-    const impression_id = uuidv4();
-    const recorded_at = played_at || new Date().toISOString();
-
-    logger.info('Impression', {
-        type: 'impression',
-        impression_id,
-        screen_id,
-        campaign_id,
-        asset_id:  asset_id  || null,
-        loop_id:   loop_id   || null,
-        slot_position: Number.isInteger(slot_position) ? slot_position : null,
-        played_at: recorded_at,
-    });
-
-    // Persist to Firestore — fire-and-forget with error isolation so that
-    // a DB outage never blocks the player's 201 response.
-    Promise.all([
-        impressionRepository.logImpression({
-            impression_id,
-            screen_id,
-            campaign_id,
-            asset_id:  asset_id  || null,
-            loop_id:   loop_id   || null,
-            slot_position: Number.isInteger(slot_position) ? slot_position : null,
-            played_at: recorded_at
-        }),
-        (async () => {
-            try {
-                const campaign = await campaignRepository.findById(campaign_id);
-                if (campaign) {
-                    await campaignRepository.update(campaign_id, {
-                        play_count: (campaign.play_count || 0) + 1,
-                        last_played_at: recorded_at
-                    });
-                }
-            } catch (countErr) {
-                logger.warn('play_count increment failed', { campaign_id, error: countErr.message });
-            }
-        })()
-    ]).catch(err => {
-        logger.error('Impression persistence failed', { impression_id, error: err.message });
-    });
-
-    res.status(201).json({ status: 'recorded', impression_id });
+router.post('/playback-observation', authenticate, requireProofOfPlaySubmission, async (req, res) => {
+    try {
+        const result = await playbackObservationService.record(req.body);
+        return res.status(result.status === 'recorded' ? 201 : 200).json({
+            status: result.status,
+            event_id: result.observation.event_id,
+        });
+    } catch (error) {
+        if (error instanceof PresentationEventError) {
+            return res.status(error.status).json({ error: error.message, ...error.details });
+        }
+        logger.error('Playback observation persistence failed', { error: error.message });
+        return res.status(503).json({ error: 'Playback observation could not be persisted' });
+    }
 });
 
 /**

@@ -1,7 +1,8 @@
 ﻿import express from 'express';
 import { heartbeatService } from '../services/index.js';
-import { impressionRepository, locationRepository } from '../repositories/index.js';
+import { impressionRepository, loopRepository, playbackObservationRepository } from '../repositories/index.js';
 import logger from '../utils/logger.js';
+import { requireNetworkProofOfPlayView } from '../middleware/requireRole.js';
 
 const router = express.Router();
 
@@ -22,39 +23,11 @@ router.post('/heartbeat', async (req, res) => {
     }
 });
 
-/**
- * POST /api/monitoring/impression
- * Logs Proof-of-Play events
- */
-router.post('/impression', async (req, res) => {
-    try {
-        const { screenId, campaignId, mediaId, duration, source, playlistId } = req.body;
-
-        if (!screenId || !campaignId) {
-            return res.status(400).json({ error: 'screenId and campaignId required' });
-        }
-
-        // Identify location for analytics clustering
-        const screens = await locationRepository.findAll({
-            where: [['screen_ids', 'array-contains', screenId]]
-        });
-        const locationId = screens[0]?.id || 'unknown';
-
-        await impressionRepository.logImpression({
-            screen_id: screenId,
-            campaign_id: campaignId,
-            media_id: mediaId,
-            location_id: locationId,
-            duration: duration || 5,
-            source,
-            playlistId
-        });
-
-        res.status(201).json({ status: 'logged' });
-    } catch (error) {
-        logger.error('Impression API error', { error: error.message });
-        res.status(500).json({ error: 'Internal server error' });
-    }
+router.post('/impression', (req, res) => {
+    return res.status(410).json({
+        error: 'Legacy impression recording has been removed',
+        proof_of_play_endpoint: '/api/telemetry/impression',
+    });
 });
 
 /**
@@ -81,6 +54,34 @@ router.get('/status', async (req, res) => {
     } catch (error) {
         logger.error('Status API error', { error: error.message });
         res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.get('/delivery-report', requireNetworkProofOfPlayView, async (req, res) => {
+    try {
+        const [loops, proofs, observations] = await Promise.all([
+            loopRepository.findAll({ where: [['status', '==', 'approved']] }),
+            impressionRepository.findAll(),
+            playbackObservationRepository.findAll(),
+        ]);
+        const slots = loops.flatMap(loop => loop.slots || []);
+        const campaignDelivery = proofs.filter(proof => proof.playback_kind === 'campaign_delivery');
+
+        return res.json({
+            allocated_capacity: {
+                scope: 'all_approved_hourly_loops',
+                approved_hourly_loop_count: loops.length,
+                approved_slot_count: slots.length,
+            },
+            campaign_delivery: campaignDelivery.length,
+            fallback_playback: observations.filter(item => item.presentation_type === 'fallback').length,
+            holding_slide_playback: observations.filter(item => item.presentation_type === 'holding_slide').length,
+            recent_campaign_delivery: campaignDelivery.slice(0, 20),
+            generated_at: new Date().toISOString(),
+        });
+    } catch (error) {
+        logger.error('Delivery report failed', { error: error.message });
+        return res.status(500).json({ error: 'Delivery report unavailable' });
     }
 });
 

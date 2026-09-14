@@ -18,6 +18,21 @@ export const clearMockStorage = () => {
     });
 };
 
+/**
+ * Commit memory-only repository records without yielding to the event loop.
+ * Callers must fully validate and construct every record first.
+ */
+export const commitMockStorage = (records) => {
+    const prepared = records.map(({ collectionName, id, data }) => {
+        const collection = MOCK_STORAGE[collectionName];
+        if (!(collection instanceof Map)) {
+            throw new Error(`Memory collection ${collectionName} is unavailable`);
+        }
+        return { collection, id, data };
+    });
+    prepared.forEach(({ collection, id, data }) => collection.set(id, data));
+};
+
 export class BaseRepository {
     constructor(collectionName) {
         this.collectionName = collectionName;

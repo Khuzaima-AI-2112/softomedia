@@ -1,12 +1,22 @@
 import { userRepository } from '../repositories/index.js';
 import { getFirebaseAuth } from '../utils/firebaseAuth.js';
+import { PERMISSIONS } from '../middleware/requireRole.js';
 
 export const DEMO_PERSONAS = Object.freeze([
     Object.freeze({ email: 'superadmin@demo.softomedia.test', name: 'Demo Super Administrator', role: 'superadmin', linked_entity_id: null }),
     Object.freeze({ email: 'admin@demo.softomedia.test', name: 'Demo Admin', role: 'admin', linked_entity_id: null }),
     Object.freeze({ email: 'brand@demo.softomedia.test', name: 'Demo Brand', role: 'brand', linked_entity_id: 'demo-advertiser-bonvie' }),
     Object.freeze({ email: 'retaileradmin@demo.softomedia.test', name: 'Demo Retailer Administrator', role: 'retaileradmin', linked_entity_id: 'demo-retailer-freshmart' }),
-    Object.freeze({ email: 'techoperator@demo.softomedia.test', name: 'Demo Technical Operator', role: 'techoperator', linked_entity_id: null }),
+    Object.freeze({
+        email: 'techoperator@demo.softomedia.test',
+        name: 'Demo Technical Operator',
+        role: 'techoperator',
+        linked_entity_id: null,
+        permissions: Object.freeze([
+            PERMISSIONS.PROOF_OF_PLAY_SUBMIT,
+            PERMISSIONS.PROOF_OF_PLAY_VIEW_NETWORK,
+        ]),
+    }),
     Object.freeze({ email: 'brand-secondary@demo.softomedia.test', name: 'Demo Secondary Brand', role: 'brand', linked_entity_id: 'demo-advertiser-secondary' }),
     Object.freeze({ email: 'retaileradmin-secondary@demo.softomedia.test', name: 'Demo Secondary Retailer Administrator', role: 'retaileradmin', linked_entity_id: 'demo-retailer-secondary' }),
 ]);
@@ -52,6 +62,7 @@ export async function provisionDemoPersonas({ password, expectedProjectId }) {
             name: persona.name,
             role: persona.role,
             linked_entity_id: persona.linked_entity_id,
+            permissions: persona.permissions || [],
         });
         provisioned.push({ uid: firebaseUser.uid, ...persona });
     }

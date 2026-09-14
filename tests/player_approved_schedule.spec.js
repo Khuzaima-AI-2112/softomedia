@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './base.fixtures.js';
 
 const hasEmulators = Boolean(
     process.env.FIRESTORE_EMULATOR_HOST
@@ -6,7 +6,7 @@ const hasEmulators = Boolean(
 );
 test.skip(!hasEmulators, 'requires Firebase Auth and Firestore emulators');
 
-test('Player refreshes approved Campaign, fallback, and Holding Slide state truthfully', async ({ page }) => {
+test('Player refreshes approved Campaign, fallback, and Holding Slide state truthfully', async ({ techoperatorPage: page, brandPage }) => {
     const suffix = `${Date.now()}`;
     const retailerId = `player-retailer-${suffix}`;
     const storeId = `player-store-${suffix}`;
@@ -15,6 +15,7 @@ test('Player refreshes approved Campaign, fallback, and Holding Slide state trut
     const loopId = `player-loop-${suffix}`;
     const assetId = `browser-asset-${suffix}`;
     const campaignId = `browser-campaign-${suffix}`;
+    const brandId = 'demo-advertiser-bonvie';
     const fallbackId = `browser-fallback-${suffix}`;
     const now = new Date();
     const date = now.toISOString().slice(0, 10);
@@ -27,6 +28,8 @@ test('Player refreshes approved Campaign, fallback, and Holding Slide state trut
     const { dailyScheduleRepository } = await import('../ad-server/src/repositories/DailyScheduleRepository.js');
     const { mediaRepository } = await import('../ad-server/src/repositories/MediaRepository.js');
     const { campaignRepository } = await import('../ad-server/src/repositories/CampaignRepository.js');
+    const { impressionRepository } = await import('../ad-server/src/repositories/ImpressionRepository.js');
+    const { playbackObservationRepository } = await import('../ad-server/src/repositories/PlaybackObservationRepository.js');
 
     await StoreRepository.create(storeId, {
         name: 'Player Browser Store',
@@ -47,16 +50,18 @@ test('Player refreshes approved Campaign, fallback, and Holding Slide state trut
     });
     await mediaRepository.create(assetId, {
         title: 'Browser Campaign Creative',
+        url: 'http://localhost:8080/assets/demo_ad_1.png',
         category: 'paid',
         owner_type: 'brand',
-        owner_id: `browser-brand-${suffix}`,
+        owner_id: brandId,
         approval_status: 'approved',
         eligible_for_playback: true,
         status: 'ready',
     });
     await campaignRepository.create(campaignId, {
         status: 'approved',
-        advertiser_id: `browser-brand-${suffix}`,
+        brand_id: brandId,
+        advertiser_id: brandId,
         retailer_id: retailerId,
         store_id: storeId,
         asset_id: assetId,
@@ -86,20 +91,30 @@ test('Player refreshes approved Campaign, fallback, and Holding Slide state trut
         loop_ids: [loop.id],
     });
 
-    await page.addInitScript(() => {
-        window.ENV = { VITE_API_URL: 'http://localhost:8080' };
-        localStorage.setItem('authToken', 'demo-token');
-        localStorage.setItem('demo_role', 'techoperator');
-    });
-
     await page.goto(`/player?screen_id=${screenId}`);
     await expect(page.getByTestId('campaign-presentation')).toBeVisible();
     await expect(page.getByTestId('player-container')).toHaveAttribute('data-schedule-status', 'approved');
+    await expect.poll(async () => (await impressionRepository.findProofsOfPlayByCampaign(campaignId)).length, {
+        timeout: 30000,
+    }).toBeGreaterThan(0);
+    const [proof] = await impressionRepository.findProofsOfPlayByCampaign(campaignId);
+    expect(proof).toEqual(expect.objectContaining({
+        event_id: expect.any(String),
+        screen_id: screenId,
+        location_id: locationId,
+        loop_id: loopId,
+        slot_position: 0,
+        campaign_id: campaignId,
+        asset_id: assetId,
+        presentation_started_at: expect.any(String),
+        intended_duration_seconds: 5,
+    }));
     await page.reload();
     await expect(page.getByTestId('campaign-presentation')).toBeVisible();
 
     await mediaRepository.create(fallbackId, {
         title: 'Browser Approved Fallback',
+        url: 'http://localhost:8080/assets/demo_ad_2.png',
         category: 'fallback',
         content_kind: 'neutral_fallback',
         owner_type: 'platform',
@@ -128,6 +143,8 @@ test('Player refreshes approved Campaign, fallback, and Holding Slide state trut
     await expect(page.getByTestId('holding-slide')).toContainText('No approved schedule', { timeout: 15000 });
     await expect(page.getByTestId('player-container')).toHaveAttribute('data-connectivity-status', 'ONLINE');
     await expect(page.getByTestId('campaign-presentation')).toHaveCount(0);
+    await expect.poll(async () => (await playbackObservationRepository.findAll())
+        .filter(item => item.screen_id === screenId && item.presentation_type === 'holding_slide').length).toBeGreaterThan(0);
 
     const campaignSlots = Array.from({ length: 12 }, (_, position) => ({
         position,
@@ -144,6 +161,11 @@ test('Player refreshes approved Campaign, fallback, and Holding Slide state trut
     await page.reload();
     await expect(page.getByTestId('fallback-presentation')).toBeVisible();
     await expect(page.getByTestId('campaign-presentation')).toHaveCount(0);
+    const fallbackProofCount = (await impressionRepository.findProofsOfPlayByCampaign(campaignId)).length;
+    await page.waitForTimeout(5500);
+    expect((await impressionRepository.findProofsOfPlayByCampaign(campaignId)).length).toBe(fallbackProofCount);
+    await expect.poll(async () => (await playbackObservationRepository.findAll())
+        .filter(item => item.screen_id === screenId && item.presentation_type === 'fallback').length).toBeGreaterThan(0);
 
     await campaignRepository.update(campaignId, {
         end_date: date,
@@ -152,9 +174,29 @@ test('Player refreshes approved Campaign, fallback, and Holding Slide state trut
     await page.reload();
     await expect(page.getByTestId('fallback-presentation')).toBeVisible();
     await expect(page.getByTestId('campaign-presentation')).toHaveCount(0);
-
     await locationRepository.update(locationId, { retailer_id: 'foreign-retailer' });
     const invalidAssignment = await page.request.get(`http://localhost:8080/api/screens/${screenId}/playback-loop`);
     expect(invalidAssignment.status()).toBe(409);
     expect(await invalidAssignment.json()).toEqual({ error: 'Screen assignment is invalid' });
+
+    await locationRepository.update(locationId, { retailer_id: retailerId });
+    await campaignRepository.update(campaignId, {
+        brand_id: brandId,
+        advertiser_id: brandId,
+        end_date: date,
+    });
+
+    await page.goto('/dashboard/techoperator');
+    await expect(page.getByTestId('delivery-report')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByTestId('campaign-delivery')).not.toHaveText('0');
+    await expect(page.getByTestId('fallback-playback')).not.toHaveText('0');
+    await expect(page.getByTestId('holding-slide-playback')).not.toHaveText('0');
+    await expect(page.getByTestId('recent-proof-of-play')).toContainText(proof.event_id);
+    await page.reload();
+    await expect(page.getByTestId('recent-proof-of-play')).toContainText(proof.event_id);
+
+    await brandPage.goto('/dashboard/brand');
+    await expect(brandPage.getByTestId(`proof-events-${campaignId}`)).toContainText(proof.event_id, { timeout: 30000 });
+    await brandPage.reload();
+    await expect(brandPage.getByTestId(`proof-events-${campaignId}`)).toContainText(proof.event_id);
 });

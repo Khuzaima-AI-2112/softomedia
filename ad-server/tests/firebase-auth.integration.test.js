@@ -12,6 +12,7 @@ const authEmulatorHost = process.env.FIREBASE_AUTH_EMULATOR_HOST || '127.0.0.1:9
 const { getFirestore, closeFirestore } = await import('../src/utils/firestore.js');
 const { default: apiRouter } = await import('../src/api/index.js');
 const { authenticate } = await import('../src/middleware/auth.js');
+const { PERMISSIONS, requireNetworkProofOfPlayView } = await import('../src/middleware/requireRole.js');
 const { ACTIONS, requirePermission } = await import('../src/middleware/authorization.js');
 const { createTestApp } = await import('./fixtures/test-app.js');
 
@@ -23,12 +24,18 @@ scopedApp.get(
     requirePermission(ACTIONS.ENTITY_RESOURCE_READ, req => ({ linkedEntityId: req.params.entityId })),
     (req, res) => res.json({ entityId: req.params.entityId })
 );
+scopedApp.get(
+    '/network-delivery',
+    authenticate,
+    requireNetworkProofOfPlayView,
+    (_req, res) => res.json({ allowed: true })
+);
 const db = getFirestore();
 const createdUserIds = [];
 
 jest.setTimeout(20_000);
 
-async function createFirebaseAccount(email, role, linkedEntityId = null) {
+async function createFirebaseAccount(email, role, linkedEntityId = null, permissions = undefined) {
     const signUpResponse = await fetch(
         `http://${authEmulatorHost}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=demo-api-key`,
         {
@@ -52,6 +59,7 @@ async function createFirebaseAccount(email, role, linkedEntityId = null) {
         name: email.split('@')[0],
         role,
         linked_entity_id: linkedEntityId,
+        ...(permissions === undefined ? {} : { permissions }),
     });
 
     return account;
@@ -210,5 +218,31 @@ describe('Firebase-authenticated profile boundary', () => {
         expect(ownEntity.status).toBe(200);
         expect(otherEntity.status).toBe(403);
         expect(otherEntity.body).toEqual({ error: 'Access denied' });
+    });
+
+    test('requires an explicit network Proof of Play permission for an operator profile', async () => {
+        const deniedAccount = await createFirebaseAccount(
+            `ungranted-operator-${Date.now()}@demo.softomedia.test`,
+            'techoperator',
+            null,
+            []
+        );
+        const grantedAccount = await createFirebaseAccount(
+            `granted-operator-${Date.now()}@demo.softomedia.test`,
+            'techoperator',
+            null,
+            [PERMISSIONS.PROOF_OF_PLAY_VIEW_NETWORK]
+        );
+
+        const denied = await request(scopedApp)
+            .get('/network-delivery')
+            .set('Authorization', `Bearer ${deniedAccount.idToken}`);
+        const granted = await request(scopedApp)
+            .get('/network-delivery')
+            .set('Authorization', `Bearer ${grantedAccount.idToken}`);
+
+        expect(denied.status).toBe(403);
+        expect(granted.status).toBe(200);
+        expect(granted.body).toEqual({ allowed: true });
     });
 });

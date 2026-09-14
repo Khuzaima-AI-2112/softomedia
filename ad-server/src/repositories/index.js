@@ -5,6 +5,7 @@ export * from './RetailerRepository.js';
 export * from './AdvertiserRepository.js';
 export * from './LocationRepository.js';
 export * from './ImpressionRepository.js';
+export * from './PlaybackObservationRepository.js';
 export * from './PlaylistRepository.js';
 export * from './CampaignRepository.js';
 export * from './MediaRepository.js';

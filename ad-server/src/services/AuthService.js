@@ -30,6 +30,7 @@ export class AuthService {
             role,
             linked_entity_id: organizationId,
             organization_id: organizationId,
+            permissions: Array.isArray(profile.permissions) ? profile.permissions : [],
         };
     }
 

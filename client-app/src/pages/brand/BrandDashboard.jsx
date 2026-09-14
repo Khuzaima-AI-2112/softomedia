@@ -9,7 +9,6 @@ import pricingService from '../../services/PricingService';
 const BrandDashboard = () => {
     const navigate = useNavigate();
     const [campaigns, setCampaigns] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({
         active: 0,
         screens: 0,
@@ -19,11 +18,12 @@ const BrandDashboard = () => {
 
     useEffect(() => {
         loadData();
+        const interval = setInterval(loadData, 15000);
+        return () => clearInterval(interval);
     }, []);
 
     const loadData = async () => {
         try {
-            setLoading(true);
             // Get campaigns for this advertiser (demo: use ALL for now, or filter if backend supports it)
             const [allCampaigns, inventory] = await Promise.all([
                 apiService.getCampaigns(),
@@ -52,7 +52,7 @@ const BrandDashboard = () => {
         } catch (error) {
             console.error('Failed to load dashboard data:', error);
         } finally {
-            setLoading(false);
+            // The last successful snapshot remains visible during refreshes.
         }
     };
 
@@ -108,9 +108,14 @@ const BrandDashboard = () => {
         {
             header: 'Proof of Play',
             render: (cmp) => (
-                <span className="text-sm font-medium">
-                    {cmp.proofs_of_play?.length || 0} Proofs of Play
-                </span>
+                <div className="text-sm font-medium">
+                    <span>{cmp.proofs_of_play?.length || 0} Proofs of Play</span>
+                    {cmp.proofs_of_play?.length > 0 && (
+                        <span data-testid={`proof-events-${cmp.id}`} className="block text-xs font-mono text-slate-500">
+                            {cmp.proofs_of_play.slice(0, 3).map(event => event.event_id).join(' · ')}
+                        </span>
+                    )}
+                </div>
             )
         },
         {

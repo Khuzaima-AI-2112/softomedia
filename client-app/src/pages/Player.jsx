@@ -81,9 +81,19 @@ function Player() {
 
         let nextLoop;
         if (playback.playback_mode === PLAYBACK_MODE.APPROVED_SCHEDULE && playback.slots?.length > 0) {
-            nextLoop = { id: playback.loop_id, hour: playback.hour, slots: playback.slots };
+            nextLoop = {
+                id: playback.loop_id,
+                hour: playback.hour,
+                locationId: playback.location_id,
+                slots: playback.slots,
+            };
         } else if (playback.playback_mode === PLAYBACK_MODE.HOLDING_SLIDE) {
-            nextLoop = { id: 'holding-slide', hour: playback.hour, slots: HOLDING_SLIDE_SLOTS };
+            nextLoop = {
+                id: 'holding-slide',
+                hour: playback.hour,
+                locationId: playback.location_id,
+                slots: HOLDING_SLIDE_SLOTS,
+            };
         } else {
             return false;
         }
@@ -221,7 +231,7 @@ function Player() {
     }, [searchParams, applyPlayback, applyOfflineFallback]);
 
     // --- SRE: White-Box Observability & Transport ---
-    const logTelemetryEvent = (type, payload) => {
+    const logTelemetryEvent = useCallback((type, payload) => {
         const isDebug = new URLSearchParams(window.location.search).get('debug') === 'true';
 
         if (import.meta.env.MODE === 'test' || isDebug || window.__FORCE_TEST_LOGGING__) {
@@ -229,9 +239,9 @@ function Player() {
             window.__TELEMETRY_LOG__.push({ type, timestamp: Date.now(), payload });
             if (window.__TELEMETRY_LOG__.length > 50) window.__TELEMETRY_LOG__.shift();
         }
-    };
+    }, []);
 
-    const sendTelemetry = (endpoint, data) => {
+    const sendTelemetry = useCallback((endpoint, data) => {
         const url = `${API_URL}${endpoint}`;
 
         logTelemetryEvent(endpoint.includes('heartbeat') ? 'HEARTBEAT' : 'IMPRESSION', data);
@@ -248,7 +258,7 @@ function Player() {
                 keepalive: true
             }).catch(e => console.error('Telemetry fallback failed', e));
         }
-    };
+    }, [logTelemetryEvent]);
 
     // Heartbeat (Every 30 seconds) — continues during fallback mode
     useEffect(() => {
@@ -261,7 +271,7 @@ function Player() {
         sendHeartbeat();
         const interval = setInterval(sendHeartbeat, 30000);
         return () => clearInterval(interval);
-    }, [screenId]);
+    }, [screenId, sendTelemetry]);
 
     // Loop Slot Playback (Loop Mode)
     useEffect(() => {
@@ -273,35 +283,47 @@ function Player() {
         const currentSlot = slots[currentSlotIndex];
         const duration = (currentSlot?.duration || 5) * 1000;
 
-        // Only Campaign presentation establishes delivery. Holding Slides,
-        // fallback, and category media remain observable but produce no claim.
-        if (currentSlot?.counts_as_delivery === true && currentSlot?.campaign_id) {
-            telemetryService.trackImpression({
-                screenId,
-                campaignId: currentSlot?.campaign_id,
-                mediaId: currentSlot?.asset_id,
-                duration: currentSlot?.duration || 5,
-                source: 'loop',
-                playlistId: currentLoop.id,
-                loopId: currentLoop.id,
-                loopHour: currentLoop.hour,
-                slotPosition: currentSlotIndex
-            });
-
-            logTelemetryEvent('LOOP_SLOT_PLAY', {
-                loopId: currentLoop.id,
-                hour: currentLoop.hour,
-                slotPosition: currentSlotIndex,
-                assetId: currentSlot?.asset_id
-            });
-        }
-
         const timer = setTimeout(() => {
             setCurrentSlotIndex((prev) => (prev + 1) % slots.length);
         }, duration);
 
         return () => clearTimeout(timer);
-    }, [status, playbackMode, currentLoop, currentSlotIndex, screenId]);
+    }, [status, playbackMode, currentLoop, currentSlotIndex]);
+
+    const handlePresentationStart = () => {
+        const currentSlot = currentLoop?.slots?.[currentSlotIndex];
+        if (!currentSlot) return;
+        const common = {
+            authToken: searchParams.get('token'),
+            screenId,
+            locationId: currentLoop.locationId,
+            loopId: currentLoop.id,
+            slotPosition: currentSlot.position ?? currentSlotIndex,
+            assetId: currentSlot.asset_id,
+            duration: currentSlot.duration || 5,
+        };
+        if (currentSlot.counts_as_delivery === true && currentSlot.campaign_id) {
+            telemetryService.trackImpression({
+                ...common,
+                campaignId: currentSlot.campaign_id,
+                source: 'loop',
+                playlistId: currentLoop.id,
+                loopHour: currentLoop.hour,
+            });
+            logTelemetryEvent('LOOP_SLOT_PLAY', {
+                loopId: currentLoop.id,
+                hour: currentLoop.hour,
+                slotPosition: common.slotPosition,
+                assetId: currentSlot.asset_id,
+            });
+        } else if ([PRESENTATION_TYPE.FALLBACK, PRESENTATION_TYPE.HOLDING_SLIDE]
+            .includes(currentSlot.presentation_type)) {
+            telemetryService.trackPlaybackObservation({
+                ...common,
+                presentationType: currentSlot.presentation_type,
+            });
+        }
+    };
 
     // Current content to display
     const getActiveContent = () => {
@@ -360,9 +382,11 @@ function Player() {
                 style={{ width: '100vw', height: '100vh', backgroundColor: 'black', overflow: 'hidden' }}
             >
                 <img
+                    key={`${currentLoop?.id}:${currentSlotIndex}`}
                     data-testid="ad-frame"
                     src={activeContent.url}
                     alt={activeContent.title}
+                    onLoad={handlePresentationStart}
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
                 

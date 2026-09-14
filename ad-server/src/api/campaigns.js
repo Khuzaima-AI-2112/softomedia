@@ -12,6 +12,7 @@ import {
 import { campaignService } from '../services/CampaignService.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { PERMISSIONS, userHasPermission } from '../middleware/requireRole.js';
 import { ROLES, ROLE_HIERARCHY, normalizeRole } from '../constants/roles.js';
 
 const router = express.Router();
@@ -116,7 +117,7 @@ const VALID_TRANSITIONS = {
  * NOTE: req.user may be undefined for unauthenticated callers — optional
  * chaining is used throughout to avoid TypeError on req.user.role.
  */
-router.get('/', async (req, res) => {
+router.get('/', authenticate, async (req, res) => {
     try {
         const { status, advertiserId } = req.query;
         let campaigns;
@@ -152,7 +153,7 @@ router.get('/', async (req, res) => {
  * Sprint 14 — S14-2: advertiser callers receive 403 if the campaign's
  * advertiser_id does not match their linked_entity_id.
  */
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticate, async (req, res) => {
     try {
         const campaign = await campaignRepository.findById(req.params.id);
         if (!campaign) {
@@ -499,13 +500,14 @@ router.put('/:id', authenticate, async (req, res) => {
     }
 });
 
-router.get('/:id/proofs-of-play', async (req, res) => {
+router.get('/:id/proofs-of-play', authenticate, async (req, res) => {
     try {
         const campaign = await campaignRepository.findById(req.params.id);
         if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
-        if (isBrand(req.user) && !campaignRepository.isOwnedByBrand(campaign, brandIdFor(req.user))) {
-            return denyBrandAccess(res);
-        }
+        const role = normalizeRole(req.user?.role);
+        const canView = userHasPermission(req.user, PERMISSIONS.PROOF_OF_PLAY_VIEW_NETWORK)
+            || (role === ROLES.BRAND && campaignRepository.isOwnedByBrand(campaign, brandIdFor(req.user)));
+        if (!canView) return denyBrandAccess(res);
         const proofs = await impressionRepository.findProofsOfPlayByCampaign(campaign.id);
         return res.json(proofs);
     } catch (error) {

@@ -27,6 +27,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
     const createdMediaIds = [];
     const createdObjectNames = [];
     const createdProofOfPlayIds = [];
+    const createdLoopIds = [];
 
     beforeAll(async () => {
         ({ default: request } = await import('supertest'));
@@ -58,6 +59,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
         await Promise.all(createdCampaignIds.map(id => firestore.collection('campaigns').doc(id).delete()));
         await Promise.all(createdMediaIds.map(id => firestore.collection('media').doc(id).delete()));
         await Promise.all(createdProofOfPlayIds.map(id => firestore.collection('impressions').doc(id).delete()));
+        await Promise.all(createdLoopIds.map(id => firestore.collection('loops').doc(id).delete()));
         const bucket = storage.bucket(process.env.DEMO_ASSETS_BUCKET);
         await Promise.all(createdObjectNames.map(name => bucket.file(name).delete({ ignoreNotFound: true })));
         await firestore?.terminate();
@@ -244,14 +246,36 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
         const afterBookingAttempt = await firestore.collection('campaigns').doc(creation.body.id).get();
         expect(afterBookingAttempt.data().status).toBe('pending_approval');
 
-        const telemetry = await request(app).post('/api/telemetry/impression').send({
-            campaign_id: creation.body.id,
-            asset_id: upload.body.id,
-            screen_id: 'demo-screen-secondary-1',
-            loop_id: 'demo-loop-secondary-1',
-            slot_position: 2,
-            played_at: '2030-01-16T12:00:00.000Z',
+        const proofLoopId = `brand-proof-loop-${Date.now()}`;
+        const proofEventId = `brand-proof-event-${Date.now()}`;
+        createdLoopIds.push(proofLoopId);
+        await firestore.collection('loops').doc(proofLoopId).set({
+            id: proofLoopId,
+            status: 'approved',
+            screen_ids: ['demo-screen-secondary-1'],
+            slots: [{
+                position: 2,
+                campaign_id: creation.body.id,
+                asset_id: upload.body.id,
+                content_kind: 'campaign',
+                is_fallback: false,
+                duration: 5,
+            }],
         });
+        const telemetry = await request(app)
+            .post('/api/telemetry/impression')
+            .set('Authorization', `Bearer ${await signIn('techoperator@demo.softomedia.test', password)}`)
+            .send({
+                event_id: proofEventId,
+                campaign_id: creation.body.id,
+                asset_id: upload.body.id,
+                screen_id: 'demo-screen-secondary-1',
+                location_id: 'demo-location-phoenix-entrance',
+                loop_id: proofLoopId,
+                slot_position: 2,
+                presentation_started_at: '2030-01-16T12:00:00.000Z',
+                intended_duration_seconds: 5,
+            });
         expect(telemetry.status).toBe(201);
 
         const proofs = await eventually(async () => request(app)
@@ -260,11 +284,12 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
         expect(proofs.status).toBe(200);
         expect(proofs.body).toEqual([
             expect.objectContaining({
-                id: telemetry.body.impression_id,
+                id: telemetry.body.event_id,
+                event_id: proofEventId,
                 campaign_id: creation.body.id,
                 asset_id: upload.body.id,
                 screen_id: 'demo-screen-secondary-1',
-                loop_id: 'demo-loop-secondary-1',
+                loop_id: proofLoopId,
                 slot_position: 2,
             }),
         ]);
