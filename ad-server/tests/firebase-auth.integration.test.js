@@ -140,22 +140,19 @@ describe('Firebase-authenticated profile boundary', () => {
     test.each([
         ['contentmanager', 'admin'],
         ['advertiser', 'brand'],
-    ])('migrates legacy role %s to %s idempotently', async (legacyRole, canonicalRole) => {
+    ])('refuses a profile still holding the retired %s role instead of acting as %s', async (legacyRole, canonicalRole) => {
         const account = await createFirebaseAccount(
             `${legacyRole}-${Date.now()}-${Math.random()}@demo.softomedia.test`,
             legacyRole,
             `${canonicalRole}-organization`
         );
 
-        const firstResponse = await authenticatedProfile(account.idToken);
-        const secondResponse = await authenticatedProfile(account.idToken);
+        const response = await authenticatedProfile(account.idToken);
         const persistedProfile = await db.collection('users').doc(account.localId).get();
 
-        expect(firstResponse.status).toBe(200);
-        expect(firstResponse.body.user.role).toBe(canonicalRole);
-        expect(secondResponse.status).toBe(200);
-        expect(secondResponse.body.user.role).toBe(canonicalRole);
-        expect(persistedProfile.data().role).toBe(canonicalRole);
+        expect(response.status).toBe(401);
+        expect(response.body).toEqual({ error: 'Authentication required' });
+        expect(persistedProfile.data().role).toBe(legacyRole);
     });
 
     test('returns the same authentication failure for missing, invalid, expired, and profile-less identities', async () => {

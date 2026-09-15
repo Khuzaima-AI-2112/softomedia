@@ -15,18 +15,11 @@ export const CANONICAL_ROLES = Object.freeze([
     ROLES.TECHOPERATOR,
 ]);
 
-// Stored profiles from before the five canonical roles are converted at sign-in.
-export const LEGACY_ROLE_MIGRATIONS = Object.freeze({
-    contentmanager: ROLES.ADMIN,
-    advertiser: ROLES.BRAND,
-});
-
+// Retired roles such as contentmanager and advertiser are not canonical and resolve to null.
 export function toCanonicalRole(raw) {
     if (!raw || typeof raw !== 'string') return null;
     const cleaned = raw.replace(/[\s_-]/g, '').toLowerCase();
     if (cleaned === 'superadmin') return ROLES.SUPERADMIN;
-    const migrated = LEGACY_ROLE_MIGRATIONS[cleaned];
-    if (migrated) return migrated;
     return CANONICAL_ROLES.includes(cleaned) ? cleaned : null;
 }
 

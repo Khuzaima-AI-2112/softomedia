@@ -2,10 +2,14 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import apiService from '../../services/ApiService';
+import { ROLES } from '../../constants/roles';
+
+// A Brand sees its own invoices; Admin and Super Administrator see every invoice.
+const INVOICE_ROLES = [ROLES.BRAND, ROLES.ADMIN, ROLES.SUPERADMIN];
 
 /**
  * Invoices — S15-4
- * Advertiser-only page showing their billing invoices.
+ * Brand page showing its own billing invoices.
  * Route: /dashboard/advertiser/invoices
  */
 export default function Invoices() {
@@ -17,15 +21,15 @@ export default function Invoices() {
     const [downloading, setDownloading] = useState(null);
 
     useEffect(() => {
-        if (user && user.role !== 'advertiser' && user.role !== 'admin' && user.role !== 'superadmin') return;
+        if (user && !INVOICE_ROLES.includes(user.role)) return;
         apiService.request('GET', '/invoices')
             .then(res => setInvoices(res?.invoices ?? res?.data ?? []))
             .catch(err => setError(err?.response?.data?.error ?? err.message))
             .finally(() => setLoading(false));
     }, [user]);
 
-    // Role guard — non-advertisers are redirected
-    if (user && user.role !== 'advertiser' && user.role !== 'admin' && user.role !== 'superadmin') {
+    // Role guard: other roles are redirected
+    if (user && !INVOICE_ROLES.includes(user.role)) {
         return <Navigate to="/dashboard" replace />;
     }
 
