@@ -6,6 +6,15 @@ import { CANONICAL_ROLES } from '../constants/roles.js';
 
 const router = express.Router();
 
+/**
+ * The Organization fields sign-in reads (AuthService). The form still sends
+ * the legacy `linkedentityid` name.
+ */
+function organizationFields(linkedentityid) {
+    const organizationId = linkedentityid ? linkedentityid.trim() : null;
+    return { organization_id: organizationId, linked_entity_id: organizationId };
+}
+
 // ─────────────────────────────────────────────
 // Phase 1: All user-management routes are
 // gated behind requirePlatformGovernance so that only
@@ -64,7 +73,7 @@ router.post('/', async (req, res) => {
             name: name.trim(),
             email: email.trim(),
             role: role.trim(),
-            linkedentityid: linkedentityid ? linkedentityid.trim() : null,
+            ...organizationFields(linkedentityid),
             status: 'active'
         };
 
@@ -126,7 +135,7 @@ router.put('/:id', async (req, res) => {
         if (name !== undefined) updates.name = name.trim();
         if (email !== undefined) updates.email = email.trim();
         if (role !== undefined) updates.role = role;
-        if (linkedentityid !== undefined) updates.linkedentityid = linkedentityid ? linkedentityid.trim() : null;
+        if (linkedentityid !== undefined) Object.assign(updates, organizationFields(linkedentityid));
         if (status !== undefined) updates.status = status;
 
         const updatedUser = await userRepository.update(req.params.id, updates);
@@ -168,7 +177,7 @@ router.patch('/:id', async (req, res) => {
         if (name           !== undefined) updates.name           = name.trim();
         if (email          !== undefined) updates.email          = email.trim();
         if (role           !== undefined) updates.role           = role;
-        if (linkedentityid !== undefined) updates.linkedentityid = linkedentityid ? linkedentityid.trim() : null;
+        if (linkedentityid !== undefined) Object.assign(updates, organizationFields(linkedentityid));
         if (status         !== undefined) updates.status         = status;
 
         const updatedUser = await userRepository.update(req.params.id, updates);

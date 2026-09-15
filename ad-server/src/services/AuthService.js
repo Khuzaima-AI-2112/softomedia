@@ -2,12 +2,29 @@ import { userRepository } from '../repositories/index.js';
 import { toCanonicalRole } from '../constants/roles.js';
 
 export class AuthService {
+    /**
+     * A profile a Super Administrator created for an email address, before any
+     * Firebase account existed. Only an account that has verified that email may use it,
+     * and the first such account is bound to it for good.
+     */
+    async profileInvitedByEmail(decodedToken) {
+        if (decodedToken.email_verified !== true || !decodedToken.email) return null;
+        const profile = await userRepository.findByEmail(decodedToken.email);
+        if (!profile) return null;
+        if (profile.auth_uid && profile.auth_uid !== decodedToken.uid) return null;
+        if (!profile.auth_uid) {
+            await userRepository.update(profile.id, { auth_uid: decodedToken.uid });
+        }
+        return { ...profile, auth_uid: decodedToken.uid };
+    }
+
     async resolveFirebaseIdentity(decodedToken) {
         const profile = await userRepository.findById(decodedToken.uid)
-            || await userRepository.findByEmail(decodedToken.email);
+            || await this.profileInvitedByEmail(decodedToken);
         const role = toCanonicalRole(profile?.role);
 
-        if (!profile || !role) return null;
+        // A deactivated profile is refused like a missing one.
+        if (!profile || !role || profile.status === 'inactive') return null;
 
         if (profile.role !== role) {
             await userRepository.update(profile.id, { role });

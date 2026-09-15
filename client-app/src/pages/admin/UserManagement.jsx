@@ -81,7 +81,7 @@ function UserManagement() {
             name: u.name || '',
             email: u.email || '',
             role: u.role || ROLE_NAMES.BRAND,
-            linkedentityid: u.linkedentityid || ''
+            linkedentityid: u.organization_id || u.linked_entity_id || u.linkedentityid || ''
         });
         setModalError('');
         setShowModal(true);

@@ -33,7 +33,7 @@ export class UserRepository extends BaseRepository {
      * Create a new user.
      * Generates a Firestore-compatible auto-ID and delegates to BaseRepository.create().
      * Timestamps (created_at / updated_at) are auto-populated by BaseRepository.
-     * @param {object} data - User data (name, email, role, linkedentityid, status)
+     * @param {object} data - User data (name, email, role, organization_id, linked_entity_id, status)
      * @returns {Promise<object>} Created user document with id
      */
     async create(idOrData, maybeData) {
