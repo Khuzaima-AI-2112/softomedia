@@ -8,10 +8,10 @@ const router = express.Router();
 
 /**
  * GET /api/advertisers
- * List all non-deleted advertisers — public within dashboard shell (all roles can read).
+ * List all non-deleted advertisers — any signed-in user can read.
  * S17-3: filters where deleted_at == null so soft-deleted advertisers are excluded.
  */
-router.get('/', async (req, res) => {
+router.get('/', authenticate, async (req, res) => {
     try {
         const advertisers = await advertiserRepository.findAll({
             where: [['deleted_at', '==', null]]
@@ -25,10 +25,10 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /api/advertisers/:id
- * Get a single advertiser by ID — public within dashboard shell.
+ * Get a single advertiser by ID — any signed-in user can read.
  * S17-4: returns 404 if the advertiser has been soft-deleted (deleted_at is set).
  */
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticate, async (req, res) => {
     try {
         const advertiser = await advertiserRepository.findById(req.params.id);
         if (!advertiser || advertiser.deleted_at) {

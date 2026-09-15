@@ -14,7 +14,7 @@ const router = express.Router();
  * Root stub — returns empty structure so PricingService initialises
  * without a 404 crash.
  */
-router.get('/', async (req, res) => {
+router.get('/', authenticate, async (req, res) => {
     try {
         const config = await PricingRepository.getConfig();
         res.json({
@@ -114,7 +114,7 @@ router.post('/overrides', authenticate, async (req, res) => {
  * GET /api/pricing/overrides/:date
  * Get pricing override for a specific date
  */
-router.get('/overrides/:date', async (req, res) => {
+router.get('/overrides/:date', authenticate, async (req, res) => {
     try {
         const override = await PricingRepository.getDateOverride(req.params.date);
         if (!override) {
@@ -132,7 +132,7 @@ router.get('/overrides/:date', async (req, res) => {
  * Calculate slot price for given hour
  * Query params: hour, screenId (optional)
  */
-router.get('/calculate', async (req, res) => {
+router.get('/calculate', authenticate, async (req, res) => {
     try {
         const hour = parseInt(req.query.hour);
         const screenId = req.query.screenId;

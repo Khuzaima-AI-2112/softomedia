@@ -1,76 +1,15 @@
-import { API_URL } from '../config';
 import { deviceAPI } from './deviceAPI.js';
-
-const STORAGE_KEY = 'softomedia_impression_buffer';
-const BATCH_SIZE_THRESHOLD = 50;            // Upload when we have this many items
-const BATCH_TIME_THRESHOLD = 60 * 60 * 1000; // or every 1 hour
 
 /**
  * TelemetryService
  *
- * Two-layer impression reporting:
- *
- * Layer 1 — Real-time (per-play)
- *   trackImpression() immediately fires POST /api/device/proof-of-play
- *   (fire-and-forget), authenticated with the Screen's device key. This
- *   populates Firestore in real time and increments campaign.play_count.
- *   Failure is swallowed — the player must never stall on a network error.
- *
- * Layer 2 — Batch fallback
- *   Every impression is also buffered in localStorage (with try/catch so the
- *   sandboxed-iframe environment never throws). When the buffer reaches
- *   BATCH_SIZE_THRESHOLD items or BATCH_TIME_THRESHOLD ms have passed,
- *   uploadBatch() pushes the full buffer to the signed-URL sink.
- *   This provides a durable offline fallback for screens with intermittent
- *   connectivity.
- *
- * Sprint 10 fix:
- *   - Added real-time POST in trackImpression() (was buffer-only before)
- *   - Fixed batch success log: captured count BEFORE clearing buffer
+ * trackImpression() fires POST /api/device/proof-of-play (fire-and-forget),
+ * authenticated with the Screen's device key, and retries transient failures.
+ * Failure is swallowed — the player must never stall on a network error.
  */
 class TelemetryService {
-    constructor() {
-        this.buffer = this.loadBuffer();
-        this.lastUploadAttempt = Date.now();
-        this.isUploading = false;
-
-        // Auto-save buffer to storage on page hide/close
-        if (typeof document !== 'undefined') {
-            document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'hidden') {
-                    this.saveBuffer();
-                }
-            });
-        }
-
-        // Periodic batch check — every 60 seconds
-        setInterval(() => this.checkUploadCriteria(), 60 * 1000);
-    }
-
-    loadBuffer() {
-        try {
-            const data = localStorage.getItem(STORAGE_KEY);
-            return data ? JSON.parse(data) : [];
-        } catch {
-            // localStorage unavailable (sandboxed iframe or private browsing) — use in-memory only
-            return [];
-        }
-    }
-
-    saveBuffer() {
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(this.buffer));
-        } catch {
-            // Silently ignore — in-memory buffer is still intact for this session
-        }
-    }
-
     /**
-     * Record a single impression.
-     *
-     * Called by Player.jsx on every ad play. Does two things:
-     *   1. Fires a real-time POST /api/device/proof-of-play (fire-and-forget).
-     *   2. Buffers the impression locally for the batch-upload fallback.
+     * Record a single impression. Called by Player.jsx on every ad play.
      *
      * @param {object} impression
      *   Required: device ({ screenId, deviceKey }), campaign_id
@@ -104,18 +43,6 @@ class TelemetryService {
             intended_duration_seconds,
         };
         this.submitProofOfPlay(proofOfPlay, record.device);
-
-        // ── Layer 2: local buffer for batch fallback (never persists the device key) ──
-        const bufferedRecord = { ...record };
-        delete bufferedRecord.device;
-        this.buffer.push(bufferedRecord);
-        this.saveBuffer();
-        this.checkUploadCriteria();
-
-        // White-box logging for SRE / E2E test verification
-        if (window.__TELEMETRY_LOG__) {
-            window.__TELEMETRY_LOG__.push({ type: 'IMPRESSION_QUEUED', payload: bufferedRecord });
-        }
     }
 
     async submitProofOfPlay(proofOfPlay, device, attempt = 0) {
@@ -128,7 +55,7 @@ class TelemetryService {
                 setTimeout(() => this.submitProofOfPlay(proofOfPlay, device, attempt + 1), retryDelays[attempt]);
                 return;
             }
-            console.warn('[Telemetry] Proof of Play submission failed; local buffer preserved:', error.message);
+            console.warn('[Telemetry] Proof of Play submission failed:', error.message);
         }
     }
 
@@ -152,67 +79,6 @@ class TelemetryService {
         deviceAPI.playbackObservation(record.device, payload)
             .catch(error => console.warn('[Telemetry] Playback observation failed:', error.message));
     }
-
-    async checkUploadCriteria() {
-        const timeSinceUpload = Date.now() - this.lastUploadAttempt;
-        const shouldUpload =
-            this.buffer.length >= BATCH_SIZE_THRESHOLD ||
-            timeSinceUpload >= BATCH_TIME_THRESHOLD;
-
-        if (this.buffer.length > 0 && shouldUpload) {
-            await this.uploadBatch();
-        }
-    }
-
-    async uploadBatch() {
-        if (this.isUploading) return;
-        this.isUploading = true;
-
-        // Capture count before clearing so the log is accurate
-        const batchCount = this.buffer.length;
-
-        try {
-            // 1. Get signed upload URL
-            // eslint-disable-next-line no-restricted-syntax
-            const response = await fetch(`${API_URL}/api/telemetry/upload-url`);
-            const { uploadUrl } = await response.json();
-
-            // 2. Upload full buffer as JSON
-            // eslint-disable-next-line no-restricted-syntax
-            const putResponse = await fetch(uploadUrl, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(this.buffer)
-            });
-
-            if (!putResponse.ok) throw new Error(`Upload PUT failed: ${putResponse.status}`);
-
-            // 3. Clear buffer on success
-            this.buffer = [];
-            this.saveBuffer();
-            this.lastUploadAttempt = Date.now();
-
-
-
-            if (window.__TELEMETRY_LOG__) {
-                window.__TELEMETRY_LOG__.push({ type: 'BATCH_UPLOAD_SUCCESS', count: batchCount });
-            }
-        } catch (err) {
-            console.error('[Telemetry] Batch upload failed — buffer preserved for retry:', err.message);
-        } finally {
-            this.isUploading = false;
-        }
-    }
-
-    /** Manual trigger for testing */
-    async forceUpload() {
-        await this.uploadBatch();
-    }
 }
 
 export const telemetryService = new TelemetryService();
-
-// Expose instance for E2E / SRE verification
-if (import.meta.env.MODE === 'test' || (typeof window !== 'undefined' && window.location.search.includes('debug=true'))) {
-    window.softomedia_telemetry = telemetryService;
-}

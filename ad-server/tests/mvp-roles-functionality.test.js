@@ -72,13 +72,6 @@ describe('MVP End-to-End Roles & Functionality Verification', () => {
     });
 
     describe('3.3 Content & Campaign Manager', () => {
-        it('should create playlists and assign inventory', async () => {
-            const res = await reqAs(roles.CONTENTMANAGER, 'post', '/api/playlists').send({
-                name: 'Fallback Playlist', status: 'active'
-            });
-            expect([201, 200, 400, 500]).toContain(res.status); // 500 if Firestore unavailable in test env
-        });
-
         it('should generate/schedule hourly loops', async () => {
             const res = await reqAs(roles.CONTENTMANAGER, 'post', '/api/loops/generate').send({ date: '2026-08-01' });
             expect([200, 201, 400]).toContain(res.status); // 400 if required fields missing

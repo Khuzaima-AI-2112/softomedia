@@ -98,11 +98,7 @@ console.log('[Server] Using Firestore for data persistence');
 
 import { cacheControl } from './src/middleware/performance.js';
 import apiRouter from './src/api/index.js';
-import { seedDatabase } from './src/services/SeedService.js';
 import { initCronJobs } from './src/utils/cron.js';
-
-// Auto-seed runs inside listen() so Jest test imports don't trigger it.
-// (Jest imports `app` without calling listen — seed must not fire at module load time.)
 
 // Boot up automated Cron tasks (e.g., MVP D-1 Loop Generators)
 initCronJobs();
@@ -112,10 +108,6 @@ app.use('/api', apiRouter);
 
 // Serve assets with caching (1 hour)
 app.use('/assets', cacheControl(3600), express.static('assets'));
-
-app.get('/api/debug/seed', (req, res) => {
-    res.json({ status: 'seeded', message: 'In-memory database is ready.' });
-});
 
 // Health check endpoint for Docker/Cloud Run
 app.get('/health', (req, res) => res.status(200).json({ status: 'healthy' }));
@@ -132,9 +124,6 @@ app.use(errorHandler);
 if (!process.env.JEST_WORKER_ID) {
     app.listen(PORT, () => {
         console.log(`Server listening on port ${PORT}`);
-        if (process.env.NODE_ENV !== 'production') {
-            seedDatabase();
-        }
     });
 }
 

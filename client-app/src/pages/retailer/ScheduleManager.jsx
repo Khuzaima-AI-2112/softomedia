@@ -91,27 +91,15 @@ function ScheduleManager() {
             // Fetch loop for current date and hour (D-1 loop management preview)
             const date = new Date().toISOString().split('T')[0];
             const hour = new Date().getHours();
-            
-            try {
-                const response = await apiClient.get(`/api/loops?location_id=${loc.id}&date=${date}&hour=${hour}&status=approved`);
-                // Find loop for this hour or take the first approved loop
-                const loop = (response.loops || []).find(l => l.hour === hour) || (response.loops || [])[0];
-                if (loop && loop.slots && loop.slots.length > 0) {
-                    const mappedSlots = loop.slots.map(s => ({
-                        ...s,
-                        title: s.campaign_id === 'demo-campaign-001' ? 'BonVie Summer Demo' : (s.title || s.asset_name || 'Fallback / Empty Slot'),
-                        type: s.campaign_id === 'demo-campaign-001' ? 'paid' : (s.type || 'fallback')
-                    }));
-                    setHourlyLoop(mappedSlots);
-                    return;
-                }
-            } catch (err) {
-                console.warn('[ScheduleManager] Failed to fetch loop preview, falling back to playlist', err);
-            }
 
-            // Fallback to legacy playlist endpoint
-            const data = await apiClient.get(`/api/playlist/${loc.screen_ids[0]}`);
-            setHourlyLoop(data.playlist || []);
+            const response = await apiClient.get(`/api/loops?location_id=${loc.id}&date=${date}&hour=${hour}&status=approved`);
+            // Find loop for this hour or take the first approved loop
+            const loop = (response.loops || []).find(l => l.hour === hour) || (response.loops || [])[0];
+            setHourlyLoop((loop?.slots || []).map(s => ({
+                ...s,
+                title: s.campaign_id === 'demo-campaign-001' ? 'BonVie Summer Demo' : (s.title || s.asset_name || 'Fallback / Empty Slot'),
+                type: s.campaign_id === 'demo-campaign-001' ? 'paid' : (s.type || 'fallback')
+            })));
         } catch (error) {
             console.error('Failed to fetch loop preview', error);
         }

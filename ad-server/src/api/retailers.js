@@ -8,7 +8,7 @@ const router = express.Router();
 
 /**
  * GET /api/retailers
- * List all non-deleted retailers — public within dashboard shell (all roles can read).
+ * List all non-deleted retailers — any signed-in user can read.
  * S17-3: filters where deleted_at == null so soft-deleted retailers are excluded.
  * Intentionally-inactive retailers (PATCH toggle, no deleted_at) are still returned
  * in the default (no query param) response for admin awareness.
@@ -23,7 +23,7 @@ const router = express.Router();
  * collection: (deleted_at ASC, status ASC). Verify firestore.indexes.json
  * before deploying to production.
  */
-router.get('/', async (req, res) => {
+router.get('/', authenticate, async (req, res) => {
     try {
         const { for: forParam } = req.query;
         const whereClause = [['deleted_at', '==', null]];
@@ -45,10 +45,10 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /api/retailers/:id
- * Get a single retailer by ID — public within dashboard shell.
+ * Get a single retailer by ID — any signed-in user can read.
  * S17-4: returns 404 if the retailer has been soft-deleted (deleted_at is set).
  */
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticate, async (req, res) => {
     try {
         const retailer = await retailerRepository.findById(req.params.id);
         if (!retailer || retailer.deleted_at) {
