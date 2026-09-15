@@ -1,64 +1,32 @@
-import { test, expect } from '@playwright/test';
-import { BASE_URL, DEMO_TOKEN, DEMO_RETAILER } from './fixtures/personas.js';
+import { test, expect, hasEmulators, signIn } from './fixtures/demo-session.js';
 
-test('Retailer Administrator sees only its stores, their local time zone, and newly added locations', async ({ page }) => {
-    const stores = [{
-        id: 'freshmart-toronto',
-        name: 'FreshMart Toronto',
-        retailer_id: DEMO_RETAILER.linkedEntityId,
-        time_zone: 'America/Toronto',
-    }];
-    const locations = [{
-        id: 'entrance',
-        name: 'Entrance',
-        store_id: 'freshmart-toronto',
-        retailer_id: DEMO_RETAILER.linkedEntityId,
-    }];
+test.skip(!hasEmulators, 'requires Firebase Auth, Firestore, and Storage emulators');
 
-    await page.route('**/api/**', route => route.fulfill({ contentType: 'application/json', body: '[]' }));
-    await page.route('**/api/stores', async route => {
-        if (route.request().method() === 'POST') {
-            const body = route.request().postDataJSON();
-            stores.push({ id: 'new-store', ...body });
-            return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(stores.at(-1)) });
-        }
-        return route.fulfill({ contentType: 'application/json', body: JSON.stringify(stores) });
-    });
-    await page.route('**/api/locations', async route => {
-        if (route.request().method() === 'POST') {
-            const body = route.request().postDataJSON();
-            const created = { id: 'checkout', retailer_id: DEMO_RETAILER.linkedEntityId, ...body };
-            locations.push(created);
-            return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(created) });
-        }
-        return route.fulfill({ contentType: 'application/json', body: JSON.stringify(locations) });
-    });
-    await page.goto(`${BASE_URL}/login`);
-    await page.evaluate(({ role, token, user }) => {
-        localStorage.setItem('demo_role', role);
-        localStorage.setItem('active_persona', role);
-        localStorage.setItem('authToken', token);
-        localStorage.setItem('auth_token', token);
-        localStorage.setItem('auth_user', JSON.stringify(user));
-    }, {
-        role: DEMO_RETAILER.role,
-        token: DEMO_TOKEN,
-        user: {
-            id: DEMO_RETAILER.id,
-            email: DEMO_RETAILER.email,
-            role: DEMO_RETAILER.role,
-            linked_entity_id: DEMO_RETAILER.linkedEntityId,
-        },
-    });
+test('Retailer Administrator sees only its Stores with their time zone and keeps a newly added Location', async ({ page, demo }) => {
+    const locationName = `Pharmacy Placement ${Date.now()}`;
+    await demo.reset();
+    await demo.provisionPersonas();
 
-    await page.goto(`${BASE_URL}/dashboard/retailer`);
-    await expect(page.getByTestId('retailer-store-manager')).toBeVisible();
-    await expect(page.getByTestId('store-time-zone-freshmart-toronto')).toHaveText('Time zone: America/Toronto');
-    await expect(page.getByText('Entrance')).toBeVisible();
+    try {
+        await signIn(page, 'retaileradmin@demo.softomedia.test', /\/dashboard\/retailer$/);
 
-    await page.getByTestId('add-location-button').click();
-    await page.getByTestId('location-name-input').fill('Checkout');
-    await page.getByTestId('add-location-form').getByRole('button', { name: 'Create Location' }).click();
+        const manager = page.getByTestId('retailer-store-manager');
+        await expect(manager).toBeVisible();
+        await expect(page.getByTestId('store-time-zone-demo-store-mtl-north')).toHaveText('Time zone: America/Toronto');
+        await expect(manager.getByText('Checkout Placement')).toBeVisible();
+        // Another Retailer's Store never appears.
+        await expect(manager.getByText('HarborCart Desert Synthetic Store')).toHaveCount(0);
+        await expect(page.getByTestId('store-time-zone-demo-store-phoenix')).toHaveCount(0);
 
-    await expect(page.getByText('Checkout')).toBeVisible();
+        await page.getByTestId('add-location-button').click();
+        await page.getByTestId('location-name-input').fill(locationName);
+        await page.getByTestId('location-store-select').selectOption('demo-store-mtl-north');
+        await page.getByTestId('add-location-form').getByRole('button', { name: 'Create Location' }).click();
+        await expect(page.getByRole('status')).toHaveText(`${locationName} was added to the selected store.`);
+
+        await page.reload();
+        await expect(page.getByTestId('retailer-store-manager').getByText(locationName)).toBeVisible();
+    } finally {
+        await demo.reset();
+    }
 });

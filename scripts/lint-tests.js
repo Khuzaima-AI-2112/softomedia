@@ -3,102 +3,65 @@ const path = require('path');
 const parser = require('@babel/parser');
 const traverse = require('@babel/traverse').default;
 
+/**
+ * Browser journeys prove behaviour through real Firebase sign-in and the real
+ * API, so a spec may neither fake a session nor intercept the API or Firebase
+ * Authentication.
+ */
 const TESTS_DIR = path.join(__dirname, '../tests');
 
-// Simple regex to catch manual role setting (we'll keep regex for this simple check)
-const MANUAL_ROLE_REGEX = /localStorage\.setItem\(['"`](demo_role|active_persona)['"`]/g;
+const FAKE_SESSION_KEYS = /localStorage\.setItem\(\s*['"`](authToken|auth_token|auth_user|demo_role|active_persona)['"`]/g;
+const INTERCEPTED_TARGET = /\/api\b|identitytoolkit|securetoken/;
 
 let errorsFound = 0;
 
-function walkDir(dir) {
-  let files = [];
-  const list = fs.readdirSync(dir);
-  for (const file of list) {
-    const filePath = path.join(dir, file);
-    const stat = fs.statSync(filePath);
-    if (stat && stat.isDirectory()) {
-      // Skip fixtures directory
-      if (file === 'fixtures' || file === 'mocks') continue;
-      files = files.concat(walkDir(filePath));
-    } else {
-      if (filePath.endsWith('.spec.js')) {
-        files.push(filePath);
-      }
-    }
-  }
-  return files;
+function specFiles(dir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+    const filePath = path.join(dir, entry.name);
+    if (entry.isDirectory()) return entry.name === 'firestore-rules' ? [] : specFiles(filePath);
+    return filePath.endsWith('.spec.js') ? [filePath] : [];
+  });
 }
 
 function lintFile(filePath) {
   const content = fs.readFileSync(filePath, 'utf8');
-  let hasError = false;
   const fileName = path.relative(process.cwd(), filePath);
+  const violations = [];
 
-  // Check Rule 2: Manual Auth State (Regex is fine for this specific API call)
-  let match;
-  while ((match = MANUAL_ROLE_REGEX.exec(content)) !== null) {
-    console.error(`❌ [Rule 2 Violation] Manual auth state detected in ${fileName}`);
-    console.error(`   Found: localStorage.setItem('${match[1]}')`);
-    console.error(`   Fix: Use loginAs() or authReset() from demo.fixtures.js or personas.js.\n`);
-    hasError = true;
+  for (const match of content.matchAll(FAKE_SESSION_KEYS)) {
+    violations.push(`fakes a session with localStorage '${match[1]}'; sign in through the login page instead`);
   }
 
-  // Check Rule 1: No Raw Data Mocks using AST
   try {
-    const ast = parser.parse(content, {
-      sourceType: 'module',
-      plugins: ['jsx']
-    });
-
+    const ast = parser.parse(content, { sourceType: 'module', plugins: ['jsx'] });
     traverse(ast, {
-      CallExpression(nodePath) {
-        const callee = nodePath.node.callee;
-        
-        // Detect page.route(..., () => ...)
-        if (
-          callee.type === 'MemberExpression' &&
-          callee.object.name === 'page' &&
-          callee.property.name === 'route'
-        ) {
-          // Now check if ANY child node inside this route call contains JSON.stringify
-          nodePath.traverse({
-            CallExpression(childPath) {
-              const childCallee = childPath.node.callee;
-              if (
-                childCallee.type === 'MemberExpression' &&
-                childCallee.object.name === 'JSON' &&
-                childCallee.property.name === 'stringify'
-              ) {
-                console.error(`❌ [Rule 1 Violation] Raw JSON mock detected in ${fileName}`);
-                console.error(`   Found: page.route() combined with inline JSON.stringify()`);
-                console.error(`   Fix: Import a factory builder from tests/fixtures/factories.js or use tests/fixtures/mock-routes.js.\n`);
-                hasError = true;
-                childPath.stop(); // Stop traversing this route call once we found one
-              }
-            }
-          });
+      CallExpression({ node }) {
+        const { callee } = node;
+        const isRoute = callee.type === 'MemberExpression'
+          && ['route', 'routeFromHAR'].includes(callee.property.name);
+        const [target] = node.arguments;
+        const pattern = target?.type === 'StringLiteral' ? target.value
+          : target?.type === 'RegExpLiteral' ? target.pattern
+            : target?.type === 'TemplateLiteral' ? target.quasis.map(quasi => quasi.value.raw).join('*')
+              : null;
+        if (isRoute && (pattern === null || INTERCEPTED_TARGET.test(pattern))) {
+          violations.push(`intercepts ${pattern ?? 'a computed route'} at line ${node.loc.start.line}; use the real API`);
         }
-      }
+      },
     });
   } catch (err) {
-    console.error(`⚠️ [Parser Error] Could not parse AST for ${fileName}: ${err.message}`);
+    violations.push(`could not be parsed: ${err.message}`);
   }
 
-  if (hasError) {
-    errorsFound++;
-  }
+  for (const violation of violations) console.error(`❌ ${fileName} ${violation}`);
+  if (violations.length > 0) errorsFound++;
 }
 
-console.log('Running test fixture guardrails lint via AST analysis...');
-const specFiles = walkDir(TESTS_DIR);
-
-for (const file of specFiles) {
-  lintFile(file);
-}
+console.log('Checking browser journeys for faked sessions and API interception...');
+specFiles(TESTS_DIR).forEach(lintFile);
 
 if (errorsFound > 0) {
-  console.error(`\n🚨 Lint failed: ${errorsFound} files have test fixture violations.`);
+  console.error(`\n🚨 ${errorsFound} spec file(s) fake a session or intercept the API.`);
   process.exit(1);
-} else {
-  console.log('✅ All tests pass fixture guardrails.');
 }
+console.log('✅ Every browser journey uses real sign-in and the real API.');

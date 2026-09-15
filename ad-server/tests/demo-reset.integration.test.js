@@ -134,7 +134,7 @@ describe('guarded demo reset', () => {
             projectId,
             bucketName,
             resetAt: '2030-01-15T10:30:00.000Z',
-            documentsWritten: 19,
+            documentsWritten: 33,
             storageObjectsWritten: 4,
         });
         expect((await staleDemoDocument.get()).exists).toBe(false);
@@ -274,7 +274,7 @@ describe('guarded demo reset', () => {
         });
 
         expect(stdout).toContain('"projectId": "softomedia-demo"');
-        expect(stdout).toContain('"documentsWritten": 19');
+        expect(stdout).toContain('"documentsWritten": 33');
         expect((await firestore.collection('campaigns').doc('demo-command-drift').get()).exists).toBe(false);
     });
 });

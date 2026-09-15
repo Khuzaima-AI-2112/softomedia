@@ -1,45 +1,19 @@
-import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
+import { test, expect, hasEmulators, signIn, signOut } from './fixtures/demo-session.js';
 
-const hasEmulators = Boolean(
-    process.env.FIRESTORE_EMULATOR_HOST
-    && process.env.STORAGE_EMULATOR_HOST
-    && process.env.FIREBASE_AUTH_EMULATOR_HOST
-);
+const BRAND_DASHBOARD = /\/dashboard\/brand$/;
+
 test.skip(!hasEmulators, 'requires Firebase Auth, Firestore, and Storage emulators');
 
-test('Brand discovers inventory, uploads a creative, and retains only its Campaign after account switches', async ({ page }) => {
-    const password = 'Phase1-demo-password!';
+test('Brand discovers inventory, uploads a creative, and retains only its Campaign after account switches', async ({ page, demo }) => {
     const title = `BonVie browser campaign ${Date.now()}`;
-    const { resetDemoBaseline } = await import('../ad-server/src/services/DemoResetService.js');
-    const { provisionDemoPersonas } = await import('../ad-server/src/services/DemoPersonaProvisioner.js');
-    const { closeFirestore, getFirestore } = await import('../ad-server/src/utils/firestore.js');
-    const { getStorageClient } = await import('../ad-server/src/utils/storage.js');
-    const firestore = getFirestore();
-    const storage = getStorageClient();
-    const reset = () => resetDemoBaseline({
-        firestore,
-        storage,
-        activeProjectId: 'softomedia-demo',
-        expectedProjectId: 'softomedia-demo',
-        bucketName: process.env.DEMO_ASSETS_BUCKET || 'softomedia-demo.firebasestorage.app',
-        resetAt: new Date('2030-01-15T10:30:00.000Z'),
-    });
-
-    await reset();
-    const accounts = await provisionDemoPersonas({ password, expectedProjectId: 'softomedia-demo' });
+    await demo.reset();
+    const accounts = await demo.provisionPersonas();
     const brand = accounts.find(account => account.email === 'brand@demo.softomedia.test');
     const secondaryBrand = accounts.find(account => account.email === 'brand-secondary@demo.softomedia.test');
 
     try {
-        await page.addInitScript(() => {
-            window.ENV = {
-                VITE_API_URL: 'http://localhost:8080',
-                VITE_FIREBASE_PROJECT_ID: 'softomedia-demo',
-                VITE_FIREBASE_AUTH_EMULATOR_URL: 'http://127.0.0.1:9099',
-            };
-        });
-        await signIn(page, brand.email, password);
+        await signIn(page, brand.email, BRAND_DASHBOARD);
         await page.getByTestId('new-campaign-btn').click();
 
         await expect(page.getByText('HarborCart Synthetic Retailer')).toBeVisible();
@@ -77,27 +51,16 @@ test('Brand discovers inventory, uploads a creative, and retains only its Campai
         await expect(page.getByText('demo-screen-secondary-1')).toBeVisible();
         await expect(page.getByRole('img', { name: `${title} creative` })).toBeVisible();
 
-        await page.getByTestId('btn-user-profile').click();
-        await page.getByTestId('btn-logout').click();
-        await signIn(page, secondaryBrand.email, password);
+        await signOut(page);
+        await signIn(page, secondaryBrand.email, BRAND_DASHBOARD);
         await expect(page.getByText(title)).toHaveCount(0);
 
-        await page.getByTestId('btn-user-profile').click();
-        await page.getByTestId('btn-logout').click();
-        await signIn(page, brand.email, password);
+        await signOut(page);
+        await signIn(page, brand.email, BRAND_DASHBOARD);
         await expect(page.getByText(title)).toBeVisible();
         await expect(page.getByText('demo-screen-secondary-1')).toBeVisible();
         await expect(page.getByRole('img', { name: `${title} creative` })).toBeVisible();
     } finally {
-        await reset();
-        await closeFirestore();
+        await demo.reset();
     }
 });
-
-async function signIn(page, email, password) {
-    await page.goto('/login');
-    await page.getByTestId('input-email').fill(email);
-    await page.getByTestId('input-password').fill(password);
-    await page.getByTestId('btn-login').click();
-    await expect(page).toHaveURL(/\/dashboard\/brand$/);
-}

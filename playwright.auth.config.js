@@ -25,7 +25,6 @@ export default defineConfig({
             env: {
                 NODE_ENV: 'development',
                 PORT: '8081',
-                ALLOW_DEMO_MODE: 'false',
                 CORS_ORIGINS: 'http://127.0.0.1:5173',
                 FIREBASE_PROJECT_ID: 'softomedia-demo',
             },

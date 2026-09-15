@@ -148,6 +148,16 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
             location_ids: ['demo-location-phoenix-entrance'],
             status: 'active',
         }, resetAtIso),
+        // Standard hours every day, as a Store created through the API receives;
+        // without them a Store is closed and no loops are generated for it.
+        ...['demo-store-mtl-north', 'demo-store-phoenix'].flatMap(storeId =>
+            Array.from({ length: 7 }, (_, dayOfWeek) => record('store_default_hours', `def_${storeId}_${dayOfWeek}`, {
+                store_id: storeId,
+                day_of_week: dayOfWeek,
+                open_time: '08:00',
+                close_time: '22:00',
+                is_closed: false,
+            }, resetAtIso))),
         record('locations', 'demo-location-mtl-entrance', {
             name: 'Entrance Placement',
             retailer_id: 'demo-retailer-freshmart',

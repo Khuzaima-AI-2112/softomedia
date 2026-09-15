@@ -1,21 +1,10 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, hasEmulators, PASSWORD, signedInPage } from './fixtures/demo-session.js';
 
-const hasEmulators = Boolean(
-    process.env.FIRESTORE_EMULATOR_HOST
-    && process.env.STORAGE_EMULATOR_HOST
-    && process.env.FIREBASE_AUTH_EMULATOR_HOST
-);
 test.skip(!hasEmulators, 'requires Firebase Auth, Firestore, and Storage emulators');
 
 const API = 'http://localhost:8080';
-const PASSWORD = 'Phase1-demo-password!';
-const BROWSER_ENV = {
-    VITE_API_URL: API,
-    VITE_FIREBASE_PROJECT_ID: 'softomedia-demo',
-    VITE_FIREBASE_AUTH_EMULATOR_URL: 'http://127.0.0.1:9099',
-};
 
-test('Player authenticates as its Screen and reports approved Campaign, fallback, and Holding Slide state truthfully', async ({ page, browser }) => {
+test('Player authenticates as its Screen and reports approved Campaign, fallback, and Holding Slide state truthfully', async ({ page, browser, demo }) => {
     const suffix = `${Date.now()}`;
     const retailerId = `player-retailer-${suffix}`;
     const storeId = `player-store-${suffix}`;
@@ -37,10 +26,6 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
     const lastDate = hours[1].date;
     const loopIds = hours.map(slot => slot.loopId);
 
-    const { resetDemoBaseline } = await import('../ad-server/src/services/DemoResetService.js');
-    const { provisionDemoPersonas } = await import('../ad-server/src/services/DemoPersonaProvisioner.js');
-    const { closeFirestore, getFirestore } = await import('../ad-server/src/utils/firestore.js');
-    const { getStorageClient } = await import('../ad-server/src/utils/storage.js');
     const { default: StoreRepository } = await import('../ad-server/src/repositories/StoreRepository.js');
     const { locationRepository } = await import('../ad-server/src/repositories/LocationRepository.js');
     const { loopRepository, LOOP_STATUS } = await import('../ad-server/src/repositories/LoopRepository.js');
@@ -49,28 +34,12 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
     const { campaignRepository } = await import('../ad-server/src/repositories/CampaignRepository.js');
     const { impressionRepository } = await import('../ad-server/src/repositories/ImpressionRepository.js');
     const { playbackObservationRepository } = await import('../ad-server/src/repositories/PlaybackObservationRepository.js');
-    const reset = () => resetDemoBaseline({
-        firestore: getFirestore(),
-        storage: getStorageClient(),
-        activeProjectId: 'softomedia-demo',
-        expectedProjectId: 'softomedia-demo',
-        bucketName: process.env.DEMO_ASSETS_BUCKET || 'softomedia-demo.firebasestorage.app',
-        resetAt: new Date('2030-01-15T10:30:00.000Z'),
-    });
-
-    await reset();
-    await provisionDemoPersonas({ password: PASSWORD, expectedProjectId: 'softomedia-demo' });
-    const contexts = [];
-    const signedInPage = async (email, landing) => {
-        const context = await browser.newContext();
-        contexts.push(context);
-        const persona = await context.newPage();
-        await persona.addInitScript(env => { window.ENV = env; }, BROWSER_ENV);
-        await persona.goto('/login');
-        await persona.getByTestId('input-email').fill(email);
-        await persona.getByTestId('input-password').fill(PASSWORD);
-        await persona.getByTestId('btn-login').click();
-        await expect(persona).toHaveURL(landing);
+    await demo.reset();
+    await demo.provisionPersonas();
+    const personaPages = [];
+    const signedInPersona = async (email, landing) => {
+        const persona = await signedInPage(browser, email, landing);
+        personaPages.push(persona);
         return persona;
     };
 
@@ -136,7 +105,6 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
         expect(registration.status()).toBe(201);
         const { device_key: deviceKey } = await registration.json();
 
-        await page.addInitScript(env => { window.ENV = env; }, BROWSER_ENV);
         await page.goto(`/player?screen_id=${screenId}`);
         await expect(page.getByTestId('player-error')).toContainText('Device key required');
         await page.goto(`/player?screen_id=${screenId}#key=not-this-screens-key`);
@@ -225,7 +193,7 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
         await locationRepository.update(locationId, { retailer_id: retailerId });
         await campaignRepository.update(campaignId, { brand_id: brandId, advertiser_id: brandId, end_date: lastDate });
 
-        const operator = await signedInPage('techoperator@demo.softomedia.test', /\/dashboard\/techoperator$/);
+        const operator = await signedInPersona('techoperator@demo.softomedia.test', /\/dashboard\/techoperator$/);
         await expect(operator.getByTestId('delivery-report')).toBeVisible({ timeout: 30000 });
         await expect(operator.getByTestId('campaign-delivery')).not.toHaveText('0');
         await expect(operator.getByTestId('fallback-playback')).not.toHaveText('0');
@@ -234,14 +202,13 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
         await operator.reload();
         await expect(operator.getByTestId('recent-proof-of-play')).toContainText(proof.event_id);
 
-        const brand = await signedInPage('brand@demo.softomedia.test', /\/dashboard\/brand$/);
+        const brand = await signedInPersona('brand@demo.softomedia.test', /\/dashboard\/brand$/);
         await expect(brand.getByTestId(`proof-events-${campaignId}`)).toContainText(proof.event_id, { timeout: 30000 });
         await brand.reload();
         await expect(brand.getByTestId(`proof-events-${campaignId}`)).toContainText(proof.event_id);
     } finally {
-        await Promise.all(contexts.map(context => context.close()));
-        await reset();
-        await closeFirestore();
+        await Promise.all(personaPages.map(persona => persona.context().close()));
+        await demo.reset();
     }
 });
 

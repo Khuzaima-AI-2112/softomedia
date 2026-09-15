@@ -1,145 +1,55 @@
-const { test, expect } = require('@playwright/test');
+import { test, expect, hasEmulators, signIn } from './fixtures/demo-session.js';
 
-function buildAllocationLoops() {
-    // Independent worked example: per-hour distributions total 42/12/6.
-    const categoriesByLoop = [
-        'pprppipprppp',
-        'rppipprppprp',
-        'pipprppprppi',
-        'pprppprppipp',
-        'rppprppipprp',
-    ];
-    const categoryName = { p: 'paid', r: 'retailer', i: 'internal' };
-    return Array.from({ length: 5 }, (_, loopIndex) => ({
-        id: `2030-01-02_${8 + loopIndex}_store-1`,
-        date: '2030-01-02',
-        hour: 8 + loopIndex,
-        retailer_id: 'retailer-1',
-        store_id: 'store-1',
-        status: 'pending_approval',
-        slots: Array.from({ length: 12 }, (_, position) => {
-            const allocated_category = categoryName[categoriesByLoop[loopIndex][position]];
-            const is_fallback = allocated_category === 'internal' && position % 2 === 1;
-            const is_media = allocated_category === 'retailer';
-            return {
-                position,
-                duration: 5,
-                allocated_category,
-                asset_id: is_fallback ? 'fallback-asset' : `${allocated_category}-asset`,
-                campaign_id: is_fallback || is_media ? null : `${allocated_category}-campaign`,
-                content_kind: is_fallback ? 'fallback' : is_media ? 'media' : 'campaign',
-                is_fallback,
-                status: 'pending',
-            };
-        }),
-    }));
-}
+test.skip(!hasEmulators, 'requires Firebase Auth, Firestore, and Storage emulators');
 
-test('Admin generates and reports a deterministic five-loop Allocation Window', async ({ page }) => {
-    await page.clock.setFixedTime(new Date('2026-09-13T12:00:00.000Z'));
-    const loops = buildAllocationLoops();
-    let generated = false;
+// The exact five-loop 42/12/6 window is proven at the HTTP seam
+// (ad-server/tests/allocation-window.integration.test.js). This journey proves
+// the Admin generates through the UI and the report matches what was persisted.
+test('Admin generates Allocation Windows and the report matches the persisted loops after reload', async ({ page, demo }) => {
+    const { loopRepository } = await import('../ad-server/src/repositories/LoopRepository.js');
+    await demo.reset();
+    await demo.provisionPersonas();
 
-    await page.addInitScript(() => {
-        window.ENV = {
-            VITE_API_URL: 'http://localhost:8080',
-            VITE_FIREBASE_PROJECT_ID: 'softomedia-demo',
-            VITE_FIREBASE_AUTH_EMULATOR_URL: 'http://127.0.0.1:9099',
+    try {
+        await signIn(page, 'admin@demo.softomedia.test', /\/dashboard\/admin$/);
+        await page.goto('/dashboard/admin/loops');
+        // The page generates for tomorrow as the browser computes it.
+        const targetDate = await page.evaluate(() => {
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            return tomorrow.toISOString().split('T')[0];
+        });
+        await page.getByTestId('generate-loops-btn').click();
+        await expect(page.getByText(`Loops generated for ${targetDate} across all stores.`)).toBeVisible();
+
+        const persisted = await loopRepository.findAll({ where: [['date', '==', targetDate]] });
+        const storeLoops = persisted.filter(loop => loop.store_id === 'demo-store-mtl-north');
+        // Default Store hours are 08:00–22:00: one twelve-slot loop per hour.
+        expect(storeLoops.map(loop => loop.hour).sort((a, b) => a - b)).toEqual([8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]);
+        expect(storeLoops.every(loop => loop.slots.length === 12)).toBe(true);
+
+        const slots = persisted.flatMap(loop => loop.slots);
+        const count = predicate => String(slots.filter(predicate).length);
+        const expected = {
+            Paid: count(slot => slot.allocated_category === 'paid'),
+            Retailer: count(slot => slot.allocated_category === 'retailer'),
+            Internal: count(slot => slot.allocated_category === 'internal'),
+            'Campaign content': count(slot => slot.content_kind === 'campaign'),
+            'Media content': count(slot => slot.content_kind === 'media'),
+            'Fallback content': count(slot => slot.content_kind === 'fallback'),
         };
-    });
-    const jwt = [
-        Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url'),
-        Buffer.from(JSON.stringify({
-            aud: 'softomedia-demo',
-            auth_time: 1789300800,
-            email: 'admin@softomedia.demo',
-            exp: 1789304400,
-            firebase: { sign_in_provider: 'password' },
-            iat: 1789300800,
-            iss: 'https://securetoken.google.com/softomedia-demo',
-            sub: 'admin-uid',
-            user_id: 'admin-uid',
-        })).toString('base64url'),
-        'test-signature',
-    ].join('.');
-    await page.route('**/identitytoolkit.googleapis.com/**', route => {
-        if (route.request().url().includes('accounts:lookup')) {
-            return route.fulfill({
-                status: 200,
-                json: {
-                    kind: 'identitytoolkit#GetAccountInfoResponse',
-                    users: [{
-                        localId: 'admin-uid',
-                        email: 'admin@softomedia.demo',
-                        emailVerified: true,
-                        displayName: 'Test Admin',
-                        providerUserInfo: [],
-                        createdAt: '1789300800000',
-                        lastLoginAt: '1789300800000',
-                    }],
-                },
-            });
+        expect(Number(expected.Paid) + Number(expected.Retailer) + Number(expected.Internal)).toBe(slots.length);
+
+        for (const view of ['generated', 'reloaded']) {
+            if (view === 'reloaded') await page.reload();
+            const summary = page.getByTestId('allocation-summary');
+            for (const [label, value] of Object.entries(expected)) {
+                await expect(summary.getByText(label, { exact: true }).locator('..')).toHaveText(`${label}${value}`);
+            }
+            await expect(page.getByTestId('loop-hour-21')).toBeVisible();
+            await expect(page.getByTestId('loop-hour-22')).toHaveCount(0);
         }
-        return route.fulfill({
-            status: 200,
-            json: {
-                kind: 'identitytoolkit#VerifyPasswordResponse',
-                localId: 'admin-uid',
-                email: 'admin@softomedia.demo',
-                displayName: 'Test Admin',
-                idToken: jwt,
-                registered: true,
-                refreshToken: 'test-refresh-token',
-                expiresIn: '3600',
-            },
-        });
-    });
-    await page.route('**/api/auth/me', route => route.fulfill({
-        status: 200,
-        json: { user: { id: 'admin-uid', email: 'admin@softomedia.demo', role: 'admin' } },
-    }));
-
-    await page.route('**/api/stores**', route => route.fulfill({
-        status: 200,
-        json: [{ id: 'store-1', retailer_id: 'retailer-1', name: 'Test Store' }],
-    }));
-    await page.route('**/api/loops**', async route => {
-        const request = route.request();
-        if (request.url().includes('/generate') && request.method() === 'POST') {
-            expect(request.postDataJSON().mock).not.toBe(true);
-            generated = true;
-            return route.fulfill({
-                status: 201,
-                json: {
-                    loops,
-                    business_hours: { start: 8, end: 13, is_closed: false, total_loops: 5 },
-                },
-            });
-        }
-        return route.fulfill({
-            status: 200,
-            json: {
-                loops: generated ? loops : [],
-                business_hours: { start: 8, end: 13, is_closed: false, total_loops: 5 },
-            },
-        });
-    });
-
-    await page.goto('/login');
-    await page.getByTestId('input-email').fill('admin@softomedia.demo');
-    await page.getByTestId('input-password').fill('test-password');
-    await page.getByTestId('btn-login').click();
-    await expect(page).toHaveURL(/\/dashboard\/admin/);
-    await page.goto('/dashboard/admin/loops');
-    await page.getByTestId('generate-loops-btn').click();
-
-    const summary = page.getByTestId('allocation-summary');
-    await expect(summary).toContainText('Paid42');
-    await expect(summary).toContainText('Retailer12');
-    await expect(summary).toContainText('Internal6');
-    await expect(summary).toContainText(/Campaign content/i);
-    await expect(summary).toContainText(/Media content/i);
-    await expect(summary).toContainText(/Fallback content/i);
-    await expect(page.getByTestId('loop-hour-12')).toBeVisible();
-    await expect(page.getByTestId('loop-hour-13')).not.toBeVisible();
+    } finally {
+        await demo.reset();
+    }
 });

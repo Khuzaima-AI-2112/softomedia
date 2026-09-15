@@ -17,28 +17,11 @@ const emulatorEnv = mediaEmulatorTest ? {
 /**
  * See https://playwright.dev/docs/test-configuration.
  *
- * Changes from original:
- *
- * 1. globalTeardown updated — now points to the dedicated wrapper file
- *    tests/demo_wizard/00_seed.teardown.js which re-exports demoSeedTeardown
- *    as a default export. Playwright globalTeardown does not support the
- *    `file#namedExport` fragment syntax; the previous value
- *    './tests/demo_wizard/00_seed.setup.js#demoSeedTeardown' caused a
- *    MODULE_NOT_FOUND crash before any test ran.
- *
- * 2. 'demo-wizard' project — isolated serial project for the 16-phase E2E
- *    demo suite. Chromium only, 90s timeout, single worker, testMatch scoped
- *    to tests/demo_wizard/. Only active when ALLOW_DEMO_MODE=true.
- *
- * 3. timeout: 60000 added at root — Playwright default is 30s which is too
- *    tight for React.lazy cold loads on CI. 60s root; 90s in demo project.
- *
- * 4. ad-server port reverted back to 8080 because .env.development hardcodes it to 8080.
+ * Browser journeys sign in for real against the Firebase emulators and read
+ * and write through the API without interception (tests/fixtures/demo-session.js).
+ * Run them under the emulators with MEDIA_EMULATOR_TEST=true.
  */
 export default defineConfig({
-    globalSetup: './tests/global.setup.js',
-    globalTeardown: './tests/demo_wizard/00_seed.teardown.js',
-
     testDir: './tests',
     testIgnore: '**/firestore-rules/**',
 
@@ -65,8 +48,7 @@ export default defineConfig({
         /* Maximum time each action such as click() can take. */
         actionTimeout: 30_000,
 
-        /* Collect trace always — essential for debugging 16-phase serial suites. */
-        trace: 'on',
+        trace: 'retain-on-failure',
 
         screenshot: 'only-on-failure',
     },
@@ -80,37 +62,6 @@ export default defineConfig({
             name: 'chromium',
             use: { ...devices['Desktop Chrome'] },
         },
-
-        /**
-         * demo-wizard — isolated project for the 16-phase E2E demo suite.
-         *
-         * Only runs when ALLOW_DEMO_MODE=true. Serial execution enforced at
-         * the describe level inside each spec (test.describe.serial); this
-         * project config ensures no other spec file runs concurrently with it.
-         *
-         * timeout: 90s — Phase 4 player broadcast needs 35s window + margins.
-         * Phase 3 Campaign Wizard 5-step flow needs headroom on cold CI.
-         *
-         * storageState is NOT set here — each phase calls loginAs() from
-         * demo.fixtures.js which loads the correct .auth/<role>.json file.
-         */
-        ...(process.env.ALLOW_DEMO_MODE === 'true' ? [{
-            name: 'demo-wizard',
-            testMatch: '**/demo_wizard/**/*.spec.js',
-            fullyParallel: false,
-            workers: 1,
-            timeout: 90_000,
-            use: {
-                ...devices['Desktop Chrome'],
-                baseURL: 'http://localhost:5173',
-                actionTimeout: 30_000,
-                trace: 'on',
-                screenshot: 'only-on-failure',
-                // Viewport matches the target deployment screens (1920×1080
-                // primary; 1280×800 for the player iframe assertions).
-                viewport: { width: 1280, height: 800 },
-            },
-        }] : []),
 
         /* Mobile viewports — uncomment to activate */
         // { name: 'Mobile Chrome',  use: { ...devices['Pixel 5'] } },
@@ -127,20 +78,14 @@ export default defineConfig({
             url: 'http://localhost:8080/health',
             reuseExistingServer: !process.env.CI && !mediaEmulatorTest,
             timeout: 120_000,
-            env: {
-                ...emulatorEnv,
-                ALLOW_DEMO_MODE: 'true'
-            }
+            env: emulatorEnv,
         },
         {
             command: 'npx kill-port 5173 && npm run dev --prefix client-app',
             url: 'http://localhost:5173',
             reuseExistingServer: !mediaEmulatorTest,
             timeout: 180_000,
-            env: {
-                ...emulatorEnv,
-                ALLOW_DEMO_MODE: 'true'
-            }
+            env: emulatorEnv,
         },
     ],
 });
