@@ -31,14 +31,10 @@ function assetsBucketName() {
         || (projectId ? `${projectId}.firebasestorage.app` : null);
 }
 
-function publicObjectUrl(bucketName, destination) {
-    if (process.env.STORAGE_EMULATOR_HOST) {
-        const origin = process.env.STORAGE_EMULATOR_HOST.replace(/\/$/, '');
-        return `${origin}/v0/b/${bucketName}/o/${encodeURIComponent(destination)}?alt=media`;
-    }
-    return `https://storage.googleapis.com/${bucketName}/${destination}`;
-}
-
+/**
+ * Stores an uploaded media file as a private object. It is never made public;
+ * the API streams it to the users and Screens allowed to see it.
+ */
 export async function uploadMediaObject({ destination, buffer, contentType, metadata = {} }) {
     const client = getStorageClient();
     const bucketName = assetsBucketName();
@@ -47,32 +43,39 @@ export async function uploadMediaObject({ destination, buffer, contentType, meta
     }
 
     const file = client.bucket(bucketName).file(destination);
-    let objectCreated = false;
-    try {
-        await file.save(buffer, {
-            resumable: false,
-            metadata: {
-                contentType,
-                cacheControl: 'public, max-age=3600',
-                metadata,
-            },
-        });
-        objectCreated = true;
-        await file.makePublic();
-    } catch (error) {
-        if (objectCreated) {
-            try {
-                await file.delete({ ignoreNotFound: true });
-            } catch (cleanupError) {
-                throw new AggregateError([error, cleanupError], 'Storage upload and cleanup both failed');
-            }
-        }
-        throw error;
-    }
+    await file.save(buffer, {
+        resumable: false,
+        metadata: {
+            contentType,
+            cacheControl: 'private, max-age=300',
+            metadata,
+        },
+    });
     return {
-        url: publicObjectUrl(bucketName, destination),
         storage_path: `gs://${bucketName}/${destination}`,
         object_ref: { kind: 'gcs', bucketName, destination },
+    };
+}
+
+/**
+ * Opens a stored media object for reading through the API. Objects are private,
+ * so this server's credentials are the only way to read them. Returns null when
+ * the path is not an object in the media bucket or the object is gone.
+ */
+export async function openMediaObject(storagePath) {
+    const match = /^gs:\/\/([^/]+)\/(.+)$/.exec(storagePath || '');
+    if (!match || match[1] !== assetsBucketName()) return null;
+    const client = getStorageClient();
+    if (!client) throw new Error('Persistent media storage is unavailable');
+
+    const file = client.bucket(match[1]).file(match[2]);
+    const [exists] = await file.exists();
+    if (!exists) return null;
+    const [metadata] = await file.getMetadata();
+    return {
+        contentType: metadata.contentType || 'application/octet-stream',
+        size: metadata.size,
+        stream: file.createReadStream(),
     };
 }
 
@@ -85,21 +88,3 @@ export async function deleteMediaObject(objectReference) {
     }
     throw new Error('Unsupported media object reference');
 }
-
-/** Legacy path-based upload retained for existing callers. */
-export const uploadFile = async (localPath, destination, bucketName = assetsBucketName()) => {
-    const client = getStorageClient();
-    if (client && bucketName) {
-        const [file] = await client.bucket(bucketName).upload(localPath, {
-            destination,
-            metadata: { cacheControl: 'public, max-age=3600' },
-        });
-        await file.makePublic();
-        return {
-            url: publicObjectUrl(bucketName, destination),
-            storage_path: `gs://${bucketName}/${destination}`,
-        };
-    }
-    const normalizedPath = localPath.replace(/\\/g, '/');
-    return { url: `http://localhost:8080/${normalizedPath}`, storage_path: localPath };
-};

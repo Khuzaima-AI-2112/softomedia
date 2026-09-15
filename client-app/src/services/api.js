@@ -109,6 +109,7 @@ class APIClient {
                 );
             }
 
+            if (options.responseType === 'blob') return modifiedResponse.blob();
             const data = await modifiedResponse.json();
             return data;
 

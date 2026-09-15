@@ -5,6 +5,7 @@ import { loopRepository, LOOP_STATUS } from '../repositories/LoopRepository.js';
 import { mediaRepository } from '../repositories/MediaRepository.js';
 import { screenRepository } from '../repositories/ScreenRepository.js';
 import StoreRepository from '../repositories/StoreRepository.js';
+import { deviceMediaPath } from '../constants/mediaPaths.js';
 import {
     isApprovedFallbackAsset,
     isApprovedPlaybackAsset,
@@ -157,7 +158,8 @@ export class PlaybackService {
             } : {}),
             asset_id: asset.id,
             asset_name: asset.title || asset.filename || slot.asset_name || null,
-            url: asset.url || asset.content_url || slot.url || null,
+            // Stored media is private; the Player reads it through its device media route.
+            url: asset.storage_path ? deviceMediaPath(asset.id) : asset.url || asset.content_url || slot.url || null,
             presentation_type: presentationType,
             counts_as_delivery: presentationType === 'campaign',
         };

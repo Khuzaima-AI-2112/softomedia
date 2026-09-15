@@ -68,14 +68,13 @@ function mediaFixture({ id, category, ownerType, ownerId, bucketName, resetAtIso
             status: 'approved',
             is_fallback: category === 'fallback',
             storage_path: `gs://${bucketName}/${objectName}`,
-            url: `https://storage.googleapis.com/${bucketName}/${objectName}`,
         }, resetAtIso),
         storageObject: {
             name: objectName,
             body: SYNTHETIC_PNG,
             metadata: {
                 contentType: 'image/png',
-                cacheControl: 'public, max-age=300',
+                cacheControl: 'private, max-age=300',
                 metadata: {
                     demoResetScope: DEMO_RESET_SCOPE,
                     mediaCategory: category,
@@ -212,7 +211,6 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
             advertiser_id: 'demo-advertiser-secondary',
             retailer_id: 'demo-retailer-secondary',
             media_id: 'demo-media-paid',
-            creative_url: `https://storage.googleapis.com/${bucketName}/${DEMO_STORAGE_PREFIX}media/paid.png`,
             status: 'approved',
             visibility: 'private',
             start_date: isoDateDaysAfter(resetAt, 1),
@@ -224,7 +222,6 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
             advertiser_id: 'demo-advertiser-secondary',
             retailer_id: 'demo-retailer-secondary',
             media_id: 'demo-media-paid',
-            creative_url: `https://storage.googleapis.com/${bucketName}/${DEMO_STORAGE_PREFIX}media/paid.png`,
             status: 'pending_approval',
             visibility: 'private',
             start_date: isoDateDaysAfter(resetAt, 7),

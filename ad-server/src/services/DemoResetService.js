@@ -72,7 +72,6 @@ export async function resetDemoBaseline({
             resumable: false,
             metadata: object.metadata,
         });
-        await file.makePublic();
     }));
     await Promise.all(scopedObjects
         .filter(object => !baselineObjectNames.has(object.name))

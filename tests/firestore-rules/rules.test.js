@@ -10,8 +10,8 @@
  */
 
 const { initializeTestEnvironment, assertFails } = require('@firebase/rules-unit-testing');
-const { doc, getDoc, setDoc, updateDoc } = require('firebase/firestore');
-const { ref, uploadString, getBytes } = require('firebase/storage');
+const { deleteDoc, doc, getDoc, setDoc, updateDoc } = require('firebase/firestore');
+const { deleteObject, ref, uploadString, getBytes } = require('firebase/storage');
 const { readFileSync } = require('fs');
 const { resolve } = require('path');
 
@@ -41,6 +41,7 @@ const IDENTITIES = [
   ['a Retailer user with role claims', { uid: 'retailer-uid', claims: { role: 'retaileradmin', retailerId: 'demo-retailer-freshmart' } }],
   ['an Admin-claimed user', { uid: 'admin-uid', claims: { role: 'admin' } }],
   ['a Super Administrator-claimed user', { uid: 'superadmin-uid', claims: { role: 'superadmin' } }],
+  ['a Technical Operator-claimed user', { uid: 'techoperator-uid', claims: { role: 'techoperator' } }],
 ];
 
 jest.setTimeout(60_000);
@@ -88,13 +89,15 @@ describe.each(IDENTITIES)('%s', (_label, identity) => {
     await assertFails(getDoc(doc(db, collection, 'existing')));
     await assertFails(setDoc(doc(db, collection, 'existing'), { retailer_id: 'forged' }));
     await assertFails(setDoc(doc(db, collection, 'created-by-client'), { retailer_id: 'forged' }));
+    await assertFails(deleteDoc(doc(db, collection, 'existing')));
   });
 
-  test('cannot read or upload Storage objects directly', async () => {
+  test('cannot read, upload or delete Storage objects directly', async () => {
     const storage = contextFor(identity).storage();
 
     await assertFails(getBytes(ref(storage, 'media/existing.png')));
     await assertFails(uploadString(ref(storage, 'media/forged.png'), 'forged'));
+    await assertFails(deleteObject(ref(storage, 'media/existing.png')));
   });
 });
 

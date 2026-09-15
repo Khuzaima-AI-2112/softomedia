@@ -4,10 +4,8 @@ test.skip(!hasEmulators, 'requires Firebase Auth, Firestore, and Storage emulato
 
 const API = 'http://localhost:8080';
 
-// The demo reset uploads these images to the Storage emulator; this is its bucket/object path,
-// the emulator's counterpart of the seeded https://storage.googleapis.com/<bucket>/<object> URL.
-const demoMediaUrl = category => `${process.env.STORAGE_EMULATOR_HOST.replace(/\/$/, '')}`
-    + `/${process.env.DEMO_ASSETS_BUCKET}/phase-1-demo/media/${category}.png`;
+// The demo reset uploads these private images; the Player reads them through its device media route.
+const demoStoragePath = category => `gs://${process.env.DEMO_ASSETS_BUCKET}/phase-1-demo/media/${category}.png`;
 
 test('Player authenticates as its Screen and reports approved Campaign, fallback, and Holding Slide state truthfully', async ({ page, browser, demo }) => {
     const suffix = `${Date.now()}`;
@@ -53,7 +51,7 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
         await locationRepository.create(locationId, { name: 'Player Browser Entrance', retailer_id: retailerId, store_id: storeId });
         await mediaRepository.create(assetId, {
             title: 'Browser Campaign Creative',
-            url: demoMediaUrl('paid'),
+            storage_path: demoStoragePath('paid'),
             category: 'paid',
             owner_type: 'brand',
             owner_id: brandId,
@@ -141,7 +139,7 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
 
         await mediaRepository.create(fallbackId, {
             title: 'Browser Approved Fallback',
-            url: demoMediaUrl('fallback'),
+            storage_path: demoStoragePath('fallback'),
             category: 'fallback',
             content_kind: 'neutral_fallback',
             owner_type: 'platform',

@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { API_URL } from '../config.js'
 import { deviceAPI, deviceFromLocation } from '../services/deviceAPI.js'
 import { telemetryService } from '../services/TelemetryService.js'
+import { useMediaSource } from '../hooks/useMediaSource.js'
+
+const DEVICE_MEDIA_PREFIX = '/api/device/media/';
+const deviceMediaPath = assetId => `${DEVICE_MEDIA_PREFIX}${assetId}`;
 
 // Neutral, local Holding Slide: available without a media or network dependency.
 const HOLDING_SLIDE_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1920' height='1080' viewBox='0 0 1920 1080'%3E%3Crect width='1920' height='1080' fill='%230f172a'/%3E%3Ctext x='50%25' y='45%25' font-family='sans-serif' font-size='72' font-weight='bold' fill='%2338bdf8' text-anchor='middle' dominant-baseline='middle'%3ESoftoMedia%3C/text%3E%3Ctext x='50%25' y='58%25' font-family='sans-serif' font-size='32' fill='%2394a3b8' text-anchor='middle' dominant-baseline='middle'%3EBroadcast Network%3C/text%3E%3C/svg%3E`;
@@ -286,7 +289,7 @@ function Player() {
                         : currentLoop.id === 'offline-fallback' ? PRESENTATION_TYPE.OFFLINE_FALLBACK
                             : PRESENTATION_TYPE.CAMPAIGN);
                 // Task V3: validate slot URL before inject — block non-HTTPS and dangerous schemes
-                let assetUrl = slot.url || `${API_URL}/api/assets/${slot.asset_id}`;
+                let assetUrl = slot.url || deviceMediaPath(slot.asset_id);
                 const permitsEmbeddedAsset = [
                     PRESENTATION_TYPE.HOLDING_SLIDE,
                     PRESENTATION_TYPE.OFFLINE_FALLBACK,
@@ -295,11 +298,13 @@ function Player() {
                     console.error('[Player][V3] Blocked dangerous slot URL scheme:', assetUrl.substring(0, 30));
                     return null;
                 }
-                if (!assetUrl.startsWith('http') && !assetUrl.startsWith('data:')) {
-                    assetUrl = `${API_URL}/api/assets/${slot.asset_id}`;
+                // Private media is read from this Screen's device media route with its device key.
+                const isDeviceMedia = assetUrl.startsWith(DEVICE_MEDIA_PREFIX);
+                if (!isDeviceMedia && !assetUrl.startsWith('http') && !assetUrl.startsWith('data:')) {
+                    assetUrl = deviceMediaPath(slot.asset_id);
                 }
-                // In production, enforce HTTPS (allow data: only for fallback slots)
-                if (import.meta.env.MODE !== 'development' && import.meta.env.MODE !== 'test') {
+                // In production, enforce HTTPS for external media (allow data: only for fallback slots)
+                if (!isDeviceMedia && import.meta.env.MODE !== 'development' && import.meta.env.MODE !== 'test') {
                     if (!assetUrl.startsWith('https://') && !assetUrl.startsWith('data:')) {
                         console.error('[Player][V3] Blocked non-HTTPS asset URL in production');
                         return null;
@@ -322,6 +327,8 @@ function Player() {
     };
 
     const activeContent = getActiveContent();
+    const loadDeviceMedia = useCallback(path => deviceAPI.media(device, path), [device]);
+    const mediaSrc = useMediaSource(activeContent?.url, loadDeviceMedia);
 
     if (status === 'playing' && activeContent) {
         return (
@@ -332,14 +339,16 @@ function Player() {
                 data-connectivity-status={connectivityStatus}
                 style={{ width: '100vw', height: '100vh', backgroundColor: 'black', overflow: 'hidden' }}
             >
-                <img
-                    key={`${currentLoop?.id}:${currentSlotIndex}`}
-                    data-testid="ad-frame"
-                    src={activeContent.url}
-                    alt={activeContent.title}
-                    onLoad={handlePresentationStart}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
+                {mediaSrc && (
+                    <img
+                        key={`${currentLoop?.id}:${currentSlotIndex}`}
+                        data-testid="ad-frame"
+                        src={mediaSrc}
+                        alt={activeContent.title}
+                        onLoad={handlePresentationStart}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                )}
                 
                 <div data-testid="slot-transition" className="hidden"></div>
 

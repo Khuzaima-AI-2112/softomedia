@@ -10,14 +10,17 @@ const mediaRepository = {
     create: async (id, data) => ({ id, ...data }),
 };
 
-jest.unstable_mockModule('../src/repositories/index.js', () => ({ mediaRepository }));
+jest.unstable_mockModule('../src/repositories/index.js', () => ({
+    mediaRepository,
+    campaignRepository: { findAll: async () => [], targetsRetailer: () => false },
+}));
 jest.unstable_mockModule('../src/utils/storage.js', () => ({
     uploadMediaObject: async ({ destination }) => ({
         storage_path: `gs://test-bucket/${destination}`,
-        url: `https://storage.test/${destination}`,
         object_ref: { kind: 'gcs', bucketName: 'test-bucket', destination },
     }),
     deleteMediaObject: async () => {},
+    openMediaObject: async () => null,
 }));
 
 const { default: assetsRouter } = await import('../src/api/assets.js');

@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 import GlassCard from '../../../components/GlassCard';
+import ProtectedImage from '../../../components/ProtectedImage';
 import apiService from '../../../services/ApiService';
 
 // Demo creative URLs for quick selection
@@ -59,7 +60,7 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
         setUploading(true);
         try {
             const asset = await apiService.uploadAsset(payload);
-            setSelectedCreative(asset.url);
+            setSelectedCreative(asset.content_path);
             setCreativeAssetId(asset.id);
             setCustomUrl('');
             setUploadSuccess('Creative uploaded successfully.');
@@ -221,7 +222,7 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
                 <GlassCard>
                     <h3 className="font-bold text-lg mb-4">Preview</h3>
                     <div className="aspect-video bg-slate-900 rounded-xl overflow-hidden max-w-2xl mx-auto shadow-2xl">
-                        <img
+                        <ProtectedImage
                             src={selectedCreative}
                             alt="Selected creative preview"
                             className="w-full h-full object-cover"

@@ -22,19 +22,24 @@ const mediaRepository = {
     },
 };
 
-jest.unstable_mockModule('../src/repositories/index.js', () => ({ mediaRepository }));
+jest.unstable_mockModule('../src/repositories/index.js', () => ({
+    mediaRepository,
+    campaignRepository: { findAll: async () => [], targetsRetailer: () => false },
+}));
 jest.unstable_mockModule('../src/utils/storage.js', () => ({
     async uploadMediaObject({ destination, buffer, contentType }) {
         if (buffer.toString().includes('storage failure')) throw new Error('Storage unavailable');
         storedObjects.set(destination, { buffer, contentType });
         return {
             storage_path: `gs://softomedia-demo.firebasestorage.app/${destination}`,
-            url: `http://127.0.0.1:9199/v0/b/softomedia-demo.firebasestorage.app/o/${encodeURIComponent(destination)}?alt=media`,
             object_ref: { kind: 'gcs', bucketName: 'softomedia-demo.firebasestorage.app', destination },
         };
     },
     async deleteMediaObject(objectReference) {
         storedObjects.delete(objectReference.destination);
+    },
+    async openMediaObject() {
+        return null;
     },
 }));
 

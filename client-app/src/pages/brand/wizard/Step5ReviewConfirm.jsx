@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import GlassCard from '../../../components/GlassCard';
 import LoopVisualisationBar from '../../../components/LoopVisualisationBar';
+import ProtectedImage from '../../../components/ProtectedImage';
 import { PriceSummary } from '../../../components/PriceDisplay';
 import TrafficTierBadge from '../../../components/TrafficTierBadge';
 import apiService from '../../../services/ApiService';
@@ -174,7 +175,7 @@ function Step5ReviewConfirm({ data, onConfirm, submitting, onPrev }) {
                             Creative Preview
                         </h3>
                         <div className="aspect-video bg-slate-900 rounded-xl overflow-hidden max-w-lg">
-                            <img
+                            <ProtectedImage
                                 src={data.creativeUrl}
                                 alt="Campaign creative"
                                 className="w-full h-full object-cover"

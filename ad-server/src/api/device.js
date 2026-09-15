@@ -7,6 +7,9 @@ import { playbackService, PlaybackError } from '../services/PlaybackService.js';
 import { proofOfPlayService } from '../services/ProofOfPlayService.js';
 import { playbackObservationService } from '../services/PlaybackObservationService.js';
 import { PresentationEventError } from '../services/PresentationEventValidation.js';
+import { isApprovedPlaybackAsset } from '../services/PlaybackEligibility.js';
+import { mediaRepository } from '../repositories/index.js';
+import { sendMediaContent } from './mediaContent.js';
 
 /**
  * Trusted Screen/device routes. Every route authenticates the calling Player
@@ -44,6 +47,13 @@ router.get('/playback', async (req, res) => {
         logger.error('Device playback failed', { screen_id: req.device.screen_id, error: error.message });
         return res.status(503).json({ error: 'Playback unavailable' });
     }
+});
+
+// GET /api/device/media/:assetId — the file of approved playback media; anything else reads as not found
+router.get('/media/:assetId', async (req, res) => {
+    const asset = await mediaRepository.findById(req.params.assetId);
+    if (!isApprovedPlaybackAsset(asset)) return res.status(404).json({ error: 'Media not found' });
+    return sendMediaContent(res, asset);
 });
 
 // POST /api/device/heartbeat — records this Screen's connectivity

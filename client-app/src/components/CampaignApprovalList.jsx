@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react';
 import apiService from '../services/ApiService.js';
 import StatusBadge from './StatusBadge.jsx';
 import GlassCard from './GlassCard.jsx';
+import ProtectedImage from './ProtectedImage.jsx';
+import { assetContentPath } from '../hooks/useMediaSource.js';
+
+const CREATIVE_PLACEHOLDER = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"%3E%3Crect width="100" height="100" fill="%23333"/%3E%3C/svg%3E';
 
 /**
  * CampaignApprovalList
@@ -149,9 +153,10 @@ export default function CampaignApprovalList() {
       {expandedCampaignId === campaign.id && (
         <div data-testid="campaign-detail" className="mt-2 pt-4 border-t border-slate-700/50 w-full space-y-4">
           <div className="flex gap-4">
-            <img
+            <ProtectedImage
               data-testid="campaign-creative-thumbnail"
-              src={campaign.creative_url || campaign.url || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"%3E%3Crect width="100" height="100" fill="%23333"/%3E%3C/svg%3E'}
+              src={assetContentPath(campaign.media_id || campaign.asset_id) || campaign.creative_url}
+              fallbackSrc={CREATIVE_PLACEHOLDER}
               alt="Creative Preview"
               className="w-32 h-24 object-cover rounded border border-slate-700"
             />

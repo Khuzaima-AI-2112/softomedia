@@ -2,9 +2,11 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import { randomUUID } from 'crypto';
-import { mediaRepository } from '../repositories/index.js';
+import { campaignRepository, mediaRepository } from '../repositories/index.js';
 import { deleteMediaObject, uploadMediaObject } from '../utils/storage.js';
 import { ROLES, normalizeRole } from '../constants/roles.js';
+import { sendMediaContent } from './mediaContent.js';
+import { assetContentPath } from '../constants/mediaPaths.js';
 
 const router = express.Router();
 const CATEGORIES = new Set(['paid', 'retailer', 'internal', 'fallback']);
@@ -120,12 +122,48 @@ router.get('/', async (req, res) => {
         const assets = await mediaRepository.findAllDurable();
         if (role === ROLES.BRAND) {
             const ownerId = req.user.linked_entity_id || req.user.organization_id;
-            return res.json(assets.filter(asset => asset.owner_type === 'brand' && asset.owner_id === ownerId));
+            return res.json(assets
+                .filter(asset => asset.owner_type === 'brand' && asset.owner_id === ownerId)
+                .map(presentAsset));
         }
-        return res.json(assets);
+        return res.json(assets.map(presentAsset));
     } catch {
         return res.status(500).json({ error: 'Media could not be loaded' });
     }
+});
+
+/** Stored media is addressed by its API content path; its Storage location stays internal. */
+function presentAsset(asset) {
+    if (!asset?.storage_path) return asset;
+    const presented = { ...asset, content_path: assetContentPath(asset.id) };
+    delete presented.url;
+    return presented;
+}
+
+/** A Retailer reviews the creative of any Campaign booked at its Stores. */
+async function isUnderReviewBy(asset, retailerId) {
+    if (!retailerId) return false;
+    const campaigns = await campaignRepository.findAll();
+    return campaigns.some(campaign => (campaign.media_id === asset.id || campaign.asset_id === asset.id)
+        && campaignRepository.targetsRetailer(campaign, retailerId));
+}
+
+/**
+ * GET /api/assets/:id/content
+ * The asset's file, for a signed-in user allowed to see the asset. Media that
+ * is outside the caller's scope reads as not found.
+ */
+router.get('/:id/content', async (req, res) => {
+    const asset = await mediaRepository.findById(req.params.id);
+    const role = normalizeRole(req.user?.role);
+    const ownerId = req.user?.organization_id || req.user?.linked_entity_id || null;
+    const visible = asset && (
+        PLATFORM_MEDIA_ROLES.has(role)
+        || (role === ROLES.BRAND && asset.owner_type === 'brand' && asset.owner_id === ownerId)
+        || (role === ROLES.RETAILERADMIN && await isUnderReviewBy(asset, ownerId))
+    );
+    if (!visible) return res.status(404).json({ error: 'Media not found' });
+    return sendMediaContent(res, asset);
 });
 
 router.post('/upload', receiveFile, async (req, res) => {
@@ -163,10 +201,9 @@ router.post('/upload', receiveFile, async (req, res) => {
             file_type: req.file.mimetype,
             size_bytes: req.file.size,
             storage_path: storedObject.storage_path,
-            url: storedObject.url,
             status: 'ready',
         });
-        return res.status(201).json(asset);
+        return res.status(201).json(presentAsset(asset));
     } catch (error) {
         if (storedObject?.storage_path) {
             try {

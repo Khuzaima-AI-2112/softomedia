@@ -39,6 +39,11 @@ export const deviceAPI = {
         return apiClient.post('/api/device/proof-of-play', presentation, { headers: deviceHeaders(device) });
     },
 
+    /** A private media file this Screen is scheduled to present, as a Blob. */
+    async media(device, path) {
+        return apiClient.get(path, { headers: deviceHeaders(device), responseType: 'blob' });
+    },
+
     async playbackObservation(device, observation) {
         return apiClient.post('/api/device/playback-observations', observation, { headers: deviceHeaders(device) });
     },

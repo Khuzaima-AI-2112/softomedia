@@ -102,7 +102,6 @@ function AdminOverview() {
         { label: 'CPM Pricing', icon: 'attach_money', path: '/dashboard/admin/pricing', color: 'emerald' },
         { label: 'Retailers', icon: 'storefront', path: '/dashboard/admin/retailers', color: 'amber' },
         { label: 'Advertisers', icon: 'campaign', path: '/dashboard/admin/advertisers', color: 'rose' },
-        { label: 'Demo Player', icon: 'slideshow', path: '/player/demo', color: 'purple' },
         { label: 'Store Hours', icon: 'schedule', path: '/dashboard/admin/hours', color: 'indigo' },
         { label: 'Network Map', icon: 'map', path: '/dashboard/admin/map', color: 'cyan' },
     ];

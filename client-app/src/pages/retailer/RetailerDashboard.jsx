@@ -63,7 +63,6 @@ function RetailerDashboard() {
     const quickActions = [
         { label: 'Schedule Calendar', icon: 'event', path: '/dashboard/retailer/schedule', color: 'primary' },
         { label: 'Approval History', icon: 'history', path: '/dashboard/retailer/schedule-history', color: 'amber' },
-        { label: 'Demo Player', icon: 'slideshow', path: '/player/demo', color: 'purple' }
     ];
 
     return (

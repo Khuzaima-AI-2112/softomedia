@@ -270,7 +270,6 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, RO
         const submittedData = brandCaller ? {
             name: req.body.name,
             media_id: req.body.media_id,
-            creative_url: brandMedia.url,
             creative_mime_type: brandMedia.mime_type,
             creative_duration: brandMedia.duration,
             start_date: req.body.start_date,

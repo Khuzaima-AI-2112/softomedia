@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import KPICard from '../../components/KPICard';
 import DataTable from '../../components/DataTable';
 import GlassCard from '../../components/GlassCard';
+import ProtectedImage from '../../components/ProtectedImage';
+import { assetContentPath } from '../../hooks/useMediaSource';
 import apiService from '../../services/ApiService';
 import pricingService from '../../services/PricingService';
 
@@ -76,9 +78,9 @@ const BrandDashboard = () => {
             header: 'Preview',
             render: (cmp) => (
                 <div className="relative w-16 h-10 rounded-md overflow-hidden bg-slate-200 dark:bg-slate-700 ring-1 ring-slate-200 dark:ring-slate-700">
-                    <img
+                    <ProtectedImage
                         className="absolute inset-0 size-full object-cover"
-                        src={cmp.creative_url}
+                        src={assetContentPath(cmp.media_id) || cmp.creative_url}
                         alt={`${cmp.name} creative`}
                     />
                 </div>
@@ -184,13 +186,6 @@ const BrandDashboard = () => {
                     <p className="text-slate-500 dark:text-slate-400">Manage and monitor your advertising campaigns</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Link
-                        to="/player/demo"
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium transition-colors"
-                    >
-                        <span className="material-symbols-outlined text-[20px]">slideshow</span>
-                        Preview Demo
-                    </Link>
                     <button
                         onClick={() => navigate('campaign/new')}
                         data-testid="new-campaign-btn"

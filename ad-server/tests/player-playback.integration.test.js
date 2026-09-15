@@ -203,6 +203,41 @@ describe('GET /api/device/playback', () => {
         });
     });
 
+    test('points the Player at the device media route for stored media, never at the Storage object', async () => {
+        await seedAssignment();
+        const loop = await seedLoop();
+        await loopRepository.update(loop.id, {
+            slots: [{
+                position: 0,
+                allocated_category: 'retailer',
+                asset_id: 'stored-fallback',
+                content_kind: 'fallback',
+                is_fallback: true,
+                duration: 5,
+            }],
+        });
+        await mediaRepository.create('stored-fallback', {
+            title: 'Stored neutral fallback',
+            category: 'fallback',
+            content_kind: 'neutral_fallback',
+            owner_type: 'platform',
+            owner_id: null,
+            approval_status: 'approved',
+            eligible_for_playback: true,
+            status: 'ready',
+            storage_path: 'gs://softomedia-demo.firebasestorage.app/phase-1-demo/uploads/stored-fallback.png',
+            url: 'https://storage.googleapis.com/softomedia-demo.firebasestorage.app/phase-1-demo/uploads/stored-fallback.png',
+        });
+
+        const response = await screenOnePlayback();
+
+        expect(response.status).toBe(200);
+        expect(response.body.slots[0]).toMatchObject({
+            asset_id: 'stored-fallback',
+            url: '/api/device/media/stored-fallback',
+        });
+    });
+
     test('does not claim Campaign delivery for approved category media', async () => {
         await seedAssignment();
         const loop = await seedLoop();

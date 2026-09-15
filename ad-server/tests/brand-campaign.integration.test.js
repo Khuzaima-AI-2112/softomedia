@@ -188,10 +188,11 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
             brand_id: 'demo-advertiser-bonvie',
             advertiser_id: 'demo-advertiser-bonvie',
             media_id: upload.body.id,
-            creative_url: upload.body.url,
             status: 'pending_approval',
             inventory_selection: inventorySelection,
         });
+        // The creative is read through the API by media_id; a submitted URL is never stored.
+        expect(creation.body).not.toHaveProperty('creative_url');
         createdCampaignIds.push(creation.body.id);
         const conflictingLegacyId = `conflicting-brand-${Date.now()}`;
         createdCampaignIds.push(conflictingLegacyId);

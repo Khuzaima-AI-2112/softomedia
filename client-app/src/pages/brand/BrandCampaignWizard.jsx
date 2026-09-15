@@ -68,7 +68,6 @@ const BrandCampaignWizard = () => {
             const campaignData = {
                 name: wizardData.campaignName || 'New Campaign',
                 media_id: wizardData.creativeAssetId,
-                creative_url: wizardData.creativeUrl,
                 duration: wizardData.creativeDuration,
                 start_date: wizardData.dateRange.start,
                 end_date: wizardData.dateRange.end,

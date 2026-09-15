@@ -11,7 +11,6 @@
  *   layouts/DashboardLayout.jsx          ✅
  *   pages/Login.jsx                      ✅
  *   pages/Player.jsx                     ✅
- *   pages/LoopDemoPlayer.jsx             ✅
  *   pages/NotFound.jsx                   ✅
  *   pages/Health.jsx                     ✅  (served at /dashboard/techoperator/health)
  *   pages/admin/Overview.jsx             ✅
@@ -68,7 +67,6 @@ const Dashboard = lazy(() => import('./layouts/DashboardLayout'));
 
 // ── Top-level pages ────────────────────────────────────────────────────────────────────────
 const Player         = lazy(() => import('./pages/Player'));
-const LoopDemoPlayer = lazy(() => import('./pages/LoopDemoPlayer'));
 const Login          = lazy(() => import('./pages/Login'));
 const Health         = lazy(() => import('./pages/Health'));
 
@@ -129,7 +127,6 @@ function App() {
                     <Routes>
                         {/* ── Public / standalone ── */}
                         <Route path="/player"      element={<Player />} />
-                        <Route path="/player/demo" element={<LoopDemoPlayer />} />
                         <Route path="/login"       element={<Login />} />
 
                         {/* ── Dashboard shell ── */}
