@@ -123,6 +123,76 @@ describeWithEmulators('Campaign Retailer scope with Firebase emulators', () => {
         expect(edit.body).toMatchObject({ name: 'Edited', status: 'pending_approval' });
     });
 
+    test('moving an approved Campaign to other Stores returns it to Retailer approval', async () => {
+        await seedCampaign('scope-edit-retarget', {
+            status: 'approved',
+            media_id: 'demo-media-paid',
+            inventory_selection: [{
+                retailer_id: 'demo-retailer-freshmart',
+                store_id: 'demo-store-mtl-north',
+                location_id: 'demo-location-mtl-checkout',
+                screen_id: 'demo-screen-north-1',
+            }],
+        });
+
+        const edit = await as('admin', request(app).put('/api/campaigns/scope-edit-retarget')).send({
+            inventory_selection: [{
+                retailer_id: 'demo-retailer-secondary',
+                store_id: 'demo-store-phoenix',
+                location_id: 'demo-location-phoenix-entrance',
+                screen_id: 'demo-screen-phoenix-1',
+            }],
+        });
+
+        expect(edit.status).toBe(200);
+        expect(edit.body).toMatchObject({ status: 'pending_approval' });
+        expect(await statusOf('scope-edit-retarget')).toBe('pending_approval');
+    });
+
+    test('swapping an approved Campaign\'s creative returns it to Retailer approval', async () => {
+        await seedCampaign('scope-edit-creative', {
+            status: 'approved',
+            media_id: 'demo-media-paid',
+            retailer_id: 'demo-retailer-freshmart',
+        });
+
+        const edit = await as('superadmin', request(app).put('/api/campaigns/scope-edit-creative'))
+            .send({ media_id: 'demo-media-internal' });
+
+        expect(edit.status).toBe(200);
+        expect(edit.body).toMatchObject({ media_id: 'demo-media-internal', status: 'pending_approval' });
+        expect(await statusOf('scope-edit-creative')).toBe('pending_approval');
+    });
+
+    test('an Admin edits only a Campaign\'s editable fields, and such edits keep its approval', async () => {
+        await seedCampaign('scope-edit-allowlist', {
+            status: 'approved',
+            media_id: 'demo-media-paid',
+            retailer_id: 'demo-retailer-freshmart',
+            created_at: '2030-01-10T00:00:00.000Z',
+        });
+
+        const edit = await as('admin', request(app).put('/api/campaigns/scope-edit-allowlist')).send({
+            name: 'Renamed',
+            end_date: '2030-02-20',
+            retailer_id: 'demo-retailer-freshmart',
+            advertiser_id: 'demo-advertiser-bonvie',
+            created_at: '1999-01-01T00:00:00.000Z',
+            approved_by: 'someone',
+        });
+
+        expect(edit.status).toBe(200);
+        const saved = (await firestore.collection('campaigns').doc('scope-edit-allowlist').get()).data();
+        expect(saved).toMatchObject({
+            name: 'Renamed',
+            end_date: '2030-02-20',
+            status: 'approved',
+            advertiser_id: 'demo-advertiser-secondary',
+            created_at: '2030-01-10T00:00:00.000Z',
+        });
+        expect(saved).not.toHaveProperty('approved_by');
+    });
+
     test('a Campaign an Admin prepares starts pending Retailer approval whatever status is sent', async () => {
         const created = await as('admin', request(app).post('/api/campaigns')).send({
             id: 'scope-admin-prepared',

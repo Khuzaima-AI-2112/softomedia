@@ -88,6 +88,24 @@ describeWithEmulators('identity binding with Firebase emulators', () => {
         expect((await me(await signIn(email))).status).toBe(401);
     });
 
+    test('a profile created with a capitalised email binds to the account that verifies that email', async () => {
+        const { getFirebaseAuth } = await import('../src/utils/firebaseAuth.js');
+        const stamp = Date.now();
+        const profile = await createProfile({
+            name: 'Invited Operator',
+            email: `Invited-Case-${stamp}@Jest.Demo.Softomedia.test`,
+            role: 'techoperator',
+        });
+
+        const email = `invited-case-${stamp}@jest.demo.softomedia.test`;
+        const account = await signUp(email);
+        await getFirebaseAuth().updateUser(account.localId, { emailVerified: true });
+        const bound = await me(await signIn(email));
+
+        expect(bound.status).toBe(200);
+        expect(bound.body.user).toMatchObject({ id: profile.id, role: 'techoperator' });
+    });
+
     test('a Super Administrator moving a user to another Organization takes effect on the next request', async () => {
         const { signInAs } = await import('./fixtures/emulator-sign-in.js');
         const retailer = await signInAs('retaileradmin', { organizationId: 'demo-retailer-freshmart' });

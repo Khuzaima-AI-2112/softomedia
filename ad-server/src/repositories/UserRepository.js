@@ -6,13 +6,13 @@ export class UserRepository extends BaseRepository {
     }
 
     /**
-     * Find user by email
+     * Find user by email. Profiles store emails lowercased, so the match ignores case.
      * @param {string} email
      * @returns {Promise<object|null>}
      */
     async findByEmail(email) {
         const users = await this.findAll({
-            where: [['email', '==', email]],
+            where: [['email', '==', String(email).trim().toLowerCase()]],
             limit: 1
         });
         return users.length > 0 ? users[0] : null;

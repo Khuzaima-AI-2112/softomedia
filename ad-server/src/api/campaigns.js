@@ -349,11 +349,14 @@ router.patch('/:id/status', authenticate, requireCampaignApproval, async (req, r
     }
 });
 
+// A Retailer approved these Stores and this creative; changing either needs approval again.
+const APPROVED_FIELDS = ['inventory_selection', 'retailer_id', 'store_id', 'media_id', 'asset_id'];
+const ADMIN_EDITABLE_FIELDS = ['name', 'start_date', 'end_date', 'budget', ...APPROVED_FIELDS];
+
 /**
  * PUT /api/campaigns/:id
- * Full replacement update for a campaign document.
- *
- * Sprint 10 — authenticate guard added (sprintWRAPUP item 1).
+ * Edits a campaign's editable fields. A Brand edits its name, dates and budget;
+ * an Admin also edits its Stores and creative, which returns it to Retailer approval.
  */
 router.put('/:id', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, null), async (req, res) => {
     try {
@@ -374,7 +377,13 @@ router.put('/:id', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, 
             start_date: req.body.start_date ?? campaign.start_date,
             end_date: req.body.end_date ?? campaign.end_date,
             budget: req.body.budget ?? campaign.budget,
-        } : req.body;
+        } : Object.fromEntries(ADMIN_EDITABLE_FIELDS
+            .filter(field => req.body?.[field] !== undefined)
+            .map(field => [field, req.body[field]]));
+        if (APPROVED_FIELDS.some(field => field in updateData
+            && JSON.stringify(updateData[field]) !== JSON.stringify(campaign[field]))) {
+            updateData.status = 'pending_approval';
+        }
         const updated = await campaignRepository.update(id, updateData);
         res.json(updated);
     } catch (error) {

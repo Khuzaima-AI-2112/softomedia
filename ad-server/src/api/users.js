@@ -71,7 +71,7 @@ router.post('/', async (req, res) => {
 
         const userData = {
             name: name.trim(),
-            email: email.trim(),
+            email: email.trim().toLowerCase(),
             role: role.trim(),
             ...organizationFields(linkedentityid),
             status: 'active'
@@ -133,7 +133,7 @@ router.put('/:id', async (req, res) => {
 
         const updates = {};
         if (name !== undefined) updates.name = name.trim();
-        if (email !== undefined) updates.email = email.trim();
+        if (email !== undefined) updates.email = email.trim().toLowerCase();
         if (role !== undefined) updates.role = role;
         if (linkedentityid !== undefined) Object.assign(updates, organizationFields(linkedentityid));
         if (status !== undefined) updates.status = status;
@@ -175,7 +175,7 @@ router.patch('/:id', async (req, res) => {
 
         const updates = {};
         if (name           !== undefined) updates.name           = name.trim();
-        if (email          !== undefined) updates.email          = email.trim();
+        if (email          !== undefined) updates.email          = email.trim().toLowerCase();
         if (role           !== undefined) updates.role           = role;
         if (linkedentityid !== undefined) Object.assign(updates, organizationFields(linkedentityid));
         if (status         !== undefined) updates.status         = status;
