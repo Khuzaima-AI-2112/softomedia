@@ -1,5 +1,7 @@
 import { jest } from '@jest/globals';
 
+const { PASSWORD, signIn } = await import('./fixtures/emulator-sign-in.js');
+
 jest.setTimeout(30_000);
 
 const hasEmulators = Boolean(
@@ -32,12 +34,12 @@ describeWithEmulators('classified media API with Firebase emulators', () => {
             .bucket(process.env.DEMO_ASSETS_BUCKET);
         const { provisionDemoPersonas } = await import('../src/services/DemoPersonaProvisioner.js');
         await provisionDemoPersonas({
-            password: 'Phase1-demo-password!',
+            password: PASSWORD,
             expectedProjectId: process.env.GOOGLE_CLOUD_PROJECT,
         });
         [adminToken, retailerToken] = await Promise.all([
-            signIn('admin@demo.softomedia.test', 'Phase1-demo-password!'),
-            signIn('retaileradmin@demo.softomedia.test', 'Phase1-demo-password!'),
+            signIn('admin@demo.softomedia.test'),
+            signIn('retaileradmin@demo.softomedia.test'),
         ]);
     });
 
@@ -138,16 +140,3 @@ describeWithEmulators('classified media API with Firebase emulators', () => {
         expect(after.data()).toEqual(before.data());
     });
 });
-
-async function signIn(email, password) {
-    const response = await fetch(
-        `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo-api-key`,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password, returnSecureToken: true }),
-        },
-    );
-    if (!response.ok) throw new Error(`Firebase emulator sign-in failed: ${await response.text()}`);
-    return (await response.json()).idToken;
-}

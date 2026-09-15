@@ -107,14 +107,7 @@ describe('LoopRepository', () => {
             });
 
             const pending = await repo.findPendingByRetailer('ret_001');
-            // findPendingByRetailer filters on LOOP_STATUS.PENDING_APPROVAL === 'pending_approval'
-            // but the loop was created with status: 'pending_approval' (uppercase from test).
-            // The in-memory store compares exactly, so this returns 0 unless we use the enum.
-            // Treat as acceptable: either 1 (if repo normalises) or 0 (if case-sensitive).
-            expect([0, 1]).toContain(pending.length);
-            if (pending.length > 0) {
-                expect(pending[0].status).toMatch(/pending_approval/i);
-            }
+            expect(pending.map(loop => loop.id)).toEqual(['2026-01-03_14']);
         });
     });
 

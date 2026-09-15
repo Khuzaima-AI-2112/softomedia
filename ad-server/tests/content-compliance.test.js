@@ -3,6 +3,10 @@ import path from 'path';
 import fs from 'fs';
 import { jest } from '@jest/globals';
 import { createTestApp } from './fixtures/test-app.js';
+import { createInMemoryUserRepository } from './fixtures/in-memory-users.js';
+import { describeWithAuthEmulator, signInAs } from './fixtures/emulator-sign-in.js';
+
+jest.setTimeout(30_000);
 
 const mediaRepository = {
     isDurable: () => true,
@@ -13,6 +17,7 @@ const mediaRepository = {
 jest.unstable_mockModule('../src/repositories/index.js', () => ({
     mediaRepository,
     campaignRepository: { findAll: async () => [], targetsRetailer: () => false },
+    userRepository: createInMemoryUserRepository(),
 }));
 jest.unstable_mockModule('../src/utils/storage.js', () => ({
     uploadMediaObject: async ({ destination }) => ({
@@ -24,33 +29,24 @@ jest.unstable_mockModule('../src/utils/storage.js', () => ({
 }));
 
 const { default: assetsRouter } = await import('../src/api/assets.js');
+const { authenticate } = await import('../src/middleware/auth.js');
+const app = createTestApp(assetsRouter, '/api/assets', { middleware: [authenticate] });
 
 const roles = {
     BRAND: 'brand',
 };
 
-const reqAs = (role, method, route) => {
-    const app = createTestApp(assetsRouter, '/api/assets', {
-        middleware: [
-            (req, _res, next) => {
-                req.user = {
-                    id: `${role}_user_123`,
-                    role,
-                    linked_entity_id: 'test_brand_id',
-                };
-                next();
-            }
-        ]
-    });
-    return request(app)[method](route);
-};
+// Headers for a Brand signed in through the Auth emulator.
+let brandHeaders;
+const reqAs = (_role, method, route) => request(app)[method](route).set(brandHeaders);
 
-describe('4.4 Content Specifications & Compliance', () => {
+describeWithAuthEmulator('4.4 Content Specifications & Compliance', () => {
     let dummyImagePath;
     let dummyVideoPath;
     let dummyGifPath;
 
-    beforeAll(() => {
+    beforeAll(async () => {
+        ({ headers: brandHeaders } = await signInAs(roles.BRAND, { organizationId: 'test_brand_id' }));
         // Create dummy files for tests
         dummyImagePath = path.join(process.cwd(), 'dummy.png');
         dummyVideoPath = path.join(process.cwd(), 'dummy.mp4');

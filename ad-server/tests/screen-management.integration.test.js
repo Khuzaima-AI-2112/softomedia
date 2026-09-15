@@ -1,6 +1,10 @@
-import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
+import { afterEach, beforeEach, expect, jest, test } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
+import { createInMemoryUserRepository } from './fixtures/in-memory-users.js';
+import { describeWithAuthEmulator, signInAs } from './fixtures/emulator-sign-in.js';
+
+jest.setTimeout(30_000);
 
 const screens = new Map();
 
@@ -54,6 +58,7 @@ jest.unstable_mockModule('../src/repositories/index.js', () => ({
     locationRepository,
     loopRepository,
     playbackObservationRepository: { findAll: jest.fn(async () => []) },
+    userRepository: createInMemoryUserRepository(),
 }));
 
 jest.unstable_mockModule('../src/repositories/StoreRepository.js', () => ({
@@ -83,23 +88,22 @@ jest.unstable_mockModule('../src/services/index.js', () => ({
 }));
 
 const { default: monitoringRouter } = await import('../src/api/monitoring.js');
+const { authenticate } = await import('../src/middleware/auth.js');
 
-function monitoringAppFor(role) {
-    const app = express();
-    app.use(express.json());
-    app.use((req, _res, next) => {
-        req.user = { id: `${role}-user`, role };
-        next();
-    });
-    app.use('/api/monitoring', monitoringRouter);
-    return app;
-}
+const app = express();
+app.use(express.json());
+app.use('/api/monitoring', authenticate, monitoringRouter);
 
-describe('Screen heartbeat connectivity', () => {
+/** A Technical Operator signed in through the Auth emulator, with a token issued on the suite's clock. */
+const technicalOperator = async () => (await signInAs('techoperator', { fakeClock: true })).headers;
+
+// Brand and Retailer Administrator denial for network status is covered by the permission matrix suite.
+describeWithAuthEmulator('Screen heartbeat connectivity', () => {
     beforeEach(() => {
         screens.clear();
         jest.clearAllMocks();
-        jest.useFakeTimers();
+        // Real timers stay for the network calls that sign in.
+        jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'setTimeout', 'setInterval'] });
         jest.setSystemTime(new Date('2026-09-12T00:00:00.000Z'));
     });
 
@@ -139,12 +143,12 @@ describe('Screen heartbeat connectivity', () => {
             status: 'OFFLINE',
             last_seen: null,
         });
-        const app = monitoringAppFor('techoperator');
+        const operator = await technicalOperator();
 
         // Heartbeats arrive through the device-authenticated route (device-contract suite).
         await heartbeatService.recordHeartbeat('screen-status');
 
-        const withoutSchedule = await request(app).get('/api/monitoring/status');
+        const withoutSchedule = await request(app).get('/api/monitoring/status').set(operator);
         expect(withoutSchedule.status).toBe(200);
         expect(withoutSchedule.body.screens[0]).toMatchObject({
             id: 'screen-status',
@@ -158,23 +162,17 @@ describe('Screen heartbeat connectivity', () => {
             date: '2026-09-12',
             location_id: 'location-entrance',
         }]);
-        const withSchedule = await request(app).get('/api/monitoring/status');
+        const withSchedule = await request(app).get('/api/monitoring/status').set(operator);
         expect(withSchedule.body.screens[0]).toMatchObject({
             connectivity: 'online',
             schedule: { state: 'available', approved: true },
         });
     });
 
-    test('denies network-wide health status to Brand and Retailer Administrator', async () => {
-        for (const role of ['brand', 'retaileradmin']) {
-            const response = await request(monitoringAppFor(role)).get('/api/monitoring/status');
-            expect(response.status).toBe(403);
-        }
-    });
-
     test('reports Backend, Firestore, and Cloud Storage independently without false health', async () => {
         jest.useRealTimers();
-        const response = await request(monitoringAppFor('techoperator')).get('/api/monitoring/health');
+        const response = await request(app).get('/api/monitoring/health')
+            .set((await signInAs('techoperator')).headers);
 
         expect(response.status).toBe(200);
         expect(response.body).toEqual({

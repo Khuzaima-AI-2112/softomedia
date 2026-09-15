@@ -8,7 +8,7 @@ process.env.DEMO_ASSETS_BUCKET = process.env.DEMO_ASSETS_BUCKET
 
 jest.setTimeout(60_000);
 
-const { describeWithAuthEmulator, signIn } = await import('./fixtures/emulator-sign-in.js');
+const { PASSWORD, describeWithAuthEmulator, signIn } = await import('./fixtures/emulator-sign-in.js');
 
 describeWithAuthEmulator('loop generation on the demo baseline', () => {
     const targetDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -32,7 +32,7 @@ describeWithAuthEmulator('loop generation on the demo baseline', () => {
             resetAt: new Date('2030-01-15T10:30:00.000Z'),
         });
         const { provisionDemoPersonas } = await import('../src/services/DemoPersonaProvisioner.js');
-        await provisionDemoPersonas({ password: 'Phase1-demo-password!', expectedProjectId: 'softomedia-demo' });
+        await provisionDemoPersonas({ password: PASSWORD, expectedProjectId: 'softomedia-demo' });
         admin = { Authorization: `Bearer ${await signIn('admin@demo.softomedia.test')}` };
         ({ default: app } = await import('../index.js'));
     });

@@ -1,5 +1,5 @@
 /**
- * S21-6: Admin → Scheduler → Campaign flow E2E tests.
+ * S21-6: Admin → Scheduler → Campaign flow.
  *
  * Covers:
  *   - GET /api/retailers?for=campaign returns only active non-deleted retailers
@@ -8,141 +8,74 @@
  *   - both admin and superadmin can reach the endpoint (S21-3 role decision)
  *   - plain GET /api/retailers still excludes deleted records
  *
- * Fixtures:
- *   ret_test_a   — active, not deleted  → must appear in ?for=campaign
- *   ret_inactive — inactive, not deleted → must NOT appear in ?for=campaign
- *   ret_deleted  — active but deleted_at set → must NOT appear anywhere
+ * Runs against the Firestore and Auth emulators with real Admin and Super
+ * Administrator sign-ins.
  */
 
-import { jest, describe, test, expect, beforeEach } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, jest, test } from '@jest/globals';
 import request from 'supertest';
-import express from 'express';
+import { createTestApp } from './fixtures/test-app.js';
+import { signInAs } from './fixtures/emulator-sign-in.js';
 
-// ── In-memory store ──────────────────────────────────────────────────────────
-const firestoreStore = new Map();
+jest.setTimeout(30_000);
 
-const mockDocRef = (id, col) => ({
-    id,
-    get: jest.fn(async () => {
-        const data = firestoreStore.get(`${col}/${id}`);
-        return { exists: !!data, data: () => data ?? null, id };
-    }),
-    update: jest.fn(async (d) => {
-        const existing = firestoreStore.get(`${col}/${id}`) ?? {};
-        firestoreStore.set(`${col}/${id}`, { ...existing, ...d });
-    }),
-});
+const emulatorsAvailable = Boolean(process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST);
+const describeWithEmulators = emulatorsAvailable ? describe : describe.skip;
 
-/**
- * The collection mock intentionally applies BOTH the deleted_at filter
- * (GUARDRAIL-15) AND the status='active' filter so that when retailers.js
- * calls the ?for=campaign branch the correct subset is returned.
- *
- * The plain GET branch only applies the deleted_at filter — the route
- * handler is expected to do the status filtering for ?for=campaign itself;
- * here we front-run it in the mock to keep tests deterministic regardless
- * of whether filtering is in the repo or the route.
- */
-const mockCollection = (name) => {
-    const makeQuery = (constraints = []) => ({
-        doc:     (id) => mockDocRef(id, name),
-        where:   jest.fn((field, op, value) => makeQuery([...constraints, [field, op, value]])),
-        orderBy: jest.fn().mockReturnThis(),
-        get:     jest.fn(async () => {
-            let entries = [...firestoreStore.entries()]
-                .filter(([k])  => k.startsWith(`${name}/`))
-                .map(([k, v])  => ({ id: k.split('/')[1], data: () => v, exists: true }))
-                .filter(e      => !e.data().deleted_at);
-            
-            for (const [field, op, value] of constraints) {
-                if (op === '==') entries = entries.filter(e => e.data()[field] === value);
-                else if (op === '!=') entries = entries.filter(e => e.data()[field] !== value);
-                else if (op === '>')  entries = entries.filter(e => e.data()[field] >  value);
-                else if (op === '>=') entries = entries.filter(e => e.data()[field] >= value);
-                else if (op === '<')  entries = entries.filter(e => e.data()[field] <  value);
-                else if (op === '<=') entries = entries.filter(e => e.data()[field] <= value);
-            }
-            return { docs: entries, empty: entries.length === 0 };
-        }),
-    });
-    return makeQuery();
+const suffix = Date.now();
+const ids = {
+    active: `scheduler-active-${suffix}`,
+    inactive: `scheduler-inactive-${suffix}`,
+    deleted: `scheduler-deleted-${suffix}`,
 };
 
-jest.unstable_mockModule('../src/utils/firestore.js', () => ({
-    getFirestore:   jest.fn(() => ({ collection: mockCollection })),
-    closeFirestore: jest.fn(),
-}));
+describeWithEmulators('Admin → Scheduler → Campaign flow with Firebase emulators', () => {
+    let app;
+    let firestore;
+    let admin;
+    let superAdmin;
 
-// ── Configurable auth mock — role is set per describe block ─────────────────
-let _currentRole = 'admin';
-jest.unstable_mockModule('../src/middleware/auth.js', () => ({
-    authenticate: (req, _res, next) => {
-        req.user = { uid: 'test-uid', role: _currentRole };
-        next();
-    },
-}));
+    beforeAll(async () => {
+        const { getFirestore } = await import('../src/utils/firestore.js');
+        const { default: apiRouter } = await import('../src/api/index.js');
+        firestore = getFirestore();
+        app = createTestApp(apiRouter, '/api');
 
-const { default: retailersRouter } = await import('../src/api/retailers.js');
+        const retailers = firestore.collection('retailers');
+        await Promise.all([
+            // Active, not deleted — should appear in ?for=campaign
+            retailers.doc(ids.active).set({ id: ids.active, name: 'Test Retailer A', status: 'active', deleted_at: null }),
+            // Deactivated, not deleted — should NOT appear in ?for=campaign
+            retailers.doc(ids.inactive).set({ id: ids.inactive, name: 'Deactivated Retailer', status: 'inactive', deleted_at: null }),
+            // Soft-deleted — should NOT appear anywhere
+            retailers.doc(ids.deleted).set({ id: ids.deleted, name: 'Deleted Retailer', status: 'active', deleted_at: '2026-05-01T00:00:00.000Z' }),
+        ]);
 
-const { createTestApp } = await import('./fixtures/test-app.js');
-
-function makeApp(role = 'admin') {
-    _currentRole = role;
-    return createTestApp(retailersRouter, '/api/retailers');
-}
-
-function seedFixtures() {
-    firestoreStore.clear();
-    // Active, not deleted — should appear in ?for=campaign
-    firestoreStore.set('retailers/ret_test_a', {
-        id: 'ret_test_a', name: 'Test Retailer A',
-        status: 'active', deleted_at: null,
+        ({ headers: admin } = await signInAs('admin'));
+        ({ headers: superAdmin } = await signInAs('superadmin'));
     });
-    // Deactivated, not deleted — should NOT appear in ?for=campaign
-    firestoreStore.set('retailers/ret_inactive', {
-        id: 'ret_inactive', name: 'Deactivated Retailer',
-        status: 'inactive', deleted_at: null,
-    });
-    // Soft-deleted — should NOT appear anywhere
-    firestoreStore.set('retailers/ret_deleted', {
-        id: 'ret_deleted', name: 'Deleted Retailer',
-        status: 'active', deleted_at: '2026-05-01T00:00:00.000Z',
-    });
-}
 
-// ── Tests ────────────────────────────────────────────────────────────────────
-describe('Admin → Scheduler → Campaign flow', () => {
-    beforeEach(() => {
-        jest.clearAllMocks();
-        seedFixtures();
+    afterAll(async () => {
+        await Promise.all(Object.values(ids).map(id => firestore.collection('retailers').doc(id).delete()));
     });
 
     test('GET ?for=campaign returns only active non-deleted retailers', async () => {
-        const app = makeApp('admin');
-        const res = await request(app).get('/api/retailers?for=campaign');
+        const res = await request(app).get('/api/retailers?for=campaign').set(admin);
 
         expect(res.status).toBe(200);
-        expect(Array.isArray(res.body)).toBe(true);
-
-        const ids = res.body.map(r => r.id);
-        expect(ids).toContain('ret_test_a');
-        expect(ids).not.toContain('ret_inactive');
-        expect(ids).not.toContain('ret_deleted');
+        const returned = res.body.map(r => r.id);
+        expect(returned).toContain(ids.active);
+        expect(returned).not.toContain(ids.inactive);
+        expect(returned).not.toContain(ids.deleted);
     });
 
-    test('admin role can reach ?for=campaign (S21-3 role decision)', async () => {
-        const res = await request(makeApp('admin')).get('/api/retailers?for=campaign');
-        expect(res.status).toBe(200);
-    });
-
-    test('superadmin role can reach ?for=campaign (S21-3 role decision)', async () => {
-        const res = await request(makeApp('superadmin')).get('/api/retailers?for=campaign');
+    test.each([['admin'], ['superadmin']])('%s can reach ?for=campaign (S21-3 role decision)', async persona => {
+        const res = await request(app).get('/api/retailers?for=campaign').set(persona === 'admin' ? admin : superAdmin);
         expect(res.status).toBe(200);
     });
 
     test('response items include all fields required by scheduler / CampaignWizard', async () => {
-        const app = makeApp('admin');
-        const res = await request(app).get('/api/retailers?for=campaign');
+        const res = await request(app).get('/api/retailers?for=campaign').set(admin);
         expect(res.status).toBe(200);
 
         res.body.forEach(retailer => {
@@ -156,11 +89,9 @@ describe('Admin → Scheduler → Campaign flow', () => {
     });
 
     test('plain GET /api/retailers also excludes soft-deleted records (GUARDRAIL-15)', async () => {
-        const app = makeApp('admin');
-        const res = await request(app).get('/api/retailers');
+        const res = await request(app).get('/api/retailers').set(admin);
 
         expect(res.status).toBe(200);
-        const ids = res.body.map(r => r.id);
-        expect(ids).not.toContain('ret_deleted');
+        expect(res.body.map(r => r.id)).not.toContain(ids.deleted);
     });
 });

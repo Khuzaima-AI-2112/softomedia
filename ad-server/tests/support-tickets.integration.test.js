@@ -13,10 +13,11 @@ const hasEmulators = Boolean(
 );
 const describeWithEmulators = hasEmulators ? describe : describe.skip;
 
+const { PASSWORD: password, signIn } = await import('./fixtures/emulator-sign-in.js');
+
 jest.setTimeout(30_000);
 
 describeWithEmulators('Support Ticket HTTP API with Firebase emulators', () => {
-    const password = 'Phase1-demo-password!';
     let request;
     let app;
     let firestore;
@@ -253,16 +254,3 @@ describeWithEmulators('Support Ticket HTTP API with Firebase emulators', () => {
         expect(responses.map(response => response.status)).toEqual([404, 404, 404, 404, 404, 404, 404]);
     });
 });
-
-async function signIn(email, password) {
-    const response = await fetch(
-        `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo-api-key`,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password, returnSecureToken: true }),
-        },
-    );
-    if (!response.ok) throw new Error(`Firebase emulator sign-in failed: ${await response.text()}`);
-    return (await response.json()).idToken;
-}

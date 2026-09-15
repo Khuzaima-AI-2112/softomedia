@@ -1,261 +1,145 @@
 /**
- * S21-6: Soft-delete lifecycle E2E tests.
+ * S21-6: Soft-delete lifecycle (GUARDRAIL-15: deleting a Retailer or Advertiser
+ * is always a soft delete).
  *
  * Covers:
- *   - DELETE /api/retailers/:id  → sets deleted_at, does NOT hard-delete (GUARDRAIL-15)
+ *   - DELETE /api/retailers/:id  → sets deleted_at, does NOT hard-delete
  *   - GET  /api/retailers        → excludes soft-deleted records
  *   - GET  /api/retailers/:id    → 404 on soft-deleted record
  *   - GET  /api/retailers?for=campaign → excludes soft-deleted AND inactive records
  *   - DELETE /api/advertisers/:id → same lifecycle
  *   - PATCH /api/advertisers/:id  → cannot overwrite deleted_at (S21-2 / SEC-S21-1)
  *
- * Mocking strategy:
- *   Firestore and auth middleware are mocked via jest.unstable_mockModule.
- *   No live database connection required.
+ * Runs against the Firestore and Auth emulators with a real Super Administrator
+ * sign-in, so the routes' own filtering is what is tested.
  */
 
-import { jest, describe, test, expect, beforeEach } from '@jest/globals';
+import { afterAll, beforeAll, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import request from 'supertest';
-import express from 'express';
+import { createTestApp } from './fixtures/test-app.js';
+import { signInAs } from './fixtures/emulator-sign-in.js';
 
-// ── In-memory Firestore store shared across route handlers ───────────────────
-const firestoreStore = new Map();
+jest.setTimeout(30_000);
 
-const mockDocRef = (id, col) => ({
-    id,
-    get: jest.fn(async () => {
-        const data = firestoreStore.get(`${col}/${id}`);
-        return { exists: !!data, data: () => data ?? null, id };
-    }),
-    set: jest.fn(async (d) => firestoreStore.set(`${col}/${id}`, d)),
-    update: jest.fn(async (d) => {
-        const existing = firestoreStore.get(`${col}/${id}`) ?? {};
-        firestoreStore.set(`${col}/${id}`, { ...existing, ...d });
-    }),
-    delete: jest.fn(async () => firestoreStore.delete(`${col}/${id}`)),
-});
+const emulatorsAvailable = Boolean(process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST);
+const describeWithEmulators = emulatorsAvailable ? describe : describe.skip;
 
-/**
- * mockCollection simulates:
- *   - deleted_at filter (GUARDRAIL-15): records with truthy deleted_at are excluded
- *   - where() filter chains applied by the route (e.g. status='active' for ?for=campaign)
- */
-const mockCollection = (name) => {
-    // Accumulate where constraints for the current query chain.
-    // Each where() call adds a [field, op, value] tuple.
-    const makeQuery = (constraints = []) => ({
-        doc:     (id) => mockDocRef(id, name),
-        where:   jest.fn((field, op, value) => makeQuery([...constraints, [field, op, value]])),
-        orderBy: jest.fn().mockReturnThis(),
-        limit:   jest.fn().mockReturnThis(),
-        get:     jest.fn(async () => {
-            let entries = [...firestoreStore.entries()]
-                .filter(([k]) => k.startsWith(`${name}/`))
-                .map(([k, v])  => ({ id: k.split('/')[1], data: () => v, exists: true }))
-                .filter(e => !e.data().deleted_at); // GUARDRAIL-15 baseline filter
+const suffix = Date.now();
+const retailerId = `soft-delete-retailer-${suffix}`;
+const advertiserId = `soft-delete-advertiser-${suffix}`;
+const DELETED_AT = '2026-06-01T00:00:00.000Z';
 
-            // Apply accumulated where() constraints
-            for (const [field, op, value] of constraints) {
-                if (op === '==') entries = entries.filter(e => e.data()[field] === value);
-                else if (op === '!=') entries = entries.filter(e => e.data()[field] !== value);
-                else if (op === '>')  entries = entries.filter(e => e.data()[field] >  value);
-                else if (op === '>=') entries = entries.filter(e => e.data()[field] >= value);
-                else if (op === '<')  entries = entries.filter(e => e.data()[field] <  value);
-                else if (op === '<=') entries = entries.filter(e => e.data()[field] <= value);
-            }
-
-            return { docs: entries, empty: entries.length === 0 };
-        }),
-    });
-    return makeQuery();
-};
-
-jest.unstable_mockModule('../src/utils/firestore.js', () => ({
-    getFirestore:   jest.fn(() => ({ collection: mockCollection })),
-    closeFirestore: jest.fn(),
-}));
-
-// ── Auth middleware: sets req.user = superadmin, who manages organizations ──
-jest.unstable_mockModule('../src/middleware/auth.js', () => ({
-    authenticate: (req, _res, next) => {
-        req.user = { uid: 'test-uid', role: 'superadmin' };
-        next();
-    },
-}));
-
-// ── Dynamic imports (AFTER all mocks are registered) ────────────────────────
-const { default: retailersRouter }   = await import('../src/api/retailers.js');
-const { default: advertisersRouter } = await import('../src/api/advertisers.js');
-
-const { createTestApp } = await import('./fixtures/test-app.js');
-
-function makeApp() {
-    const app = createTestApp(retailersRouter, '/api/retailers');
-    app.use('/api/advertisers', advertisersRouter);
-    return app;
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-describe('Soft-delete lifecycle — retailers', () => {
+describeWithEmulators('Soft-delete lifecycle with Firebase emulators', () => {
     let app;
+    let firestore;
+    let superAdmin;
 
-    beforeEach(() => {
-        firestoreStore.clear();
-        jest.clearAllMocks();
-        app = makeApp();
+    const retailers = () => firestore.collection('retailers');
+    const advertisers = () => firestore.collection('advertisers');
+    const seedRetailer = fields => retailers().doc(retailerId).set({
+        id: retailerId, name: 'Test Retailer A', status: 'active', deleted_at: null, ...fields,
+    });
+    const seedAdvertiser = fields => advertisers().doc(advertiserId).set({
+        id: advertiserId, name: 'Test Advertiser A', status: 'active', deleted_at: null, ...fields,
+    });
 
-        // Seed: Test Retailer A — active, not deleted
-        firestoreStore.set('retailers/ret_test_a', {
-            id:         'ret_test_a',
-            name:       'Test Retailer A',
-            status:     'active',
-            deleted_at: null,
+    beforeAll(async () => {
+        const { getFirestore } = await import('../src/utils/firestore.js');
+        const { default: apiRouter } = await import('../src/api/index.js');
+        firestore = getFirestore();
+        app = createTestApp(apiRouter, '/api');
+        ({ headers: superAdmin } = await signInAs('superadmin'));
+    });
+
+    afterAll(async () => {
+        await Promise.all([retailers().doc(retailerId).delete(), advertisers().doc(advertiserId).delete()]);
+    });
+
+    describe('retailers', () => {
+        beforeEach(() => seedRetailer());
+
+        test('GET /api/retailers includes an active Retailer', async () => {
+            const res = await request(app).get('/api/retailers').set(superAdmin);
+            expect(res.status).toBe(200);
+            expect(res.body.map(r => r.id)).toContain(retailerId);
+        });
+
+        test('DELETE /api/retailers/:id sets deleted_at and does NOT hard-delete (GUARDRAIL-15)', async () => {
+            const res = await request(app).delete(`/api/retailers/${retailerId}`).set(superAdmin);
+            expect(res.status).toBe(200);
+
+            const stored = await retailers().doc(retailerId).get();
+            expect(stored.exists).toBe(true);
+            expect(stored.data().deleted_at).toBeTruthy();
+        });
+
+        test('GET /api/retailers excludes a soft-deleted record (GUARDRAIL-15)', async () => {
+            await seedRetailer({ deleted_at: DELETED_AT });
+            const res = await request(app).get('/api/retailers').set(superAdmin);
+            expect(res.status).toBe(200);
+            expect(res.body.map(r => r.id)).not.toContain(retailerId);
+        });
+
+        test('GET /api/retailers/:id returns 404 for a soft-deleted record', async () => {
+            await seedRetailer({ deleted_at: DELETED_AT });
+            const res = await request(app).get(`/api/retailers/${retailerId}`).set(superAdmin);
+            expect(res.status).toBe(404);
+        });
+
+        test('GET /api/retailers?for=campaign excludes a soft-deleted record', async () => {
+            await seedRetailer({ deleted_at: DELETED_AT });
+            const res = await request(app).get('/api/retailers?for=campaign').set(superAdmin);
+            expect(res.status).toBe(200);
+            expect(res.body.map(r => r.id)).not.toContain(retailerId);
+        });
+
+        test('GET /api/retailers?for=campaign excludes an inactive (non-deleted) Retailer (S21-4)', async () => {
+            await seedRetailer({ status: 'inactive' });
+            const res = await request(app).get('/api/retailers?for=campaign').set(superAdmin);
+            expect(res.status).toBe(200);
+            expect(res.body.map(r => r.id)).not.toContain(retailerId);
         });
     });
 
-    test('GET /api/retailers includes ret_test_a when active', async () => {
-        const res = await request(app).get('/api/retailers');
-        expect(res.status).toBe(200);
-        expect(res.body.map(r => r.id)).toContain('ret_test_a');
-    });
+    describe('advertisers', () => {
+        beforeEach(() => seedAdvertiser());
 
-    test('DELETE /api/retailers/:id sets deleted_at and does NOT hard-delete (GUARDRAIL-15)', async () => {
-        const res = await request(app).delete('/api/retailers/ret_test_a');
-        expect(res.status).toBe(200);
+        test('DELETE /api/advertisers/:id sets deleted_at, does not hard-delete (GUARDRAIL-15)', async () => {
+            const res = await request(app).delete(`/api/advertisers/${advertiserId}`).set(superAdmin);
+            expect(res.status).toBe(200);
 
-        // Record must still exist in the store
-        const stored = firestoreStore.get('retailers/ret_test_a');
-        expect(stored).toBeDefined();
-        expect(stored.deleted_at).toBeTruthy();
-    });
-
-    test('GET /api/retailers excludes soft-deleted record (GUARDRAIL-15)', async () => {
-        firestoreStore.set('retailers/ret_test_a', {
-            id:         'ret_test_a',
-            name:       'Test Retailer A',
-            status:     'active',
-            deleted_at: '2026-06-01T00:00:00.000Z',
+            const stored = await advertisers().doc(advertiserId).get();
+            expect(stored.exists).toBe(true);
+            expect(stored.data().deleted_at).toBeTruthy();
         });
 
-        const res = await request(app).get('/api/retailers');
-        expect(res.status).toBe(200);
-        expect(res.body.map(r => r.id)).not.toContain('ret_test_a');
-    });
-
-    test('GET /api/retailers/:id returns 404 for soft-deleted record', async () => {
-        firestoreStore.set('retailers/ret_test_a', {
-            id:         'ret_test_a',
-            name:       'Test Retailer A',
-            status:     'active',
-            deleted_at: '2026-06-01T00:00:00.000Z',
+        test('GET /api/advertisers excludes a soft-deleted Advertiser (GUARDRAIL-15)', async () => {
+            await seedAdvertiser({ deleted_at: DELETED_AT });
+            const res = await request(app).get('/api/advertisers').set(superAdmin);
+            expect(res.status).toBe(200);
+            expect(res.body.map(a => a.id)).not.toContain(advertiserId);
         });
 
-        const res = await request(app).get('/api/retailers/ret_test_a');
-        expect(res.status).toBe(404);
-    });
+        test('PATCH /api/advertisers/:id strips deleted_at — cannot resurrect via PATCH (S21-2)', async () => {
+            await seedAdvertiser({ deleted_at: DELETED_AT });
 
-    test('GET /api/retailers?for=campaign excludes soft-deleted record', async () => {
-        firestoreStore.set('retailers/ret_test_a', {
-            id:         'ret_test_a',
-            name:       'Test Retailer A',
-            status:     'active',
-            deleted_at: '2026-06-01T00:00:00.000Z',
+            // The allowlist strips deleted_at, leaving an empty patch.
+            const res = await request(app).patch(`/api/advertisers/${advertiserId}`).set(superAdmin)
+                .send({ deleted_at: null });
+            expect(res.status).toBe(400);
+
+            const stored = await advertisers().doc(advertiserId).get();
+            expect(stored.data().deleted_at).toBe(DELETED_AT);
         });
 
-        const res = await request(app).get('/api/retailers?for=campaign');
-        expect(res.status).toBe(200);
-        expect(res.body.map(r => r.id)).not.toContain('ret_test_a');
-    });
+        test('PATCH /api/advertisers/:id with a valid field does not touch deleted_at (S21-2)', async () => {
+            await seedAdvertiser({ deleted_at: DELETED_AT });
 
-    test('GET /api/retailers?for=campaign excludes inactive (non-deleted) retailer (S21-4)', async () => {
-        firestoreStore.set('retailers/ret_test_a', {
-            id:         'ret_test_a',
-            name:       'Test Retailer A',
-            status:     'inactive',   // deactivated, not deleted
-            deleted_at: null,
+            await request(app).patch(`/api/advertisers/${advertiserId}`).set(superAdmin)
+                .send({ name: 'Renamed Advertiser A' });
+
+            const stored = await advertisers().doc(advertiserId).get();
+            expect(stored.data().deleted_at).toBe(DELETED_AT);
         });
-
-        const res = await request(app).get('/api/retailers?for=campaign');
-        expect(res.status).toBe(200);
-        expect(res.body.map(r => r.id)).not.toContain('ret_test_a');
-    });
-});
-
-// ────────────────────────────────────────────────────────────────────────────
-describe('Soft-delete lifecycle — advertisers', () => {
-    let app;
-
-    beforeEach(() => {
-        firestoreStore.clear();
-        jest.clearAllMocks();
-        app = makeApp();
-
-        firestoreStore.set('advertisers/adv_test_a', {
-            id:         'adv_test_a',
-            name:       'Test Advertiser A',
-            status:     'active',
-            deleted_at: null,
-        });
-    });
-
-    test('DELETE /api/advertisers/:id sets deleted_at, does not hard-delete (GUARDRAIL-15)', async () => {
-        const res = await request(app).delete('/api/advertisers/adv_test_a');
-        expect(res.status).toBe(200);
-
-        const stored = firestoreStore.get('advertisers/adv_test_a');
-        expect(stored).toBeDefined();
-        expect(stored.deleted_at).toBeTruthy();
-    });
-
-    test('GET /api/advertisers excludes soft-deleted advertiser (GUARDRAIL-15)', async () => {
-        firestoreStore.set('advertisers/adv_test_a', {
-            id:         'adv_test_a',
-            name:       'Test Advertiser A',
-            status:     'active',
-            deleted_at: '2026-06-01T00:00:00.000Z',
-        });
-
-        const res = await request(app).get('/api/advertisers');
-        expect(res.status).toBe(200);
-        expect(res.body.map(a => a.id)).not.toContain('adv_test_a');
-    });
-
-    test('PATCH /api/advertisers/:id strips deleted_at — cannot resurrect via PATCH (S21-2)', async () => {
-        // Mark advertiser as deleted
-        firestoreStore.set('advertisers/adv_test_a', {
-            id:         'adv_test_a',
-            name:       'Test Advertiser A',
-            status:     'active',
-            deleted_at: '2026-06-01T00:00:00.000Z',
-        });
-
-        // Attempt to clear deleted_at via PATCH — allowlist strips it
-        const res = await request(app)
-            .patch('/api/advertisers/adv_test_a')
-            .send({ deleted_at: null });
-
-        // Allowlist produces an empty patch → 400
-        expect(res.status).toBe(400);
-
-        // Confirm deleted_at is still set in the store
-        const stored = firestoreStore.get('advertisers/adv_test_a');
-        expect(stored.deleted_at).toBe('2026-06-01T00:00:00.000Z');
-    });
-
-    test('PATCH /api/advertisers/:id with valid field does not touch deleted_at (S21-2)', async () => {
-        firestoreStore.set('advertisers/adv_test_a', {
-            id:         'adv_test_a',
-            name:       'Test Advertiser A',
-            status:     'active',
-            deleted_at: '2026-06-01T00:00:00.000Z',
-        });
-
-        await request(app)
-            .patch('/api/advertisers/adv_test_a')
-            .send({ name: 'Renamed Advertiser A' });
-
-        const stored = firestoreStore.get('advertisers/adv_test_a');
-        // deleted_at must survive a legitimate PATCH
-        expect(stored.deleted_at).toBe('2026-06-01T00:00:00.000Z');
     });
 });

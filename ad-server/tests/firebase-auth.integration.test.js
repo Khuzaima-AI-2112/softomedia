@@ -18,6 +18,7 @@ const { default: apiRouter } = await import('../src/api/index.js');
 const { authenticate } = await import('../src/middleware/auth.js');
 const { PERMISSIONS, requireNetworkProofOfPlayView } = await import('../src/middleware/requireRole.js');
 const { createTestApp } = await import('./fixtures/test-app.js');
+const { PASSWORD } = await import('./fixtures/emulator-sign-in.js');
 
 const app = createTestApp(apiRouter);
 const scopedApp = express();
@@ -40,7 +41,7 @@ async function createFirebaseAccount(email, role, linkedEntityId = null, permiss
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 email,
-                password: 'Phase1-demo-password!',
+                password: PASSWORD,
                 returnSecureToken: true,
             }),
         }
@@ -70,7 +71,7 @@ async function createAccountWithoutProfile(email) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 email,
-                password: 'Phase1-demo-password!',
+                password: PASSWORD,
                 returnSecureToken: true,
             }),
         }

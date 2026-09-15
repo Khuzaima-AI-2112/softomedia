@@ -13,7 +13,7 @@ const hasEmulators = Boolean(
 );
 const describeWithEmulators = hasEmulators ? describe : describe.skip;
 
-const { signIn } = await import('./fixtures/emulator-sign-in.js');
+const { PASSWORD: password, signIn } = await import('./fixtures/emulator-sign-in.js');
 
 jest.setTimeout(30_000);
 
@@ -23,7 +23,6 @@ jest.setTimeout(30_000);
  * never inferred from one role ranking above another.
  */
 describeWithEmulators('Phase 1 permission matrix with Firebase emulators', () => {
-    const password = 'Phase1-demo-password!';
     let request;
     let app;
     let firestore;

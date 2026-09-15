@@ -1,6 +1,10 @@
 import { jest } from '@jest/globals';
 import request from 'supertest';
 import { createTestApp } from './fixtures/test-app.js';
+import { createInMemoryUserRepository } from './fixtures/in-memory-users.js';
+import { describeWithAuthEmulator, signInAs } from './fixtures/emulator-sign-in.js';
+
+jest.setTimeout(30_000);
 
 const storedMedia = new Map();
 const storedObjects = new Map();
@@ -25,6 +29,7 @@ const mediaRepository = {
 jest.unstable_mockModule('../src/repositories/index.js', () => ({
     mediaRepository,
     campaignRepository: { findAll: async () => [], targetsRetailer: () => false },
+    userRepository: createInMemoryUserRepository(),
 }));
 jest.unstable_mockModule('../src/utils/storage.js', () => ({
     async uploadMediaObject({ destination, buffer, contentType }) {
@@ -44,23 +49,20 @@ jest.unstable_mockModule('../src/utils/storage.js', () => ({
 }));
 
 const { default: assetsRouter } = await import('../src/api/assets.js');
+const { authenticate } = await import('../src/middleware/auth.js');
+const app = createTestApp(assetsRouter, '/api/assets', { middleware: [authenticate] });
 
-function appAs(role, linkedEntityId = `entity-${role}`) {
-    return createTestApp(assetsRouter, '/api/assets', {
-        middleware: [(req, _res, next) => {
-            req.user = {
-                id: `${role}-user`,
-                role,
-                linked_entity_id: linkedEntityId,
-                organization_id: linkedEntityId,
-            };
-            next();
-        }],
-    });
+/** Requests from a user signed in through the Auth emulator with this role and Organization. */
+async function appAs(role, organizationId = `entity-${role}`) {
+    const { headers } = await signInAs(role, { organizationId });
+    return {
+        get: path => request(app).get(path).set(headers),
+        post: path => request(app).post(path).set(headers),
+    };
 }
 
-function upload(app, fields = {}, filename = 'creative.png') {
-    let pending = request(app).post('/api/assets/upload');
+function upload(client, fields = {}, filename = 'creative.png') {
+    let pending = client.post('/api/assets/upload');
     for (const [key, value] of Object.entries(fields)) pending = pending.field(key, value);
     const bytes = filename.endsWith('.mp4')
         ? Buffer.concat([Buffer.alloc(4), Buffer.from('ftypisom')])
@@ -71,13 +73,13 @@ function upload(app, fields = {}, filename = 'creative.png') {
     });
 }
 
-function uploadBytes(app, fields, bytes, filename = 'creative.png') {
-    let pending = request(app).post('/api/assets/upload');
+function uploadBytes(client, fields, bytes, filename = 'creative.png') {
+    let pending = client.post('/api/assets/upload');
     for (const [key, value] of Object.entries(fields)) pending = pending.field(key, value);
     return pending.attach('file', Buffer.from(bytes), { filename, contentType: 'image/png' });
 }
 
-describe('classified media API', () => {
+describeWithAuthEmulator('classified media API', () => {
     beforeEach(() => {
         storedMedia.clear();
         storedObjects.clear();
@@ -90,7 +92,7 @@ describe('classified media API', () => {
         ['internal', 'platform', '', 'campaign'],
         ['fallback', 'platform', '', 'neutral_fallback'],
     ])('lets Admin persist %s media with playback metadata', async (category, ownerType, ownerId, contentKind) => {
-        const response = await upload(appAs('admin'), {
+        const response = await upload(await appAs('admin'), {
             title: `${category} creative`,
             category,
             owner_type: ownerType,
@@ -118,8 +120,8 @@ describe('classified media API', () => {
     });
 
     it('lets Brand use the same upload contract while enforcing Brand ownership', async () => {
-        const app = appAs('brand', 'brand-owned-org');
-        const response = await upload(app, {
+        const brand = await appAs('brand', 'brand-owned-org');
+        const response = await upload(brand, {
             title: 'Brand creative',
             category: 'paid',
             owner_type: 'platform',
@@ -137,13 +139,13 @@ describe('classified media API', () => {
             eligible_for_playback: false,
         });
 
-        const list = await request(app).get('/api/assets');
+        const list = await brand.get('/api/assets');
         expect(list.status).toBe(200);
         expect(list.body.map(asset => asset.id)).toContain(response.body.id);
     });
 
     it.each(['retaileradmin', 'techoperator'])('rejects %s uploads', async role => {
-        const response = await upload(appAs(role), {
+        const response = await upload(await appAs(role), {
             title: 'Forbidden fallback',
             category: 'fallback',
             owner_type: 'platform',
@@ -157,7 +159,7 @@ describe('classified media API', () => {
     });
 
     it('rejects missing classification metadata before storing an object', async () => {
-        const response = await upload(appAs('admin'), { title: 'Incomplete' });
+        const response = await upload(await appAs('admin'), { title: 'Incomplete' });
 
         expect(response.status).toBe(400);
         expect(response.body.error).toMatch(/category/i);
@@ -165,7 +167,7 @@ describe('classified media API', () => {
     });
 
     it('removes the uploaded object when metadata persistence fails', async () => {
-        const response = await upload(appAs('admin'), {
+        const response = await upload(await appAs('admin'), {
             title: 'Metadata failure',
             category: 'internal',
             owner_type: 'platform',
@@ -180,7 +182,7 @@ describe('classified media API', () => {
     });
 
     it('reports storage failure without recording metadata or success', async () => {
-        const response = await uploadBytes(appAs('admin'), {
+        const response = await uploadBytes(await appAs('admin'), {
             title: 'Storage failure',
             category: 'internal',
             owner_type: 'platform',
@@ -195,7 +197,7 @@ describe('classified media API', () => {
     });
 
     it('rejects bytes that do not match the declared media type', async () => {
-        const response = await uploadBytes(appAs('admin'), {
+        const response = await uploadBytes(await appAs('admin'), {
             title: 'Disguised executable',
             category: 'internal',
             owner_type: 'platform',
@@ -211,7 +213,7 @@ describe('classified media API', () => {
 
     it('does not store an object or report success when durable metadata is unavailable', async () => {
         durableMetadataAvailable = false;
-        const response = await upload(appAs('admin'), {
+        const response = await upload(await appAs('admin'), {
             title: 'Cannot persist',
             category: 'internal',
             owner_type: 'platform',

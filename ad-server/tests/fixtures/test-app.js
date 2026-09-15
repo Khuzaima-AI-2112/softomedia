@@ -51,34 +51,3 @@ export function createTestApp(router, path = '/api', options = {}) {
 
     return app;
 }
-
-/**
- * Create a mock request user object for auth middleware bypass.
- *
- * @param {object} [overrides]
- * @returns {object} A mock user object
- */
-export function createMockUser(overrides = {}) {
-    return {
-        id: 'test-user-001',
-        email: 'test@softomedia.demo',
-        role: 'admin',
-        linked_entity_id: 'entity-admin-001',
-        ...overrides,
-    };
-}
-
-/**
- * Create a middleware that injects a mock user into req.user,
- * simulating authenticated requests without real auth infrastructure.
- *
- * @param {object} [userOverrides] — overrides for the mock user
- * @returns {Function} Express middleware
- */
-export function createMockAuthMiddleware(userOverrides = {}) {
-    const mockUser = createMockUser(userOverrides);
-    return (req, _res, next) => {
-        req.user = mockUser;
-        next();
-    };
-}

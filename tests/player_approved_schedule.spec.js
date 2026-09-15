@@ -1,4 +1,4 @@
-import { test, expect, hasEmulators, PASSWORD, signedInPage } from './fixtures/demo-session.js';
+import { test, expect, hasEmulators, signedInPage } from './fixtures/demo-session.js';
 
 test.skip(!hasEmulators, 'requires Firebase Auth, Firestore, and Storage emulators');
 
@@ -29,6 +29,7 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
     const lastDate = hours[1].date;
     const loopIds = hours.map(slot => slot.loopId);
 
+    const { retailerRepository } = await import('../ad-server/src/repositories/RetailerRepository.js');
     const { default: StoreRepository } = await import('../ad-server/src/repositories/StoreRepository.js');
     const { locationRepository } = await import('../ad-server/src/repositories/LocationRepository.js');
     const { loopRepository, LOOP_STATUS } = await import('../ad-server/src/repositories/LoopRepository.js');
@@ -47,7 +48,8 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
     };
 
     try {
-        await StoreRepository.create(storeId, { name: 'Player Browser Store', retailer_id: retailerId, time_zone: 'UTC' });
+        await retailerRepository.create(retailerId, { name: 'Player Browser Retailer', status: 'active' });
+        await StoreRepository.create(storeId, { name: 'Player Browser Store', retailer_id: retailerId, city: 'Test City', time_zone: 'UTC' });
         await locationRepository.create(locationId, { name: 'Player Browser Entrance', retailer_id: retailerId, store_id: storeId });
         await mediaRepository.create(assetId, {
             title: 'Browser Campaign Creative',
@@ -99,14 +101,19 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
         }
         const updateLoops = patch => Promise.all(loopIds.map(id => loopRepository.update(id, patch)));
 
-        // Technical Operator registers the Screen through the API and receives its one-time device key.
-        const operatorToken = await firebaseIdToken('techoperator@demo.softomedia.test');
-        const registration = await page.request.post(`${API}/api/screens`, {
-            headers: { Authorization: `Bearer ${operatorToken}` },
-            data: { screen_id: screenId, store_id: storeId, location_id: locationId },
-        });
-        expect(registration.status()).toBe(201);
-        const { device_key: deviceKey } = await registration.json();
+        // Technical Operator signs in, registers the Screen and receives its one-time device key.
+        const operator = await signedInPersona('techoperator@demo.softomedia.test', /\/dashboard\/techoperator$/);
+        await operator.getByTestId('nav-screens').click();
+        await operator.getByTestId('btn-add-screen').click();
+        const screenForm = operator.getByTestId('modal-screen-form');
+        await screenForm.getByLabel('Screen Hardware ID').fill(screenId);
+        await screenForm.getByLabel('Retailer').selectOption(retailerId);
+        await screenForm.getByLabel('Store').selectOption(storeId);
+        await screenForm.getByLabel('Location').selectOption(locationId);
+        await operator.getByTestId('btn-screen-form-submit').click();
+        await expect(operator.getByTestId('screen-device-credential')).toContainText(screenId);
+        const deviceKey = (await operator.getByTestId('screen-device-key').textContent()).trim();
+        expect(deviceKey).not.toBe('');
 
         await page.goto(`/player?screen_id=${screenId}`);
         await expect(page.getByTestId('player-error')).toContainText('Device key required');
@@ -177,10 +184,13 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
         await expect(page.getByTestId('fallback-presentation')).toBeVisible();
         await expect(page.getByTestId('campaign-presentation')).toHaveCount(0);
         const fallbackProofCount = (await impressionRepository.findProofsOfPlayByCampaign(campaignId)).length;
-        await page.waitForTimeout(5500);
+        const fallbackPresentations = async () => (await playbackObservationRepository.findAll())
+            .filter(item => item.screen_id === screenId && item.presentation_type === 'fallback').length;
+        await expect.poll(fallbackPresentations).toBeGreaterThan(0);
+        // Wait for the next five-second slot to present fallback too, then confirm no delivery was recorded.
+        const presentedSoFar = await fallbackPresentations();
+        await expect.poll(fallbackPresentations, { timeout: 15000 }).toBeGreaterThan(presentedSoFar);
         expect((await impressionRepository.findProofsOfPlayByCampaign(campaignId)).length).toBe(fallbackProofCount);
-        await expect.poll(async () => (await playbackObservationRepository.findAll())
-            .filter(item => item.screen_id === screenId && item.presentation_type === 'fallback').length).toBeGreaterThan(0);
 
         await campaignRepository.update(campaignId, { end_date: lastDate, advertiser_id: 'foreign-brand' });
         await page.reload();
@@ -196,7 +206,7 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
         await locationRepository.update(locationId, { retailer_id: retailerId });
         await campaignRepository.update(campaignId, { brand_id: brandId, advertiser_id: brandId, end_date: lastDate });
 
-        const operator = await signedInPersona('techoperator@demo.softomedia.test', /\/dashboard\/techoperator$/);
+        await operator.goto('/dashboard/techoperator');
         await expect(operator.getByTestId('delivery-report')).toBeVisible({ timeout: 30000 });
         await expect(operator.getByTestId('campaign-delivery')).not.toHaveText('0');
         await expect(operator.getByTestId('fallback-playback')).not.toHaveText('0');
@@ -211,19 +221,8 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
         await expect(brand.getByTestId(`proof-events-${campaignId}`)).toContainText(proof.event_id);
     } finally {
         await Promise.all(personaPages.map(persona => persona.context().close()));
+        // Not demo-scoped, so the reset would leave it for the Screen form of later journeys.
+        await retailerRepository.delete(retailerId).catch(() => null);
         await demo.reset();
     }
 });
-
-async function firebaseIdToken(email) {
-    const response = await fetch(
-        `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo-api-key`,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password: PASSWORD, returnSecureToken: true }),
-        },
-    );
-    if (!response.ok) throw new Error(`Firebase emulator sign-in failed: ${await response.text()}`);
-    return (await response.json()).idToken;
-}
