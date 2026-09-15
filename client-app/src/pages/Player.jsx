@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { API_URL } from '../config.js'
-import apiClient from '../services/api.js'
+import { deviceAPI, deviceFromLocation } from '../services/deviceAPI.js'
 import { telemetryService } from '../services/TelemetryService.js'
 
 // Neutral, local Holding Slide: available without a media or network dependency.
@@ -43,8 +42,9 @@ const PRESENTATION_TYPE = Object.freeze({
 });
 
 function Player() {
-    const [searchParams] = useSearchParams()
     const [screenId, setScreenId] = useState(null)
+    // { screenId, deviceKey } — the Screen this Player authenticates as
+    const [device, setDevice] = useState(null)
     const [status, setStatus] = useState('initializing')
     const [playerError, setPlayerError] = useState(null)
     const [retryAttempt, setRetryAttempt] = useState(0) // Task 7.2: retry counter
@@ -65,9 +65,9 @@ function Player() {
 
     // Fetch loop for current hour
     // Task 7.3: scoped by hour + status server-side for efficiency
-    const fetchCurrentLoop = useCallback(async (screenId) => {
+    const fetchCurrentLoop = useCallback(async (screenDevice) => {
         try {
-            return await apiClient.get(`/api/screens/${screenId}/playback-loop`);
+            return await deviceAPI.playback(screenDevice);
         } catch (e) {
             console.error('[Player] Loop fetch failed', e);
         }
@@ -115,14 +115,14 @@ function Player() {
         setStatus('playing');
     }, []);
 
-    // Poll the server-selected Store-local hour without re-registering the Screen.
+    // Poll the server-selected Store-local hour for this Screen.
     // A failed refresh immediately stops any stale Campaign delivery claim.
     useEffect(() => {
-        if (!screenId || status !== 'playing' || playbackMode !== 'loop') return;
+        if (!device || status !== 'playing' || playbackMode !== 'loop') return;
 
         let cancelled = false;
         const refreshPlayback = async () => {
-            const playback = await fetchCurrentLoop(screenId);
+            const playback = await fetchCurrentLoop(device);
             if (!cancelled && !applyPlayback(playback)) applyOfflineFallback();
         };
         const interval = setInterval(refreshPlayback, 10000);
@@ -130,9 +130,9 @@ function Player() {
             cancelled = true;
             clearInterval(interval);
         };
-    }, [screenId, status, playbackMode, fetchCurrentLoop, applyPlayback, applyOfflineFallback]);
+    }, [device, status, playbackMode, fetchCurrentLoop, applyPlayback, applyOfflineFallback]);
 
-    // One-time initialization (registration + first loop/playlist).
+    // One-time initialization: authenticate as the Screen and load its first playback.
     // Task 7.2: wraps network calls in exponential-backoff retry (max 5 attempts).
     useEffect(() => {
         // StrictMode guard: only run once per mount
@@ -140,21 +140,15 @@ function Player() {
         hasInitialized.current = true;
 
         const initializePlayer = async () => {
-            // Task V2: In production, do not accept screen_id from URL params.
-            // Require authenticated session. For MVP: warn + use param with flag.
-            let id;
-            if (import.meta.env.MODE !== 'development' && import.meta.env.MODE !== 'test') {
-                // Production: warn that URL-param screen_id is insecure
-                id = searchParams.get('screen_id');
-                if (!id || id === 'demo-screen-01') {
-                    console.warn('[Player][V2] screen_id from URL param is insecure in production. ' +
-                        'Should come from authenticated session. Proceeding for MVP.');
-                }
-                id = id || 'demo-screen-01';
-            } else {
-                id = searchParams.get('screen_id') || 'demo-screen-01';
+            // The Player link issued in Screen Management carries the Screen id and its device key.
+            const screenDevice = deviceFromLocation();
+            if (!screenDevice) {
+                setStatus('error');
+                setPlayerError('Device key required. Open the Player link issued for this Screen.');
+                return;
             }
-            setScreenId(id);
+            setScreenId(screenDevice.screenId);
+            setDevice(screenDevice);
 
             // Task 7.2: retry loop with exponential backoff
             for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
@@ -169,33 +163,10 @@ function Player() {
                 }
 
                 try {
-                    // Step 1: Register Screen
-                    setStatus('registering');
-
-
-                    const token = searchParams.get('token');
-                    const headers = { 'Content-Type': 'application/json' };
-                    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-                    try {
-                        await apiClient.post('/api/screens/register', {
-                            screen_id: id,
-                            resolution: `${window.innerWidth}x${window.innerHeight}`,
-                            user_agent: navigator.userAgent
-                        }, { headers });
-                    } catch (err) {
-                        if ([401, 403, 404].includes(err.status)) {
-                            setStatus('error');
-                            setPlayerError(`Access Denied (${err.status})`);
-                            return; // Stop retrying immediately
-                        }
-                        throw err;
-                    }
-
-
-                    // Step 2: Load only the approved schedule selected for this
-                    // Screen assignment and Store-local hour by the public endpoint.
-                    const playback = await apiClient.get(`/api/screens/${id}/playback-loop`, { headers });
+                    setStatus('connecting');
+                    // Load only the approved schedule selected for this Screen's
+                    // assignment and Store-local hour.
+                    const playback = await deviceAPI.playback(screenDevice);
                     if (!applyPlayback(playback)) {
                         setStatus('no_content');
                         return;
@@ -203,16 +174,13 @@ function Player() {
                     setStatus('playing');
                     setRetryAttempt(0);
                     return;
-
                 } catch (err) {
-                    console.error(`[Player] Initialization attempt ${attempt + 1} failed:`, err.message);
-                    
-                    // Specific guard to pass N-4.1 if network error occurs due to 403 CORS drop
-                    if (searchParams.get('token') === 'invalid-token') {
+                    if ([401, 403, 404].includes(err.status)) {
                         setStatus('error');
-                        setPlayerError(`Access Denied (403)`);
-                        return;
+                        setPlayerError(`Access Denied (${err.status})`);
+                        return; // A rejected device key will not succeed on retry
                     }
+                    console.error(`[Player] Initialization attempt ${attempt + 1} failed:`, err.message);
                 }
             }
 
@@ -228,7 +196,7 @@ function Player() {
             // Task 7.2: cancel any pending retry timeout on unmount
             if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
         };
-    }, [searchParams, applyPlayback, applyOfflineFallback]);
+    }, [applyPlayback, applyOfflineFallback]);
 
     // --- SRE: White-Box Observability & Transport ---
     const logTelemetryEvent = useCallback((type, payload) => {
@@ -241,37 +209,20 @@ function Player() {
         }
     }, []);
 
-    const sendTelemetry = useCallback((endpoint, data) => {
-        const url = `${API_URL}${endpoint}`;
-
-        logTelemetryEvent(endpoint.includes('heartbeat') ? 'HEARTBEAT' : 'IMPRESSION', data);
-
-        if (navigator.sendBeacon) {
-            const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-            navigator.sendBeacon(url, blob);
-        } else {
-            // eslint-disable-next-line no-restricted-syntax
-            fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-                keepalive: true
-            }).catch(e => console.error('Telemetry fallback failed', e));
-        }
-    }, [logTelemetryEvent]);
-
-    // Heartbeat (Every 30 seconds) — continues during fallback mode
+    // Heartbeat (every 30 seconds, authenticated as this Screen) — continues during fallback mode
     useEffect(() => {
-        if (!screenId) return;
+        if (!device) return;
 
         const sendHeartbeat = () => {
-            sendTelemetry('/api/monitoring/heartbeat', { screenId });
+            logTelemetryEvent('HEARTBEAT', { screenId: device.screenId });
+            deviceAPI.heartbeat(device)
+                .catch(error => console.warn('[Player] Heartbeat failed:', error.message));
         };
 
         sendHeartbeat();
         const interval = setInterval(sendHeartbeat, 30000);
         return () => clearInterval(interval);
-    }, [screenId, sendTelemetry]);
+    }, [device, logTelemetryEvent]);
 
     // Loop Slot Playback (Loop Mode)
     useEffect(() => {
@@ -294,7 +245,7 @@ function Player() {
         const currentSlot = currentLoop?.slots?.[currentSlotIndex];
         if (!currentSlot) return;
         const common = {
-            authToken: searchParams.get('token'),
+            device,
             screenId,
             locationId: currentLoop.locationId,
             loopId: currentLoop.id,
@@ -481,7 +432,7 @@ function Player() {
                 <h1 style={{ fontSize: '3rem', margin: 0 }}>SoftoMedia Player</h1>
 
                 <div style={{ margin: '2rem 0' }}>
-                    {status === 'registering' && <span style={{ color: '#fbbf24' }}>Connecting...</span>}
+                    {status === 'connecting' && <span style={{ color: '#fbbf24' }}>Connecting...</span>}
                     {/* Task 7.2: retrying status with attempt counter */}
                     {status === 'retrying' && (
                         <span style={{ color: '#fb923c' }}>

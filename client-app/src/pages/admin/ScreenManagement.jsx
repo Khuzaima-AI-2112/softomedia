@@ -3,6 +3,7 @@ import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import { ToastContainer, useToasts } from '../../components/Toast';
 import apiService from '../../services/ApiService';
+import { playerUrlFor } from '../../services/deviceAPI';
 
 // Allowed screen statuses (matches backend enum).
 const SCREEN_STATUS = Object.freeze({ ACTIVE: 'active', INACTIVE: 'inactive' });
@@ -20,6 +21,8 @@ function ScreenManagement() {
     const [pageError, setPageError] = useState('');
     const [togglingIds, setTogglingIds] = useState(new Set());
     const [showAddModal, setShowAddModal] = useState(false);
+    // { screenId, deviceKey } — shown once after registration or key rotation
+    const [issuedCredential, setIssuedCredential] = useState(null);
     const [newScreen, setNewScreen] = useState({
         screen_id: '',
         resolution: '1920x1080',
@@ -156,7 +159,10 @@ function ScreenManagement() {
     const handleCreateScreen = useCallback(async (e) => {
         e.preventDefault();
         try {
-            await apiService.createScreen(newScreen);
+            const created = await apiService.createScreen(newScreen);
+            if (created?.device_key) {
+                setIssuedCredential({ screenId: created.screen_id, deviceKey: created.device_key });
+            }
             setShowAddModal(false);
             setNewScreen({
                 screen_id: '',
@@ -183,6 +189,17 @@ function ScreenManagement() {
             }
         }
     }, [newScreen, loadData, addToast]);
+
+    const handleRotateDeviceKey = useCallback(async (screen) => {
+        if (!confirm(`Issue a new device key for "${screen.screen_id}"? Its current Player link will stop working.`)) return;
+        try {
+            const rotated = await apiService.rotateScreenDeviceKey(screen.id);
+            setIssuedCredential({ screenId: rotated.screen_id, deviceKey: rotated.device_key });
+            addToast(`New device key issued for "${screen.screen_id}".`, 'success');
+        } catch (error) {
+            addToast(error?.message || 'Failed to issue a new device key.', 'error');
+        }
+    }, [addToast]);
 
     const getStoreName = useCallback((screen) => {
         const store = stores.find(s => s.id === screen.store_id);
@@ -222,6 +239,41 @@ function ScreenManagement() {
                     >
                         {pageError}
                     </div>
+                )}
+
+                {issuedCredential && (
+                    <section
+                        aria-label="Screen device key"
+                        data-testid="screen-device-credential"
+                        className="px-4 py-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-900 dark:text-amber-100 text-sm space-y-2"
+                    >
+                        <p>
+                            Device key for <strong>{issuedCredential.screenId}</strong>. It is shown only once —
+                            open the Player link on the Screen now or copy the key.
+                        </p>
+                        <code data-testid="screen-device-key" className="block break-all font-mono">
+                            {issuedCredential.deviceKey}
+                        </code>
+                        <div className="flex gap-3">
+                            <a
+                                data-testid="screen-player-link"
+                                href={playerUrlFor(issuedCredential.screenId, issuedCredential.deviceKey)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="font-medium underline"
+                            >
+                                Open Player
+                            </a>
+                            <button
+                                type="button"
+                                data-testid="screen-device-key-dismiss-btn"
+                                onClick={() => setIssuedCredential(null)}
+                                className="font-medium"
+                            >
+                                Dismiss
+                            </button>
+                        </div>
+                    </section>
                 )}
 
                 <GlassCard>
@@ -294,6 +346,15 @@ function ScreenManagement() {
                                                                 ? 'toggle_on'
                                                                 : 'toggle_off'}
                                                     </span>
+                                                </button>
+
+                                                {/* Device key rotation */}
+                                                <button
+                                                    onClick={() => handleRotateDeviceKey(screen)}
+                                                    aria-label={`Issue new device key for "${screen.screen_id}"`}
+                                                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors mr-1"
+                                                >
+                                                    <span className="material-symbols-outlined text-[20px]" aria-hidden="true">key</span>
                                                 </button>
 
                                                 {/* Delete */}

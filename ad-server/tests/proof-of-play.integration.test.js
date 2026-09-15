@@ -34,7 +34,9 @@ describeWithEmulator('Proof of Play HTTP API with Firestore persistence', () => 
     const asOperator = response => response
         .set('Authorization', 'Bearer demo-token')
         .set('x-demo-role', 'techoperator');
-    const submitProof = body => asOperator(request(app).post('/api/telemetry/impression')).send(body);
+    let deviceKey;
+    const asScreen = pending => pending.set('Authorization', `Device ${ids.screen}:${deviceKey}`);
+    const submitProof = body => asScreen(request(app).post('/api/device/proof-of-play')).send(body);
 
     const proof = {
         event_id: ids.event,
@@ -92,7 +94,11 @@ describeWithEmulator('Proof of Play HTTP API with Firestore persistence', () => 
             retailer_id: ids.retailer,
             store_id: ids.store,
         });
+        const { deviceCredentialService } = await import('../src/services/DeviceCredentialService.js');
+        const credential = deviceCredentialService.newCredential();
+        deviceKey = credential.deviceKey;
         await firestore.collection('screens').doc(ids.screen).set({
+            ...credential.fields,
             id: ids.screen,
             location_id: ids.location,
             retailer_id: ids.retailer,
@@ -161,13 +167,13 @@ describeWithEmulator('Proof of Play HTTP API with Firestore persistence', () => 
         });
         expect(legacy.status).toBe(410);
 
+        // The Screen is identified by its device credential, never by the request body.
         const missing = await submitProof({});
         expect(missing.status).toBe(400);
         expect(missing.body).toEqual({
             error: 'Invalid Proof of Play',
             missing_fields: [
                 'event_id',
-                'screen_id',
                 'location_id',
                 'loop_id',
                 'slot_position',
@@ -248,7 +254,7 @@ describeWithEmulator('Proof of Play HTTP API with Firestore persistence', () => 
             .set('x-demo-role', 'admin');
         expect(admin.status).toBe(403);
 
-        const futureFallback = await asOperator(request(app).post('/api/telemetry/playback-observation')).send({
+        const futureFallback = await asScreen(request(app).post('/api/device/playback-observations')).send({
             event_id: `${ids.event}-future-fallback-observation`,
             screen_id: ids.screen,
             location_id: ids.location,
@@ -261,7 +267,7 @@ describeWithEmulator('Proof of Play HTTP API with Firestore persistence', () => 
         });
         expect(futureFallback.status).toBe(422);
 
-        const unassignedFallback = await asOperator(request(app).post('/api/telemetry/playback-observation')).send({
+        const unassignedFallback = await asScreen(request(app).post('/api/device/playback-observations')).send({
             event_id: `${ids.event}-unassigned-fallback-observation`,
             screen_id: ids.screen,
             location_id: ids.location,
@@ -274,7 +280,7 @@ describeWithEmulator('Proof of Play HTTP API with Firestore persistence', () => 
         });
         expect(unassignedFallback.status).toBe(422);
 
-        await asOperator(request(app).post('/api/telemetry/playback-observation')).send({
+        await asScreen(request(app).post('/api/device/playback-observations')).send({
             event_id: `${ids.event}-fallback-observation`,
             screen_id: ids.screen,
             location_id: ids.location,
@@ -285,7 +291,7 @@ describeWithEmulator('Proof of Play HTTP API with Firestore persistence', () => 
             presentation_started_at: presentationStartedAt.toISOString(),
             intended_duration_seconds: 5,
         });
-        const invalidHolding = await asOperator(request(app).post('/api/telemetry/playback-observation')).send({
+        const invalidHolding = await asScreen(request(app).post('/api/device/playback-observations')).send({
             event_id: `${ids.event}-holding-observation`,
             screen_id: ids.screen,
             location_id: ids.location,
@@ -296,7 +302,7 @@ describeWithEmulator('Proof of Play HTTP API with Firestore persistence', () => 
         expect(invalidHolding.status).toBe(422);
 
         await firestore.collection('daily_schedules').doc(ids.schedule).delete();
-        const holding = await asOperator(request(app).post('/api/telemetry/playback-observation')).send({
+        const holding = await asScreen(request(app).post('/api/device/playback-observations')).send({
             event_id: `${ids.event}-holding-observation`,
             screen_id: ids.screen,
             location_id: ids.location,

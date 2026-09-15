@@ -1,5 +1,5 @@
 import { API_URL } from '../config';
-import apiClient from './api.js';
+import { deviceAPI } from './deviceAPI.js';
 
 const STORAGE_KEY = 'softomedia_impression_buffer';
 const BATCH_SIZE_THRESHOLD = 50;            // Upload when we have this many items
@@ -11,9 +11,9 @@ const BATCH_TIME_THRESHOLD = 60 * 60 * 1000; // or every 1 hour
  * Two-layer impression reporting:
  *
  * Layer 1 — Real-time (per-play)
- *   trackImpression() immediately fires POST /api/telemetry/impression
- *   (fire-and-forget). This populates Firestore in real time and increments
- *   campaign.play_count via the server handler.
+ *   trackImpression() immediately fires POST /api/device/proof-of-play
+ *   (fire-and-forget), authenticated with the Screen's device key. This
+ *   populates Firestore in real time and increments campaign.play_count.
  *   Failure is swallowed — the player must never stall on a network error.
  *
  * Layer 2 — Batch fallback
@@ -69,12 +69,11 @@ class TelemetryService {
      * Record a single impression.
      *
      * Called by Player.jsx on every ad play. Does two things:
-     *   1. Fires a real-time POST /api/telemetry/impression (fire-and-forget).
-     *      This is the primary Firestore write path wired in Sprint 10.
+     *   1. Fires a real-time POST /api/device/proof-of-play (fire-and-forget).
      *   2. Buffers the impression locally for the batch-upload fallback.
      *
      * @param {object} impression
-     *   Required: screen_id, campaign_id
+     *   Required: device ({ screenId, deviceKey }), campaign_id
      *   Required: event_id (generated here), location_id, asset_id, loop_id,
      *   slot_position, presentation_started_at, intended_duration_seconds
      */
@@ -104,29 +103,29 @@ class TelemetryService {
             presentation_started_at: record.presentation_started_at,
             intended_duration_seconds,
         };
-        this.submitProofOfPlay(proofOfPlay, record.authToken);
+        this.submitProofOfPlay(proofOfPlay, record.device);
 
-        // ── Layer 2: local buffer for batch fallback ──────────────────────────
-        this.buffer.push(record);
+        // ── Layer 2: local buffer for batch fallback (never persists the device key) ──
+        const bufferedRecord = { ...record };
+        delete bufferedRecord.device;
+        this.buffer.push(bufferedRecord);
         this.saveBuffer();
         this.checkUploadCriteria();
 
         // White-box logging for SRE / E2E test verification
         if (window.__TELEMETRY_LOG__) {
-            window.__TELEMETRY_LOG__.push({ type: 'IMPRESSION_QUEUED', payload: record });
+            window.__TELEMETRY_LOG__.push({ type: 'IMPRESSION_QUEUED', payload: bufferedRecord });
         }
     }
 
-    async submitProofOfPlay(proofOfPlay, authToken, attempt = 0) {
+    async submitProofOfPlay(proofOfPlay, device, attempt = 0) {
         try {
-            await apiClient.post('/api/telemetry/impression', proofOfPlay, {
-                ...(authToken ? { headers: { Authorization: `Bearer ${authToken}` } } : {}),
-            });
+            await deviceAPI.proofOfPlay(device, proofOfPlay);
         } catch (error) {
             const retryDelays = [1000, 5000, 15000];
             const retryable = !error.status || [408, 429, 500, 502, 503, 504].includes(error.status);
             if (retryable && attempt < retryDelays.length) {
-                setTimeout(() => this.submitProofOfPlay(proofOfPlay, authToken, attempt + 1), retryDelays[attempt]);
+                setTimeout(() => this.submitProofOfPlay(proofOfPlay, device, attempt + 1), retryDelays[attempt]);
                 return;
             }
             console.warn('[Telemetry] Proof of Play submission failed; local buffer preserved:', error.message);
@@ -150,9 +149,8 @@ class TelemetryService {
             presentation_started_at: record.presentation_started_at,
             intended_duration_seconds: record.duration,
         };
-        apiClient.post('/api/telemetry/playback-observation', payload, {
-            ...(record.authToken ? { headers: { Authorization: `Bearer ${record.authToken}` } } : {}),
-        }).catch(error => console.warn('[Telemetry] Playback observation failed:', error.message));
+        deviceAPI.playbackObservation(record.device, payload)
+            .catch(error => console.warn('[Telemetry] Playback observation failed:', error.message));
     }
 
     async checkUploadCriteria() {

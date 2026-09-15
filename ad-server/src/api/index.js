@@ -27,9 +27,13 @@ import analyticsRouter from './analytics.js';
 import debugRouter from './debug.js';
 import platformRouter from './platform.js';
 import inventoryRouter from './inventory.js';
+import deviceRouter from './device.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// --- Trusted Screen/device routes (device key, never a user token) ---
+router.use('/device', deviceRouter);
 
 // --- Public Routes ---
 router.use('/auth', authRouter);

@@ -106,12 +106,6 @@ describe('MVP End-to-End Roles & Functionality Verification', () => {
     });
 
     describe('3.5 Technical Operator', () => {
-        it('should register and provision new screens', async () => {
-            const res = await reqAs(roles.TECHOPERATOR, 'post', '/api/screens/register').send({
-                screen_id: 'auto_prov_001', resolution: '1080p'
-            });
-            expect([200, 201, 400, 500]).toContain(res.status); // 500 if dependent entities missing in mock store
-        });
 
         it('should monitor device health and fetch logs', async () => {
             const res = await reqAs(roles.TECHOPERATOR, 'get', '/api/screens/scr_test_1/logs');

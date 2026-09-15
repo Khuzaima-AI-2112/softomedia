@@ -15,8 +15,14 @@ const { loopRepository, LOOP_STATUS } = await import('../src/repositories/LoopRe
 const { dailyScheduleRepository } = await import('../src/repositories/DailyScheduleRepository.js');
 const { mediaRepository } = await import('../src/repositories/MediaRepository.js');
 const { campaignRepository } = await import('../src/repositories/CampaignRepository.js');
+const { deviceCredentialService } = await import('../src/services/DeviceCredentialService.js');
 
 const app = createTestApp(apiRouter, '/api');
+let screenOneDeviceKey;
+
+const screenOnePlayback = () => request(app)
+    .get('/api/device/playback')
+    .set('Authorization', `Device screen-one:${screenOneDeviceKey}`);
 
 async function seedAssignment() {
     await StoreRepository.create('store-toronto', {
@@ -29,7 +35,10 @@ async function seedAssignment() {
         retailer_id: 'retailer-one',
         store_id: 'store-toronto',
     });
+    const credential = deviceCredentialService.newCredential();
+    screenOneDeviceKey = credential.deviceKey;
     await screenRepository.create('screen-one', {
+        ...credential.fields,
         name: 'Entrance Screen',
         retailer_id: 'retailer-one',
         store_id: 'store-toronto',
@@ -91,7 +100,7 @@ async function seedLoop({
     return loop;
 }
 
-describe('GET /api/screens/:id/playback-loop', () => {
+describe('GET /api/device/playback', () => {
     beforeEach(() => {
         clearMockStorage();
         jest.useFakeTimers({
@@ -108,7 +117,7 @@ describe('GET /api/screens/:id/playback-loop', () => {
         await seedAssignment();
         await seedLoop();
 
-        const response = await request(app).get('/api/screens/screen-one/playback-loop');
+        const response = await screenOnePlayback();
 
         expect(response.status).toBe(200);
         expect(response.body).toMatchObject({
@@ -135,7 +144,7 @@ describe('GET /api/screens/:id/playback-loop', () => {
         await seedAssignment();
         await seedLoop({ status: LOOP_STATUS.PENDING_APPROVAL });
 
-        const response = await request(app).get('/api/screens/screen-one/playback-loop');
+        const response = await screenOnePlayback();
 
         expect(response.status).toBe(200);
         expect(response.body).toMatchObject({
@@ -181,7 +190,7 @@ describe('GET /api/screens/:id/playback-loop', () => {
             url: 'https://cdn.example.test/approved-fallback.png',
         });
 
-        const response = await request(app).get('/api/screens/screen-one/playback-loop');
+        const response = await screenOnePlayback();
 
         expect(response.status).toBe(200);
         expect(response.body.slots[0]).toMatchObject({
@@ -218,7 +227,7 @@ describe('GET /api/screens/:id/playback-loop', () => {
             status: 'ready',
         });
 
-        const response = await request(app).get('/api/screens/screen-one/playback-loop');
+        const response = await screenOnePlayback();
 
         expect(response.body.slots[0]).toMatchObject({
             presentation_type: 'media',
@@ -267,7 +276,7 @@ describe('GET /api/screens/:id/playback-loop', () => {
             status: 'ready',
         });
 
-        const response = await request(app).get('/api/screens/screen-one/playback-loop');
+        const response = await screenOnePlayback();
 
         expect(response.body.slots[0]).toMatchObject({
             allocated_category: 'paid',
@@ -298,7 +307,7 @@ describe('GET /api/screens/:id/playback-loop', () => {
             status: 'ready',
         });
 
-        const response = await request(app).get('/api/screens/screen-one/playback-loop');
+        const response = await screenOnePlayback();
 
         expect(response.body.slots[0]).toMatchObject({
             allocated_category: 'paid',
@@ -344,7 +353,7 @@ describe('GET /api/screens/:id/playback-loop', () => {
             status: 'ready',
         });
 
-        const response = await request(app).get('/api/screens/screen-one/playback-loop');
+        const response = await screenOnePlayback();
 
         expect(response.body.slots[0]).toMatchObject({
             allocated_category: 'retailer',
@@ -369,7 +378,7 @@ describe('GET /api/screens/:id/playback-loop', () => {
             status: 'ready',
         });
 
-        const response = await request(app).get('/api/screens/screen-one/playback-loop');
+        const response = await screenOnePlayback();
 
         expect(response.body.slots[0]).toMatchObject({
             allocated_category: 'paid',
@@ -402,7 +411,7 @@ describe('GET /api/screens/:id/playback-loop', () => {
             status: 'ready',
         });
 
-        const response = await request(app).get('/api/screens/screen-one/playback-loop');
+        const response = await screenOnePlayback();
 
         expect(response.body.slots[0]).toMatchObject({
             asset_id: 'targeting-fallback',
@@ -435,7 +444,7 @@ describe('GET /api/screens/:id/playback-loop', () => {
             status: 'ready',
         });
 
-        const response = await request(app).get('/api/screens/screen-one/playback-loop');
+        const response = await screenOnePlayback();
 
         expect(response.body).toMatchObject({
             schedule_status: 'No approved schedule',
@@ -449,7 +458,7 @@ describe('GET /api/screens/:id/playback-loop', () => {
         await seedLoop();
         await locationRepository.update('location-entrance', { retailer_id: 'retailer-two' });
 
-        const response = await request(app).get('/api/screens/screen-one/playback-loop');
+        const response = await screenOnePlayback();
 
         expect(response.status).toBe(409);
         expect(response.body).toEqual({ error: 'Screen assignment is invalid' });
@@ -470,7 +479,7 @@ describe('GET /api/screens/:id/playback-loop', () => {
             }],
         });
 
-        const response = await request(app).get('/api/screens/screen-one/playback-loop');
+        const response = await screenOnePlayback();
 
         expect(response.status).toBe(200);
         expect(response.body).toMatchObject({
@@ -504,8 +513,8 @@ describe('GET /api/screens/:id/playback-loop', () => {
             ],
         });
 
-        const firstLoad = await request(app).get('/api/screens/screen-one/playback-loop');
-        const reloaded = await request(app).get('/api/screens/screen-one/playback-loop');
+        const firstLoad = await screenOnePlayback();
+        const reloaded = await screenOnePlayback();
 
         expect(firstLoad.body).toMatchObject({
             schedule_status: 'No approved schedule',

@@ -13,7 +13,6 @@ export const DEMO_PERSONAS = Object.freeze([
         role: 'techoperator',
         linked_entity_id: null,
         permissions: Object.freeze([
-            PERMISSIONS.PROOF_OF_PLAY_SUBMIT,
             PERMISSIONS.PROOF_OF_PLAY_VIEW_NETWORK,
         ]),
     }),

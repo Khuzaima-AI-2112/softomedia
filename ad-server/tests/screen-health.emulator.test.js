@@ -61,8 +61,9 @@ describeWithEmulator('Technical Operator Screen health with Firebase emulators',
         });
         expect(created.status).toBe(201);
 
-        const heartbeat = await asTechnicalOperator(app, 'post', '/api/monitoring/heartbeat')
-            .send({ screenId: ids.screen });
+        const heartbeat = await request(app)
+            .post('/api/device/heartbeat')
+            .set('Authorization', `Device ${ids.screen}:${created.body.device_key}`);
         expect(heartbeat.status).toBe(200);
 
         const persisted = await firestore.collection('screens').doc(ids.screen).get();

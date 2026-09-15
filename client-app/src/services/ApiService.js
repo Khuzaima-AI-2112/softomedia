@@ -214,6 +214,14 @@ class ApiService {
         return apiClient.delete(`/api/screens/${id}`);
     }
 
+    /**
+     * Issue a replacement device key; the Screen's previous key stops working.
+     * @returns {Promise<{screen_id: string, device_key: string}>}
+     */
+    async rotateScreenDeviceKey(id) {
+        return apiClient.post(`/api/screens/${encodeURIComponent(id)}/device-key`, {});
+    }
+
     async getScreenStatus() {
         return apiClient.get('/api/monitoring/status');
     }

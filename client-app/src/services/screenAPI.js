@@ -14,15 +14,6 @@ export const screenAPI = {
     },
 
     /**
-     * Register screen
-     * @param {string} screenId - Screen ID
-     * @returns {Promise<{status: string, data: object}>}
-     */
-    async register(screenId) {
-        return apiClient.post('/api/screens/register', { screen_id: screenId });
-    },
-
-    /**
      * Record impression
      * @param {string} screenId - Screen ID
      * @param {string} adId - Ad ID

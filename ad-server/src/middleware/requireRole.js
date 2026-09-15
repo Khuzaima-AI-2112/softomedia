@@ -16,7 +16,6 @@ export { ROLES, ROLE_HIERARCHY, normalizeRole };
 
 export const PERMISSIONS = Object.freeze({
     PLATFORM_GOVERNANCE: 'platform.governance',
-    PROOF_OF_PLAY_SUBMIT: 'proof_of_play.submit',
     PROOF_OF_PLAY_VIEW_NETWORK: 'proof_of_play.view_network',
     SUPPORT_TICKET_CREATE_OWN: 'support_ticket.create_own',
     SUPPORT_TICKET_VIEW_OWN: 'support_ticket.view_own',
@@ -28,7 +27,6 @@ export const PERMISSIONS = Object.freeze({
 const ROLE_PERMISSIONS = Object.freeze({
     [ROLES.SUPERADMIN]: Object.freeze([
         PERMISSIONS.PLATFORM_GOVERNANCE,
-        PERMISSIONS.PROOF_OF_PLAY_SUBMIT,
         PERMISSIONS.PROOF_OF_PLAY_VIEW_NETWORK,
         PERMISSIONS.SUPPORT_TICKET_MANAGE_NETWORK,
         PERMISSIONS.SCREEN_MANAGEMENT,
@@ -121,10 +119,6 @@ export function requirePermission(permission, requiredRole = permission) {
 export const requirePlatformGovernance = requirePermission(
     PERMISSIONS.PLATFORM_GOVERNANCE,
     ROLES.SUPERADMIN,
-);
-export const requireProofOfPlaySubmission = requirePermission(
-    PERMISSIONS.PROOF_OF_PLAY_SUBMIT,
-    ROLES.TECHOPERATOR,
 );
 export const requireNetworkProofOfPlayView = requirePermission(
     PERMISSIONS.PROOF_OF_PLAY_VIEW_NETWORK,

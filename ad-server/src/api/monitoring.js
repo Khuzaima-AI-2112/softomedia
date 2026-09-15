@@ -17,30 +17,10 @@ router.get('/health', requireRole(ROLES.TECHOPERATOR), async (_req, res) => {
     res.json(await operationalHealthService.check());
 });
 
-/**
- * POST /api/monitoring/heartbeat
- * Receives health signal from player screens
- */
-router.post('/heartbeat', async (req, res) => {
-    try {
-        const { screenId } = req.body;
-        if (!screenId) return res.status(400).json({ error: 'screenId required' });
-
-        await heartbeatService.recordHeartbeat(screenId);
-        res.json({ status: 'ok', timestamp: new Date().toISOString() });
-    } catch (error) {
-        logger.error('Heartbeat API error', { error: error.message });
-        if (error.message === 'Screen not found') {
-            return res.status(404).json({ error: 'Screen not found' });
-        }
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
 router.post('/impression', (req, res) => {
     return res.status(410).json({
         error: 'Legacy impression recording has been removed',
-        proof_of_play_endpoint: '/api/telemetry/impression',
+        proof_of_play_endpoint: '/api/device/proof-of-play',
     });
 });
 

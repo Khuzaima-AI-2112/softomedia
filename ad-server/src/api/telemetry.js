@@ -1,12 +1,6 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
-import { impressionLimiter } from '../middleware/rateLimiter.js';
-import { proofOfPlayService, ProofOfPlayError } from '../services/ProofOfPlayService.js';
-import { playbackObservationService } from '../services/PlaybackObservationService.js';
-import { PresentationEventError } from '../services/PresentationEventValidation.js';
-import { authenticate } from '../middleware/auth.js';
-import { requireProofOfPlaySubmission } from '../middleware/requireRole.js';
 
 const router = express.Router();
 
@@ -59,57 +53,6 @@ if (process.env.NODE_ENV !== 'production') {
         res.status(200).send('OK');
     });
 }
-
-/**
- * POST /api/telemetry/impression
- * Receives a single real-time impression event from the Player.
- *
- * Sprint 9 — Task 9.3: impressionLimiter applied (100 req/min per IP).
- * Issue #11: persist a caller-identified Proof of Play and increment the
- * Campaign delivery counter in one atomic transaction.
- *
- * Body:
- *   - event_id, screen_id, location_id, loop_id, campaign_id, asset_id
- *   - slot_position, presentation_started_at, intended_duration_seconds
- *
- * Returns 201 { status: 'recorded', event_id } on first persistence.
- * Returns 200 { status: 'duplicate', event_id } for an idempotent retry.
- * Returns 429 with Retry-After header when rate limit exceeded.
- */
-router.post('/impression', authenticate, requireProofOfPlaySubmission, impressionLimiter, async (req, res) => {
-    try {
-        const result = await proofOfPlayService.record(req.body);
-        logger.info('Proof of Play', {
-            type: 'proof_of_play',
-            event_id: result.event.event_id,
-            status: result.status,
-        });
-        const response = { status: result.status, event_id: result.event.event_id };
-        return res.status(result.status === 'recorded' ? 201 : 200).json(response);
-    } catch (error) {
-        if (error instanceof ProofOfPlayError) {
-            return res.status(error.status).json({ error: error.message, ...error.details });
-        }
-        logger.error('Proof of Play persistence failed', { error: error.message });
-        return res.status(503).json({ error: 'Proof of Play could not be persisted' });
-    }
-});
-
-router.post('/playback-observation', authenticate, requireProofOfPlaySubmission, async (req, res) => {
-    try {
-        const result = await playbackObservationService.record(req.body);
-        return res.status(result.status === 'recorded' ? 201 : 200).json({
-            status: result.status,
-            event_id: result.observation.event_id,
-        });
-    } catch (error) {
-        if (error instanceof PresentationEventError) {
-            return res.status(error.status).json({ error: error.message, ...error.details });
-        }
-        logger.error('Playback observation persistence failed', { error: error.message });
-        return res.status(503).json({ error: 'Playback observation could not be persisted' });
-    }
-});
 
 /**
  * POST /api/telemetry/error

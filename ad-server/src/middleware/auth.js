@@ -32,7 +32,6 @@ function legacyDemoIdentity(req) {
         linked_entity_id: organizationId,
         organization_id: organizationId,
         permissions: role === ROLES.TECHOPERATOR ? [
-            PERMISSIONS.PROOF_OF_PLAY_SUBMIT,
             PERMISSIONS.PROOF_OF_PLAY_VIEW_NETWORK,
         ] : [],
     };

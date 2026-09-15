@@ -9,6 +9,7 @@ import {
     normalizeRole,
 } from '../middleware/requireRole.js';
 import { ROLES } from '../constants/roles.js';
+import { deviceCredentialService, withoutDeviceCredential } from '../services/DeviceCredentialService.js';
 
 const router = express.Router();
 
@@ -28,50 +29,6 @@ function handleCircuitBreakerError(error, res) {
     }
     return false;
 }
-
-/**
- * POST /api/screens/register
- * Device self-registration — authenticate only, no role guard.
- * Physical screens have no user role; any authenticated caller may register.
- * Stores store_id as location_id in Firestore (internal field name).
- */
-router.post('/register', authenticate, async (req, res) => {
-    try {
-        const { screen_id, resolution, user_agent, retailer_id, store_id } = req.body;
-        if (!screen_id) return res.status(400).json({ error: 'screen_id required' });
-
-        const screenData = {
-            screen_id,
-            resolution,
-            user_agent,
-            status: 'ONLINE',
-            last_seen: new Date().toISOString()
-        };
-
-        if (retailer_id) screenData.retailer_id = retailer_id;
-        if (store_id) screenData.location_id = store_id;   // canonical internal field
-
-        const screen = await screenRepository.create(screen_id, screenData);
-        res.json(screen);
-    } catch (error) {
-        if (error.code === 6 || (error.message && error.message.includes('ALREADY_EXISTS'))) {
-            try {
-                const existingScreen = await screenRepository.findById(req.body.screen_id);
-                // Device rebooted — update its last_seen and resolution
-                await screenRepository.update(req.body.screen_id, {
-                    last_seen: new Date().toISOString(),
-                    resolution: req.body.resolution,
-                    status: 'ONLINE'
-                });
-                return res.status(200).json(existingScreen);
-            } catch (findErr) {
-                console.error('Failed to update existing screen during register:', findErr);
-            }
-        }
-        if (handleCircuitBreakerError(error, res)) return;
-        res.status(500).json({ error: error.message });
-    }
-});
 
 /**
  * POST /api/screens
@@ -105,14 +62,16 @@ router.post('/', authenticate, requireScreenManagement, async (req, res) => {
         if (resolution) screenData.resolution = resolution;
         if (user_agent) screenData.user_agent = user_agent;
 
-        const screen = await screenRepository.create(screen_id, screenData);
-        res.status(201).json(screen);
+        // The device key is returned only in this response; only its hash is stored.
+        const credential = deviceCredentialService.newCredential();
+        const screen = await screenRepository.create(screen_id, { ...screenData, ...credential.fields });
+        res.status(201).json({ ...withoutDeviceCredential(screen), device_key: credential.deviceKey });
     } catch (error) {
         if (error.code === 6 || (error.message && error.message.includes('ALREADY_EXISTS'))) {
             try {
                 const docId = req.body.screen_id || req.body.id || req.body.name;
                 const existingScreen = await screenRepository.findById(docId);
-                return res.status(200).json(existingScreen);
+                return res.status(200).json(withoutDeviceCredential(existingScreen));
             } catch (findErr) {
                 // If it fails to fetch, fall through to error logging
                 console.error('Failed to fetch existing screen during idempotent creation:', findErr);
@@ -150,7 +109,7 @@ router.get('/', authenticate, async (req, res) => {
             const screens = storeId
                 ? await screenRepository.findByLocation(storeId)
                 : await screenRepository.findAll();
-            return res.json(screens);
+            return res.json(screens.map(withoutDeviceCredential));
         }
 
         if (userLevel === retailerLevel && role === ROLES.RETAILERADMIN) {
@@ -165,7 +124,7 @@ router.get('/', authenticate, async (req, res) => {
             const screens = await screenRepository.findAll({
                 where: [['retailer_id', '==', retailerId]]
             });
-            return res.json(screens);
+            return res.json(screens.map(withoutDeviceCredential));
         }
 
         // advertiser or unrecognised role — no screen visibility
@@ -278,7 +237,7 @@ router.patch('/:id/status', authenticate, requireScreenManagement,
             }
 
             const updated = await screenRepository.updateStatus(req.params.id, status);
-            return res.json(updated);
+            return res.json(withoutDeviceCredential(updated));
         } catch (error) {
             console.error('PATCH /api/screens/:id/status failed:', error);
             res.status(500).json({ error: error.message });
@@ -287,23 +246,18 @@ router.patch('/:id/status', authenticate, requireScreenManagement,
 );
 
 /**
- * GET /api/screens/:id/playback-loop
- * Devices poll this public endpoint for playback selected from the Screen's
- * persisted assignment and the current Store-local date/hour. The service
- * returns either an approved schedule or an explicit Holding Slide state.
+ * POST /api/screens/:id/device-key
+ * Issues a replacement device key for a Screen; the previous key stops working.
+ * Players read playback through the device-authenticated /api/device routes.
  */
-import { playbackService, PlaybackError } from '../services/PlaybackService.js';
-
-router.get('/:id/playback-loop', async (req, res) => {
+router.post('/:id/device-key', authenticate, requireScreenManagement, async (req, res) => {
     try {
-        const playback = await playbackService.getForScreen(req.params.id);
-        return res.status(200).json(playback);
+        const deviceKey = await deviceCredentialService.rotate(req.params.id);
+        if (!deviceKey) return res.status(404).json({ error: 'Screen not found' });
+        return res.json({ screen_id: req.params.id, device_key: deviceKey });
     } catch (error) {
-        if (error instanceof PlaybackError) {
-            return res.status(error.status).json({ error: error.message });
-        }
-        console.error('GET /api/screens/:id/playback-loop failed:', error);
-        res.status(500).json({ error: error.message });
+        if (handleCircuitBreakerError(error, res)) return;
+        return res.status(503).json({ error: 'Device key could not be issued' });
     }
 });
 

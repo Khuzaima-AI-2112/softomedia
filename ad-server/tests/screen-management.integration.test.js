@@ -214,9 +214,8 @@ describe('Screen heartbeat connectivity', () => {
         });
         const app = monitoringAppFor('techoperator');
 
-        expect((await request(app).post('/api/monitoring/heartbeat').send({
-            screenId: 'screen-status',
-        })).status).toBe(200);
+        // Heartbeats arrive through the device-authenticated route (device-contract suite).
+        await heartbeatService.recordHeartbeat('screen-status');
 
         const withoutSchedule = await request(app).get('/api/monitoring/status');
         expect(withoutSchedule.status).toBe(200);

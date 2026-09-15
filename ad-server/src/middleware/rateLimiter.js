@@ -2,7 +2,8 @@
  * rateLimiter.js
  *
  * Sprint 9 — Task 9.3: Replace stub with a real in-memory sliding-window
- * rate limiter for POST /api/telemetry/impression.
+ * rate limiter for device presentation reports (POST /api/device/proof-of-play
+ * and /api/device/playback-observations).
  *
  * Design decisions:
  *   - In-process Map (no Redis dep for MVP) — resets on server restart.

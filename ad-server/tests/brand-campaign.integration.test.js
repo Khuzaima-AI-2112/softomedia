@@ -295,9 +295,13 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
                 duration: 5,
             }],
         });
+        const issuedDeviceKey = await request(app)
+            .post('/api/screens/demo-screen-secondary-1/device-key')
+            .set('Authorization', `Bearer ${await signIn('techoperator@demo.softomedia.test', password)}`);
+        expect(issuedDeviceKey.status).toBe(200);
         const telemetry = await request(app)
-            .post('/api/telemetry/impression')
-            .set('Authorization', `Bearer ${await signIn('techoperator@demo.softomedia.test', password)}`)
+            .post('/api/device/proof-of-play')
+            .set('Authorization', `Device demo-screen-secondary-1:${issuedDeviceKey.body.device_key}`)
             .send({
                 event_id: proofEventId,
                 campaign_id: creation.body.id,
