@@ -126,6 +126,54 @@ describeWithEmulators('Phase 1 permission matrix with Firebase emulators', () =>
         },
     );
 
+    test('a Brand reads only its own Advertiser record', async () => {
+        const [list, other] = await Promise.all([
+            as('brand', request(app).get('/api/advertisers')),
+            as('brand', request(app).get('/api/advertisers/demo-advertiser-secondary')),
+        ]);
+
+        expect(list.status).toBe(200);
+        expect(list.body.map(({ id }) => id)).toEqual(['demo-advertiser-bonvie']);
+        expect(other.status).toBe(404);
+        expect(JSON.stringify(other.body)).not.toContain('Northstar');
+    });
+
+    test('a Retailer reads only audit entries for its own loops, Stores and Screens', async () => {
+        const entries = {
+            'matrix-audit-own-loop': { action: 'loop_approved', entity_id: 'demo-loop-mtl-next-day-08' },
+            'matrix-audit-own-store': { action: 'approval_window_reopened', store_id: 'demo-store-mtl-north' },
+            'matrix-audit-foreign-store': { action: 'approval_window_reopened', store_id: 'demo-store-phoenix' },
+            'matrix-audit-foreign-screen': { action: 'screen_restart', screen_id: 'demo-screen-secondary-1' },
+            'matrix-audit-unscoped': { action: 'screen_restart' },
+        };
+        const audits = firestore.collection('scheduling_audits');
+        await Promise.all(Object.entries(entries).map(([id, entry]) =>
+            audits.doc(id).set({ ...entry, timestamp: '2030-01-15T10:00:00.000Z' })));
+
+        try {
+            const [retailer, operator] = await Promise.all([
+                as('retaileradmin', request(app).get('/api/audit')),
+                as('techoperator', request(app).get('/api/audit')),
+            ]);
+            const matrixIds = response => response.body.map(({ id }) => id).filter(id => id.startsWith('matrix-audit-')).sort();
+
+            expect(retailer.status).toBe(200);
+            expect(matrixIds(retailer)).toEqual(['matrix-audit-own-loop', 'matrix-audit-own-store']);
+            expect(operator.status).toBe(200);
+            expect(matrixIds(operator)).toEqual(Object.keys(entries).sort());
+        } finally {
+            await Promise.all(Object.keys(entries).map(id => audits.doc(id).delete()));
+        }
+    });
+
+    test('stub Schedule reads are gone for signed-in users too', async () => {
+        const [list, preview] = await Promise.all([
+            as('superadmin', request(app).get('/api/schedules')),
+            as('superadmin', request(app).get('/api/schedules/preview?storeId=demo-store-phoenix&date=2030-01-16')),
+        ]);
+        expect([list.status, preview.status]).toEqual([404, 404]);
+    });
+
     // Each request is shaped so a permitted persona gets a known non-denial
     // outcome (usually a validation or not-found response) without side effects.
     const GRANTS = [
@@ -150,6 +198,11 @@ describeWithEmulators('Phase 1 permission matrix with Firebase emulators', () =>
             allowed: { techoperator: 200, superadmin: 200 },
         },
         {
+            action: 'read the scheduling audit log',
+            send: pending => pending.get('/api/audit?locationId=matrix-location'),
+            allowed: { superadmin: 200, techoperator: 200, retaileradmin: 200 },
+        },
+        {
             action: 'record an operations audit entry',
             send: pending => pending.post('/api/audit').send({}),
             allowed: { techoperator: 400, superadmin: 400 },
@@ -158,6 +211,21 @@ describeWithEmulators('Phase 1 permission matrix with Firebase emulators', () =>
             action: 'create a Campaign',
             send: pending => pending.post('/api/campaigns').send({}),
             allowed: { brand: 400, admin: 400, superadmin: 400 },
+        },
+        {
+            action: 'set a date pricing override',
+            send: pending => pending.post('/api/pricing/overrides').send({}),
+            allowed: { superadmin: 400 },
+        },
+        {
+            action: 'read Advertiser records',
+            send: pending => pending.get('/api/advertisers/matrix-advertiser'),
+            allowed: { superadmin: 404, admin: 404, brand: 404 },
+        },
+        {
+            action: 'read network loop delivery analytics',
+            send: pending => pending.get('/api/analytics/loops'),
+            allowed: { admin: 400, superadmin: 400 },
         },
         {
             action: 'read Campaigns',

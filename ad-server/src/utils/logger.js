@@ -32,7 +32,10 @@ const logger = winston.createLogger({
     defaultMeta: {
         service: 'ad-server',
         environment: process.env.NODE_ENV || 'development',
-        project_id: 'softomedia-live-2026'
+        // Read at log time, so it names the project the server is actually connected to.
+        get project_id() {
+            return process.env.GOOGLE_CLOUD_PROJECT || process.env.FIREBASE_PROJECT_ID || 'unknown';
+        },
     },
     transports
 });

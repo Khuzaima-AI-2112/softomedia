@@ -1,11 +1,13 @@
 import express from 'express';
 import { impressionRepository } from '../repositories/index.js';
 import { authenticate } from '../middleware/auth.js';
+import { PERMISSIONS, requirePermission } from '../middleware/requireRole.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
 
-router.get('/loops', authenticate, async (req, res) => {
+// Network-wide delivery monitoring (Admin and Super Administrator).
+router.get('/loops', authenticate, requirePermission(PERMISSIONS.IMPRESSION_VIEW_NETWORK, null), async (req, res) => {
     try {
         const { date } = req.query;
         if (!date) {

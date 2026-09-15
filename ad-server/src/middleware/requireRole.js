@@ -21,6 +21,7 @@ export const PERMISSIONS = Object.freeze({
     SCREEN_DIAGNOSTICS: 'screens.diagnostics',
     STORE_VIEW_NETWORK: 'stores.view_network',
     ORGANIZATION_MANAGEMENT: 'organizations.manage',
+    ADVERTISER_VIEW_NETWORK: 'advertisers.view_network',
     CAMPAIGN_CREATE: 'campaigns.create',
     CAMPAIGN_DELETE: 'campaigns.delete',
     CAMPAIGN_APPROVAL: 'campaigns.approve',
@@ -30,6 +31,8 @@ export const PERMISSIONS = Object.freeze({
     IMPRESSION_VIEW_NETWORK: 'impressions.view_network',
     IMPRESSION_VIEW_OWN: 'impressions.view_own',
     INVOICE_GENERATE: 'invoices.generate',
+    AUDIT_VIEW_NETWORK: 'audit.view_network',
+    AUDIT_VIEW_OWN: 'audit.view_own',
 });
 
 // The accepted Phase 1 permission matrix (docs/phase-1-demo-acceptance.md).
@@ -45,6 +48,7 @@ const ROLE_PERMISSIONS = Object.freeze({
         PERMISSIONS.SCREEN_DIAGNOSTICS,
         PERMISSIONS.STORE_VIEW_NETWORK,
         PERMISSIONS.ORGANIZATION_MANAGEMENT,
+        PERMISSIONS.ADVERTISER_VIEW_NETWORK,
         PERMISSIONS.CAMPAIGN_CREATE,
         PERMISSIONS.CAMPAIGN_DELETE,
         PERMISSIONS.LOOP_INJECT,
@@ -52,10 +56,12 @@ const ROLE_PERMISSIONS = Object.freeze({
         PERMISSIONS.SCHEDULE_OVERRIDE,
         PERMISSIONS.IMPRESSION_VIEW_NETWORK,
         PERMISSIONS.INVOICE_GENERATE,
+        PERMISSIONS.AUDIT_VIEW_NETWORK,
     ]),
     [ROLES.ADMIN]: Object.freeze([
         PERMISSIONS.SCREEN_MANAGEMENT,
         PERMISSIONS.STORE_VIEW_NETWORK,
+        PERMISSIONS.ADVERTISER_VIEW_NETWORK,
         PERMISSIONS.CAMPAIGN_CREATE,
         PERMISSIONS.LOOP_GENERATE,
         PERMISSIONS.SCHEDULE_OVERRIDE,
@@ -72,12 +78,14 @@ const ROLE_PERMISSIONS = Object.freeze({
         PERMISSIONS.CAMPAIGN_APPROVAL,
         PERMISSIONS.SCHEDULE_OVERRIDE,
         PERMISSIONS.IMPRESSION_VIEW_OWN,
+        PERMISSIONS.AUDIT_VIEW_OWN,
     ]),
     [ROLES.TECHOPERATOR]: Object.freeze([
         PERMISSIONS.SUPPORT_TICKET_MANAGE_NETWORK,
         PERMISSIONS.SCREEN_MANAGEMENT,
         PERMISSIONS.SCREEN_DIAGNOSTICS,
         PERMISSIONS.STORE_VIEW_NETWORK,
+        PERMISSIONS.AUDIT_VIEW_NETWORK,
     ]),
 });
 

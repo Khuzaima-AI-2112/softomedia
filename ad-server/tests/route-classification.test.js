@@ -32,6 +32,16 @@ const REMOVED = [
     'GET /api/telemetry/upload-url',
     'PUT /api/telemetry/sink/sweep-file',
     'POST /api/telemetry/error',
+    // Firestore export to a caller-named bucket; backups are GCP scheduled exports.
+    'POST /api/ops/backup',
+    // Unused stubs and mocked or ungated data.
+    'GET /api/dashboard/stats',
+    'GET /api/pricing',
+    'GET /api/pricing/estimate',
+    'GET /api/pricing/calculate',
+    'GET /api/pricing/overrides/sweep-id',
+    // Public static files; media is served from Cloud Storage.
+    'GET /assets/demo_ad_1.png',
 ];
 
 // Express 4 keeps a mount path only as a RegExp such as /^\/device\/?(?=\/|$)/i.
@@ -95,7 +105,7 @@ describe('route classification', () => {
         expect(reachable).toEqual([]);
     });
 
-    test('debug, custom login, legacy playlist and unauthenticated telemetry routes are gone', async () => {
+    test('debug, custom login, legacy playlist, telemetry, backup, stub and static file routes are gone', async () => {
         const stillPresent = [];
         for (const route of REMOVED) {
             const [method, path] = route.split(' ');

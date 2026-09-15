@@ -107,13 +107,9 @@
 
 | Method | Path | Request body | Auth guard | Source file | Notes |
 |---|---|---|---|---|---|
-| GET | `/api/pricing` | — | `requireAuth` | `pricing.js` | Returns full pricing config for display |
 | GET | `/api/pricing/config` | — | `authenticate` + `requireRole('admin')` | `pricing.js` | Admin-only read of raw config doc. **S15-1: hardened from public.** |
 | PUT | `/api/pricing/config` | `{ baseCPM?, allocation?: { paid, retailer, internal }, ...overrides? }` | `authenticate` + `requireRole('admin')` | `pricing.js` | Overwrites config. `allocation` values must sum to 100 (integer) — returns `400` otherwise. **S15-1: role guard added.** |
-| POST | `/api/pricing/overrides` | `{ date, multiplier }` | `requireAuth` | `pricing.js` | Add a date-specific override |
-| GET | `/api/pricing/overrides/:date` | — | `requireAuth` | `pricing.js` | Get override for a specific date |
-| GET | `/api/pricing/calculate` | — (query: `hour`, `screen_id?`) | `requireAuth` | `pricing.js` | Calculate effective CPM for a given hour/screen |
-| GET | `/api/pricing/estimate` | — (query: `slots`, `cpm`) | `authenticate` | `pricing.js` | **S15-1: new.** Returns `{ estimatedCost }` = `slots × cpm / 1000`. Pure calculation, no Firestore read. |
+| POST | `/api/pricing/overrides` | `{ date, multiplier }` | `authenticate` + `requirePlatformGovernance` | `pricing.js` | Add a date-specific override. Super Administrator only (global pricing). |
 
 ---
 

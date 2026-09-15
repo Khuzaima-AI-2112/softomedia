@@ -89,7 +89,6 @@ console.log('[Server] Environment configured successfully');
 console.log('[Server] CORS origins:', CORS_ORIGINS);
 console.log('[Server] Using Firestore for data persistence');
 
-import { cacheControl } from './src/middleware/performance.js';
 import apiRouter from './src/api/index.js';
 import { initCronJobs } from './src/utils/cron.js';
 
@@ -98,9 +97,6 @@ initCronJobs();
 
 // Domain API Routes
 app.use('/api', apiRouter);
-
-// Serve assets with caching (1 hour)
-app.use('/assets', cacheControl(3600), express.static('assets'));
 
 // Health check endpoint for Docker/Cloud Run
 app.get('/health', (req, res) => res.status(200).json({ status: 'healthy' }));

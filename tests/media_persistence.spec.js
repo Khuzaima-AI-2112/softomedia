@@ -22,3 +22,11 @@ test('Admin uploads neutral fallback media and still sees it after reload withou
     await page.reload();
     await expect(page.getByRole('heading', { name: title })).toBeVisible();
 });
+
+// A left-over approved fallback would become the network fallback for later journeys
+// after the next demo reset deletes its uploaded file.
+test.afterEach(async () => {
+    const { mediaRepository } = await import('../ad-server/src/repositories/MediaRepository.js');
+    const uploads = (await mediaRepository.findAll()).filter(media => media.title?.startsWith('Browser fallback '));
+    await Promise.all(uploads.map(media => mediaRepository.delete(media.id)));
+});

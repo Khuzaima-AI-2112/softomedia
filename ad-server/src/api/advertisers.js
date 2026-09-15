@@ -2,20 +2,40 @@ import express from 'express';
 import { advertiserRepository } from '../repositories/AdvertiserRepository.js';
 import logger from '../utils/logger.js';
 import { authenticate } from '../middleware/auth.js';
-import { requireOrganizationManagement } from '../middleware/requireRole.js';
+import {
+    PERMISSIONS,
+    ROLES,
+    normalizeRole,
+    requireOrganizationManagement,
+    userHasPermission,
+} from '../middleware/requireRole.js';
 
 const router = express.Router();
 
+const isBrand = user => normalizeRole(user?.role) === ROLES.BRAND;
+const canViewNetwork = user => userHasPermission(user, PERMISSIONS.ADVERTISER_VIEW_NETWORK);
+
+/** Admin and Super Administrator read every Advertiser; a Brand reads only its own. */
+function requireAdvertiserRead(req, res, next) {
+    if (canViewNetwork(req.user) || isBrand(req.user)) return next();
+    return res.status(403).json({ error: 'Access denied' });
+}
+
+function inScope(user, advertiser) {
+    return canViewNetwork(user)
+        || advertiser.id === (user?.organization_id || user?.linked_entity_id || null);
+}
+
 /**
  * GET /api/advertisers
- * List all non-deleted advertisers — any signed-in user can read.
+ * List the non-deleted Advertisers the caller may read.
  * S17-3: soft-deleted advertisers (deleted_at set) are excluded.
  */
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticate, requireAdvertiserRead, async (req, res) => {
     try {
         // A record without deleted_at is not deleted; Firestore's `== null` would skip it.
         const advertisers = (await advertiserRepository.findAll())
-            .filter(advertiser => !advertiser.deleted_at);
+            .filter(advertiser => !advertiser.deleted_at && inScope(req.user, advertiser));
         res.json(advertisers);
     } catch (error) {
         logger.error('Failed to fetch advertisers:', error);
@@ -25,13 +45,13 @@ router.get('/', authenticate, async (req, res) => {
 
 /**
  * GET /api/advertisers/:id
- * Get a single advertiser by ID — any signed-in user can read.
+ * Get a single advertiser by ID; one outside the caller's scope reads as not found.
  * S17-4: returns 404 if the advertiser has been soft-deleted (deleted_at is set).
  */
-router.get('/:id', authenticate, async (req, res) => {
+router.get('/:id', authenticate, requireAdvertiserRead, async (req, res) => {
     try {
         const advertiser = await advertiserRepository.findById(req.params.id);
-        if (!advertiser || advertiser.deleted_at) {
+        if (!advertiser || advertiser.deleted_at || !inScope(req.user, advertiser)) {
             return res.status(404).json({ error: 'Advertiser not found' });
         }
         res.json(advertiser);

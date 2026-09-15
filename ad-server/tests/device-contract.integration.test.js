@@ -27,11 +27,15 @@ describeWithEmulators('trusted Screen device contract with Firebase emulators', 
 
     const asDevice = (pending, screenId, deviceKey) => pending.set('Authorization', `Device ${screenId}:${deviceKey}`);
 
-    const registerScreen = screenId => as('techOperator', request(app).post('/api/screens')).send({
-        screen_id: screenId,
-        store_id: 'demo-store-mtl-north',
-        location_id: 'demo-location-mtl-entrance',
-    });
+    const registeredScreenIds = [];
+    const registerScreen = screenId => {
+        registeredScreenIds.push(screenId);
+        return as('techOperator', request(app).post('/api/screens')).send({
+            screen_id: screenId,
+            store_id: 'demo-store-mtl-north',
+            location_id: 'demo-location-mtl-entrance',
+        });
+    };
 
     beforeAll(async () => {
         ({ default: request } = await import('supertest'));
@@ -62,6 +66,8 @@ describeWithEmulators('trusted Screen device contract with Firebase emulators', 
     });
 
     afterAll(async () => {
+        // Leftover Screens would show up as Bookable Inventory in later suites.
+        await Promise.all(registeredScreenIds.map(id => firestore?.collection('screens').doc(id).delete()));
         await firestore?.terminate();
     });
 

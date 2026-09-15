@@ -10,30 +10,6 @@ import { requirePlatformGovernance } from '../middleware/requireRole.js';
 const router = express.Router();
 
 /**
- * GET /api/pricing
- * Root stub — returns empty structure so PricingService initialises
- * without a 404 crash.
- */
-router.get('/', authenticate, async (req, res) => {
-    try {
-        const config = await PricingRepository.getConfig();
-        res.json({
-            ...config,
-            tiers: config.tiers || [],
-            meta: { stub: false }
-        });
-    } catch {
-        res.status(200).json({
-            tiers: [],
-            currency: 'USD',
-            billingCycles: [],
-            features: {},
-            meta: { stub: true, message: 'Pricing not yet configured.' }
-        });
-    }
-});
-
-/**
  * GET /api/pricing/config
  * Get current pricing configuration — Super Administrator only.
  * SEC-S15-5: was public; hardened in S15.
@@ -76,25 +52,10 @@ router.put('/config', authenticate, requirePlatformGovernance, async (req, res) 
 });
 
 /**
- * GET /api/pricing/estimate
- * Estimate cost for a given slot count and CPM rate.
- * Pure calculation — no Firestore dependency.
- * Query params: slots (number), cpm (number)
- */
-router.get('/estimate', authenticate, async (req, res) => {
-    const slots = parseFloat(req.query.slots);
-    const cpm   = parseFloat(req.query.cpm);
-    if (isNaN(slots) || isNaN(cpm)) {
-        return res.status(400).json({ error: 'slots and cpm are required' });
-    }
-    return res.json({ estimatedCost: (slots * cpm / 1000).toFixed(4) });
-});
-
-/**
  * POST /api/pricing/overrides
- * Set a date-specific pricing override (requires auth)
+ * Set a date-specific pricing override — Super Administrator only (global pricing).
  */
-router.post('/overrides', authenticate, async (req, res) => {
+router.post('/overrides', authenticate, requirePlatformGovernance, async (req, res) => {
     try {
         const { date, ...overrides } = req.body;
 
@@ -107,45 +68,6 @@ router.post('/overrides', authenticate, async (req, res) => {
     } catch (error) {
         console.error('Failed to set pricing override:', error);
         res.status(500).json({ error: 'Failed to set pricing override' });
-    }
-});
-
-/**
- * GET /api/pricing/overrides/:date
- * Get pricing override for a specific date
- */
-router.get('/overrides/:date', authenticate, async (req, res) => {
-    try {
-        const override = await PricingRepository.getDateOverride(req.params.date);
-        if (!override) {
-            return res.status(404).json({ error: 'No override for this date' });
-        }
-        res.json(override);
-    } catch (error) {
-        console.error('Failed to fetch pricing override:', error);
-        res.status(500).json({ error: 'Failed to fetch pricing override' });
-    }
-});
-
-/**
- * GET /api/pricing/calculate
- * Calculate slot price for given hour
- * Query params: hour, screenId (optional)
- */
-router.get('/calculate', authenticate, async (req, res) => {
-    try {
-        const hour = parseInt(req.query.hour);
-        const screenId = req.query.screenId;
-
-        if (isNaN(hour) || hour < 0 || hour > 23) {
-            return res.status(400).json({ error: 'Valid hour (0-23) is required' });
-        }
-
-        const pricing = await PricingRepository.calculateSlotPrice(hour, screenId);
-        res.json(pricing);
-    } catch (error) {
-        console.error('Failed to calculate price:', error);
-        res.status(500).json({ error: 'Failed to calculate price' });
     }
 });
 
