@@ -19,7 +19,7 @@
     "test:e2e:mock": "playwright test --grep-invert @seed",
     "test:e2e:seed": "npx cross-env ALLOW_DEMO_MODE=true playwright test --grep @seed",
     "pretest:e2e": "node scripts/test-preflight.js",
-    "test:rules": "firebase emulators:exec --project softomedia-demo --only firestore \"npx jest tests/firestore-rules/\"",
+    "test:rules": "firebase emulators:exec --config firebase.json --project softomedia-demo --only firestore,storage \"npx jest --runInBand --runTestsByPath tests/firestore-rules/rules.test.js\"",
     "test:demo-reset": "firebase emulators:exec --config firebase.json --project softomedia-demo --only auth,firestore,storage \"cd ad-server && node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand --coverage=false tests/demo-reset.integration.test.js\"",
     "test:media:http": "npm --prefix ad-server test -- --runInBand --coverage=false tests/media-assets.integration.test.js",
     "test:media:browser": "playwright test tests/media_persistence.spec.js --project=chromium",
