@@ -6,7 +6,6 @@ import DataTable from '../../components/DataTable';
 import apiService from '../../services/ApiService';
 import { useAuth } from '../../contexts/AuthContext';
 import { Trash2, X, PlusCircle } from 'lucide-react';
-import { ROLES, normalizeRole } from '../../constants/roles';
 import { PERMISSIONS } from '../../constants/permissions';
 
 const CAMPAIGN_STATUSES = [
@@ -27,11 +26,10 @@ const EMPTY_FORM = {
 
 function CampaignManagement() {
     const navigate = useNavigate();
-    const { user, loading, can } = useAuth();
+    const { loading, can } = useAuth();
 
-    const userRole   = normalizeRole(user?.role);
     // The Softomedia campaign workspace: Admin and Super Administrator
-    const canView    = [ROLES.ADMIN, ROLES.SUPERADMIN].includes(userRole);
+    const canView    = can(PERMISSIONS.CAMPAIGN_VIEW_NETWORK);
     const canDelete  = can(PERMISSIONS.CAMPAIGN_DELETE);
     // Only a Retailer Administrator approves; no administrative override
     const canApprove = can(PERMISSIONS.CAMPAIGN_APPROVAL);

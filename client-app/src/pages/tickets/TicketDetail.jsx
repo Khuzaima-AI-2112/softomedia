@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { ROLES } from '../../constants/roles';
+import { PERMISSIONS } from '../../constants/permissions';
 import { supportTicketAPI } from '../../services/supportTicketAPI';
 import {
     SUPPORT_TICKET_STATUSES,
@@ -17,18 +17,16 @@ import {
     supportTicketStatusLabel,
 } from '../../constants/supportTickets';
 
-const TICKET_MANAGER_ROLES = new Set([ROLES.TECHOPERATOR, ROLES.SUPERADMIN]);
-
 const TicketDetail = () => {
     const { id } = useParams();
-    const { persona } = useAuth();
+    const { can } = useAuth();
     const [ticket, setTicket] = useState(null);
     const [loadError, setLoadError] = useState(null);
     const [status, setStatus] = useState('open');
     const [note, setNote] = useState('');
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState(null);
-    const canManage = TICKET_MANAGER_ROLES.has(persona);
+    const canManage = can(PERMISSIONS.SUPPORT_TICKET_MANAGE_NETWORK);
 
     useEffect(() => {
         let active = true;

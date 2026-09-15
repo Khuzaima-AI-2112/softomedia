@@ -7,10 +7,17 @@ import { v4 as uuidv4 } from 'uuid';
 import { campaignRepository } from '../repositories/CampaignRepository.js';
 import PricingRepository from '../repositories/PricingRepository.js';
 import { BaseRepository } from '../repositories/BaseRepository.js';
-import { PERMISSIONS, requirePermission } from '../middleware/requireRole.js';
-import { ROLES } from '../constants/roles.js';
+import { PERMISSIONS, requirePermission, userHasPermission } from '../middleware/requireRole.js';
 
 const router = express.Router();
+
+/** Admin and Super Administrator read every invoice; a Brand reads its own. */
+const seesAllInvoices = user => userHasPermission(user, PERMISSIONS.INVOICE_VIEW_NETWORK);
+
+function requireInvoiceRead(req, res, next) {
+    if (seesAllInvoices(req.user) || userHasPermission(req.user, PERMISSIONS.INVOICE_VIEW_OWN)) return next();
+    return res.status(403).json({ error: 'Access denied' });
+}
 
 // Invoice collection repository
 class InvoiceRepository extends BaseRepository {
@@ -80,14 +87,13 @@ router.post('/generate', requirePermission(PERMISSIONS.INVOICE_GENERATE), async 
  * - admin/superadmin: all invoices, paginated
  * - advertiser: own invoices only (scoped to linked_entity_id)
  */
-router.get('/', async (req, res) => {
+router.get('/', requireInvoiceRead, async (req, res) => {
     try {
-        const role = req.user?.role;
         const page  = Math.max(1, parseInt(req.query.page)  || 1);
         const limit = Math.min(100, parseInt(req.query.limit) || 20);
 
         let invoices;
-        if (role === ROLES.ADMIN || role === ROLES.SUPERADMIN) {
+        if (seesAllInvoices(req.user)) {
             invoices = await invoiceRepository.findAll({ limit });
         } else {
             const advertiserId = req.user?.linked_entity_id;
@@ -112,15 +118,14 @@ router.get('/', async (req, res) => {
  * Get a single invoice.
  * Advertisers may only access their own invoices.
  */
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireInvoiceRead, async (req, res) => {
     try {
         const invoice = await invoiceRepository.findById(req.params.id);
         if (!invoice) {
             return res.status(404).json({ error: 'Invoice not found' });
         }
 
-        const role = req.user?.role;
-        if (role !== ROLES.ADMIN && role !== ROLES.SUPERADMIN) {
+        if (!seesAllInvoices(req.user)) {
             const advertiserId = req.user?.linked_entity_id;
             if (invoice.advertiserId !== advertiserId) {
                 return res.status(403).json({ error: 'Access denied' });
@@ -140,15 +145,14 @@ router.get('/:id', async (req, res) => {
  * Real PDF generation deferred post-MVP.
  * Advertisers may only access their own invoices.
  */
-router.get('/:id/pdf', async (req, res) => {
+router.get('/:id/pdf', requireInvoiceRead, async (req, res) => {
     try {
         const invoice = await invoiceRepository.findById(req.params.id);
         if (!invoice) {
             return res.status(404).json({ error: 'Invoice not found' });
         }
 
-        const role = req.user?.role;
-        if (role !== ROLES.ADMIN && role !== ROLES.SUPERADMIN) {
+        if (!seesAllInvoices(req.user)) {
             const advertiserId = req.user?.linked_entity_id;
             if (invoice.advertiserId !== advertiserId) {
                 return res.status(403).json({ error: 'Access denied' });

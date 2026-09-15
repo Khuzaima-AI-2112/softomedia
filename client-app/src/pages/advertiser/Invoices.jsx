@@ -2,10 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import apiService from '../../services/ApiService';
-import { ROLES } from '../../constants/roles';
-
-// A Brand sees its own invoices; Admin and Super Administrator see every invoice.
-const INVOICE_ROLES = [ROLES.BRAND, ROLES.ADMIN, ROLES.SUPERADMIN];
+import { PERMISSIONS } from '../../constants/permissions';
 
 /**
  * Invoices — S15-4
@@ -13,7 +10,9 @@ const INVOICE_ROLES = [ROLES.BRAND, ROLES.ADMIN, ROLES.SUPERADMIN];
  * Route: /dashboard/advertiser/invoices
  */
 export default function Invoices() {
-    const { user } = useAuth();
+    const { user, can } = useAuth();
+    // A Brand sees its own invoices; Admin and Super Administrator see every invoice.
+    const canViewInvoices = can(PERMISSIONS.INVOICE_VIEW_OWN) || can(PERMISSIONS.INVOICE_VIEW_NETWORK);
 
     const [invoices, setInvoices] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -21,15 +20,15 @@ export default function Invoices() {
     const [downloading, setDownloading] = useState(null);
 
     useEffect(() => {
-        if (user && !INVOICE_ROLES.includes(user.role)) return;
+        if (user && !canViewInvoices) return;
         apiService.request('GET', '/invoices')
             .then(res => setInvoices(res?.invoices ?? res?.data ?? []))
             .catch(err => setError(err?.response?.data?.error ?? err.message))
             .finally(() => setLoading(false));
-    }, [user]);
+    }, [user, canViewInvoices]);
 
-    // Role guard: other roles are redirected
-    if (user && !INVOICE_ROLES.includes(user.role)) {
+    // Without an invoice grant the user is redirected
+    if (user && !canViewInvoices) {
         return <Navigate to="/dashboard" replace />;
     }
 

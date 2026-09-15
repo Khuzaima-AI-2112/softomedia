@@ -12,8 +12,15 @@ vi.mock('../../services/ApiService', () => ({ default: { request } }));
 
 import Invoices from './Invoices';
 
-function renderAs(role) {
-    auth.user = { id: `${role}-user`, role };
+// The profile's explicit grants, as GET /api/auth/me returns them.
+const GRANTS = {
+    brand: ['campaigns.create', 'invoices.view_own'],
+    retaileradmin: ['campaigns.approve', 'support_ticket.create_own'],
+};
+
+function renderAs(role, permissions = GRANTS[role] ?? []) {
+    auth.user = { id: `${role}-user`, role, permissions };
+    auth.can = permission => permissions.includes(permission);
     render(
         <MemoryRouter initialEntries={['/dashboard/advertiser/invoices']}>
             <Routes>
@@ -42,5 +49,11 @@ describe('Invoices', () => {
 
         expect(await screen.findByText('Dashboard home')).toBeTruthy();
         await waitFor(() => expect(request).not.toHaveBeenCalled());
+    });
+
+    it('follows the invoice grant rather than the role name', async () => {
+        renderAs('retaileradmin', ['invoices.view_network']);
+
+        expect(await screen.findByText('No invoices yet.')).toBeTruthy();
     });
 });

@@ -87,6 +87,16 @@ describeWithEmulators('Phase 1 permission matrix with Firebase emulators', () =>
         expect(operator.body.user.permissions).not.toContain('campaigns.approve');
     });
 
+    test('campaign and invoice visibility are explicit grants on the signed-in profile', async () => {
+        const personas = ['superadmin', 'admin', 'brand', 'retaileradmin', 'techoperator'];
+        const profiles = await Promise.all(personas.map(persona => as(persona, request(app).get('/api/auth/me'))));
+        const holders = grant => personas.filter((_, index) => profiles[index].body.user.permissions.includes(grant));
+
+        expect(holders('campaigns.view_network')).toEqual(['superadmin', 'admin']);
+        expect(holders('invoices.view_network')).toEqual(['superadmin', 'admin']);
+        expect(holders('invoices.view_own')).toEqual(['brand']);
+    });
+
     test('Technical Operator lists Retailers, Stores and Locations network-wide to register and assign Screens', async () => {
         const [retailers, stores, locations] = await Promise.all([
             as('techoperator', request(app).get('/api/retailers')),
@@ -235,6 +245,16 @@ describeWithEmulators('Phase 1 permission matrix with Firebase emulators', () =>
             action: 'edit a Campaign',
             send: pending => pending.put('/api/campaigns/matrix-campaign').send({}),
             allowed: { brand: 404, admin: 404, superadmin: 404 },
+        },
+        {
+            action: 'list invoices',
+            send: pending => pending.get('/api/invoices'),
+            allowed: { superadmin: 200, admin: 200, brand: 200 },
+        },
+        {
+            action: 'read an invoice',
+            send: pending => pending.get('/api/invoices/matrix-invoice'),
+            allowed: { superadmin: 404, admin: 404, brand: 404 },
         },
         {
             action: 'generate an invoice',

@@ -57,8 +57,8 @@ const TECHOP_NAV = [
     { to: '/dashboard/techoperator', icon: 'monitor', label: 'Tech Ops', end: true, testId: 'nav-tech-ops' },
     { to: '/dashboard/techoperator/health', icon: 'monitor_heart', label: 'Health' },
     // fix(mvp-nav): MVP §3.5 — register/provision screens and assign them to retailers
-    // and locations. ScreenManagement serves both; GET /api/screens admits techoperator
-    // (ROLE_HIERARCHY level 2), so the screen renders with data for this persona.
+    // and locations. ScreenManagement serves both; the Technical Operator holds the
+    // screens.manage grant, so the screen renders with data for this persona.
     { to: '/dashboard/techoperator/screens', icon: 'tv', label: 'Screens', testId: 'nav-screens' },
     // fix(mvp-nav): MVP §3.5 — incident tracking and resolution
     { to: '/dashboard/tickets', icon: 'confirmation_number', label: 'Support Tickets', testId: 'nav-tickets' },
@@ -66,7 +66,7 @@ const TECHOP_NAV = [
 
 function getNavItems(persona) {
     if (!persona) return [];
-    if (persona === ROLES.SUPERADMIN || persona === 'super_admin') return SUPERADMIN_NAV;
+    if (persona === ROLES.SUPERADMIN) return SUPERADMIN_NAV;
     if (persona === ROLES.ADMIN) return ADMIN_NAV;
     if (persona === ROLES.BRAND) return BRAND_NAV;
     if (persona === ROLES.RETAILERADMIN) return RETAILER_NAV;

@@ -10,19 +10,19 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { ROLES } from '../../constants/roles';
+import { PERMISSIONS } from '../../constants/permissions';
 import SupportTicketModal from '../../components/SupportTicketModal';
 import { supportTicketAPI } from '../../services/supportTicketAPI';
 import { supportTicketCategoryLabel, supportTicketStatusLabel } from '../../constants/supportTickets';
 
 const TicketDashboard = () => {
-    const { persona } = useAuth();
+    const { can } = useAuth();
     const [tickets, setTickets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showModal, setShowModal] = useState(false);
     const [notice, setNotice] = useState('');
-    const canReport = persona === ROLES.RETAILERADMIN;
+    const canReport = can(PERMISSIONS.SUPPORT_TICKET_CREATE_OWN);
 
     useEffect(() => {
         let active = true;

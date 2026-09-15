@@ -219,7 +219,7 @@ router.get('/:id', async (req, res) => {
  * POST /api/loops
  * Demo Seed Bypass: allow superadmin to explicitly inject loops with a specific ID.
  */
-router.post('/', authenticate, requirePermission(PERMISSIONS.LOOP_INJECT, 'superadmin'), async (req, res) => {
+router.post('/', authenticate, requirePermission(PERMISSIONS.LOOP_INJECT, ROLES.SUPERADMIN), async (req, res) => {
     try {
         const { id, ...loopData } = req.body;
         const loop = await loopRepository.create(id, loopData);

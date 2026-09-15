@@ -25,12 +25,15 @@ export const PERMISSIONS = Object.freeze({
     CAMPAIGN_CREATE: 'campaigns.create',
     CAMPAIGN_DELETE: 'campaigns.delete',
     CAMPAIGN_APPROVAL: 'campaigns.approve',
+    CAMPAIGN_VIEW_NETWORK: 'campaigns.view_network',
     LOOP_INJECT: 'loops.inject',
     LOOP_GENERATE: 'loops.generate',
     SCHEDULE_OVERRIDE: 'schedules.override',
     IMPRESSION_VIEW_NETWORK: 'impressions.view_network',
     IMPRESSION_VIEW_OWN: 'impressions.view_own',
     INVOICE_GENERATE: 'invoices.generate',
+    INVOICE_VIEW_NETWORK: 'invoices.view_network',
+    INVOICE_VIEW_OWN: 'invoices.view_own',
     AUDIT_VIEW_NETWORK: 'audit.view_network',
     AUDIT_VIEW_OWN: 'audit.view_own',
 });
@@ -51,11 +54,13 @@ const ROLE_PERMISSIONS = Object.freeze({
         PERMISSIONS.ADVERTISER_VIEW_NETWORK,
         PERMISSIONS.CAMPAIGN_CREATE,
         PERMISSIONS.CAMPAIGN_DELETE,
+        PERMISSIONS.CAMPAIGN_VIEW_NETWORK,
         PERMISSIONS.LOOP_INJECT,
         PERMISSIONS.LOOP_GENERATE,
         PERMISSIONS.SCHEDULE_OVERRIDE,
         PERMISSIONS.IMPRESSION_VIEW_NETWORK,
         PERMISSIONS.INVOICE_GENERATE,
+        PERMISSIONS.INVOICE_VIEW_NETWORK,
         PERMISSIONS.AUDIT_VIEW_NETWORK,
     ]),
     [ROLES.ADMIN]: Object.freeze([
@@ -63,13 +68,16 @@ const ROLE_PERMISSIONS = Object.freeze({
         PERMISSIONS.STORE_VIEW_NETWORK,
         PERMISSIONS.ADVERTISER_VIEW_NETWORK,
         PERMISSIONS.CAMPAIGN_CREATE,
+        PERMISSIONS.CAMPAIGN_VIEW_NETWORK,
         PERMISSIONS.LOOP_GENERATE,
         PERMISSIONS.SCHEDULE_OVERRIDE,
         PERMISSIONS.IMPRESSION_VIEW_NETWORK,
         PERMISSIONS.INVOICE_GENERATE,
+        PERMISSIONS.INVOICE_VIEW_NETWORK,
     ]),
     [ROLES.BRAND]: Object.freeze([
         PERMISSIONS.CAMPAIGN_CREATE,
+        PERMISSIONS.INVOICE_VIEW_OWN,
     ]),
     [ROLES.RETAILERADMIN]: Object.freeze([
         PERMISSIONS.SUPPORT_TICKET_CREATE_OWN,
@@ -98,10 +106,7 @@ export function permissionsFor(user) {
 }
 
 export function userHasPermission(user, permission) {
-    const role = normalizeRole(user?.role);
-    return Array.isArray(user?.permissions) && user.permissions.includes(permission)
-        || ROLE_PERMISSIONS[role]?.includes(permission)
-        || false;
+    return permissionsFor(user).includes(permission);
 }
 
 /**

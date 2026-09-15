@@ -8,7 +8,7 @@ Welcome to **softomedia-live2026**! This repository houses the full-stack Digita
 
 The system is structured as a decoupled monorepo containing two core services:
 
-* **Ad Server (`ad-server/`)**: Express.js REST API backend handling campaign management, screen player heartbeats, CPM pricing multipliers, AI generation routines (via Google Gemini), and Firestore integration.
+* **Ad Server (`ad-server/`)**: Express.js REST API backend handling campaign management, retailer approval, screen player heartbeats and Proof of Play, CPM pricing, Support Tickets, and Firestore and Cloud Storage persistence. Users sign in with Firebase Authentication; Screens authenticate with their own device keys.
 * **Client App (`client-app/`)**: Modern React (Vite) single-page application providing UI dashboards for Super Admins, Brand Managers, and Screen Operators.
 
 ---
@@ -41,15 +41,15 @@ cp .env.example .env.development
 The default `.env.development` configuration:
 ```env
 VITE_API_URL=http://localhost:8080
-JWT_SECRET=your-secure-random-jwt-secret
 CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 NODE_ENV=development
 PORT=8080
 CLIENT_PORT=5173
-ALLOW_DEMO_MODE=true
 ```
 
-> ⚠️ **Note**: `ad-server` requires `JWT_SECRET` on startup and will exit with an error if it is not set.
+The demo reset and persona provisioning variables are described in `.env.example`.
+There is no demo token, custom JWT or demo mode: every request signs in through
+Firebase Authentication (or the Auth emulator locally).
 
 ### 3. Running the Local Servers
 Start the backend server and frontend client in separate terminals (or terminal tabs):
@@ -74,6 +74,12 @@ Start the backend server and frontend client in separate terminals (or terminal 
 Run backend Jest unit tests:
 ```bash
 npm run test:unit
+```
+
+Most backend suites sign in for real and need the Firebase emulators; see
+[`docs/TESTING.md`](docs/TESTING.md). Firestore and Storage security rules:
+```bash
+npm run test:rules
 ```
 
 ### Reproducible Demo Baseline
@@ -105,7 +111,7 @@ npm run test:demo-reset
 ```
 
 ### End-to-End (E2E) Tests
-Run Playwright browser tests (ensure the backend server is running on `http://localhost:8080` first):
+Run Playwright browser tests. The script starts the Firebase emulators and both dev servers:
 ```bash
 npm run test:e2e
 ```
@@ -132,10 +138,9 @@ Cloud Build Trigger (softomedia-live-2026)
 ```
 
 ### Key Secret Dependencies (GCP Secret Manager)
-Deployments depend on one secret stored in GCP Secret Manager under project `softomedia-live-2026`:
-1. `JWT_SECRET`: Signing key for authentication tokens.
-
-The AI service and its `GEMINI_API_KEY` secret were removed in Phase 1 (issue #12).
+Authentication needs no application secret: the server verifies Firebase ID tokens
+with its Google Cloud credentials. The retired `JWT_SECRET` (issue #13) and the AI
+service's `GEMINI_API_KEY` (issue #12) are no longer used.
 
 > 🔒 **Security Policy**: Never commit `.env` or production secrets to Git. Secret Manager injects runtime secrets into Cloud Run containers dynamically during Step 5 of Cloud Build.
 
@@ -154,19 +159,15 @@ The AI service and its `GEMINI_API_KEY` secret were removed in Phase 1 (issue #1
 
 ## 🛠️ Troubleshooting & FAQ
 
-### 1. `JWT_SECRET environment variable is not set`
-* **Cause**: `ad-server` exited on boot because `JWT_SECRET` was missing.
-* **Fix**: Ensure `.env.development` exists in the project root with a defined `JWT_SECRET=your-secret` string (`cp .env.example .env.development`).
-
-### 2. `Not allowed by CORS` Error
+### 1. `Not allowed by CORS` Error
 * **Cause**: Browser request origin (e.g. `http://localhost:5173`) is not listed in `CORS_ORIGINS`.
 * **Fix**: Ensure `CORS_ORIGINS` in `.env.development` includes `http://localhost:5173`.
 
-### 3. Client App Shows `Failed to fetch`
+### 2. Client App Shows `Failed to fetch`
 * **Cause**: `client-app` cannot connect to `ad-server`.
 * **Fix**: Ensure `ad-server` is running on port 8080 (`npm run dev:server`) and `VITE_API_URL` points to `http://localhost:8080`.
 
-### 4. Port Conflict (EADDRINUSE: 8080 or 5173)
+### 3. Port Conflict (EADDRINUSE: 8080 or 5173)
 * **Cause**: Another service or orphaned node process is using port 8080 or 5173.
 * **Fix**: Identify and terminate the process listening on that port or specify a different `PORT` in `.env.development`.
 

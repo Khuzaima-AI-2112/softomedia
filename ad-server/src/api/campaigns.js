@@ -137,28 +137,30 @@ router.get('/', authenticate, requireCampaignRead, async (req, res) => {
         const { status, advertiserId } = req.query;
         let campaigns;
 
-        // Advertiser-scoped path — show only the caller's own campaigns
-        if (isBrand(req.user)) {
-            campaigns = await campaignRepository.findByBrandId(
-                brandIdFor(req.user),
-                status?.toLowerCase(),
-            );
+        if (userHasPermission(req.user, PERMISSIONS.CAMPAIGN_VIEW_NETWORK)) {
+            if (advertiserId) {
+                campaigns = await campaignRepository.findAll({
+                    where: [['advertiser_id', '==', advertiserId]]
+                });
+            } else if (status) {
+                campaigns = await campaignRepository.findAll({
+                    where: [['status', '==', status]]
+                });
+            } else {
+                campaigns = await campaignRepository.findAll();
+            }
         } else if (isRetailer(req.user)) {
             const retailerId = retailerIdFor(req.user);
             campaigns = (await campaignRepository.findAll())
                 .filter(campaign => campaignRepository.targetsRetailer(campaign, retailerId)
                     && (!status || campaign.status === status))
                 .map(withoutBudget);
-        } else if (advertiserId) {
-            campaigns = await campaignRepository.findAll({
-                where: [['advertiser_id', '==', advertiserId]]
-            });
-        } else if (status) {
-            campaigns = await campaignRepository.findAll({
-                where: [['status', '==', status]]
-            });
         } else {
-            campaigns = await campaignRepository.findAll();
+            // A Brand sees only its own Campaigns.
+            campaigns = await campaignRepository.findByBrandId(
+                brandIdFor(req.user),
+                status?.toLowerCase(),
+            );
         }
 
         res.json(campaigns);
@@ -181,12 +183,8 @@ router.get('/:id', authenticate, requireCampaignRead, async (req, res) => {
             return res.status(404).json({ error: 'Campaign not found' });
         }
 
-        // Ownership guard for advertiser role
-        if (
-            isBrand(req.user) &&
-            !campaignRepository.isOwnedByBrand(campaign, brandIdFor(req.user))
-        ) {
-            return res.status(403).json({ error: 'Forbidden' });
+        if (userHasPermission(req.user, PERMISSIONS.CAMPAIGN_VIEW_NETWORK)) {
+            return res.json(campaign);
         }
         if (isRetailer(req.user)) {
             if (!campaignRepository.targetsRetailer(campaign, retailerIdFor(req.user))) {
@@ -194,7 +192,10 @@ router.get('/:id', authenticate, requireCampaignRead, async (req, res) => {
             }
             return res.json(withoutBudget(campaign));
         }
-
+        // A Brand reads only its own Campaigns.
+        if (!campaignRepository.isOwnedByBrand(campaign, brandIdFor(req.user))) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
         res.json(campaign);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -220,15 +221,15 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, RO
         // T1: Brands create for their own organization; Admin and Super
         // Administrator create on behalf of a named advertiser.
         const brandCaller = isBrand(req.user);
-        const isAdminTier = !brandCaller;
+        const preparedForAdvertiser = !brandCaller;
         const brandOwnerId = brandIdFor(req.user);
 
         if (brandCaller && !brandOwnerId) {
             return res.status(403).json({ error: 'Brand account has no organization assignment' });
         }
 
-        // T1: Admin-tier callers must explicitly supply advertiser_id
-        if (isAdminTier && !req.body.advertiser_id) {
+        // T1: a Campaign prepared for an advertiser must name that advertiser
+        if (preparedForAdvertiser && !req.body.advertiser_id) {
             return res.status(400).json({
                 error: 'advertiser_id is required when creating a campaign as admin or superadmin',
             });
@@ -280,11 +281,9 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, RO
         } : req.body;
         const campaignData = {
             ...submittedData,
-            // T5: Role-tier stamping — admin tier uses body value (validated
-            // above); all other roles get JWT-stamped value only (body ignored).
-            ...(brandCaller ? {} : {
-                advertiser_id: isAdminTier ? req.body.advertiser_id : brandOwnerId,
-            }),
+            // T5: a Brand's ownership is stamped by createForBrand from its identity;
+            // a Campaign prepared for an advertiser uses the advertiser named above.
+            ...(preparedForAdvertiser ? { advertiser_id: req.body.advertiser_id } : {}),
             // Every Campaign awaits Retailer approval; no administrative override.
             status: 'pending_approval',
             created_at: new Date().toISOString()
