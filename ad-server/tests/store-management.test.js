@@ -7,9 +7,13 @@ import { createTestApp } from './fixtures/test-app.js';
 const { default: apiRouter } = await import('../src/api/index.js');
 const app = createTestApp(apiRouter, '/api');
 
+// A retailer of its own, so Stores other suites leave in the shared emulator never appear here.
+const retailerId = `store-management-retailer-${Date.now()}`;
+
 const retailerHeaders = {
     Authorization: 'Bearer demo-token',
     'x-demo-role': 'retaileradmin',
+    'x-demo-retailer-id': retailerId,
 };
 
 const adminHeaders = {
@@ -34,7 +38,7 @@ describe('Retailer Administrator store management', () => {
             .set(retailerHeaders)
             .send({
                 name: 'Retailer Admin Toronto Store',
-                retailer_id: 'demo-retailer-freshmart',
+                retailer_id: retailerId,
                 time_zone: 'America/Toronto',
             });
 
@@ -80,7 +84,7 @@ describe('Retailer Administrator store management', () => {
         expect(ownLocation.body).toMatchObject({
             name: 'Entrance',
             store_id: created.body.id,
-            retailer_id: 'demo-retailer-freshmart',
+            retailer_id: retailerId,
         });
 
         const secondaryStore = await StoreRepository.createWithScreens({

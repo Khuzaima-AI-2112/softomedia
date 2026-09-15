@@ -21,20 +21,23 @@ export const PERMISSIONS = Object.freeze({
     SUPPORT_TICKET_VIEW_OWN: 'support_ticket.view_own',
     SUPPORT_TICKET_MANAGE_NETWORK: 'support_ticket.manage_network',
     SCREEN_MANAGEMENT: 'screens.manage',
+    STORE_VIEW_NETWORK: 'stores.view_network',
     CAMPAIGN_APPROVAL: 'campaigns.approve',
 });
 
+// Phase 1 matrix: approval belongs to the Retailer Administrator alone; no
+// administrative override approves on a Retailer's behalf.
 const ROLE_PERMISSIONS = Object.freeze({
     [ROLES.SUPERADMIN]: Object.freeze([
         PERMISSIONS.PLATFORM_GOVERNANCE,
         PERMISSIONS.PROOF_OF_PLAY_VIEW_NETWORK,
         PERMISSIONS.SUPPORT_TICKET_MANAGE_NETWORK,
         PERMISSIONS.SCREEN_MANAGEMENT,
-        PERMISSIONS.CAMPAIGN_APPROVAL,
+        PERMISSIONS.STORE_VIEW_NETWORK,
     ]),
     [ROLES.ADMIN]: Object.freeze([
         PERMISSIONS.SCREEN_MANAGEMENT,
-        PERMISSIONS.CAMPAIGN_APPROVAL,
+        PERMISSIONS.STORE_VIEW_NETWORK,
     ]),
     [ROLES.RETAILERADMIN]: Object.freeze([
         PERMISSIONS.SUPPORT_TICKET_CREATE_OWN,
@@ -44,6 +47,7 @@ const ROLE_PERMISSIONS = Object.freeze({
     [ROLES.TECHOPERATOR]: Object.freeze([
         PERMISSIONS.SUPPORT_TICKET_MANAGE_NETWORK,
         PERMISSIONS.SCREEN_MANAGEMENT,
+        PERMISSIONS.STORE_VIEW_NETWORK,
     ]),
 });
 
@@ -95,7 +99,8 @@ export const requireSuperAdmin = requireRole(ROLES.SUPERADMIN);
 
 /**
  * Require a named action grant instead of inferring authority from rank.
- * `requiredRole` preserves the established denial response for existing API consumers.
+ * `requiredRole` preserves the established denial response for existing API consumers;
+ * pass null for the generic denial that names no roles.
  */
 export function requirePermission(permission, requiredRole = permission) {
     return (req, res, next) => {
@@ -105,6 +110,7 @@ export function requirePermission(permission, requiredRole = permission) {
 
         const role = normalizeRole(req.user.role);
         if (!userHasPermission(req.user, permission)) {
+            if (requiredRole === null) return res.status(403).json({ error: 'Access denied' });
             return res.status(403).json({
                 error: 'Forbidden',
                 required: requiredRole,
@@ -130,6 +136,6 @@ export const requireScreenManagement = requirePermission(
 );
 export const requireCampaignApproval = requirePermission(
     PERMISSIONS.CAMPAIGN_APPROVAL,
-    ROLES.RETAILERADMIN,
+    null,
 );
 export const requireAdmin      = requireRole(ROLES.ADMIN);

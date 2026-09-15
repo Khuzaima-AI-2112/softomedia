@@ -2,8 +2,8 @@ import express from 'express';
 import StoreRepository from '../repositories/StoreRepository.js';
 import { BusinessHoursService } from '../services/BusinessHoursService.js';
 import { authenticate } from '../middleware/auth.js';
+import { PERMISSIONS, userHasPermission } from '../middleware/requireRole.js';
 import {
-    canManageAnyRetailer,
     canManageRetailer,
     denyStoreAccess,
     findManagedStore,
@@ -37,7 +37,7 @@ router.get('/', async (req, res) => {
         const requestedRetailerId = req.query.retailer_id || req.query.retailerId || req.query.retailerid;
         const ownRetailerId = retailerIdFor(req.user);
 
-        if (!canManageAnyRetailer(req.user)) {
+        if (!userHasPermission(req.user, PERMISSIONS.STORE_VIEW_NETWORK)) {
             if (!ownRetailerId || (requestedRetailerId && requestedRetailerId !== ownRetailerId)) {
                 return denyStoreAccess(res);
             }

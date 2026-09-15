@@ -455,10 +455,8 @@ router.patch('/:id/status', authenticate, requireCampaignApproval, async (req, r
         const currentStatus = campaign.status || 'pending_approval';
         const allowed = VALID_TRANSITIONS[currentStatus] ?? [];
 
-        const callerRole = req.user?.role;
-        const isAdminOverride = callerRole === ROLES.ADMIN || callerRole === ROLES.SUPERADMIN;
-
-        if (!isAdminOverride && !allowed.includes(requestedStatus)) {
+        // No administrative override: only the Retailer Administrator holds this grant.
+        if (!allowed.includes(requestedStatus)) {
             return res.status(400).json({
                 error: 'Invalid status transition',
                 from: currentStatus,
