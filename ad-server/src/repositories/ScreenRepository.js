@@ -21,9 +21,9 @@ export class ScreenRepository extends BaseRepository {
      * @param {string} id 
      * @param {string} status 
      */
-    async updateHeartbeat(id, status = 'ONLINE') {
+    async updateHeartbeat(id, status = 'ONLINE', seenAt = new Date()) {
         return this.update(id, {
-            last_seen: new Date().toISOString(),
+            last_seen: seenAt.toISOString(),
             status
         });
     }

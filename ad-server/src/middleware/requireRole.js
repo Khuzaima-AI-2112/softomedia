@@ -21,6 +21,8 @@ export const PERMISSIONS = Object.freeze({
     SUPPORT_TICKET_CREATE_OWN: 'support_ticket.create_own',
     SUPPORT_TICKET_VIEW_OWN: 'support_ticket.view_own',
     SUPPORT_TICKET_MANAGE_NETWORK: 'support_ticket.manage_network',
+    SCREEN_MANAGEMENT: 'screens.manage',
+    CAMPAIGN_APPROVAL: 'campaigns.approve',
 });
 
 const ROLE_PERMISSIONS = Object.freeze({
@@ -29,13 +31,21 @@ const ROLE_PERMISSIONS = Object.freeze({
         PERMISSIONS.PROOF_OF_PLAY_SUBMIT,
         PERMISSIONS.PROOF_OF_PLAY_VIEW_NETWORK,
         PERMISSIONS.SUPPORT_TICKET_MANAGE_NETWORK,
+        PERMISSIONS.SCREEN_MANAGEMENT,
+        PERMISSIONS.CAMPAIGN_APPROVAL,
+    ]),
+    [ROLES.ADMIN]: Object.freeze([
+        PERMISSIONS.SCREEN_MANAGEMENT,
+        PERMISSIONS.CAMPAIGN_APPROVAL,
     ]),
     [ROLES.RETAILERADMIN]: Object.freeze([
         PERMISSIONS.SUPPORT_TICKET_CREATE_OWN,
         PERMISSIONS.SUPPORT_TICKET_VIEW_OWN,
+        PERMISSIONS.CAMPAIGN_APPROVAL,
     ]),
     [ROLES.TECHOPERATOR]: Object.freeze([
         PERMISSIONS.SUPPORT_TICKET_MANAGE_NETWORK,
+        PERMISSIONS.SCREEN_MANAGEMENT,
     ]),
 });
 
@@ -119,5 +129,13 @@ export const requireProofOfPlaySubmission = requirePermission(
 export const requireNetworkProofOfPlayView = requirePermission(
     PERMISSIONS.PROOF_OF_PLAY_VIEW_NETWORK,
     ROLES.TECHOPERATOR,
+);
+export const requireScreenManagement = requirePermission(
+    PERMISSIONS.SCREEN_MANAGEMENT,
+    ROLES.TECHOPERATOR,
+);
+export const requireCampaignApproval = requirePermission(
+    PERMISSIONS.CAMPAIGN_APPROVAL,
+    ROLES.RETAILERADMIN,
 );
 export const requireAdmin      = requireRole(ROLES.ADMIN);

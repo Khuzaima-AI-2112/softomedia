@@ -11,8 +11,12 @@ import {
 } from '../repositories/index.js';
 import { campaignService } from '../services/CampaignService.js';
 import { authenticate } from '../middleware/auth.js';
-import { requireRole } from '../middleware/requireRole.js';
-import { PERMISSIONS, userHasPermission } from '../middleware/requireRole.js';
+import {
+    PERMISSIONS,
+    requireCampaignApproval,
+    requireRole,
+    userHasPermission,
+} from '../middleware/requireRole.js';
 import { ROLES, ROLE_HIERARCHY, normalizeRole } from '../constants/roles.js';
 
 const router = express.Router();
@@ -433,7 +437,7 @@ router.post('/:id/book', authenticate, async (req, res) => {
  * fix: authenticate middleware was missing — req.user was never populated so
  *   requireRole resolved every caller to level -1 → 403.
  */
-router.patch('/:id/status', authenticate, requireRole(ROLES.RETAILERADMIN), async (req, res) => {
+router.patch('/:id/status', authenticate, requireCampaignApproval, async (req, res) => {
     try {
         const { id } = req.params;
         const rawStatus = req.body.status;

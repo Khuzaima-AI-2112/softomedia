@@ -59,7 +59,7 @@ const TECHOP_NAV = [
     // fix(mvp-nav): MVP §3.5 — register/provision screens and assign them to retailers
     // and locations. ScreenManagement serves both; GET /api/screens admits techoperator
     // (ROLE_HIERARCHY level 2), so the screen renders with data for this persona.
-    { to: '/dashboard/admin/screens', icon: 'tv', label: 'Screens', testId: 'nav-screens' },
+    { to: '/dashboard/techoperator/screens', icon: 'tv', label: 'Screens', testId: 'nav-screens' },
     // fix(mvp-nav): MVP §3.5 — incident tracking and resolution
     { to: '/dashboard/tickets', icon: 'confirmation_number', label: 'Support Tickets', testId: 'nav-tickets' },
 ];

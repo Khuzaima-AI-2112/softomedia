@@ -187,6 +187,7 @@ function App() {
                             {/* Tech Operator */}
                             <Route path="techoperator"        element={<TechOpsDashboard />} />
                             <Route path="techoperator/health" element={<Health />} />
+                            <Route path="techoperator/screens" element={<ScreenManagement />} />
 
                             {/* Catch-all for unknown /dashboard/* paths */}
                             <Route path="*" element={<NotFound />} />
