@@ -3,11 +3,13 @@ import { screenRepository, impressionRepository, locationRepository } from '../r
 import StoreRepository from '../repositories/StoreRepository.js';
 import { authenticate } from '../middleware/auth.js';
 import {
-    requireRole,
+    PERMISSIONS,
+    requireScreenDiagnostics,
     requireScreenManagement,
-    ROLE_HIERARCHY,
     normalizeRole,
+    userHasPermission,
 } from '../middleware/requireRole.js';
+import { retailerIdFor } from '../middleware/storeManagement.js';
 import { ROLES } from '../constants/roles.js';
 import { deviceCredentialService, withoutDeviceCredential } from '../services/DeviceCredentialService.js';
 
@@ -87,24 +89,17 @@ router.post('/', authenticate, requireScreenManagement, async (req, res) => {
  * GET /api/screens
  * List screens with role-conditional visibility.
  *
- * Sprint 11 — S11-8:
- *   - techoperator (level 2) and above: full unfiltered list.
- *   - retaileradmin (level 1): list filtered to their own retailer_id from JWT.
- *   - brand (level 1): denied; Brands use the sanitized Bookable Inventory API.
- *   - Unauthenticated or insufficient role: 403.
- *
- * fix: brand role was missing from ROLE_HIERARCHY entirely, causing 403 on
- *      GET /api/screens during campaign wizard load for all brand users.
+ * Sprint 11 — S11-8, Phase 1 grants:
+ *   - screens.manage (Technical Operator, Admin, Super Administrator): full list.
+ *   - screens.view_own (Retailer Administrator): own Retailer's Screens only.
+ *   - Brand: denied; Brands use the sanitized Bookable Inventory API.
  */
 router.get('/', authenticate, async (req, res) => {
     try {
         const role = normalizeRole(req.user?.role);
-        const userLevel = ROLE_HIERARCHY[role] ?? -1;
-        const techopLevel = ROLE_HIERARCHY[ROLES.TECHOPERATOR];    // 2
-        const retailerLevel = ROLE_HIERARCHY[ROLES.RETAILERADMIN]; // 1
 
-        if (userLevel >= techopLevel) {
-            // techoperator, contentmanager, admin, superadmin — see everything
+        if (userHasPermission(req.user, PERMISSIONS.SCREEN_MANAGEMENT)) {
+            // Technical Operator, Admin, Super Administrator — see everything
             const storeId = req.query.store_id || req.query.storeId || req.query.storeid;
             const screens = storeId
                 ? await screenRepository.findByLocation(storeId)
@@ -112,9 +107,9 @@ router.get('/', authenticate, async (req, res) => {
             return res.json(screens.map(withoutDeviceCredential));
         }
 
-        if (userLevel === retailerLevel && role === ROLES.RETAILERADMIN) {
-            // retaileradmin — scoped to their own retailer_id from the auth token
-            const retailerId = req.user.linkedentityid || req.user.retailer_id;
+        if (userHasPermission(req.user, PERMISSIONS.SCREEN_VIEW_OWN)) {
+            // Retailer Administrator — scoped to the Retailer of the signed-in identity
+            const retailerId = retailerIdFor(req.user);
             if (!retailerId) {
                 return res.status(403).json({
                     error: 'Forbidden',
@@ -156,7 +151,7 @@ router.get('/', authenticate, async (req, res) => {
  *   404  { error: 'Screen not found' }  when screen_id does not exist
  *   403  insufficient role
  */
-router.get('/:id/logs', authenticate, requireRole('techoperator'), async (req, res) => {
+router.get('/:id/logs', authenticate, requireScreenDiagnostics, async (req, res) => {
     try {
         const screenId = req.params.id;
 

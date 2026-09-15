@@ -1,6 +1,6 @@
-﻿import express from 'express';
+import express from 'express';
 import { authenticate } from '../middleware/auth.js';
-import { ACTIONS, requirePermission } from '../middleware/authorization.js';
+import { permissionsFor } from '../middleware/requireRole.js';
 
 const router = express.Router();
 
@@ -8,13 +8,12 @@ const router = express.Router();
 
 /**
  * GET /api/auth/me
- * Returns current authenticated user session
+ * Returns the authenticated user's profile and the explicit grants it holds.
  */
 router.get(
     '/me',
     authenticate,
-    requirePermission(ACTIONS.AUTHENTICATED_PROFILE_READ),
-    (req, res) => res.json({ status: 'ok', user: req.user })
+    (req, res) => res.json({ status: 'ok', user: { ...req.user, permissions: permissionsFor(req.user) } })
 );
 
 export default router;

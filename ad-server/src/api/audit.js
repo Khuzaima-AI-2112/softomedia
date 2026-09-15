@@ -1,7 +1,7 @@
 import express from 'express';
 import { schedulingAuditRepository } from '../repositories/index.js';
 import { authenticate } from '../middleware/auth.js';
-import { requireRole } from '../middleware/requireRole.js';
+import { requireScreenDiagnostics } from '../middleware/requireRole.js';
 
 const router = express.Router();
 
@@ -42,7 +42,7 @@ router.get('/', async (req, res) => {
  * Returns 201 { id, ...entry } on success.
  * Returns 400 if action is missing.
  */
-router.post('/', authenticate, requireRole('techoperator'), async (req, res) => {
+router.post('/', authenticate, requireScreenDiagnostics, async (req, res) => {
     try {
         const { action, screen_id, user_id, outcome, timestamp, ...rest } = req.body;
         if (!action) {

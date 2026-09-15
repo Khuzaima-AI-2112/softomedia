@@ -46,9 +46,11 @@ export const AuthProvider = ({ children }) => {
     };
 
     const persona = user?.role || null;
+    // UI gating only: the backend enforces every grant on its own.
+    const can = permission => Boolean(user?.permissions?.includes(permission));
 
     return (
-        <AuthContext.Provider value={{ user, persona, loading, login, logout }}>
+        <AuthContext.Provider value={{ user, persona, loading, login, logout, can }}>
             {children}
         </AuthContext.Provider>
     );

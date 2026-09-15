@@ -31,17 +31,6 @@ export function toCanonicalRole(raw) {
     return CANONICAL_ROLES.includes(cleaned) ? cleaned : null;
 }
 
-/** Role hierarchy levels — single source, mirrors requireRole.js */
-export const ROLE_HIERARCHY = {
-    [ROLES.SUPERADMIN]:     5,
-    [ROLES.ADMIN]:          4,
-    contentmanager:         3,
-    [ROLES.TECHOPERATOR]:   2,
-    [ROLES.RETAILERADMIN]:  1,
-    [ROLES.BRAND]:          0,
-    advertiser:             0,
-};
-
 /** Normalize super_admin / SUPER_ADMIN variants to canonical form */
 export function normalizeRole(raw) {
     return toCanonicalRole(raw) || raw;

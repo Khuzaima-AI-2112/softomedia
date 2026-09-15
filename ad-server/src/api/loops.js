@@ -29,7 +29,7 @@ import { BusinessHoursService } from '../services/BusinessHoursService.js';
 import { approvalWindowService, ApprovalWindowError } from '../services/ApprovalWindowService.js';
 import StoreRepository from '../repositories/StoreRepository.js';
 import { authenticate } from '../middleware/auth.js';
-import { requireCampaignApproval, requireRole } from '../middleware/requireRole.js';
+import { PERMISSIONS, requireCampaignApproval, requirePermission } from '../middleware/requireRole.js';
 import { canManageRetailer, denyStoreAccess, retailerIdFor } from '../middleware/storeManagement.js';
 import { normalizeRole, ROLES } from '../constants/roles.js';
 import logger from '../utils/logger.js';
@@ -180,7 +180,7 @@ router.get('/review/:storeId/:date', async (req, res) => {
  * Ordering: registered before GET /:id to prevent "pending" being matched
  * as a loop ID param.
  */
-router.get('/pending/:retailerId', authenticate, requireRole('retaileradmin'), async (req, res) => {
+router.get('/pending/:retailerId', authenticate, requireCampaignApproval, async (req, res) => {
     try {
         if (req.params.retailerId !== retailerIdFor(req.user)) return denyStoreAccess(res);
         const loops = await loopRepository.findPendingByRetailer(req.params.retailerId);
@@ -219,7 +219,7 @@ router.get('/:id', async (req, res) => {
  * POST /api/loops
  * Demo Seed Bypass: allow superadmin to explicitly inject loops with a specific ID.
  */
-router.post('/', authenticate, requireRole('superadmin'), async (req, res) => {
+router.post('/', authenticate, requirePermission(PERMISSIONS.LOOP_INJECT, 'superadmin'), async (req, res) => {
     try {
         const { id, ...loopData } = req.body;
         const loop = await loopRepository.create(id, loopData);

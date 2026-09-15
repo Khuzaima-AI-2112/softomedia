@@ -2,20 +2,20 @@ import express from 'express';
 import { advertiserRepository } from '../repositories/AdvertiserRepository.js';
 import logger from '../utils/logger.js';
 import { authenticate } from '../middleware/auth.js';
-import { requireRole } from '../middleware/requireRole.js';
+import { requireOrganizationManagement } from '../middleware/requireRole.js';
 
 const router = express.Router();
 
 /**
  * GET /api/advertisers
  * List all non-deleted advertisers — any signed-in user can read.
- * S17-3: filters where deleted_at == null so soft-deleted advertisers are excluded.
+ * S17-3: soft-deleted advertisers (deleted_at set) are excluded.
  */
 router.get('/', authenticate, async (req, res) => {
     try {
-        const advertisers = await advertiserRepository.findAll({
-            where: [['deleted_at', '==', null]]
-        });
+        // A record without deleted_at is not deleted; Firestore's `== null` would skip it.
+        const advertisers = (await advertiserRepository.findAll())
+            .filter(advertiser => !advertiser.deleted_at);
         res.json(advertisers);
     } catch (error) {
         logger.error('Failed to fetch advertisers:', error);
@@ -47,9 +47,9 @@ router.get('/:id', authenticate, async (req, res) => {
  * Required fields: name, logo, industry, contactemail, budget, status
  * Document ID is prefixed with 'adv_'
  *
- * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added.
+ * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added; Phase 1: Super Administrator only.
  */
-router.post('/', authenticate, requireRole('admin'), async (req, res) => {
+router.post('/', authenticate, requireOrganizationManagement, async (req, res) => {
     try {
         const { name, logo, industry, contactemail, budget, status } = req.body;
 
@@ -102,9 +102,9 @@ router.post('/', authenticate, requireRole('admin'), async (req, res) => {
  * PUT /api/advertisers/:id
  * Full update an advertiser (replaces all fields).
  *
- * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added.
+ * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added; Phase 1: Super Administrator only.
  */
-router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
+router.put('/:id', authenticate, requireOrganizationManagement, async (req, res) => {
     try {
         const advertiser = await advertiserRepository.update(req.params.id, req.body);
         res.json(advertiser);
@@ -120,20 +120,18 @@ router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
  * Used for field-level edits (name, logo, industry, contactemail, budget)
  * and active/inactive status toggles.
  *
- * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added.
+ * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added; Phase 1: Super Administrator only.
  * S21-2 (SEC-S21-1): explicit field allowlist added. deleted_at is owned
  * exclusively by softDelete() and cannot be overwritten via PATCH —
  * GUARDRAIL-15.
- * S21-3 resolution: requireRole('admin') is the correct and sufficient
- * guard for all retailer and advertiser mutation routes; superadmin is
- * not required. Caller audit confirmed all mutations originate from
- * admin-gated management pages only.
+ * Phase 1: organizations.manage (Super Administrator) guards all retailer
+ * and advertiser mutation routes, superseding the S21-3 admin decision.
  * S21-3: 'status' added to allowlist for active/inactive toggles —
  * mirrors the retailers PATCH pattern. 'suspended' is reserved for
  * softDelete() exclusively and is rejected with 400 if sent here.
  * A PATCH body containing only non-allowlisted fields returns 400.
  */
-router.patch('/:id', authenticate, requireRole('admin'), async (req, res) => {
+router.patch('/:id', authenticate, requireOrganizationManagement, async (req, res) => {
     try {
         // Allowlist: only non-sensitive business fields are patchable.
         // deleted_at  — owned exclusively by softDelete(); blocked per GUARDRAIL-15.
@@ -165,15 +163,12 @@ router.patch('/:id', authenticate, requireRole('admin'), async (req, res) => {
  * Preserves referential integrity with campaigns that reference advertiser_id.
  * Record is excluded from GET / list after this operation.
  *
- * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added.
+ * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added; Phase 1: Super Administrator only.
  * S17-2: deleted_at field written to Firestore as canonical deletion marker.
  */
-router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
+router.delete('/:id', authenticate, requireOrganizationManagement, async (req, res) => {
     try {
-        if (req.user.role === 'superadmin') {
-            await advertiserRepository.delete(req.params.id);
-            return res.status(200).json({ success: true });
-        }
+        // Always a soft delete (GUARDRAIL-15), whoever holds organizations.manage.
         const updated = await advertiserRepository.softDelete(req.params.id);
         res.status(200).json(updated);
     } catch (error) {

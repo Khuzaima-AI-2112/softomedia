@@ -4,8 +4,8 @@ import StoreRepository from '../repositories/StoreRepository.js';
 import { loopRepository, LOOP_STATUS } from '../repositories/LoopRepository.js';
 import { normalizeRole, ROLES } from '../constants/roles.js';
 import { approvalWindowService, ApprovalWindowError } from '../services/ApprovalWindowService.js';
+import { PERMISSIONS, userHasPermission } from '../middleware/requireRole.js';
 import {
-    canManageAnyRetailer,
     canManageRetailer,
     denyStoreAccess,
     findManagedStore,
@@ -33,7 +33,7 @@ router.get('/', async (req, res) => {
             ));
         }
 
-        if (canManageAnyRetailer(req.user)) {
+        if (userHasPermission(req.user, PERMISSIONS.STORE_VIEW_NETWORK)) {
             return res.json(await includeStoreTimeZones(await locationRepository.findAll()));
         }
 

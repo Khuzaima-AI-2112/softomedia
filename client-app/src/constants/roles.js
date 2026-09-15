@@ -29,17 +29,6 @@ export function dashboardRouteForRole(role) {
     return DASHBOARD_ROUTE_BY_ROLE[normalizeRole(role)] || null;
 }
 
-/** Role hierarchy levels — single source, mirrors requireRole.js */
-export const ROLE_HIERARCHY = {
-    [ROLES.SUPERADMIN]:     5,
-    [ROLES.ADMIN]:          4,
-    [ROLES.CONTENTMANAGER]: 3,
-    [ROLES.TECHOPERATOR]:   2,
-    [ROLES.RETAILERADMIN]:  1,
-    [ROLES.BRAND]:          0,
-    [ROLES.ADVERTISER]:     0,
-};
-
 /** Normalize super_admin / SUPER_ADMIN variants to canonical form */
 export function normalizeRole(raw) {
     if (!raw || typeof raw !== 'string') return raw;

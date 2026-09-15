@@ -2,14 +2,14 @@ import express from 'express';
 import { retailerRepository } from '../repositories/RetailerRepository.js';
 import logger from '../utils/logger.js';
 import { authenticate } from '../middleware/auth.js';
-import { requireRole } from '../middleware/requireRole.js';
+import { requireOrganizationManagement } from '../middleware/requireRole.js';
 
 const router = express.Router();
 
 /**
  * GET /api/retailers
  * List all non-deleted retailers — any signed-in user can read.
- * S17-3: filters where deleted_at == null so soft-deleted retailers are excluded.
+ * S17-3: soft-deleted retailers (deleted_at set) are excluded.
  * Intentionally-inactive retailers (PATCH toggle, no deleted_at) are still returned
  * in the default (no query param) response for admin awareness.
  *
@@ -18,24 +18,16 @@ const router = express.Router();
  * with status='active'. This is the endpoint the Campaign Wizard and scheduler use
  * to populate retailer dropdowns with only bookable (active) venues.
  * Inactive retailers (deactivated via PATCH toggle, no deleted_at) are excluded.
- *
- * NOTE: ?for=campaign requires a composite Firestore index on the retailers
- * collection: (deleted_at ASC, status ASC). Verify firestore.indexes.json
- * before deploying to production.
  */
 router.get('/', authenticate, async (req, res) => {
     try {
         const { for: forParam } = req.query;
-        const whereClause = [['deleted_at', '==', null]];
+        // Scheduler/CampaignWizard context: active retailers only.
+        const query = forParam === 'campaign' ? { where: [['status', '==', 'active']] } : {};
 
-        if (forParam === 'campaign') {
-            // Scheduler/CampaignWizard context: active retailers only.
-            whereClause.push(['status', '==', 'active']);
-        }
-
-        const retailers = await retailerRepository.findAll({
-            where: whereClause
-        });
+        // A record without deleted_at is not deleted; Firestore's `== null` would skip it.
+        const retailers = (await retailerRepository.findAll(query))
+            .filter(retailer => !retailer.deleted_at);
         res.json(retailers);
     } catch (error) {
         logger.error('Failed to fetch retailers:', error);
@@ -65,9 +57,9 @@ router.get('/:id', authenticate, async (req, res) => {
  * POST /api/retailers
  * Create a new retailer.
  *
- * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added.
+ * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added; Phase 1: Super Administrator only.
  */
-router.post('/', authenticate, requireRole('admin'), async (req, res) => {
+router.post('/', authenticate, requireOrganizationManagement, async (req, res) => {
     try {
         const { name, contact_email, contract_start, logo, status } = req.body;
 
@@ -120,9 +112,9 @@ router.post('/', authenticate, requireRole('admin'), async (req, res) => {
  * PUT /api/retailers/:id
  * Update a retailer.
  *
- * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added.
+ * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added; Phase 1: Super Administrator only.
  */
-router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
+router.put('/:id', authenticate, requireOrganizationManagement, async (req, res) => {
     try {
         const retailer = await retailerRepository.update(req.params.id, req.body);
         res.json(retailer);
@@ -138,15 +130,12 @@ router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
  * Preserves referential integrity with stores, screens, loops, impressions.
  * Record is excluded from GET / list after this operation.
  *
- * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added.
+ * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added; Phase 1: Super Administrator only.
  * S17-1: deleted_at field written to Firestore as canonical deletion marker.
  */
-router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
+router.delete('/:id', authenticate, requireOrganizationManagement, async (req, res) => {
     try {
-        if (req.user.role === 'superadmin') {
-            await retailerRepository.delete(req.params.id);
-            return res.status(200).json({ success: true });
-        }
+        // Always a soft delete (GUARDRAIL-15), whoever holds organizations.manage.
         const updated = await retailerRepository.softDelete(req.params.id);
         res.status(200).json(updated);
     } catch (error) {
@@ -163,9 +152,9 @@ router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
  * Toggle retailer status between 'active' and 'inactive'.
  * Does NOT set deleted_at — this is intentional deactivation, not deletion.
  *
- * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added.
+ * Sprint 11 — S11-1: authenticate + requireRole('admin') guard added; Phase 1: Super Administrator only.
  */
-router.patch('/:id', authenticate, requireRole('admin'), async (req, res) => {
+router.patch('/:id', authenticate, requireOrganizationManagement, async (req, res) => {
     try {
         const { status } = req.body;
         const allowedStatuses = ['active', 'inactive'];

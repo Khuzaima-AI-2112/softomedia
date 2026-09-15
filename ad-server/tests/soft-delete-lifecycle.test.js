@@ -75,13 +75,12 @@ jest.unstable_mockModule('../src/utils/firestore.js', () => ({
     closeFirestore: jest.fn(),
 }));
 
-// ── Auth middleware: pass-through, sets req.user = admin ────────────────────
+// ── Auth middleware: sets req.user = superadmin, who manages organizations ──
 jest.unstable_mockModule('../src/middleware/auth.js', () => ({
     authenticate: (req, _res, next) => {
-        req.user = { uid: 'test-uid', role: 'admin' };
+        req.user = { uid: 'test-uid', role: 'superadmin' };
         next();
     },
-    requireRole: () => (_req, _res, next) => next(),
 }));
 
 // ── Dynamic imports (AFTER all mocks are registered) ────────────────────────

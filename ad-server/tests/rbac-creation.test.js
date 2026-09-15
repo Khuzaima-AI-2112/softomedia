@@ -70,19 +70,21 @@ describe('RBAC Creation Endpoints (POST)', () => {
         });
     });
 
-    describe('2. Retailers (requires admin)', () => {
+    describe('2. Retailers (requires organization management: Super Administrator)', () => {
         const route = '/api/retailers';
         const payload = {
             name: 'Test Retailer',
             contact_email: 'retailer@test.com'
         };
 
-        it('should allow superadmin and admin', async () => {
+        it('should allow superadmin', async () => {
             const resSuper = await postAsRole(roles.SUPERADMIN, route, payload);
             expect([200, 201, 400]).toContain(resSuper.status); // 200 if retailer already exists (idempotent)
+        });
 
-            const resAdmin = await postAsRole(roles.ADMIN, route, payload);
-            expect([200, 201, 400]).toContain(resAdmin.status);
+        it('should deny admin', async () => {
+            const res = await postAsRole(roles.ADMIN, route, payload);
+            expect(res.status).toBe(403);
         });
 
         it('should deny advertiser', async () => {

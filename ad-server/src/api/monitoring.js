@@ -7,13 +7,12 @@ import {
     screenRepository,
 } from '../repositories/index.js';
 import { LOOP_STATUS } from '../repositories/LoopRepository.js';
-import { requireNetworkProofOfPlayView, requireRole } from '../middleware/requireRole.js';
-import { ROLES } from '../constants/roles.js';
+import { requireNetworkProofOfPlayView, requireScreenDiagnostics } from '../middleware/requireRole.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
 
-router.get('/health', requireRole(ROLES.TECHOPERATOR), async (_req, res) => {
+router.get('/health', requireScreenDiagnostics, async (_req, res) => {
     res.json(await operationalHealthService.check());
 });
 
@@ -28,7 +27,7 @@ router.post('/impression', (req, res) => {
  * GET /api/monitoring/status
  * Aggregate metrics for Tech Ops dashboard
  */
-router.get('/status', requireRole(ROLES.TECHOPERATOR), async (_req, res) => {
+router.get('/status', requireScreenDiagnostics, async (_req, res) => {
     try {
         await heartbeatService.checkScreenHealth();
         const [screens, approvedLoops] = await Promise.all([

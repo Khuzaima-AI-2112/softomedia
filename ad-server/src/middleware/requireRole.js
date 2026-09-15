@@ -1,18 +1,14 @@
 /**
- * requireRole — Phase 1
- * Factory that returns an Express middleware enforcing a minimum role.
+ * Explicit permission grants — Phase 1.
+ * Every route authorizes a named action; no role inherits another's authority.
  *
  * Usage:
- *   router.get('/sensitive', requireRole('superadmin'), handler);
- *
- * The demo auth layer sets req.user.role from the x-demo-role header
- * (or from the JWT in production).  This middleware rejects anything
- * that doesn't match the expected role.
+ *   router.get('/sensitive', authenticate, requirePermission(PERMISSIONS.X), handler);
  */
 
-import { ROLES, ROLE_HIERARCHY, normalizeRole } from '../constants/roles.js';
+import { ROLES, normalizeRole } from '../constants/roles.js';
 
-export { ROLES, ROLE_HIERARCHY, normalizeRole };
+export { ROLES, normalizeRole };
 
 export const PERMISSIONS = Object.freeze({
     PLATFORM_GOVERNANCE: 'platform.governance',
@@ -21,35 +17,74 @@ export const PERMISSIONS = Object.freeze({
     SUPPORT_TICKET_VIEW_OWN: 'support_ticket.view_own',
     SUPPORT_TICKET_MANAGE_NETWORK: 'support_ticket.manage_network',
     SCREEN_MANAGEMENT: 'screens.manage',
+    SCREEN_VIEW_OWN: 'screens.view_own',
+    SCREEN_DIAGNOSTICS: 'screens.diagnostics',
     STORE_VIEW_NETWORK: 'stores.view_network',
+    ORGANIZATION_MANAGEMENT: 'organizations.manage',
+    CAMPAIGN_CREATE: 'campaigns.create',
+    CAMPAIGN_DELETE: 'campaigns.delete',
     CAMPAIGN_APPROVAL: 'campaigns.approve',
+    LOOP_INJECT: 'loops.inject',
+    SCHEDULE_OVERRIDE: 'schedules.override',
+    IMPRESSION_VIEW_NETWORK: 'impressions.view_network',
+    IMPRESSION_VIEW_OWN: 'impressions.view_own',
+    INVOICE_GENERATE: 'invoices.generate',
 });
 
-// Phase 1 matrix: approval belongs to the Retailer Administrator alone; no
-// administrative override approves on a Retailer's behalf.
+// The accepted Phase 1 permission matrix (docs/phase-1-demo-acceptance.md).
+// Every grant is explicit; no role inherits another role's authority.
+// Approval belongs to the Retailer Administrator alone; no administrative
+// override approves on a Retailer's behalf.
 const ROLE_PERMISSIONS = Object.freeze({
     [ROLES.SUPERADMIN]: Object.freeze([
         PERMISSIONS.PLATFORM_GOVERNANCE,
         PERMISSIONS.PROOF_OF_PLAY_VIEW_NETWORK,
         PERMISSIONS.SUPPORT_TICKET_MANAGE_NETWORK,
         PERMISSIONS.SCREEN_MANAGEMENT,
+        PERMISSIONS.SCREEN_DIAGNOSTICS,
         PERMISSIONS.STORE_VIEW_NETWORK,
+        PERMISSIONS.ORGANIZATION_MANAGEMENT,
+        PERMISSIONS.CAMPAIGN_CREATE,
+        PERMISSIONS.CAMPAIGN_DELETE,
+        PERMISSIONS.LOOP_INJECT,
+        PERMISSIONS.SCHEDULE_OVERRIDE,
+        PERMISSIONS.IMPRESSION_VIEW_NETWORK,
+        PERMISSIONS.INVOICE_GENERATE,
     ]),
     [ROLES.ADMIN]: Object.freeze([
         PERMISSIONS.SCREEN_MANAGEMENT,
         PERMISSIONS.STORE_VIEW_NETWORK,
+        PERMISSIONS.CAMPAIGN_CREATE,
+        PERMISSIONS.SCHEDULE_OVERRIDE,
+        PERMISSIONS.IMPRESSION_VIEW_NETWORK,
+        PERMISSIONS.INVOICE_GENERATE,
+    ]),
+    [ROLES.BRAND]: Object.freeze([
+        PERMISSIONS.CAMPAIGN_CREATE,
     ]),
     [ROLES.RETAILERADMIN]: Object.freeze([
         PERMISSIONS.SUPPORT_TICKET_CREATE_OWN,
         PERMISSIONS.SUPPORT_TICKET_VIEW_OWN,
+        PERMISSIONS.SCREEN_VIEW_OWN,
         PERMISSIONS.CAMPAIGN_APPROVAL,
+        PERMISSIONS.SCHEDULE_OVERRIDE,
+        PERMISSIONS.IMPRESSION_VIEW_OWN,
     ]),
     [ROLES.TECHOPERATOR]: Object.freeze([
         PERMISSIONS.SUPPORT_TICKET_MANAGE_NETWORK,
         PERMISSIONS.SCREEN_MANAGEMENT,
+        PERMISSIONS.SCREEN_DIAGNOSTICS,
         PERMISSIONS.STORE_VIEW_NETWORK,
     ]),
 });
+
+/** The explicit grants a user holds, for the profile the client gates its UI on. */
+export function permissionsFor(user) {
+    return [...new Set([
+        ...(ROLE_PERMISSIONS[normalizeRole(user?.role)] ?? []),
+        ...(Array.isArray(user?.permissions) ? user.permissions : []),
+    ])];
+}
 
 export function userHasPermission(user, permission) {
     const role = normalizeRole(user?.role);
@@ -57,45 +92,6 @@ export function userHasPermission(user, permission) {
         || ROLE_PERMISSIONS[role]?.includes(permission)
         || false;
 }
-
-/**
- * requireRole(minRole)
- * Middleware that allows requests where req.user.role >= minRole
- * in the ROLE_HIERARCHY table.
- */
-export function requireRole(minRole) {
-    return (req, res, next) => {
-        // Guard: req.user must be populated by authenticate() before this middleware runs.
-        // If it is absent, the route is misconfigured — authenticate is missing from the chain.
-        // Return 500 (not 403) so the misconfiguration is immediately distinguishable from
-        // a legitimate access-denied response.
-        if (!req.user) {
-            console.error(
-                `[requireRole] FATAL: req.user undefined on ${req.method} ${req.path} — authenticate middleware is missing.`
-            );
-            return res.status(500).json({ error: 'Misconfigured route: authentication middleware missing' });
-        }
-
-        const rawRole = req.user?.role;
-        const role = normalizeRole(rawRole);
-        const userLevel  = ROLE_HIERARCHY[role]  ?? -1;
-        const minLevel   = ROLE_HIERARCHY[minRole] ?? 999;
-
-        if (userLevel < minLevel) {
-            return res.status(403).json({
-                error: 'Forbidden',
-                required: minRole,
-                actual:   role || 'unauthenticated',
-            });
-        }
-        // Stamp the normalized role so downstream handlers can trust it
-        if (req.user) req.user.role = role;
-        next();
-    };
-}
-
-/** Convenience shorthand */
-export const requireSuperAdmin = requireRole(ROLES.SUPERADMIN);
 
 /**
  * Require a named action grant instead of inferring authority from rank.
@@ -138,4 +134,11 @@ export const requireCampaignApproval = requirePermission(
     PERMISSIONS.CAMPAIGN_APPROVAL,
     null,
 );
-export const requireAdmin      = requireRole(ROLES.ADMIN);
+export const requireOrganizationManagement = requirePermission(
+    PERMISSIONS.ORGANIZATION_MANAGEMENT,
+    ROLES.SUPERADMIN,
+);
+export const requireScreenDiagnostics = requirePermission(
+    PERMISSIONS.SCREEN_DIAGNOSTICS,
+    ROLES.TECHOPERATOR,
+);

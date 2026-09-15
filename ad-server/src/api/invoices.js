@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { campaignRepository } from '../repositories/CampaignRepository.js';
 import PricingRepository from '../repositories/PricingRepository.js';
 import { BaseRepository } from '../repositories/BaseRepository.js';
-import { authorize } from '../middleware/auth.js';
+import { PERMISSIONS, requirePermission } from '../middleware/requireRole.js';
 import { ROLES } from '../constants/roles.js';
 
 const router = express.Router();
@@ -25,7 +25,7 @@ const invoiceRepository = new InvoiceRepository();
  * Generate an invoice for a completed campaign.
  * Admin only.
  */
-router.post('/generate', authorize(['admin', 'superadmin']), async (req, res) => {
+router.post('/generate', requirePermission(PERMISSIONS.INVOICE_GENERATE), async (req, res) => {
     try {
         const { campaignId } = req.body;
         if (!campaignId) {

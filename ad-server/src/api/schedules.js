@@ -28,7 +28,7 @@
 
 import express from 'express';
 import { authenticate } from '../middleware/auth.js';
-import { requireRole } from '../middleware/requireRole.js';
+import { PERMISSIONS, requirePermission } from '../middleware/requireRole.js';
 import BusinessHoursService from '../services/BusinessHoursService.js';
 
 const router = express.Router();
@@ -166,7 +166,7 @@ router.get('/history', (req, res) => {
     return res.status(404).json({ error: 'Not found' });
 });
 
-router.post('/', authenticate, requireRole('retaileradmin'), (req, res) => {
+router.post('/', authenticate, requirePermission(PERMISSIONS.SCHEDULE_OVERRIDE), (req, res) => {
     const isDemoMode = getIsDemoMode();
     const id = isDemoMode
         ? `sched_demo_${Date.now()}`

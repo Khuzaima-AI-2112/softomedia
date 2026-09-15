@@ -5,6 +5,8 @@ import DataTable from '../../components/DataTable';
 import apiService from '../../services/ApiService';
 import { Trash2, Pencil } from 'lucide-react';
 import { ToastContainer, useToasts } from '../../components/Toast';
+import { useAuth } from '../../contexts/AuthContext';
+import { PERMISSIONS } from '../../constants/permissions';
 
 const TRAFFIC_OPTIONS = ['low', 'medium', 'high'];
 
@@ -124,6 +126,9 @@ function RetailerManagement() {
     const [bulkBusy, setBulkBusy] = useState(false);
 
     const { toasts, addToast, removeToast } = useToasts();
+    // Retailer organizations are managed by the Super Administrator; others read only.
+    const { can } = useAuth();
+    const canManageOrganizations = can(PERMISSIONS.ORGANIZATION_MANAGEMENT);
 
     const loadData = useCallback(async () => {
         try {
@@ -502,7 +507,7 @@ function RetailerManagement() {
                 </div>
             )
         }
-    ];
+    ].filter(column => column.header !== 'Actions' || canManageOrganizations);
 
     // helper: input border class
     const inputClass = (fieldError) =>
@@ -563,7 +568,7 @@ function RetailerManagement() {
                             <option value="inactive">Inactive only</option>
                         </select>
                     </div>
-                    <div className="flex items-center gap-2">
+                    {canManageOrganizations && <div className="flex items-center gap-2">
                         <button
                             type="button"
                             onClick={handleBulkDeactivateEmpty}
@@ -583,7 +588,7 @@ function RetailerManagement() {
                             <span className="material-symbols-outlined text-[20px]">add_business</span>
                             Add Retailer
                         </button>
-                    </div>
+                    </div>}
                 </div>
             </div>
 

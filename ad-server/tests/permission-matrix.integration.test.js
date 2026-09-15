@@ -64,13 +64,49 @@ describeWithEmulators('Phase 1 permission matrix with Firebase emulators', () =>
         await firestore?.terminate();
     });
 
-    test('Technical Operator lists Stores network-wide to register and assign Screens', async () => {
-        const response = await as('techoperator', request(app).get('/api/stores'));
+    test('Admin lists the demo Advertisers a Campaign is prepared for', async () => {
+        const advertisers = await as('admin', request(app).get('/api/advertisers'));
 
-        expect(response.status).toBe(200);
-        expect(response.body.map(({ id }) => id)).toEqual(expect.arrayContaining([
+        expect(advertisers.status).toBe(200);
+        expect(advertisers.body.map(({ id }) => id)).toEqual(expect.arrayContaining([
+            'demo-advertiser-bonvie',
+            'demo-advertiser-secondary',
+        ]));
+    });
+
+    test('the signed-in profile carries the explicit grants the client gates its actions on', async () => {
+        const [retailer, operator] = await Promise.all([
+            as('retaileradmin', request(app).get('/api/auth/me')),
+            as('techoperator', request(app).get('/api/auth/me')),
+        ]);
+
+        expect(retailer.body.user.permissions).toEqual(expect.arrayContaining(['campaigns.approve']));
+        expect(retailer.body.user.permissions).not.toContain('screens.manage');
+        expect(operator.body.user.permissions).toEqual(expect.arrayContaining(['screens.manage', 'screens.diagnostics']));
+        expect(operator.body.user.permissions).not.toContain('campaigns.approve');
+    });
+
+    test('Technical Operator lists Retailers, Stores and Locations network-wide to register and assign Screens', async () => {
+        const [retailers, stores, locations] = await Promise.all([
+            as('techoperator', request(app).get('/api/retailers')),
+            as('techoperator', request(app).get('/api/stores')),
+            as('techoperator', request(app).get('/api/locations')),
+        ]);
+
+        expect(retailers.status).toBe(200);
+        expect(retailers.body.map(({ id }) => id)).toEqual(expect.arrayContaining([
+            'demo-retailer-freshmart',
+            'demo-retailer-secondary',
+        ]));
+        expect(stores.status).toBe(200);
+        expect(stores.body.map(({ id }) => id)).toEqual(expect.arrayContaining([
             'demo-store-mtl-north',
             'demo-store-phoenix',
+        ]));
+        expect(locations.status).toBe(200);
+        expect(locations.body.map(({ id }) => id)).toEqual(expect.arrayContaining([
+            'demo-location-mtl-checkout',
+            'demo-location-phoenix-entrance',
         ]));
     });
 
@@ -87,6 +123,61 @@ describeWithEmulators('Phase 1 permission matrix with Firebase emulators', () =>
             expect(statuses).toEqual([403, 403, 403, 403]);
         },
     );
+
+    // Each request is shaped so a permitted persona gets a known non-denial
+    // outcome (usually a validation or not-found response) without side effects.
+    const GRANTS = [
+        {
+            action: 'manage Retailer organizations',
+            send: pending => pending.patch('/api/retailers/matrix-retailer').send({}),
+            allowed: { superadmin: 400 },
+        },
+        {
+            action: 'manage Advertiser organizations',
+            send: pending => pending.patch('/api/advertisers/matrix-advertiser').send({}),
+            allowed: { superadmin: 400 },
+        },
+        {
+            action: 'read Screen diagnostics logs',
+            send: pending => pending.get('/api/screens/matrix-screen/logs'),
+            allowed: { techoperator: 404, superadmin: 404 },
+        },
+        {
+            action: 'read network monitoring status',
+            send: pending => pending.get('/api/monitoring/status'),
+            allowed: { techoperator: 200, superadmin: 200 },
+        },
+        {
+            action: 'record an operations audit entry',
+            send: pending => pending.post('/api/audit').send({}),
+            allowed: { techoperator: 400, superadmin: 400 },
+        },
+        {
+            action: 'create a Campaign',
+            send: pending => pending.post('/api/campaigns').send({}),
+            allowed: { brand: 400, admin: 400, superadmin: 400 },
+        },
+        {
+            action: 'generate an invoice',
+            send: pending => pending.post('/api/invoices/generate').send({}),
+            allowed: { admin: 400, superadmin: 400 },
+        },
+        {
+            action: 'query delivery impressions',
+            send: pending => pending.get('/api/impressions'),
+            allowed: { admin: 400, superadmin: 400, retaileradmin: 400 },
+        },
+    ];
+    const PERSONAS = ['superadmin', 'admin', 'brand', 'retaileradmin', 'techoperator'];
+
+    test.each(GRANTS)('only the granted personas may $action', async ({ send, allowed }) => {
+        const expected = Object.fromEntries(PERSONAS.map(persona => [persona, allowed[persona] ?? 403]));
+        const actual = {};
+        for (const persona of PERSONAS) {
+            actual[persona] = (await as(persona, send(request(app)))).status;
+        }
+        expect(actual).toEqual(expected);
+    });
 });
 
 async function signIn(email, password) {

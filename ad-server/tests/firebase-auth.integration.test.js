@@ -13,17 +13,10 @@ const { getFirestore, closeFirestore } = await import('../src/utils/firestore.js
 const { default: apiRouter } = await import('../src/api/index.js');
 const { authenticate } = await import('../src/middleware/auth.js');
 const { PERMISSIONS, requireNetworkProofOfPlayView } = await import('../src/middleware/requireRole.js');
-const { ACTIONS, requirePermission } = await import('../src/middleware/authorization.js');
 const { createTestApp } = await import('./fixtures/test-app.js');
 
 const app = createTestApp(apiRouter);
 const scopedApp = express();
-scopedApp.get(
-    '/entities/:entityId',
-    authenticate,
-    requirePermission(ACTIONS.ENTITY_RESOURCE_READ, req => ({ linkedEntityId: req.params.entityId })),
-    (req, res) => res.json({ entityId: req.params.entityId })
-);
 scopedApp.get(
     '/network-delivery',
     authenticate,
@@ -199,25 +192,6 @@ describe('Firebase-authenticated profile boundary', () => {
             if (previousDemoMode === undefined) delete process.env.ALLOW_DEMO_MODE;
             else process.env.ALLOW_DEMO_MODE = previousDemoMode;
         }
-    });
-
-    test('enforces an explicit action against the authenticated entity scope', async () => {
-        const account = await createFirebaseAccount(
-            `scoped-brand-${Date.now()}@demo.softomedia.test`,
-            'brand',
-            'brand-one'
-        );
-
-        const ownEntity = await request(scopedApp)
-            .get('/entities/brand-one')
-            .set('Authorization', `Bearer ${account.idToken}`);
-        const otherEntity = await request(scopedApp)
-            .get('/entities/brand-two')
-            .set('Authorization', `Bearer ${account.idToken}`);
-
-        expect(ownEntity.status).toBe(200);
-        expect(otherEntity.status).toBe(403);
-        expect(otherEntity.body).toEqual({ error: 'Access denied' });
     });
 
     test('requires an explicit network Proof of Play permission for an operator profile', async () => {

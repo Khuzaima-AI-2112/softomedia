@@ -1,7 +1,8 @@
 import express from 'express';
 import { impressionRepository } from '../repositories/index.js';
 import { authenticate } from '../middleware/auth.js';
-import { requireRole, ROLE_HIERARCHY, normalizeRole } from '../middleware/requireRole.js';
+import { PERMISSIONS, normalizeRole, userHasPermission } from '../middleware/requireRole.js';
+import { retailerIdFor } from '../middleware/storeManagement.js';
 
 const router = express.Router();
 
@@ -16,24 +17,21 @@ const router = express.Router();
  *   ?location_id=X   — all impressions for a location
  *   ?screen_id=X     — all impressions for a screen
  *
- * Role rules:
- *   - contentmanager (level 3) and above: unrestricted access to any filter.
- *   - retaileradmin  (level 1): may only query by campaign_id or screen_id;
- *     request is auto-scoped so that only records whose retailer_id matches
- *     their JWT linkedentityid are returned.  location_id queries are
- *     rejected with 403 to prevent cross-retailer enumeration.
- *   - Lower roles / unauthenticated: 403.
+ * Grants:
+ *   - impressions.view_network (Admin, Super Administrator): any filter.
+ *   - impressions.view_own (Retailer Administrator): campaign_id or screen_id
+ *     only, scoped to the Retailer of the signed-in identity. location_id
+ *     queries are rejected with 403 to prevent cross-retailer enumeration.
+ *   - Everyone else: 403.
  *
  * Returns 400 when no recognised filter param is provided.
  */
 router.get('/', authenticate, async (req, res) => {
     try {
         const role = normalizeRole(req.user?.role);
-        const userLevel = ROLE_HIERARCHY[role] ?? -1;
-        const contentManagerLevel = ROLE_HIERARCHY['contentmanager']; // 3
-        const retailerAdminLevel  = ROLE_HIERARCHY['retaileradmin'];  // 1
+        const networkView = userHasPermission(req.user, PERMISSIONS.IMPRESSION_VIEW_NETWORK);
 
-        if (userLevel < retailerAdminLevel) {
+        if (!networkView && !userHasPermission(req.user, PERMISSIONS.IMPRESSION_VIEW_OWN)) {
             return res.status(403).json({
                 error: 'Forbidden',
                 required: 'retaileradmin',
@@ -43,8 +41,8 @@ router.get('/', authenticate, async (req, res) => {
 
         const { campaign_id, location_id, screen_id } = req.query;
 
-        // retaileradmin: reject location_id queries, enforce retailer scope
-        if (userLevel < contentManagerLevel) {
+        // Own Retailer only: reject location_id queries, enforce retailer scope
+        if (!networkView) {
             if (location_id) {
                 return res.status(403).json({
                     error: 'Forbidden',
@@ -52,7 +50,7 @@ router.get('/', authenticate, async (req, res) => {
                 });
             }
             // For campaign/screen queries we add a retailer_id filter
-            const retailerId = req.user.linkedentityid || req.user.retailer_id;
+            const retailerId = retailerIdFor(req.user);
             if (!retailerId) {
                 return res.status(403).json({
                     error: 'Forbidden',
@@ -85,7 +83,7 @@ router.get('/', authenticate, async (req, res) => {
             });
         }
 
-        // contentmanager and above: full access
+        // Network view: full access
         if (campaign_id) {
             const results = await impressionRepository.findByCampaign(campaign_id);
             return res.json(results);

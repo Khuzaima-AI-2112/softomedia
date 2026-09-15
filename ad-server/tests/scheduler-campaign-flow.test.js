@@ -80,13 +80,6 @@ jest.unstable_mockModule('../src/middleware/auth.js', () => ({
         req.user = { uid: 'test-uid', role: _currentRole };
         next();
     },
-    requireRole: (allowed) => (req, res, next) => {
-        const roles = Array.isArray(allowed) ? allowed : [allowed];
-        if (!roles.includes(req.user?.role)) {
-            return res.status(403).json({ error: 'Forbidden' });
-        }
-        next();
-    },
 }));
 
 const { default: retailersRouter } = await import('../src/api/retailers.js');

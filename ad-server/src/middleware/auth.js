@@ -79,21 +79,3 @@ export const authenticate = async (req, res, next) => {
         return authenticationFailure(res);
     }
 };
-
-/**
- * Legacy explicit-role middleware. New Phase 1 routes use requirePermission;
- * this remains temporarily for routes migrated by later tickets.
- */
-export const authorize = (allowedRoles) => {
-    return (req, res, next) => {
-        if (!req.user || !allowedRoles.includes(req.user.role)) {
-            logger.warn('Unauthorized access attempt', {
-                user: req.user?.email,
-                role: req.user?.role,
-                path: req.path,
-            });
-            return res.status(403).json({ error: 'Access denied: Insufficient permissions' });
-        }
-        next();
-    };
-};

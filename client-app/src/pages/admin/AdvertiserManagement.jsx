@@ -7,6 +7,8 @@ import PriceDisplay from '../../components/PriceDisplay';
 import apiService from '../../services/ApiService';
 import pricingService from '../../services/PricingService';
 import { ToastContainer, useToasts } from '../../components/Toast';
+import { useAuth } from '../../contexts/AuthContext';
+import { PERMISSIONS } from '../../constants/permissions';
 
 const INDUSTRIES = [
     'Electronics', 'Food & Beverage', 'Fashion', 'Automotive', 'Healthcare',
@@ -26,6 +28,9 @@ function AdvertiserManagement() {
     const [togglingIds, setTogglingIds] = useState(new Set());
 
     const { toasts, addToast, removeToast } = useToasts();
+    // Advertiser organizations are managed by the Super Administrator; others read only.
+    const { can } = useAuth();
+    const canManageOrganizations = can(PERMISSIONS.ORGANIZATION_MANAGEMENT);
 
     const [formData, setFormData] = useState({
         name: '',
@@ -279,7 +284,7 @@ function AdvertiserManagement() {
                 </div>
             )
         }
-    ];
+    ].filter(column => column.header !== 'Actions' || canManageOrganizations);
 
     const totalBudget = advertisers.reduce((sum, a) => sum + (a.budget || 0), 0);
     const totalSpent = advertisers.reduce((sum, a) => sum + getTotalSpent(a.id), 0);
@@ -297,14 +302,14 @@ function AdvertiserManagement() {
                         Manage brand and agency advertising accounts
                     </p>
                 </div>
-                <button
+                {canManageOrganizations && <button
                     data-testid="btn-add-advertiser"
                     onClick={() => openModal()}
                     className="px-4 py-2 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover transition-colors flex items-center gap-2"
                 >
                     <span className="material-symbols-outlined text-[20px]">person_add</span>
                     Add Advertiser
-                </button>
+                </button>}
             </div>
 
             {/* Stats */}

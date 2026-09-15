@@ -14,10 +14,10 @@ import { authenticate } from '../middleware/auth.js';
 import {
     PERMISSIONS,
     requireCampaignApproval,
-    requireRole,
+    requirePermission,
     userHasPermission,
 } from '../middleware/requireRole.js';
-import { ROLES, ROLE_HIERARCHY, normalizeRole } from '../constants/roles.js';
+import { ROLES, normalizeRole } from '../constants/roles.js';
 
 const router = express.Router();
 
@@ -99,14 +99,6 @@ const VALID_TRANSITIONS = {
     completed: [],
     rejected: [],
 };
-
-/**
- * ROLE_HIERARCHY — mirrors requireRole.js; used locally to determine
- * whether the caller is admin-tier (level >= 4) for advertiser_id
- * stamping logic in POST /api/campaigns.
- *
- * advertiser = 1, brand = 2, retaileradmin = 3, admin = 4, superadmin = 5
- */
 
 
 /**
@@ -205,7 +197,7 @@ router.get('/:id', authenticate, async (req, res) => {
  *   Guard is maximally narrow: only demo-brand in demo mode triggers it.
  *   All real-caller logic below the guard is unchanged.
  */
-router.post('/', authenticate, requireRole(ROLES.ADVERTISER), async (req, res) => {
+router.post('/', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, ROLES.BRAND), async (req, res) => {
     // TASK-2: Demo short-circuit — deterministic response for E2E step 3.7
     if (
         process.env.ALLOW_DEMO_MODE === 'true' &&
@@ -249,10 +241,10 @@ router.post('/', authenticate, requireRole(ROLES.ADVERTISER), async (req, res) =
 
 
     try {
-        // T1: Determine if the caller is admin-tier
-        const callerLevel = ROLE_HIERARCHY[req.user?.role] ?? -1;
-        const isAdminTier = callerLevel >= ROLE_HIERARCHY[ROLES.ADMIN]; // 4+
+        // T1: Brands create for their own organization; Admin and Super
+        // Administrator create on behalf of a named advertiser.
         const brandCaller = isBrand(req.user);
+        const isAdminTier = !brandCaller;
         const brandOwnerId = brandIdFor(req.user);
 
         if (brandCaller && !brandOwnerId) {
@@ -523,7 +515,7 @@ router.get('/:id/proofs-of-play', authenticate, async (req, res) => {
  * Sprint 9  — Task 9.2: authenticate + requireRole guard added.
  * Sprint 11 — S11-3   : tightened to requireRole('superadmin').
  */
-router.delete('/:id', authenticate, requireRole(ROLES.SUPERADMIN), async (req, res) => {
+router.delete('/:id', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_DELETE, ROLES.SUPERADMIN), async (req, res) => {
     try {
         await campaignRepository.delete(req.params.id);
         res.status(204).send();

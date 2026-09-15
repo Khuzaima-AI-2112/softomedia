@@ -6,7 +6,8 @@ import DataTable from '../../components/DataTable';
 import apiService from '../../services/ApiService';
 import { useAuth } from '../../contexts/AuthContext';
 import { Trash2, X, PlusCircle } from 'lucide-react';
-import { ROLES, ROLE_HIERARCHY, normalizeRole } from '../../constants/roles';
+import { ROLES, normalizeRole } from '../../constants/roles';
+import { PERMISSIONS } from '../../constants/permissions';
 
 const CAMPAIGN_STATUSES = [
     { value: 'all',              label: 'All' },
@@ -26,18 +27,15 @@ const EMPTY_FORM = {
 
 function CampaignManagement() {
     const navigate = useNavigate();
-    const { user, loading } = useAuth();
+    const { user, loading, can } = useAuth();
 
     const userRole   = normalizeRole(user?.role);
-    const userLevel  = ROLE_HIERARCHY[userRole] ?? -1;
-    // Only admin+ may view this page
-    const canView    = userLevel >= ROLE_HIERARCHY[ROLES.ADMIN];
-    // Only superadmin may hard-delete
-    const canDelete  = userLevel >= ROLE_HIERARCHY[ROLES.SUPERADMIN];
-    // retaileradmin+ may approve/reject
-    const canApprove = userLevel >= ROLE_HIERARCHY[ROLES.RETAILERADMIN];
-    // admin+ may create campaigns
-    const canCreate  = userLevel >= ROLE_HIERARCHY[ROLES.ADMIN];
+    // The Softomedia campaign workspace: Admin and Super Administrator
+    const canView    = [ROLES.ADMIN, ROLES.SUPERADMIN].includes(userRole);
+    const canDelete  = can(PERMISSIONS.CAMPAIGN_DELETE);
+    // Only a Retailer Administrator approves; no administrative override
+    const canApprove = can(PERMISSIONS.CAMPAIGN_APPROVAL);
+    const canCreate  = can(PERMISSIONS.CAMPAIGN_CREATE);
 
     const [campaigns,        setCampaigns]        = useState([]);
     const [advertisers,      setAdvertisers]      = useState([]);

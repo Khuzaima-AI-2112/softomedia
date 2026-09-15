@@ -8,7 +8,7 @@ const router = express.Router();
 
 // ─────────────────────────────────────────────
 // Phase 1: All user-management routes are
-// gated behind requireSuperAdmin so that only
+// gated behind requirePlatformGovernance so that only
 // users whose role normalises to 'superadmin'
 // can list, create, update or delete accounts.
 // ─────────────────────────────────────────────
