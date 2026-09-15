@@ -38,7 +38,6 @@
 | POST | `/api/campaigns` | `{ name, advertiser_id, start_date, end_date, budget, duration }` | `requireRole('brandmanager')` | `campaigns.js` | Creates campaign; status set to `pending_approval` |
 | PATCH | `/api/campaigns/:id` | `{ name?, start_date?, end_date?, budget? }` | `requireRole('brandmanager')` | `campaigns.js` | Partial update of mutable fields |
 | PATCH | `/api/campaigns/:id/status` | `{ status }` | `requireRole('retaileradmin')` | `campaigns.js` | Allowed values: `approved`, `rejected`, `pending_approval`. Normalises to lowercase before write. |
-| POST | `/api/campaigns/:id/book` | `{ slots: [{ screen_id, date, hour, slot_index }] }` | `requireRole('brandmanager')` | `campaigns.js` | Books one or more loop slots for a campaign |
 | DELETE | `/api/campaigns/:id` | — | `requireRole('superadmin')` | `campaigns.js` | Soft-delete only. **S13-3: corrected from `admin` → `superadmin` to match live code at L187.** |
 
 ---

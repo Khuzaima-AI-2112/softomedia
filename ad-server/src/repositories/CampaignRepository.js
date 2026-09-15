@@ -13,6 +13,19 @@ export class CampaignRepository extends BaseRepository {
         return Boolean(brandId) && this.brandIdOf(campaign) === brandId;
     }
 
+    /**
+     * Whether the Campaign books Stores at this Retailer. A Campaign without an
+     * inventory selection or a Retailer is network-wide, matching loop generation.
+     */
+    targetsRetailer(campaign, retailerId) {
+        if (!retailerId) return false;
+        const selections = Array.isArray(campaign?.inventory_selection) ? campaign.inventory_selection : [];
+        if (selections.length > 0) {
+            return selections.some(selection => selection.retailer_id === retailerId);
+        }
+        return !campaign?.retailer_id || campaign.retailer_id === retailerId;
+    }
+
     async findByBrandId(brandId, status) {
         const [canonical, legacy] = await Promise.all([
             this.findAll({ where: [['brand_id', '==', brandId]] }),

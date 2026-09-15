@@ -281,49 +281,6 @@ export class LoopRepository extends BaseRepository {
         return result;
     }
 
-    /**
-     * Book a slot in a loop for an advertiser campaign
-     * @param {string} loopId
-     * @param {number} position - Slot position (0-11)
-     * @param {object} bookingData - { campaign_id, advertiser_id, creative_url, booked_at }
-     * @returns {Promise<object>}
-     */
-    async bookSlot(loopId, position, bookingData) {
-        const loop = await this.findById(loopId);
-        if (!loop) throw new Error(`Loop ${loopId} not found`);
-
-        const slots = loop.slots ? [...loop.slots] : Array(12).fill(null).map((_, i) => ({
-            position: i,
-            status: SLOT_STATUS.AVAILABLE,
-            asset_id: null
-        }));
-
-        if (position < 0 || position >= slots.length) {
-            throw new Error(`Invalid slot position: ${position}`);
-        }
-
-        slots[position] = {
-            ...slots[position],
-            position,
-            status: SLOT_STATUS.BOOKED,
-            campaign_id: bookingData.campaign_id,
-            advertiser_id: bookingData.advertiser_id,
-            creative_url: bookingData.creative_url,
-            booked_at: bookingData.booked_at || new Date().toISOString()
-        };
-
-        const result = await this.update(loopId, { slots });
-
-        await schedulingAuditRepository.logAction('slot_booked', {
-            entity_id: loopId,
-            slot_index: position,
-            campaign_id: bookingData.campaign_id,
-            advertiser_id: bookingData.advertiser_id,
-            timestamp: new Date().toISOString()
-        });
-
-        return result;
-    }
 
     /**
      * Get all loops for a specific date

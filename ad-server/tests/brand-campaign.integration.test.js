@@ -228,12 +228,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
             .send({ name: 'stolen' });
         expect(otherMutation.status).toBe(403);
 
-        const otherBooking = await request(app)
-            .post('/api/campaigns/demo-secondary-campaign-1/book')
-            .set('Authorization', `Bearer ${brandToken}`)
-            .send({ slots: [] });
-        expect(otherBooking.status).toBe(403);
-
+        // Campaigns reach loops only through loop generation; direct slot booking is gone.
         const ownBooking = await request(app)
             .post(`/api/campaigns/${creation.body.id}/book`)
             .set('Authorization', `Bearer ${brandToken}`)
@@ -244,7 +239,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
                     creativeUrl: 'https://attacker.invalid/unowned-creative.mp4',
                 }],
             });
-        expect(ownBooking.status).toBe(403);
+        expect(ownBooking.status).toBe(404);
         const afterBookingAttempt = await firestore.collection('campaigns').doc(creation.body.id).get();
         expect(afterBookingAttempt.data().status).toBe('pending_approval');
 

@@ -338,19 +338,6 @@ class ApiService {
         return apiClient.patch(`/api/campaigns/${id}/status`, { status });
     }
 
-    /**
-     * Book ad slots for a campaign.
-     * Calls POST /api/campaigns/:id/book — note: NOT /slots (Bug #S8-2 fix).
-     * Body shape: { slots: [...] } as expected by the backend route handler.
-     *
-     * @param {string} campaignId
-     * @param {Array}  slots      - Array of { loopId, slotIndex, creativeUrl, advertiser_id }
-     * @returns {Promise<object>} Booking confirmation
-     */
-    async bookSlots(campaignId, slots) {
-        return apiClient.post(`/api/campaigns/${campaignId}/book`, { slots });
-    }
-
     // ============================================
     // ASSETS
     // ============================================

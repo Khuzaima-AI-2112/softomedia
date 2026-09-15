@@ -3,7 +3,6 @@ import {
     campaignRepository,
     impressionRepository,
     locationRepository,
-    loopRepository,
     mediaRepository,
     retailerRepository,
     screenRepository,
@@ -27,6 +26,30 @@ function isBrand(user) {
 
 function brandIdFor(user) {
     return user?.linked_entity_id || user?.organization_id || null;
+}
+
+function isRetailer(user) {
+    return normalizeRole(user?.role) === ROLES.RETAILERADMIN;
+}
+
+function retailerIdFor(user) {
+    return user?.organization_id || user?.linked_entity_id || null;
+}
+
+/** Campaign records are read by those who create them or approve them, within their scope. */
+function requireCampaignRead(req, res, next) {
+    if (userHasPermission(req.user, PERMISSIONS.CAMPAIGN_CREATE)
+        || userHasPermission(req.user, PERMISSIONS.CAMPAIGN_APPROVAL)) {
+        return next();
+    }
+    return res.status(403).json({ error: 'Access denied' });
+}
+
+/** A Retailer reviews content, not a Brand's finances. */
+const BUDGET_FIELDS = new Set(['budget', 'budget_total']);
+
+function withoutBudget(campaign) {
+    return Object.fromEntries(Object.entries(campaign).filter(([field]) => !BUDGET_FIELDS.has(field)));
 }
 
 function denyBrandAccess(res) {
@@ -105,15 +128,11 @@ const VALID_TRANSITIONS = {
  * GET /api/campaigns
  * List campaigns.
  *
- * Sprint 14 — S14-2: advertiser callers scoped to their own linked_entity_id.
- * All other authenticated roles (and unauthenticated callers to preserve
- * backward compat) continue to see all campaigns, filtered only by the
- * optional ?status= or ?advertiserId= query params.
- *
- * NOTE: req.user may be undefined for unauthenticated callers — optional
- * chaining is used throughout to avoid TypeError on req.user.role.
+ * A Brand sees its own Campaigns; a Retailer sees Campaigns for its Stores
+ * without budgets. Admin and Super Administrator see every Campaign, filtered
+ * by the optional ?status= or ?advertiserId= query params.
  */
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticate, requireCampaignRead, async (req, res) => {
     try {
         const { status, advertiserId } = req.query;
         let campaigns;
@@ -124,6 +143,12 @@ router.get('/', authenticate, async (req, res) => {
                 brandIdFor(req.user),
                 status?.toLowerCase(),
             );
+        } else if (isRetailer(req.user)) {
+            const retailerId = retailerIdFor(req.user);
+            campaigns = (await campaignRepository.findAll())
+                .filter(campaign => campaignRepository.targetsRetailer(campaign, retailerId)
+                    && (!status || campaign.status === status))
+                .map(withoutBudget);
         } else if (advertiserId) {
             campaigns = await campaignRepository.findAll({
                 where: [['advertiser_id', '==', advertiserId]]
@@ -149,7 +174,7 @@ router.get('/', authenticate, async (req, res) => {
  * Sprint 14 — S14-2: advertiser callers receive 403 if the campaign's
  * advertiser_id does not match their linked_entity_id.
  */
-router.get('/:id', authenticate, async (req, res) => {
+router.get('/:id', authenticate, requireCampaignRead, async (req, res) => {
     try {
         const campaign = await campaignRepository.findById(req.params.id);
         if (!campaign) {
@@ -162,6 +187,12 @@ router.get('/:id', authenticate, async (req, res) => {
             !campaignRepository.isOwnedByBrand(campaign, brandIdFor(req.user))
         ) {
             return res.status(403).json({ error: 'Forbidden' });
+        }
+        if (isRetailer(req.user)) {
+            if (!campaignRepository.targetsRetailer(campaign, retailerIdFor(req.user))) {
+                return res.status(404).json({ error: 'Campaign not found' });
+            }
+            return res.json(withoutBudget(campaign));
         }
 
         res.json(campaign);
@@ -255,108 +286,14 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, RO
             ...(brandCaller ? {} : {
                 advertiser_id: isAdminTier ? req.body.advertiser_id : brandOwnerId,
             }),
-            status: brandCaller ? 'pending_approval' : (req.body.status || 'pending_approval'),
+            // Every Campaign awaits Retailer approval; no administrative override.
+            status: 'pending_approval',
             created_at: new Date().toISOString()
         };
         const campaign = brandCaller
             ? await campaignRepository.createForBrand(id, campaignData, brandOwnerId)
             : await campaignRepository.create(id, campaignData);
         res.status(201).json(campaign);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-/**
- * POST /api/campaigns/:id/book
- * Book slots for a campaign.
- * Body: { slots: [{ loopId, slotIndex, creativeUrl }] }
- *
- * Sprint 10 — authenticate guard added (sprintWRAPUP item 2).
- * Caller must be authenticated; advertiser_id ownership is validated against
- * the campaign record before any slot is written.
- */
-router.post('/:id/book', authenticate, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { slots } = req.body;
-
-        if (!slots || !Array.isArray(slots)) {
-            return res.status(400).json({ error: 'Slots array is required' });
-        }
-
-        const campaign = await campaignRepository.findById(id);
-        if (!campaign) {
-            return res.status(404).json({ error: 'Campaign not found' });
-        }
-        if (isBrand(req.user)) {
-            if (!campaignRepository.isOwnedByBrand(campaign, brandIdFor(req.user))) {
-                return denyBrandAccess(res);
-            }
-            return res.status(403).json({
-                error: 'Campaign slot allocation requires Retailer Approval',
-            });
-        }
-
-        const loopMap = new Map();
-        const orphanedLoopIds = [];
-        const conflictSlots = [];
-
-        for (const slot of slots) {
-            if (!loopMap.has(slot.loopId)) {
-                const loop = await loopRepository.findById(slot.loopId);
-                if (!loop) {
-                    orphanedLoopIds.push(slot.loopId);
-                } else {
-                    loopMap.set(slot.loopId, loop);
-                }
-            }
-
-            const loop = loopMap.get(slot.loopId);
-            if (loop) {
-                const targetSlot = loop.slots?.[slot.slotIndex];
-                if (targetSlot && ['booked', 'BOOKED'].includes(targetSlot.status)) {
-                    conflictSlots.push({ loopId: slot.loopId, slotIndex: slot.slotIndex });
-                }
-            }
-        }
-
-        if (orphanedLoopIds.length > 0) {
-            return res.status(400).json({
-                error: 'VALIDATION_FAILED',
-                message: 'One or more requested loops do not exist. Generated inventory is required.',
-                orphaned_ids: orphanedLoopIds
-            });
-        }
-
-        if (conflictSlots.length > 0) {
-            return res.status(409).json({
-                error: 'CONFLICT',
-                message: 'One or more requested slots have already been booked by another campaign.',
-                conflicts: conflictSlots
-            });
-        }
-
-        const bookedSlots = [];
-        for (const slot of slots) {
-            const { loopId, slotIndex, creativeUrl } = slot;
-
-            await loopRepository.bookSlot(loopId, slotIndex, {
-                campaign_id: id,
-                advertiser_id: campaign.advertiser_id,
-                creative_url: creativeUrl || campaign.creative_url,
-                booked_at: new Date().toISOString()
-            });
-
-            bookedSlots.push({ loopId, slotIndex, success: true });
-        }
-
-        await campaignRepository.update(id, {
-            booked_slots: (campaign.booked_slots || 0) + bookedSlots.length,
-            status: 'active'
-        });
-
-        res.json({ campaign_id: id, booked: bookedSlots });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -388,6 +325,10 @@ router.patch('/:id/status', authenticate, requireCampaignApproval, async (req, r
         if (!campaign) {
             return res.status(404).json({ error: 'Campaign not found' });
         }
+        // Retailers approve content only for their own Stores.
+        if (!campaignRepository.targetsRetailer(campaign, retailerIdFor(req.user))) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
 
         const currentStatus = campaign.status || 'pending_approval';
         const allowed = VALID_TRANSITIONS[currentStatus] ?? [];
@@ -416,8 +357,12 @@ router.patch('/:id/status', authenticate, requireCampaignApproval, async (req, r
  *
  * Sprint 10 — authenticate guard added (sprintWRAPUP item 1).
  */
-router.put('/:id', authenticate, async (req, res) => {
+router.put('/:id', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, null), async (req, res) => {
     try {
+        // Status changes only through Retailer approval (PATCH /:id/status).
+        if (req.body?.status !== undefined) {
+            return res.status(400).json({ error: 'Campaign status cannot be edited; it changes through Retailer approval' });
+        }
         const { id } = req.params;
         const campaign = await campaignRepository.findById(id);
         if (!campaign) {
