@@ -66,15 +66,6 @@ jest.unstable_mockModule('../src/repositories/LoopRepository.js', () => ({
     LOOP_STATUS: { APPROVED: 'approved' },
 }));
 
-jest.unstable_mockModule('../src/services/AuthService.js', () => ({
-    authService: { resolveFirebaseIdentity: jest.fn() },
-}));
-
-jest.unstable_mockModule('../src/utils/firebaseAuth.js', () => ({
-    getFirebaseAuth: jest.fn(),
-}));
-
-const { default: screensRouter } = await import('../src/api/screens.js');
 const { HeartbeatService } = await import('../src/services/HeartbeatService.js');
 const heartbeatService = new HeartbeatService();
 const operationalHealthService = {
@@ -93,18 +84,6 @@ jest.unstable_mockModule('../src/services/index.js', () => ({
 
 const { default: monitoringRouter } = await import('../src/api/monitoring.js');
 
-function appFor(role) {
-    const app = express();
-    app.use(express.json());
-    app.use((req, _res, next) => {
-        req.headers.authorization = 'Bearer demo-token';
-        req.headers['x-demo-role'] = role;
-        next();
-    });
-    app.use('/api/screens', screensRouter);
-    return app;
-}
-
 function monitoringAppFor(role) {
     const app = express();
     app.use(express.json());
@@ -115,58 +94,6 @@ function monitoringAppFor(role) {
     app.use('/api/monitoring', monitoringRouter);
     return app;
 }
-
-describe('Technical Operator Screen registration', () => {
-    beforeEach(() => {
-        screens.clear();
-        jest.clearAllMocks();
-    });
-
-    test('persists the intended Retailer, Store, and Location and returns it after reload', async () => {
-        const app = appFor('techoperator');
-
-        const created = await request(app).post('/api/screens').send({
-            screen_id: 'screen-entrance-1',
-            retailer_id: 'retailer-a',
-            store_id: 'store-north',
-            location_id: 'location-entrance',
-            resolution: '1920x1080',
-        });
-
-        expect(created.status).toBe(201);
-        expect(created.body).toMatchObject({
-            id: 'screen-entrance-1',
-            screen_id: 'screen-entrance-1',
-            retailer_id: 'retailer-a',
-            store_id: 'store-north',
-            location_id: 'location-entrance',
-            status: 'OFFLINE',
-            last_seen: null,
-        });
-
-        const reloaded = await request(app).get('/api/screens');
-        expect(reloaded.status).toBe(200);
-        expect(reloaded.body).toContainEqual(expect.objectContaining({
-            id: 'screen-entrance-1',
-            store_id: 'store-north',
-            location_id: 'location-entrance',
-        }));
-    });
-
-    test.each(['brand', 'retaileradmin'])(
-        'denies Screen registration to %s',
-        async role => {
-            const response = await request(appFor(role)).post('/api/screens').send({
-                screen_id: `screen-${role}`,
-                retailer_id: 'retailer-a',
-                store_id: 'store-north',
-                location_id: 'location-entrance',
-            });
-
-            expect(response.status).toBe(403);
-        },
-    );
-});
 
 describe('Screen heartbeat connectivity', () => {
     beforeEach(() => {

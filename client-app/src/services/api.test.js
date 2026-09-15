@@ -74,6 +74,19 @@ describe('APIClient', () => {
         }));
     });
 
+    it('sends no credentials from a stored development identity when signed out', async () => {
+        localStorage.setItem('authToken', 'demo-token');
+        localStorage.setItem('auth_user', JSON.stringify({ role: 'superadmin', linked_entity_id: 'retailer-1' }));
+        fetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+
+        await apiClient.get('/secure');
+
+        const [, { headers }] = fetch.mock.calls[0];
+        expect(Object.keys(headers).map(name => name.toLowerCase()))
+            .not.toEqual(expect.arrayContaining(['authorization']));
+        expect(Object.keys(headers).filter(name => name.toLowerCase().startsWith('x-demo-'))).toEqual([]);
+    });
+
     it('uploads FormData without overriding the browser multipart boundary', async () => {
         fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'ast_1' }) });
         const form = new FormData();

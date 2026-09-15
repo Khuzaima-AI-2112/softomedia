@@ -11,14 +11,6 @@ steps:
         echo "🔍 Running Pre-Deployment Verification..."
         node verify_predeploy.js
 
-        echo "🔐 Verifying Secrets..."
-        for SECRET in JWT_SECRET; do
-          if ! gcloud secrets describe "$$SECRET" --project=$PROJECT_ID &>/dev/null; then
-            echo "ERROR: Secret '$$SECRET' not found in Secret Manager"
-            exit 1
-          fi
-        done
-
         if [ -z "${_VITE_FIREBASE_API_KEY}" ]; then
           echo "ERROR: _VITE_FIREBASE_API_KEY substitution is required"
           exit 1
@@ -99,8 +91,7 @@ steps:
           --region ${_REGION} \
           --platform managed \
           --allow-unauthenticated \
-          --set-env-vars "NODE_ENV=production,CORS_ORIGINS=$$CORS_VALUE,BUILD_ID=$BUILD_ID,ALLOW_DEMO_MODE=${_ALLOW_DEMO_MODE}" \
-          --set-secrets "JWT_SECRET=JWT_SECRET:latest" \
+          --set-env-vars "NODE_ENV=production,CORS_ORIGINS=$$CORS_VALUE,BUILD_ID=$BUILD_ID" \
           --labels "version=$BUILD_ID,deployed-by=cloud-build"
 
         SERVICE_URL=$$(gcloud run services describe ${_SERVICE_ADSERVER} --region ${_REGION} --format='value(status.url)')
@@ -196,7 +187,6 @@ substitutions:
   _ARTIFACT_REGISTRY: 'softomedia'
   _SERVICE_CLIENT: 'client-app'
   _SERVICE_ADSERVER: 'ad-server'
-  _ALLOW_DEMO_MODE: 'false'
   _VITE_API_URL: ''          # Populated at runtime via entrypoint.sh; ARG pathway kept valid
   _VITE_FIREBASE_API_KEY: '' # Required Cloud Build trigger substitution
 

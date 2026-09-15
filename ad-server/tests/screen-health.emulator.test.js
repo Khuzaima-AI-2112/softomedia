@@ -3,10 +3,11 @@ import request from 'supertest';
 import { createTestApp } from './fixtures/test-app.js';
 import { getFirestore } from '../src/utils/firestore.js';
 import apiRouter from '../src/api/index.js';
+import { signInAs } from './fixtures/emulator-sign-in.js';
 
 jest.setTimeout(30_000);
 
-const emulatorAvailable = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
+const emulatorAvailable = Boolean(process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST);
 const describeWithEmulator = emulatorAvailable ? describe : describe.skip;
 const ids = {
     retailer: 'issue-5-retailer',
@@ -15,11 +16,7 @@ const ids = {
     screen: 'issue-5-screen',
 };
 
-function asTechnicalOperator(app, method, path) {
-    return request(app)[method](path)
-        .set('Authorization', 'Bearer demo-token')
-        .set('x-demo-role', 'techoperator');
-}
+const technicalOperator = async () => (await signInAs('techoperator')).headers;
 
 describeWithEmulator('Technical Operator Screen health with Firebase emulators', () => {
     const firestore = getFirestore();
@@ -52,7 +49,7 @@ describeWithEmulator('Technical Operator Screen health with Firebase emulators',
     });
 
     test('persists registration, assignment, heartbeat, and independent schedule state', async () => {
-        const created = await asTechnicalOperator(app, 'post', '/api/screens').send({
+        const created = await request(app).post('/api/screens').set(await technicalOperator()).send({
             screen_id: ids.screen,
             retailer_id: ids.retailer,
             store_id: ids.store,
@@ -74,7 +71,7 @@ describeWithEmulator('Technical Operator Screen health with Firebase emulators',
         });
         expect(persisted.data().last_seen).toBeTruthy();
 
-        const status = await asTechnicalOperator(app, 'get', '/api/monitoring/status');
+        const status = await request(app).get('/api/monitoring/status').set(await technicalOperator());
         expect(status.status).toBe(200);
         expect(status.body.screens).toContainEqual(expect.objectContaining({
             id: ids.screen,
@@ -88,7 +85,7 @@ describeWithEmulator('Technical Operator Screen health with Firebase emulators',
             location_id: ids.location,
             status: 'approved',
         });
-        const scheduledStatus = await asTechnicalOperator(app, 'get', '/api/monitoring/status');
+        const scheduledStatus = await request(app).get('/api/monitoring/status').set(await technicalOperator());
         expect(scheduledStatus.body.screens).toContainEqual(expect.objectContaining({
             id: ids.screen,
             connectivity: 'online',

@@ -14,11 +14,15 @@ const { dailyScheduleRepository } = await import('../src/repositories/DailySched
 const { schedulingAuditRepository } = await import('../src/repositories/SchedulingAuditRepository.js');
 
 const app = createTestApp(apiRouter, '/api');
-const headersFor = (role, retailerId = 'retailer-one') => ({
-    Authorization: 'Bearer demo-token',
-    'x-demo-role': role,
-    'x-demo-retailer-id': retailerId,
+const { describeWithAuthEmulator, signInAs } = await import('./fixtures/emulator-sign-in.js');
+
+// Only a Retailer Administrator belongs to a Retailer; the other roles work network-wide.
+const identityFor = (role, retailerId = 'retailer-one') => signInAs(role, {
+    organizationId: role === 'retaileradmin' ? retailerId : null,
+    fakeClock: true,
 });
+const headersFor = async (role, retailerId) => (await identityFor(role, retailerId)).headers;
+const uidFor = async role => (await identityFor(role)).uid;
 
 const fullSlots = () => Array.from({ length: 12 }, (_, position) => ({
     position,
@@ -58,7 +62,7 @@ async function seedSchedule({
     return loops;
 }
 
-describe('Store-scoped Retailer schedule approval', () => {
+describeWithAuthEmulator('Store-scoped Retailer schedule approval', () => {
     beforeEach(() => {
         clearMockStorage();
         jest.useFakeTimers({
@@ -83,7 +87,7 @@ describe('Store-scoped Retailer schedule approval', () => {
 
         const review = await request(app)
             .get('/api/loops/review/store-one/2026-03-09')
-            .set(headersFor('retaileradmin'));
+            .set(await headersFor('retaileradmin'));
 
         expect(review.status).toBe(200);
         expect(review.body).toMatchObject({
@@ -98,23 +102,23 @@ describe('Store-scoped Retailer schedule approval', () => {
 
         const foreign = await request(app)
             .get('/api/loops/review/store-two/2026-03-30')
-            .set(headersFor('retaileradmin'));
+            .set(await headersFor('retaileradmin'));
         expect(foreign.status).toBe(403);
         expect(foreign.body).toEqual({ error: 'Access denied' });
 
         const foreignDirectRead = await request(app)
             .get('/api/loops/store-two-2026-03-30-8')
-            .set(headersFor('retaileradmin'));
+            .set(await headersFor('retaileradmin'));
         expect(foreignDirectRead.status).toBe(403);
 
         const foreignPendingRead = await request(app)
             .get('/api/loops/pending/retailer-two')
-            .set(headersFor('retaileradmin'));
+            .set(await headersFor('retaileradmin'));
         expect(foreignPendingRead.status).toBe(403);
 
         const adminReview = await request(app)
             .get('/api/loops/review/store-two/2026-03-30')
-            .set(headersFor('admin'));
+            .set(await headersFor('admin'));
         expect(adminReview.status).toBe(200);
         expect(adminReview.body.approval_window.normal_deadline).toBe('2026-03-29T16:00:00.000Z');
     });
@@ -125,15 +129,15 @@ describe('Store-scoped Retailer schedule approval', () => {
         jest.setSystemTime(new Date('2026-03-08T21:59:59.999Z'));
         const approved = await request(app)
             .patch(`/api/loops/${beforeBoundary.id}/approve`)
-            .set(headersFor('retaileradmin'));
+            .set(await headersFor('retaileradmin'));
         expect(approved.status).toBe(200);
-        expect(approved.body).toMatchObject({ status: 'approved', approved_by: 'demo-retaileradmin' });
+        expect(approved.body).toMatchObject({ status: 'approved', approved_by: await uidFor('retaileradmin') });
         expect((await loopRepository.findById(beforeBoundary.id)).status).toBe('approved');
 
         jest.setSystemTime(new Date('2026-03-08T22:00:00.000Z'));
         const expired = await request(app)
             .patch(`/api/loops/${atBoundary.id}/approve`)
-            .set(headersFor('retaileradmin'));
+            .set(await headersFor('retaileradmin'));
         expect(expired.status).toBe(409);
         expect(expired.body).toEqual({ error: 'Approval window is closed' });
         expect((await loopRepository.findById(atBoundary.id)).status).toBe('pending_approval');
@@ -141,7 +145,7 @@ describe('Store-scoped Retailer schedule approval', () => {
         for (const role of ['admin', 'superadmin']) {
             const denied = await request(app)
                 .patch(`/api/loops/${atBoundary.id}/approve`)
-                .set(headersFor(role));
+                .set(await headersFor(role));
             expect(denied.status).toBe(403);
             expect(denied.body).toEqual({ error: 'Access denied' });
         }
@@ -153,7 +157,7 @@ describe('Store-scoped Retailer schedule approval', () => {
 
         const reopened = await request(app)
             .post('/api/loops/review/store-one/2026-03-09/reopen')
-            .set(headersFor('admin'))
+            .set(await headersFor('admin'))
             .send({ reason: 'Corrected creative ready for retailer review', expires_at: '2026-03-09T11:30:00.000Z' });
 
         expect(reopened.status).toBe(200);
@@ -161,7 +165,7 @@ describe('Store-scoped Retailer schedule approval', () => {
             state: 'open',
             effective_deadline: '2026-03-09T11:30:00.000Z',
             reopened: {
-                actor_id: 'demo-admin',
+                actor_id: await uidFor('admin'),
                 actor_role: 'admin',
                 reason: 'Corrected creative ready for retailer review',
                 store_id: 'store-one',
@@ -177,7 +181,7 @@ describe('Store-scoped Retailer schedule approval', () => {
         expect(await schedulingAuditRepository.findAll()).toEqual(expect.arrayContaining([
             expect.objectContaining({
                 action: 'approval_window_reopened',
-                user_id: 'demo-admin',
+                user_id: await uidFor('admin'),
                 reason: 'Corrected creative ready for retailer review',
                 store_id: 'store-one',
                 broadcast_date: '2026-03-09',
@@ -188,7 +192,7 @@ describe('Store-scoped Retailer schedule approval', () => {
 
         const duplicateReopen = await request(app)
             .post('/api/loops/review/store-one/2026-03-09/reopen')
-            .set(headersFor('superadmin'))
+            .set(await headersFor('superadmin'))
             .send({ reason: 'Window is already open', expires_at: '2026-03-09T11:45:00.000Z' });
         expect(duplicateReopen.status).toBe(409);
         expect(duplicateReopen.body).toEqual({ error: 'Approval window is still open' });
@@ -196,12 +200,12 @@ describe('Store-scoped Retailer schedule approval', () => {
         jest.setSystemTime(new Date('2026-03-09T11:29:59.999Z'));
         expect((await request(app)
             .patch(`/api/loops/${beforeExpiry.id}/approve`)
-            .set(headersFor('retaileradmin'))).status).toBe(200);
+            .set(await headersFor('retaileradmin'))).status).toBe(200);
 
         jest.setSystemTime(new Date('2026-03-09T11:30:00.000Z'));
         const expired = await request(app)
             .patch(`/api/loops/${atExpiry.id}/approve`)
-            .set(headersFor('retaileradmin'));
+            .set(await headersFor('retaileradmin'));
         expect(expired.status).toBe(409);
         expect(expired.body).toEqual({ error: 'Approval window is closed' });
     });
@@ -218,7 +222,7 @@ describe('Store-scoped Retailer schedule approval', () => {
         for (const [body, status, error] of cases) {
             const response = await request(app)
                 .post('/api/loops/review/store-one/2026-03-09/reopen')
-                .set(headersFor('admin'))
+                .set(await headersFor('admin'))
                 .send(body);
             expect(response.status).toBe(status);
             expect(response.body).toEqual({ error });
@@ -226,17 +230,17 @@ describe('Store-scoped Retailer schedule approval', () => {
 
         const retailerDenied = await request(app)
             .post('/api/loops/review/store-one/2026-03-09/reopen')
-            .set(headersFor('retaileradmin'))
+            .set(await headersFor('retaileradmin'))
             .send({ reason: 'Not permitted', expires_at: '2026-03-09T11:00:00.000Z' });
         expect(retailerDenied.status).toBe(403);
 
         const superAdminReopened = await request(app)
             .post('/api/loops/review/store-one/2026-03-09/reopen')
-            .set(headersFor('superadmin'))
+            .set(await headersFor('superadmin'))
             .send({ reason: 'Authorized late review', expires_at: '2026-03-09T07:45' });
         expect(superAdminReopened.status).toBe(200);
         expect(superAdminReopened.body.reopened).toMatchObject({
-            actor_id: 'demo-superadmin',
+            actor_id: await uidFor('superadmin'),
             actor_role: 'superadmin',
             expires_at: '2026-03-09T11:45:00.000Z',
         });
@@ -244,7 +248,7 @@ describe('Store-scoped Retailer schedule approval', () => {
         jest.setSystemTime(new Date('2026-03-09T12:00:00.000Z'));
         const broadcastStarted = await request(app)
             .post('/api/loops/review/store-one/2026-03-09/reopen')
-            .set(headersFor('superadmin'))
+            .set(await headersFor('superadmin'))
             .send({ reason: 'Too late', expires_at: '2026-03-09T12:30:00.000Z' });
         expect(broadcastStarted.status).toBe(409);
         expect(broadcastStarted.body).toEqual({ error: 'Broadcasting has started' });
@@ -255,7 +259,7 @@ describe('Store-scoped Retailer schedule approval', () => {
 
         const requested = await request(app)
             .patch(`/api/loops/${loop.id}/slots/3/reject`)
-            .set(headersFor('retaileradmin'))
+            .set(await headersFor('retaileradmin'))
             .send({ reason: 'Competitor content is not accepted' });
         expect(requested.status).toBe(200);
         expect(requested.body).toMatchObject({
@@ -265,20 +269,20 @@ describe('Store-scoped Retailer schedule approval', () => {
                     position: 3,
                     status: 'rejected',
                     rejection_reason: 'Competitor content is not accepted',
-                    rejected_by: 'demo-retaileradmin',
+                    rejected_by: await uidFor('retaileradmin'),
                 }),
             ]),
         });
 
         const retailerCannotReplace = await request(app)
             .patch(`/api/loops/${loop.id}/slots/3/replace`)
-            .set(headersFor('retaileradmin'))
+            .set(await headersFor('retaileradmin'))
             .send({ assetId: 'corrected-asset' });
         expect(retailerCannotReplace.status).toBe(403);
 
         const corrected = await request(app)
             .patch(`/api/loops/${loop.id}/slots/3/replace`)
-            .set(headersFor('admin'))
+            .set(await headersFor('admin'))
             .send({ assetId: 'corrected-asset' });
         expect(corrected.status).toBe(200);
         expect(corrected.body).toMatchObject({
@@ -292,7 +296,7 @@ describe('Store-scoped Retailer schedule approval', () => {
 
         const persistedReview = await request(app)
             .get('/api/loops/review/store-one/2026-03-09')
-            .set(headersFor('retaileradmin'));
+            .set(await headersFor('retaileradmin'));
         expect(persistedReview.body.loops[0].slots[3]).toMatchObject({
             asset_id: 'corrected-asset',
             rejection_reason: 'Competitor content is not accepted',
@@ -300,13 +304,13 @@ describe('Store-scoped Retailer schedule approval', () => {
 
         const foreignRetailer = await request(app)
             .patch(`/api/loops/${loop.id}/slots/2/reject`)
-            .set(headersFor('retaileradmin', 'retailer-two'))
+            .set(await headersFor('retaileradmin', 'retailer-two'))
             .send({ reason: 'Should not see this schedule' });
         expect(foreignRetailer.status).toBe(403);
 
         const superAdminCannotReplace = await request(app)
             .patch(`/api/loops/${loop.id}/slots/3/replace`)
-            .set(headersFor('superadmin'))
+            .set(await headersFor('superadmin'))
             .send({ assetId: 'another-asset' });
         expect(superAdminCannotReplace.status).toBe(403);
     });

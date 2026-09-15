@@ -66,7 +66,7 @@ const corsOptions = {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-demo-role', 'x-demo-retailer-id'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
 // Handle CORS pre-flight for ALL routes
@@ -84,13 +84,6 @@ app.use(securityHeaders);
 app.use(requestLogger);
 
 const PORT = process.env.PORT || 8080;
-const JWT_SECRET = process.env.JWT_SECRET;
-
-// Validate required environment variables
-if (!JWT_SECRET) {
-    console.error('FATAL ERROR: JWT_SECRET environment variable is not set.');
-    process.exit(1);
-}
 
 console.log('[Server] Environment configured successfully');
 console.log('[Server] CORS origins:', CORS_ORIGINS);

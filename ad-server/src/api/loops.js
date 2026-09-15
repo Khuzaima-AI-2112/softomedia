@@ -237,9 +237,9 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.LOOP_INJECT, 'super
  * POST /api/loops/generate
  * Trigger D-1 loop generation
  * Body: { targetDate, retailerId, storeId }
- * Requires authentication (defence-in-depth — router is also behind authenticate).
+ * Requires loops.generate: Admin and Super Administrator prepare schedules.
  */
-router.post('/generate', authenticate, async (req, res) => {
+router.post('/generate', authenticate, requirePermission(PERMISSIONS.LOOP_GENERATE), async (req, res) => {
     try {
         const { targetDate, retailerId, storeId, mock } = req.body;
 

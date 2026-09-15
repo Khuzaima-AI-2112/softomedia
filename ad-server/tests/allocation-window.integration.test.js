@@ -11,17 +11,19 @@ const { clearMockStorage } = await import('../src/repositories/BaseRepository.js
 const { BusinessHoursService } = await import('../src/services/BusinessHoursService.js');
 const { campaignRepository } = await import('../src/repositories/CampaignRepository.js');
 const { mediaRepository } = await import('../src/repositories/MediaRepository.js');
+const { describeWithAuthEmulator, signInAs } = await import('./fixtures/emulator-sign-in.js');
 
 const app = createTestApp(loopsRouter, '/api/loops');
-const auth = { Authorization: 'Bearer demo-token', 'x-demo-role': 'admin' };
+let auth;
 
-describe('POST /api/loops/generate Allocation Window', () => {
+describeWithAuthEmulator('POST /api/loops/generate Allocation Window', () => {
     beforeEach(async () => {
         clearMockStorage();
         jest.useFakeTimers({
             now: new Date('2030-01-01T12:00:00.000Z'),
             doNotFake: ['nextTick', 'setImmediate', 'setTimeout', 'setInterval'],
         });
+        ({ headers: auth } = await signInAs('admin', { fakeClock: true }));
         jest.spyOn(BusinessHoursService, 'getEffectiveHours').mockResolvedValue({
             is_closed: false,
             open_time: '08:00',
@@ -82,6 +84,7 @@ describe('POST /api/loops/generate Allocation Window', () => {
 
     test('preserves continuity through a closed day and reports deficient-category fallback', async () => {
         clearMockStorage();
+        ({ headers: auth } = await signInAs('admin', { fakeClock: true }));
         BusinessHoursService.getEffectiveHours.mockImplementation(async (_storeId, date) => {
             if (date === '2030-01-02') return { is_closed: true };
             if (date === '2030-01-01') return { is_closed: false, open_time: '08:00', close_time: '10:00' };

@@ -4,10 +4,15 @@ process.env.NODE_ENV = 'test';
 process.env.GOOGLE_CLOUD_PROJECT = process.env.GOOGLE_CLOUD_PROJECT || 'softomedia-demo';
 process.env.FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || 'softomedia-demo';
 
-const hasFirestoreEmulator = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
+const hasFirestoreEmulator = Boolean(process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST);
 const describeWithEmulator = hasFirestoreEmulator ? describe : describe.skip;
 
 jest.setTimeout(30_000);
+
+const { signInAs } = await import('./fixtures/emulator-sign-in.js');
+const headersFor = async (role, options) => (await signInAs(role, options)).headers;
+// Network Proof of Play visibility is an explicit grant on the operator's profile.
+const operatorHeaders = () => headersFor('techoperator', { permissions: ['proof_of_play.view_network'] });
 
 describeWithEmulator('Proof of Play HTTP API with Firestore persistence', () => {
     const suffix = `${Date.now()}`;
@@ -31,9 +36,6 @@ describeWithEmulator('Proof of Play HTTP API with Firestore persistence', () => 
     let app;
     let firestore;
 
-    const asOperator = response => response
-        .set('Authorization', 'Bearer demo-token')
-        .set('x-demo-role', 'techoperator');
     let deviceKey;
     const asScreen = pending => pending.set('Authorization', `Device ${ids.screen}:${deviceKey}`);
     const submitProof = body => asScreen(request(app).post('/api/device/proof-of-play')).send(body);
@@ -161,7 +163,7 @@ describeWithEmulator('Proof of Play HTTP API with Firestore persistence', () => 
     });
 
     test('requires the complete presentation contract and refuses fallback delivery', async () => {
-        const legacy = await asOperator(request(app).post('/api/monitoring/impression')).send({
+        const legacy = await request(app).post('/api/monitoring/impression').set(await operatorHeaders()).send({
             screenId: ids.screen,
             campaignId: ids.campaign,
         });
@@ -228,30 +230,24 @@ describeWithEmulator('Proof of Play HTTP API with Firestore persistence', () => 
     test('restricts Brand delivery to owned Campaigns and grants explicit operator visibility', async () => {
         const own = await request(app)
             .get(`/api/campaigns/${ids.campaign}/proofs-of-play`)
-            .set('Authorization', 'Bearer demo-token')
-            .set('x-demo-role', 'brand')
-            .set('x-demo-retailer-id', ids.brand);
+            .set(await headersFor('brand', { organizationId: ids.brand }));
         expect(own.status).toBe(200);
         expect(own.body).toEqual([expect.objectContaining({ event_id: ids.event })]);
 
         const foreign = await request(app)
             .get(`/api/campaigns/${ids.campaign}/proofs-of-play`)
-            .set('Authorization', 'Bearer demo-token')
-            .set('x-demo-role', 'brand')
-            .set('x-demo-retailer-id', 'another-brand');
+            .set(await headersFor('brand', { organizationId: 'another-brand' }));
         expect(foreign.status).toBe(403);
 
         const operator = await request(app)
             .get(`/api/campaigns/${ids.campaign}/proofs-of-play`)
-            .set('Authorization', 'Bearer demo-token')
-            .set('x-demo-role', 'techoperator');
+            .set(await operatorHeaders());
         expect(operator.status).toBe(200);
         expect(operator.body).toEqual([expect.objectContaining({ event_id: ids.event })]);
 
         const admin = await request(app)
             .get(`/api/campaigns/${ids.campaign}/proofs-of-play`)
-            .set('Authorization', 'Bearer demo-token')
-            .set('x-demo-role', 'admin');
+            .set(await headersFor('admin'));
         expect(admin.status).toBe(403);
 
         const futureFallback = await asScreen(request(app).post('/api/device/playback-observations')).send({
@@ -314,8 +310,7 @@ describeWithEmulator('Proof of Play HTTP API with Firestore persistence', () => 
 
         const report = await request(app)
             .get('/api/monitoring/delivery-report')
-            .set('Authorization', 'Bearer demo-token')
-            .set('x-demo-role', 'techoperator');
+            .set(await operatorHeaders());
         expect(report.status).toBe(200);
         expect(report.body).toEqual(expect.objectContaining({
             allocated_capacity: {

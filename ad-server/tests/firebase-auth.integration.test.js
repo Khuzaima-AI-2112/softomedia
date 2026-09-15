@@ -1,11 +1,15 @@
 import { beforeAll, afterAll, describe, expect, jest, test } from '@jest/globals';
 import request from 'supertest';
 import express from 'express';
+import { createHmac } from 'node:crypto';
 
 process.env.NODE_ENV = 'test';
 process.env.ALLOW_DEMO_MODE = 'false';
 process.env.GCLOUD_PROJECT = process.env.GCLOUD_PROJECT || 'softomedia-demo';
 process.env.GOOGLE_CLOUD_PROJECT = process.env.GOOGLE_CLOUD_PROJECT || 'softomedia-demo';
+// A revision that still carries the retired secret must not accept tokens signed with it.
+const LEGACY_JWT_SECRET = 'retired-jwt-secret';
+process.env.JWT_SECRET = LEGACY_JWT_SECRET;
 
 const authEmulatorHost = process.env.FIREBASE_AUTH_EMULATOR_HOST || '127.0.0.1:9099';
 
@@ -90,6 +94,13 @@ function expireFirebaseToken(idToken) {
     return `${header}.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.`;
 }
 
+// An HS256 token in the shape the retired POST /api/auth/login issued.
+function legacyJwt(claims, secret) {
+    const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
+    const unsigned = `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ ...claims, iat: Math.floor(Date.now() / 1000) })}`;
+    return `${unsigned}.${createHmac('sha256', secret).update(unsigned).digest('base64url')}`;
+}
+
 beforeAll(async () => {
     await Promise.all([
         ...createdUserIds.map(id => db.collection('users').doc(id).delete()),
@@ -172,25 +183,33 @@ describe('Firebase-authenticated profile boundary', () => {
         expect(missingProfileResponse.body).toEqual({ error: 'Authentication required' });
     });
 
-    test('never accepts the legacy demo token in production', async () => {
-        const previousNodeEnv = process.env.NODE_ENV;
-        const previousDemoMode = process.env.ALLOW_DEMO_MODE;
-        process.env.NODE_ENV = 'production';
+    test('refuses the retired demo token and custom JWTs even with the old switches on', async () => {
+        const previous = {
+            ALLOW_DEMO_MODE: process.env.ALLOW_DEMO_MODE,
+            ALLOW_LEGACY_JWT_AUTH: process.env.ALLOW_LEGACY_JWT_AUTH,
+        };
         process.env.ALLOW_DEMO_MODE = 'true';
+        process.env.ALLOW_LEGACY_JWT_AUTH = 'true';
 
         try {
-            const response = await request(app)
+            const demoToken = await request(app)
                 .get('/api/auth/me')
                 .set('Authorization', 'Bearer demo-token')
                 .set('x-demo-role', 'superadmin');
+            const customJwt = await authenticatedProfile(
+                legacyJwt({ id: 'legacy-user', role: 'superadmin' }, LEGACY_JWT_SECRET)
+            );
 
-            expect(response.status).toBe(401);
-            expect(response.body).toEqual({ error: 'Authentication required' });
+            const refusal = { status: 401, body: { error: 'Authentication required' } };
+            expect({
+                demoToken: { status: demoToken.status, body: demoToken.body },
+                customJwt: { status: customJwt.status, body: customJwt.body },
+            }).toEqual({ demoToken: refusal, customJwt: refusal });
         } finally {
-            if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
-            else process.env.NODE_ENV = previousNodeEnv;
-            if (previousDemoMode === undefined) delete process.env.ALLOW_DEMO_MODE;
-            else process.env.ALLOW_DEMO_MODE = previousDemoMode;
+            for (const [name, value] of Object.entries(previous)) {
+                if (value === undefined) delete process.env[name];
+                else process.env[name] = value;
+            }
         }
     });
 

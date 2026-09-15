@@ -3,33 +3,26 @@ import { clearMockStorage } from '../src/repositories/BaseRepository.js';
 import StoreRepository from '../src/repositories/StoreRepository.js';
 import { locationRepository } from '../src/repositories/index.js';
 import { createTestApp } from './fixtures/test-app.js';
+import { describeWithAuthEmulator, signInAs } from './fixtures/emulator-sign-in.js';
 
 const { default: apiRouter } = await import('../src/api/index.js');
 const app = createTestApp(apiRouter, '/api');
 
-// A retailer of its own, so Stores other suites leave in the shared emulator never appear here.
+// Retailers of their own, so Stores other suites leave in the shared emulator never appear here.
 const retailerId = `store-management-retailer-${Date.now()}`;
+const secondaryRetailerId = `store-management-secondary-${Date.now()}`;
+const secondaryLocationId = `${secondaryRetailerId}-location`;
 
-const retailerHeaders = {
-    Authorization: 'Bearer demo-token',
-    'x-demo-role': 'retaileradmin',
-    'x-demo-retailer-id': retailerId,
-};
+describeWithAuthEmulator('Retailer Administrator store management', () => {
+    let retailerHeaders;
+    let adminHeaders;
+    let secondaryRetailerHeaders;
 
-const adminHeaders = {
-    Authorization: 'Bearer demo-token',
-    'x-demo-role': 'admin',
-};
-
-const secondaryRetailerHeaders = {
-    Authorization: 'Bearer demo-token',
-    'x-demo-role': 'retaileradmin',
-    'x-demo-retailer-id': 'secondary-retailer',
-};
-
-describe('Retailer Administrator store management', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
         clearMockStorage();
+        ({ headers: retailerHeaders } = await signInAs('retaileradmin', { organizationId: retailerId }));
+        ({ headers: adminHeaders } = await signInAs('admin'));
+        ({ headers: secondaryRetailerHeaders } = await signInAs('retaileradmin', { organizationId: secondaryRetailerId }));
     });
 
     it('persists default local hours and isolates another retailer’s stores and locations', async () => {
@@ -89,13 +82,13 @@ describe('Retailer Administrator store management', () => {
 
         const secondaryStore = await StoreRepository.createWithScreens({
             name: 'Secondary Retailer Store',
-            retailer_id: 'secondary-retailer',
+            retailer_id: secondaryRetailerId,
             time_zone: 'America/Phoenix',
         });
-        await locationRepository.create('secondary-location', {
+        await locationRepository.create(secondaryLocationId, {
             name: 'Secondary Entrance',
             store_id: secondaryStore.id,
-            retailer_id: 'secondary-retailer',
+            retailer_id: secondaryRetailerId,
         });
 
         const stores = await request(app).get('/api/stores').set(retailerHeaders);
@@ -112,7 +105,7 @@ describe('Retailer Administrator store management', () => {
 
         const switchedAccountLocations = await request(app).get('/api/locations').set(secondaryRetailerHeaders);
         expect(switchedAccountLocations.status).toBe(200);
-        expect(switchedAccountLocations.body.map(({ id }) => id)).toEqual(['secondary-location']);
+        expect(switchedAccountLocations.body.map(({ id }) => id)).toEqual([secondaryLocationId]);
 
         for (const response of [
             await request(app).get(`/api/stores/${secondaryStore.id}`).set(retailerHeaders),

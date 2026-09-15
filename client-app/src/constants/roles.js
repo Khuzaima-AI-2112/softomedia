@@ -2,11 +2,9 @@
 export const ROLES = {
     SUPERADMIN:     'superadmin',
     ADMIN:          'admin',
-    CONTENTMANAGER: 'contentmanager',
     TECHOPERATOR:   'techoperator',
     RETAILERADMIN:  'retaileradmin',
     BRAND:          'brand',
-    ADVERTISER:     'advertiser',
 };
 
 export const CANONICAL_ROLES = Object.freeze([

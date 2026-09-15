@@ -1,21 +1,41 @@
 import request from 'supertest';
 import { createTestApp } from './fixtures/test-app.js';
+import { getFirestore } from '../src/utils/firestore.js';
 import { clearMockStorage } from '../src/repositories/BaseRepository.js';
 import { platformAuditRepository } from '../src/repositories/index.js';
 import apiRouter from '../src/api/index.js';
+import { describeWithAuthEmulator, signInAs } from './fixtures/emulator-sign-in.js';
 
+const identities = {};
+
+// Every request from this app carries the signed-in role's Firebase ID token.
 const appForRole = (role) => createTestApp(apiRouter, '/api', {
     middleware: [
         (req, _res, next) => {
-            req.headers.authorization = 'Bearer demo-token';
-            req.headers['x-demo-role'] = role;
+            Object.assign(req.headers, { authorization: identities[role].headers.Authorization });
             next();
         },
     ],
 });
 
-describe('platform governance HTTP API', () => {
-    beforeEach(() => clearMockStorage());
+describeWithAuthEmulator('platform governance HTTP API', () => {
+    // These tests save global pricing; other suites read it from the same emulator.
+    const pricingDocument = () => getFirestore().collection('pricing_config').doc('global');
+    let savedPricing;
+
+    beforeAll(async () => {
+        savedPricing = await pricingDocument().get();
+    });
+
+    afterAll(async () => {
+        if (savedPricing.exists) await pricingDocument().set(savedPricing.data());
+        else await pricingDocument().delete();
+    });
+
+    beforeEach(async () => {
+        clearMockStorage();
+        for (const role of ['superadmin', 'admin']) identities[role] = await signInAs(role);
+    });
 
     it('lets a Super Administrator create a persisted demo organization', async () => {
         const created = await request(appForRole('superadmin'))
@@ -104,7 +124,7 @@ describe('platform governance HTTP API', () => {
         expect(audit.body).toEqual(expect.arrayContaining([
             expect.objectContaining({
                 action: 'pricing_config_updated',
-                actor_id: 'demo-superadmin',
+                actor_id: identities.superadmin.uid,
                 changes: { baseCPM: 18, allocation: { paid: 70, retailer: 20, internal: 10 } },
             }),
         ]));
@@ -138,10 +158,14 @@ describe('platform governance HTTP API', () => {
     it('does not change saved pricing when recording the acceptance audit fails', async () => {
         const superAdmin = appForRole('superadmin');
         const before = await request(superAdmin).get('/api/pricing/config');
-        const record = platformAuditRepository.record;
-        platformAuditRepository.record = async () => {
-            throw new Error('audit storage unavailable');
-        };
+        // The audit write fails inside the save: its record id is already taken.
+        const takenAuditId = `platform_audit_taken_${Date.now()}`;
+        await platformAuditRepository.create(takenAuditId, { action: 'occupied' });
+        const buildRecord = platformAuditRepository.buildRecord;
+        platformAuditRepository.buildRecord = entry => ({
+            ...buildRecord.call(platformAuditRepository, entry),
+            id: takenAuditId,
+        });
         try {
             const rejected = await request(superAdmin)
                 .put('/api/pricing/config')
@@ -153,7 +177,7 @@ describe('platform governance HTTP API', () => {
             expect(after.body.allocation).toEqual(before.body.allocation);
             expect(after.body.baseCPM).toBe(before.body.baseCPM);
         } finally {
-            platformAuditRepository.record = record;
+            platformAuditRepository.buildRecord = buildRecord;
         }
     });
 });

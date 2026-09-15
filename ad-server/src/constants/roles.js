@@ -2,11 +2,9 @@
 export const ROLES = {
     SUPERADMIN:     'superadmin',
     ADMIN:          'admin',
-    CONTENTMANAGER: 'contentmanager',
     TECHOPERATOR:   'techoperator',
     RETAILERADMIN:  'retaileradmin',
     BRAND:          'brand',
-    ADVERTISER:     'advertiser',
 };
 
 export const CANONICAL_ROLES = Object.freeze([
@@ -17,6 +15,7 @@ export const CANONICAL_ROLES = Object.freeze([
     ROLES.TECHOPERATOR,
 ]);
 
+// Stored profiles from before the five canonical roles are converted at sign-in.
 export const LEGACY_ROLE_MIGRATIONS = Object.freeze({
     contentmanager: ROLES.ADMIN,
     advertiser: ROLES.BRAND,

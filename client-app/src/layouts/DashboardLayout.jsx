@@ -68,7 +68,7 @@ function getNavItems(persona) {
     if (!persona) return [];
     if (persona === ROLES.SUPERADMIN || persona === 'super_admin') return SUPERADMIN_NAV;
     if (persona === ROLES.ADMIN) return ADMIN_NAV;
-    if (persona === ROLES.ADVERTISER || persona === ROLES.BRAND) return BRAND_NAV;
+    if (persona === ROLES.BRAND) return BRAND_NAV;
     if (persona === ROLES.RETAILERADMIN) return RETAILER_NAV;
     if (persona === ROLES.TECHOPERATOR) return TECHOP_NAV;
     return [];
@@ -79,7 +79,7 @@ function Sidebar({ persona }) {
     if (!navItems.length) return null;
 
     let testId = 'nav-admin';
-    if (persona === ROLES.ADVERTISER || persona === ROLES.BRAND) testId = 'nav-brand';
+    if (persona === ROLES.BRAND) testId = 'nav-brand';
     else if (persona === ROLES.RETAILERADMIN) testId = 'nav-retailer';
     else if (persona === ROLES.TECHOPERATOR) testId = 'nav-techop';
 

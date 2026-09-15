@@ -36,8 +36,7 @@ router.post('/generate', requirePermission(PERMISSIONS.INVOICE_GENERATE), async 
         if (!campaign) {
             return res.status(404).json({ error: 'Campaign not found' });
         }
-        const isDemo = process.env.ALLOW_DEMO_MODE === 'true';
-        if (campaign.status !== 'completed' && !isDemo) {
+        if (campaign.status !== 'completed') {
             return res.status(400).json({ error: 'Campaign must be completed' });
         }
 

@@ -3,7 +3,6 @@
 
 import { API_URL } from '../config.js';
 import { auth } from '../firebase.js';
-import { getDevelopmentIdentity } from './developmentIdentity.js';
 
 /**
  * API Client Configuration
@@ -186,19 +185,14 @@ class APIClient {
 const apiClient = new APIClient();
 
 apiClient.addRequestInterceptor(async (url, options) => {
+    // A Firebase ID token is the only credential the client sends.
     const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
-    const developmentToken = import.meta.env.DEV ? localStorage.getItem('authToken') : null;
-    const developmentUser = getDevelopmentIdentity();
 
     const hasAuth = options.headers && (options.headers['Authorization'] || options.headers['authorization']);
-    if ((token || developmentToken) && !hasAuth) {
+    if (token && !hasAuth) {
         options.headers = {
             ...options.headers,
-            'Authorization': `Bearer ${token || developmentToken}`,
-            ...(developmentToken ? {
-                'x-demo-role': developmentUser?.role || localStorage.getItem('demo_role'),
-                'x-demo-retailer-id': developmentUser?.linked_entity_id || '',
-            } : {}),
+            'Authorization': `Bearer ${token}`,
         };
     }
 

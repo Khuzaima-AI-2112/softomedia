@@ -132,7 +132,8 @@ describeWithEmulators('classified media API with Firebase emulators', () => {
             .set('Authorization', `Bearer ${retailerToken}`)
             .send({ approval_status: 'rejected' });
 
-        expect([403, 404]).toContain(response.status);
+        // No metadata alteration route exists for any role.
+        expect(response.status).toBe(404);
         const after = await firestore.collection('media').doc(existing).get();
         expect(after.data()).toEqual(before.data());
     });

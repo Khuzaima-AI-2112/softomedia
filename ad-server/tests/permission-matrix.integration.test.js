@@ -13,6 +13,8 @@ const hasEmulators = Boolean(
 );
 const describeWithEmulators = hasEmulators ? describe : describe.skip;
 
+const { signIn } = await import('./fixtures/emulator-sign-in.js');
+
 jest.setTimeout(30_000);
 
 /**
@@ -163,6 +165,21 @@ describeWithEmulators('Phase 1 permission matrix with Firebase emulators', () =>
             allowed: { admin: 400, superadmin: 400 },
         },
         {
+            action: 'manage user profiles',
+            send: pending => pending.post('/api/users').send({}),
+            allowed: { superadmin: 400 },
+        },
+        {
+            action: 'register a Screen',
+            send: pending => pending.post('/api/screens').send({}),
+            allowed: { superadmin: 400, admin: 400, techoperator: 400 },
+        },
+        {
+            action: 'generate hourly loops',
+            send: pending => pending.post('/api/loops/generate').send({}),
+            allowed: { superadmin: 400, admin: 400 },
+        },
+        {
             action: 'query delivery impressions',
             send: pending => pending.get('/api/impressions'),
             allowed: { admin: 400, superadmin: 400, retaileradmin: 400 },
@@ -179,16 +196,3 @@ describeWithEmulators('Phase 1 permission matrix with Firebase emulators', () =>
         expect(actual).toEqual(expected);
     });
 });
-
-async function signIn(email, password) {
-    const response = await fetch(
-        `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo-api-key`,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password, returnSecureToken: true }),
-        },
-    );
-    if (!response.ok) throw new Error(`Firebase emulator sign-in failed: ${await response.text()}`);
-    return (await response.json()).idToken;
-}

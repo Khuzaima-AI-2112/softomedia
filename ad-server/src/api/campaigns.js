@@ -174,72 +174,17 @@ router.get('/:id', authenticate, async (req, res) => {
  * POST /api/campaigns
  * Create a new campaign (defaults to pending_approval).
  *
- * Sprint 9  — Task 9.2 : authenticate guard added.
- * Sprint 14 — S14-1    : requireRole('advertiser') added.
- *   Hierarchical guard (DECISION-2): allows advertiser + all higher roles
- *   so admin oversight of campaign creation is preserved.
+ * Requires campaigns.create: a Brand creates for its own organization; Admin
+ * and Super Administrator create on behalf of a named advertiser.
  *
- * T1 fix: Admin-tier callers (admin/superadmin) MUST supply advertiser_id
+ * T1 fix: Admin and Super Administrator callers MUST supply advertiser_id
  *   in the request body — returns 400 if missing. Prevents orphaned
  *   campaigns with advertiser_id: null written to Firestore (Gap #1).
  *
- * T5 fix: Role-tier enforcement on advertiser_id stamping:
- *   - Admin tier (level >= 4): advertiser_id taken from req.body (must
- *     be present per T1 guard above).
- *   - All other roles: advertiser_id stamped from req.user.linked_entity_id
- *     exclusively; any value in req.body is ignored to prevent spoofing.
- *
- * TASK-2 (Sprint 23): Demo short-circuit for E2E suite.
- *   When ALLOW_DEMO_MODE=true AND the caller is the demo-brand persona,
- *   return a deterministic response matching 00_seed.setup.js constants
- *   so step 3.7 assertion passes. advertiser_id is still JWT-stamped
- *   (req.user.linked_entity_id) — never from req.body (Rule 7).
- *   Guard is maximally narrow: only demo-brand in demo mode triggers it.
- *   All real-caller logic below the guard is unchanged.
+ * T5 fix: a Brand's advertiser_id is stamped from its signed-in identity;
+ *   any value in req.body is ignored to prevent spoofing.
  */
 router.post('/', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, ROLES.BRAND), async (req, res) => {
-    // TASK-2: Demo short-circuit — deterministic response for E2E step 3.7
-    if (
-        process.env.ALLOW_DEMO_MODE === 'true' &&
-        req.user?.id === 'demo-brand'
-    ) {
-        const demoPayload = {
-            id:            'demo-campaign-001',
-            status:        'pending_approval',  // MUST be pending_approval so it appears in Retailer Approvals queue!
-            advertiser_id: req.user.linked_entity_id,  // JWT-stamped, never from body (Rule 7)
-            name:          'BonVie Summer Demo',
-            created_at:    new Date().toISOString(),
-            retailer_id:   'demo-retailer-freshmart',
-            start_date:    '2026-06-01',
-            end_date:      '2026-08-31',
-            budget:        5000,
-            cpm:           12.5,
-            creative_url:  'https://cdn.softomedia.demo/bonvie-ad-1.mp4',
-            impressions_delivered: 120000,
-        };
-        try {
-            try {
-                await campaignRepository.create('demo-campaign-001', demoPayload);
-            } catch (error) {
-                const isAlreadyExists = error.code === 6 || 
-                                        error.message?.includes('ALREADY_EXISTS') || 
-                                        error.message?.includes('already exists');
-                if (isAlreadyExists) {
-                    // Overwrite cleanly by deleting existing first to ensure E2E is idempotent
-                    await campaignRepository.delete('demo-campaign-001');
-                    await campaignRepository.create('demo-campaign-001', demoPayload);
-                } else {
-                    throw error;
-                }
-            }
-            return res.status(201).json(demoPayload);
-        } catch (err) {
-            console.error('Failed to create demo campaign:', err);
-            return res.status(500).json({ error: err.message });
-        }
-    }
-
-
     try {
         // T1: Brands create for their own organization; Admin and Super
         // Administrator create on behalf of a named advertiser.

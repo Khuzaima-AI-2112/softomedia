@@ -23,8 +23,7 @@ jest.unstable_mockModule('../src/utils/storage.js', () => ({
 const { default: assetsRouter } = await import('../src/api/assets.js');
 
 const roles = {
-    ADVERTISER: 'advertiser',
-    CONTENTMANAGER: 'contentmanager'
+    BRAND: 'brand',
 };
 
 const reqAs = (role, method, route) => {
@@ -73,22 +72,21 @@ describe('4.4 Content Specifications & Compliance', () => {
     });
 
     it('should reject unsupported file types like .gif', async () => {
-        const res = await reqAs(roles.ADVERTISER, 'post', '/api/assets/upload')
+        const res = await reqAs(roles.BRAND, 'post', '/api/assets/upload')
             .attach('file', dummyGifPath);
 
-        // Multer throws error HTML/JSON depending on handler, but expects 500 or 400 for bad extension
-        expect([400, 500]).toContain(res.status);
+        expect(res.status).toBe(400);
     });
 
     it('should reject .mp4 files if duration is missing or not exactly 5', async () => {
-        const resNoDuration = await reqAs(roles.ADVERTISER, 'post', '/api/assets/upload')
+        const resNoDuration = await reqAs(roles.BRAND, 'post', '/api/assets/upload')
             .field('title', 'Video creative')
             .field('category', 'paid')
             .attach('file', dummyVideoPath);
         expect(resNoDuration.status).toBe(400);
         expect(resNoDuration.body.error).toMatch(/duration must be exactly 5 seconds/i);
 
-        const resBadDuration = await reqAs(roles.ADVERTISER, 'post', '/api/assets/upload')
+        const resBadDuration = await reqAs(roles.BRAND, 'post', '/api/assets/upload')
             .field('title', 'Video creative')
             .field('category', 'paid')
             .field('duration', '15')
@@ -98,7 +96,7 @@ describe('4.4 Content Specifications & Compliance', () => {
     });
 
     it('should accept .mp4 files if duration is exactly 5', async () => {
-        const res = await reqAs(roles.ADVERTISER, 'post', '/api/assets/upload')
+        const res = await reqAs(roles.BRAND, 'post', '/api/assets/upload')
             .field('title', 'Video creative')
             .field('category', 'paid')
             .field('duration', '5')
@@ -109,7 +107,7 @@ describe('4.4 Content Specifications & Compliance', () => {
     });
 
     it('should accept image files implicitly defaulting duration to 5', async () => {
-        const res = await reqAs(roles.ADVERTISER, 'post', '/api/assets/upload')
+        const res = await reqAs(roles.BRAND, 'post', '/api/assets/upload')
             .field('title', 'Image creative')
             .field('category', 'paid')
             .attach('file', dummyImagePath);
