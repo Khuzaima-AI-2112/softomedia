@@ -9,6 +9,11 @@
 *.yml text eol=lf
 *.yaml text eol=lf
 
+# Docker build files run inside containers on any host OS — keep LF
+Dockerfile* text eol=lf
+.dockerignore text eol=lf
+firebase-emulators/*.js text eol=lf
+
 # Binary files — no line ending conversion
 *.png binary
 *.jpg binary

@@ -68,6 +68,37 @@ Start the backend server and frontend client in separate terminals (or terminal 
 
 ---
 
+## 🐳 Run the Demo with Docker
+
+Runs the whole Phase 1 demo — Firebase emulators, `ad-server`, and `client-app` — in
+containers. Needs only Git and Docker Desktop; no Node, Java, or Firebase CLI on the host.
+
+**One-time setup:** copy `.env.docker.example` to `.env.docker` and set `DEMO_ACCOUNT_PASSWORD`
+(12+ characters). Never commit `.env.docker`.
+```bash
+cp .env.docker.example .env.docker
+```
+
+**Start** (one command):
+```bash
+docker compose up --build
+```
+Open `http://localhost:3000`. All five personas can sign in there with the seven demo
+accounts listed in `ad-server/src/services/DemoPersonaProvisioner.js`, using the password
+from `.env.docker`.
+
+**Reset** the demo back to its synthetic baseline without restarting everything:
+```bash
+docker compose run --rm seed
+```
+
+**Stop:**
+```bash
+docker compose down
+```
+
+---
+
 ## 🧪 Testing & Verification
 
 ### Unit Tests

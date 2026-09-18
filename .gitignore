@@ -8,12 +8,13 @@ test-results/
 .archives/
 .worktrees/
 
-# Environment files (keep .env.example)
+# Environment files (keep .env.example, .env.docker.example)
 .env
 .env.development
 .env.staging
 .env.production
 .env.local
+.env.docker
 
 *.log
 .gemini

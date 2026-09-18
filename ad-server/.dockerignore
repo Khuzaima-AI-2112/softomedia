@@ -1,0 +1,11 @@
+node_modules
+coverage
+logs
+combined.log
+error.log
+*.log
+test_output.json
+tests
+.env
+.env.*
+!.env.example
