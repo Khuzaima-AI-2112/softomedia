@@ -16,9 +16,10 @@ RUN npm install -g firebase-tools@^15.22.0
 
 WORKDIR /app
 
-# Bake the Firestore emulator jar into the image so container startup
-# never needs to download anything.
-RUN firebase setup:emulators:firestore
+# Bake the Firestore and Storage emulator jars into the image so container
+# startup never needs to download anything.
+RUN firebase setup:emulators:firestore \
+    && firebase setup:emulators:storage
 
 COPY firebase.json ./firebase.json
 COPY firestore.indexes.json ./firestore.indexes.json
