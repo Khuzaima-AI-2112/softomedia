@@ -40,6 +40,8 @@ function LoopManagement() {
     const [businessHours, setBusinessHours] = useState(() => getBusinessHours());
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
+    const [stores, setStores] = useState([]);
+    const [selectedStoreId, setSelectedStoreId] = useState('');
 
     // Mock template state for E2E tests
     const [showLoopModal, setShowLoopModal] = useState(false);
@@ -49,10 +51,29 @@ function LoopManagement() {
     });
 
     const { toasts, addToast, removeToast } = useToasts();
+
+    // Loops are generated and reviewed per store — an Admin manages one
+    // store's broadcast schedule at a time, matching how a Retailer only
+    // ever sees its own store's loops.
+    useEffect(() => {
+        apiService.getStores().then(data => {
+            const list = data?.stores || data || [];
+            setStores(list);
+            setSelectedStoreId(prev => prev || list[0]?.id || '');
+        }).catch(error => {
+            console.error('Failed to fetch stores:', error);
+        });
+    }, []);
+
     const fetchLoops = useCallback(async () => {
+        if (!selectedStoreId) {
+            setLoops([]);
+            setLoading(false);
+            return;
+        }
         setLoading(true);
         try {
-            const data = await apiService.getLoopsByDate(targetDate);
+            const data = await apiService.getLoopsByDate(targetDate, selectedStoreId);
             const nextLoops = data?.loops || [];
             setLoops(nextLoops);
             const generatedHours = [...new Set(nextLoops.map(loop => loop.hour))].sort((a, b) => a - b);
@@ -72,33 +93,29 @@ function LoopManagement() {
         } finally {
             setLoading(false);
         }
-    }, [addToast, targetDate]);
+    }, [addToast, targetDate, selectedStoreId]);
 
     useEffect(() => {
         fetchLoops();
     }, [fetchLoops]);
 
     const handleGenerate = async () => {
+        const store = stores.find(s => s.id === selectedStoreId);
+        if (!store) {
+            addToast('Select a store to generate loops for.', 'error');
+            return;
+        }
+
         setGenerating(true);
         try {
-            const stores = await apiService.getStores();
-            if (!stores || stores.length === 0) {
-                addToast('No stores found in the system to generate loops for.', 'error');
-                setGenerating(false);
-                return;
-            }
-
-            // Generate persisted Daily Schedules for all Stores simultaneously.
-            await Promise.all(stores.map(store =>
-                apiService.generateLoops({
-                    targetDate,
-                    retailerId: store.retailer_id || 'ret_demo',
-                    storeId: store.id
-                })
-            ));
+            await apiService.generateLoops({
+                targetDate,
+                retailerId: store.retailer_id || 'ret_demo',
+                storeId: store.id
+            });
 
             await fetchLoops();
-            addToast(`Loops generated for ${targetDate} across all stores.`, 'success');
+            addToast(`Loops generated for ${targetDate} at ${store.name}.`, 'success');
         } catch (error) {
             console.error('Failed to generate loops:', error);
             const message = error?.response?.data?.error || error?.message || 'Failed to generate loops.';
@@ -162,6 +179,18 @@ function LoopManagement() {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <select
+                        value={selectedStoreId}
+                        onChange={(e) => setSelectedStoreId(e.target.value)}
+                        aria-label="Target store for loop generation"
+                        className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-surface-dark text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none"
+                        data-testid="loop-store-picker"
+                    >
+                        {stores.length === 0 && <option value="">No stores found</option>}
+                        {stores.map(store => (
+                            <option key={store.id} value={store.id}>{store.name}</option>
+                        ))}
+                    </select>
                     <input
                         type="date"
                         value={targetDate}
@@ -180,7 +209,7 @@ function LoopManagement() {
                     </button>
                     <button
                         onClick={handleGenerate}
-                        disabled={generating}
+                        disabled={generating || !selectedStoreId}
                         aria-label={generating ? 'Generating loops...' : `Generate loops for ${targetDate}`}
                         className="px-4 py-2 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         data-testid="generate-loops-btn"
@@ -366,7 +395,7 @@ function LoopManagement() {
                     </p>
                     <button
                         onClick={handleGenerate}
-                        disabled={generating}
+                        disabled={generating || !selectedStoreId}
                         className="px-6 py-3 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {generating ? 'Generating...' : `Generate Loops for ${targetDate}`}

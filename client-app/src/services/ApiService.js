@@ -246,8 +246,9 @@ class ApiService {
      * @param {string} date - ISO date string, e.g. '2026-06-05'
      * @returns {Promise<Array>} Array of loop objects with id, hour, status, slots, version, screen_ids
      */
-    async getLoopsByDate(date) {
-        return apiClient.get(`/api/loops?date=${date}`);
+    async getLoopsByDate(date, storeId) {
+        const query = storeId ? `&store_id=${storeId}` : '';
+        return apiClient.get(`/api/loops?date=${date}${query}`);
     }
 
     async getScheduleReview(storeId, date) {
