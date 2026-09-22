@@ -11,6 +11,15 @@ const TrafficTierSchema = z.object({
 });
 
 /**
+ * Store Foot-Traffic Tier Schema
+ * Priced per Store from its own `traffic_level`, independent of the hour of day.
+ */
+const StoreTrafficTierSchema = z.object({
+    multiplier: z.number().min(0.1).max(5.0),
+    label: z.string().min(1)
+});
+
+/**
  * Pricing Config Local Schema
  */
 export const PricingConfigSchema = z.object({
@@ -21,6 +30,7 @@ export const PricingConfigSchema = z.object({
     slotDuration: z.number().int().positive().default(5),
     slotsPerLoop: z.number().int().positive().default(12),
     trafficTiers: z.record(z.string(), TrafficTierSchema),
+    storeTrafficTiers: z.record(z.string(), StoreTrafficTierSchema).optional(),
     dateOverrides: z.record(z.string(), z.object({
         multiplier: z.number().min(0.1).max(5.0),
         label: z.string().optional(),

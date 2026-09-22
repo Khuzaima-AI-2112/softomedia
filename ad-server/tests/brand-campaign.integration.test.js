@@ -137,6 +137,61 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
         }
     });
 
+    // A Store's foot-traffic tier prices on top of the hour-of-day tier and the
+    // retailer base CPM override; an unassigned Store stays at 1.0x.
+    test('Bookable Inventory prices each Store by its assigned foot-traffic tier', async () => {
+        const pricingRef = firestore.collection('pricing_config').doc('global');
+        const storeRef = firestore.collection('stores').doc('demo-store-mtl-north');
+        const { cpm_traffic_tier: originalTier = null } = (await storeRef.get()).data() || {};
+
+        await pricingRef.set({
+            baseCPM: 10,
+            trafficTiers: { medium: { multiplier: 1.0, label: 'Medium', color: '#fbbf24', hours: [12] } },
+            storeTrafficTiers: {
+                low: { multiplier: 0.8, label: 'Low traffic' },
+                medium: { multiplier: 1.0, label: 'Standard traffic' },
+                high: { multiplier: 1.5, label: 'High traffic' },
+            },
+            retailerOverrides: {},
+        }, { merge: true });
+
+        try {
+            // A Store describing itself as high-footfall does not reprice; only
+            // an assigned cpm_traffic_tier does.
+            await storeRef.set({ traffic_level: 'high' }, { merge: true });
+            const described = await request(app).get('/api/inventory')
+                .set('Authorization', `Bearer ${brandToken}`);
+            const describedNorth = described.body.items.find(item => item.store.id === 'demo-store-mtl-north');
+            expect(describedNorth.booking_price.store_traffic_multiplier).toBe(1);
+            expect(describedNorth.booking_price.traffic_tiers.find(tier => tier.id === 'medium').price).toBe(10);
+
+            await storeRef.set({ cpm_traffic_tier: 'high' }, { merge: true });
+            const tiered = await request(app).get('/api/inventory')
+                .set('Authorization', `Bearer ${brandToken}`);
+            expect(tiered.status).toBe(200);
+
+            const northern = tiered.body.items.find(item => item.store.id === 'demo-store-mtl-north');
+            expect(northern.store.cpm_traffic_tier).toBe('high');
+            expect(northern.booking_price.store_traffic_multiplier).toBe(1.5);
+            // base 10 x hour tier 1.0 x store tier 1.5
+            expect(northern.booking_price.traffic_tiers.find(tier => tier.id === 'medium').price).toBe(15);
+
+            // A Store the admin never tiered keeps the standard rate.
+            const untiered = tiered.body.items.find(item => item.store.id !== 'demo-store-mtl-north');
+            expect(untiered.booking_price.store_traffic_multiplier).toBe(1);
+            expect(untiered.booking_price.traffic_tiers.find(tier => tier.id === 'medium').price).toBe(10);
+
+            await storeRef.set({ cpm_traffic_tier: 'low' }, { merge: true });
+            const lowered = await request(app).get('/api/inventory')
+                .set('Authorization', `Bearer ${brandToken}`);
+            const loweredNorth = lowered.body.items.find(item => item.store.id === 'demo-store-mtl-north');
+            // base 10 x hour tier 1.0 x store tier 0.8
+            expect(loweredNorth.booking_price.traffic_tiers.find(tier => tier.id === 'medium').price).toBe(8);
+        } finally {
+            await storeRef.set({ cpm_traffic_tier: originalTier, traffic_level: null }, { merge: true });
+        }
+    });
+
     test('Brand submission persists identity-owned creative, Campaign, selection, and Proof-of-Play visibility', async () => {
         const pngBytes = Buffer.from([
             0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,

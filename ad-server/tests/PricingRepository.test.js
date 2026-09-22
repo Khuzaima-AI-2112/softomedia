@@ -266,6 +266,88 @@ describe('PricingRepository', () => {
         });
     });
 
+    describe('storeTrafficMultiplier', () => {
+        test('should default a Store with no assigned tier to the standard 1.0x multiplier', async () => {
+            setupMock(false, null);
+            const config = await repo.getConfig();
+
+            expect(repo.storeTrafficMultiplier(config, null)).toBe(1.0);
+            expect(repo.storeTrafficMultiplier(config, undefined)).toBe(1.0);
+            expect(repo.storeTrafficMultiplier(config, '')).toBe(1.0);
+        });
+
+        test('should apply the configured multiplier for each assigned foot-traffic tier', async () => {
+            setupMock(false, null);
+            const config = await repo.getConfig();
+
+            expect(repo.storeTrafficMultiplier(config, 'high')).toBe(1.5);
+            expect(repo.storeTrafficMultiplier(config, 'medium')).toBe(1.0);
+            expect(repo.storeTrafficMultiplier(config, 'low')).toBe(0.8);
+        });
+
+        test('should fall back to 1.0x for a tier name that is not configured', async () => {
+            setupMock(false, null);
+            const config = await repo.getConfig();
+
+            expect(repo.storeTrafficMultiplier(config, 'nonexistent')).toBe(1.0);
+        });
+
+        test('should honour Super Administrator overrides of the tier multipliers', async () => {
+            setupMock(true, {
+                baseCPM: 10.00,
+                trafficTiers: {},
+                storeTrafficTiers: {
+                    high: { multiplier: 2.0, label: 'High traffic' },
+                    medium: { multiplier: 1.0, label: 'Standard traffic' },
+                    low: { multiplier: 0.5, label: 'Low traffic' },
+                },
+            });
+            const config = await repo.getConfig();
+
+            expect(repo.storeTrafficMultiplier(config, 'high')).toBe(2.0);
+            expect(repo.storeTrafficMultiplier(config, 'low')).toBe(0.5);
+        });
+    });
+
+    describe('storeTrafficTiers config', () => {
+        test('should provide default foot-traffic tiers when none are stored', async () => {
+            setupMock(false, null);
+            const config = await repo.getConfig();
+
+            expect(config.storeTrafficTiers.high.multiplier).toBe(1.5);
+            expect(config.storeTrafficTiers.medium.multiplier).toBe(1.0);
+            expect(config.storeTrafficTiers.low.multiplier).toBe(0.8);
+        });
+
+        test('should normalize snake_case store_traffic_tiers to camelCase', async () => {
+            setupMock(true, {
+                baseCPM: 15.00,
+                trafficTiers: {},
+                store_traffic_tiers: {
+                    high: { multiplier: 1.8, label: 'High traffic' },
+                },
+            });
+
+            const config = await repo.getConfig();
+
+            expect(config.storeTrafficTiers.high.multiplier).toBe(1.8);
+            expect(config.store_traffic_tiers).toBeUndefined();
+        });
+
+        test('should persist updated store traffic tiers in camelCase', async () => {
+            setupMock(true, { baseCPM: 15.00, trafficTiers: {} });
+
+            const result = await repo.updateConfig({
+                store_traffic_tiers: { high: { multiplier: 1.9, label: 'High traffic' } },
+            });
+
+            const updateCall = mockDocSet.mock.calls[0][0];
+            expect(updateCall.storeTrafficTiers.high.multiplier).toBe(1.9);
+            expect(updateCall.store_traffic_tiers).toBeUndefined();
+            expect(result.storeTrafficTiers.high.multiplier).toBe(1.9);
+        });
+    });
+
     describe('Schema Parity', () => {
         test('should handle both snake_case and camelCase inputs', async () => {
             setupMock(true, { baseCPM: 15.00, trafficTiers: {} });

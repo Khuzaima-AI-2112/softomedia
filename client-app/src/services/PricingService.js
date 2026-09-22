@@ -1,4 +1,5 @@
 import apiService from './ApiService';
+import { UNASSIGNED_STORE_TIER, storeTierLabel } from '../constants/storeTrafficTiers';
 
 class PricingService {
     constructor() {
@@ -24,6 +25,12 @@ class PricingService {
             screenOverrides: Object.fromEntries(items.map(item => [
                 item.screen.id,
                 { baseCPM: item.booking_price.base },
+            ])),
+            // Bookable Inventory carries each Store's own tier multiplier; a
+            // Brand is not shown the Super Administrator's tier catalogue.
+            storeTrafficMultipliers: Object.fromEntries(items.map(item => [
+                item.store.id,
+                item.booking_price.store_traffic_multiplier ?? 1.0,
             ])),
         };
         this.screens = items.map(item => ({
@@ -99,6 +106,43 @@ class PricingService {
     }
 
     /**
+     * Get a Store's own foot-traffic tier, which prices its Slots in addition
+     * to the hour-of-day tier. A Store with no tier, or one naming a tier that
+     * is not configured, prices as Standard (1.0x).
+     *
+     * This multiplier is deliberately surfaced in every price it affects and is
+     * editable in the Super Administrator's Pricing Configuration — INC-2026-01-12
+     * traced a pricing discrepancy to an earlier version of it being applied
+     * while invisible.
+     * Read from the Store's explicitly assigned `cpm_traffic_tier`, never its
+     * descriptive `traffic_level`.
+     * @param {string} storeId
+     * @returns {object} { key, multiplier, label }
+     */
+    getStoreTrafficTier(storeId) {
+        if (!storeId) return UNASSIGNED_STORE_TIER;
+
+        const store = this.stores?.find(candidate => candidate.id === storeId);
+        const key = store?.cpm_traffic_tier || null;
+        const suppliedMultiplier = this.config?.storeTrafficMultipliers?.[storeId];
+
+        if (suppliedMultiplier !== undefined) {
+            if (!key) return UNASSIGNED_STORE_TIER;
+            return {
+                key,
+                multiplier: suppliedMultiplier,
+                label: this.config?.storeTrafficTiers?.[key]?.label || storeTierLabel(key),
+            };
+        }
+        if (!key) return UNASSIGNED_STORE_TIER;
+
+        const tier = this.config?.storeTrafficTiers?.[key];
+        return tier
+            ? { key, multiplier: tier.multiplier, label: tier.label }
+            : UNASSIGNED_STORE_TIER;
+    }
+
+    /**
      * Get base CPM for a specific screen, store, or retailer
      * Checks for overrides in order: screen > store > retailer > global
      * @param {string} screenId 
@@ -158,10 +202,9 @@ class PricingService {
         }
 
         // 4. Calculate Final Price
-        // LAYER 3: Removed hidden multipliers (storeTrafficMultiplier)
+        // Store-level foot traffic is not known here; getSlotPrice applies it
+        // per Screen, where the Store is known.
         const finalPrice = baseCPM * tierMultiplier * dateMultiplier;
-
-
 
         return finalPrice;
     }
@@ -195,13 +238,12 @@ class PricingService {
      * - Base CPM (visible in header)
      * - Traffic Tier multiplier (visible in dropdown)
      * - Date Override multiplier (visible in date override section)
-     * 
-     * REMOVED: Store traffic multiplier (was hidden, caused confusion)
-     * 
-     * @param {string} screenId 
+     * - Store foot-traffic tier (visible and editable in Pricing Configuration)
+     *
+     * @param {string} screenId
      * @param {string} date - ISO date string (YYYY-MM-DD)
      * @param {number} hour - Hour of the day (0-23)
-     * @returns {object} { price, baseCPM, trafficTier, multipliers }
+     * @returns {object} { price, baseCPM, trafficTier, storeTrafficTier, multipliers }
      */
     getSlotPrice(screenId, date, hour) {
         const screen = this.screens.find(s => s.id === screenId);
@@ -212,21 +254,20 @@ class PricingService {
         const baseCPM = this.getBaseCPM(screenId, screen.store_id, screen.retailer_id);
         const trafficTier = this.getTrafficTier(hour, date);
         const dateMultiplier = this.getDateMultiplier(date);
+        const storeTrafficTier = this.getStoreTrafficTier(screen.store_id);
 
-        // SIMPLIFIED: Only visible multipliers
-        // Formula: Base CPM × Traffic Tier × Date Multiplier
-        const price = baseCPM * trafficTier.multiplier * dateMultiplier;
-
-
+        // Formula: Base CPM × Traffic Tier × Date Multiplier × Store Traffic Tier
+        const price = baseCPM * trafficTier.multiplier * dateMultiplier * storeTrafficTier.multiplier;
 
         return {
             price: Math.round(price * 100) / 100, // Round to 2 decimal places
             baseCPM,
             trafficTier,
+            storeTrafficTier,
             multipliers: {
                 traffic: trafficTier.multiplier,
-                date: dateMultiplier
-                // NOTE: storeTraffic REMOVED - was hidden from UI
+                date: dateMultiplier,
+                storeTraffic: storeTrafficTier.multiplier
             }
         };
     }
@@ -467,6 +508,13 @@ class PricingService {
             this.config.dateOverrides = newConfig.dateOverrides;
         } else if (newConfig.date_overrides !== undefined) {
             this.config.dateOverrides = newConfig.date_overrides;
+        }
+
+        // Explicitly update storeTrafficTiers
+        if (newConfig.storeTrafficTiers !== undefined) {
+            this.config.storeTrafficTiers = newConfig.storeTrafficTiers;
+        } else if (newConfig.store_traffic_tiers !== undefined) {
+            this.config.storeTrafficTiers = newConfig.store_traffic_tiers;
         }
 
         // Explicitly update retailerOverrides

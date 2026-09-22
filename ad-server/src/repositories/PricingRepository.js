@@ -15,8 +15,19 @@ const DEFAULT_PRICING = {
         low: { multiplier: 0.7, label: 'Low', color: '#94a3b8', hours: [8, 9, 10, 11, 19, 20] },
         medium: { multiplier: 1.0, label: 'Medium', color: '#fbbf24', hours: [14, 15, 16] },
         high: { multiplier: 1.5, label: 'High', color: '#22c55e', hours: [12, 13, 17, 18] }
+    },
+    // Per-Store foot-traffic tiers, keyed by the Store's assigned
+    // `cpm_traffic_tier` — never its descriptive `traffic_level`.
+    // Distinct from `trafficTiers`, which price the hour of day.
+    storeTrafficTiers: {
+        low: { multiplier: 0.8, label: 'Low traffic' },
+        medium: { multiplier: 1.0, label: 'Standard traffic' },
+        high: { multiplier: 1.5, label: 'High traffic' }
     }
 };
+
+/** A Store with no assigned foot-traffic tier prices as Standard. */
+export const DEFAULT_STORE_TRAFFIC_MULTIPLIER = 1.0;
 
 export class PricingRepositoryClass extends BaseRepository {
     constructor() {
@@ -56,10 +67,34 @@ export class PricingRepositoryClass extends BaseRepository {
             };
         }
 
+        const rawStoreTiers = data.storeTrafficTiers
+            || data.store_traffic_tiers
+            || DEFAULT_PRICING.storeTrafficTiers;
+        normalized.storeTrafficTiers = Object.fromEntries(Object.entries(rawStoreTiers)
+            .map(([key, val]) => [key, {
+                multiplier: val.multiplier ?? DEFAULT_STORE_TRAFFIC_MULTIPLIER,
+                label: val.label || key.charAt(0).toUpperCase() + key.slice(1),
+            }]));
+
         normalized.dateOverrides = data.dateOverrides || data.date_overrides || {};
         normalized.retailerOverrides = data.retailerOverrides || data.retailer_overrides || {};
 
         return normalized;
+    }
+
+    /**
+     * The multiplier a Store's assigned foot-traffic tier contributes. It
+     * applies in addition to the hour-of-day tier and the retailer base CPM
+     * override. A Store with no tier assigned, or one naming a tier that is not
+     * configured, prices as Standard, so no Store reprices until an
+     * administrator assigns it a tier.
+     * @param {object} config - Pricing configuration from getConfig()
+     * @param {string|null} assignedTier - The Store's `cpm_traffic_tier`
+     */
+    storeTrafficMultiplier(config, assignedTier) {
+        if (!assignedTier) return DEFAULT_STORE_TRAFFIC_MULTIPLIER;
+        return config?.storeTrafficTiers?.[assignedTier]?.multiplier
+            ?? DEFAULT_STORE_TRAFFIC_MULTIPLIER;
     }
 
     /**
@@ -94,6 +129,7 @@ export class PricingRepositoryClass extends BaseRepository {
         const normalizedUpdates = { ...updates };
         if (updates.base_cpm !== undefined) { normalizedUpdates.baseCPM = updates.base_cpm; delete normalizedUpdates.base_cpm; }
         if (updates.traffic_tiers !== undefined) { normalizedUpdates.trafficTiers = updates.traffic_tiers; delete normalizedUpdates.traffic_tiers; }
+        if (updates.store_traffic_tiers !== undefined) { normalizedUpdates.storeTrafficTiers = updates.store_traffic_tiers; delete normalizedUpdates.store_traffic_tiers; }
         if (updates.date_overrides !== undefined) { normalizedUpdates.dateOverrides = updates.date_overrides; delete normalizedUpdates.date_overrides; }
         if (updates.retailer_overrides !== undefined) { normalizedUpdates.retailerOverrides = updates.retailer_overrides; delete normalizedUpdates.retailer_overrides; }
 
@@ -114,7 +150,7 @@ export class PricingRepositoryClass extends BaseRepository {
         };
 
         // 3. Cleanup: ensure strict camelCase normalization
-        const keysToRemove = ['base_cpm', 'traffic_tiers', 'date_overrides', 'retailer_overrides', 'slot_duration', 'slots_per_loop'];
+        const keysToRemove = ['base_cpm', 'traffic_tiers', 'store_traffic_tiers', 'date_overrides', 'retailer_overrides', 'slot_duration', 'slots_per_loop'];
         keysToRemove.forEach(key => {
             if (finalConfig[key] !== undefined) delete finalConfig[key];
         });
