@@ -153,6 +153,30 @@ describeWithEmulators('media access with Firebase emulators', () => {
         }
     });
 
+    test('a Retailer reads the creative assigned to a Slot in its Store\'s Loop, even without a booked Campaign; no other Retailer does', async () => {
+        const asset = await brandUpload('Loop-assigned creative');
+        const loopId = `media-access-loop-${Date.now()}`;
+        await firestore.collection('loops').doc(loopId).set({
+            date: '2030-01-16',
+            hour: 9,
+            retailer_id: 'demo-retailer-freshmart',
+            store_id: 'demo-store-mtl-north',
+            status: 'pending_approval',
+            slots: [{ position: 0, asset_id: asset.id, duration: 5, status: 'pending' }],
+        });
+
+        try {
+            const path = `/api/assets/${asset.id}/content`;
+            const [reviewer, otherRetailer] = await Promise.all([
+                binary(as('retaileradmin', request(app).get(path))),
+                as('secondaryRetailer', request(app).get(path)),
+            ]);
+            expect([reviewer.status, otherRetailer.status]).toEqual([200, 404]);
+        } finally {
+            await firestore.collection('loops').doc(loopId).delete();
+        }
+    });
+
     test('a Screen reads approved playback media with its device key, but not media awaiting approval', async () => {
         const screenId = `media-access-screen-${Date.now()}`;
         const registration = await as('techoperator', request(app).post('/api/screens')).send({

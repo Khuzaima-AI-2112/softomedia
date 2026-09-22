@@ -6,6 +6,7 @@
 
 import { useState } from 'react';
 import StatusBadge from './StatusBadge';
+import LoopPlaybackPreview from './LoopPlaybackPreview';
 import apiClient from '../services/api';
 
 // Rejection reasons dropdown options
@@ -30,6 +31,7 @@ function LoopPreviewModal({ loop, onClose, onRefresh, approvalOpen = true }) {
     const [rejectionReason, setRejectionReason] = useState('');
     const [saving, setSaving] = useState(false);
     const [actionError, setActionError] = useState('');
+    const [showPlayback, setShowPlayback] = useState(false);
 
     const handleRejectSlot = async (position) => {
         if (!rejectionReason) {
@@ -96,6 +98,14 @@ function LoopPreviewModal({ loop, onClose, onRefresh, approvalOpen = true }) {
                             loop.status?.toLowerCase() === 'approved' ? 'Active' :
                                 loop.status?.toLowerCase() === 'pending_approval' ? 'Warning' : 'Offline'
                         } />
+                        <button
+                            onClick={() => setShowPlayback(true)}
+                            data-testid="btn-preview-playback"
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">play_circle</span>
+                            Preview Loop
+                        </button>
                         <button
                             onClick={onClose}
                             data-testid="btn-modal-close" className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -199,6 +209,11 @@ function LoopPreviewModal({ loop, onClose, onRefresh, approvalOpen = true }) {
                     <div role="alert" className="px-6 py-3 bg-red-50 text-red-700" data-testid="approval-action-error">
                         {actionError}
                     </div>
+                )}
+
+                {/* Loop Playback Preview — plays the loop's currently assigned Slot assets in real broadcast order */}
+                {showPlayback && (
+                    <LoopPlaybackPreview slots={slots} onClose={() => setShowPlayback(false)} />
                 )}
 
                 {/* Rejection Reason Modal */}
