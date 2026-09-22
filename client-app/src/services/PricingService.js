@@ -312,7 +312,11 @@ class PricingService {
             case 'high': baseImpressions *= 1.8; break;
         }
 
-        // Adjust by store traffic level
+        // Adjust by the Store's descriptive foot traffic. These factors estimate
+        // audience, not price: they are deliberately independent of the
+        // storeTrafficTiers multipliers, which bill against the separately
+        // assigned `cpm_traffic_tier`. Do not reconcile the two — describing a
+        // Store as busy must never move what it charges.
         if (store?.traffic_level === 'high') baseImpressions *= 1.5;
         else if (store?.traffic_level === 'low') baseImpressions *= 0.7;
 

@@ -9,6 +9,7 @@ import {
     StoreRepository,
 } from '../repositories/index.js';
 import { campaignService } from '../services/CampaignService.js';
+import { resolveAgreedCpm } from '../services/CampaignPricingService.js';
 import { authenticate } from '../middleware/auth.js';
 import {
     PERMISSIONS,
@@ -279,14 +280,19 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, RO
             inventory_selection: req.body.inventory_selection,
             selected_slots: Array.isArray(req.body.selected_slots) ? req.body.selected_slots : [],
         } : req.body;
+        const bookedAt = new Date().toISOString();
         const campaignData = {
             ...submittedData,
             // T5: a Brand's ownership is stamped by createForBrand from its identity;
             // a Campaign prepared for an advertiser uses the advertiser named above.
             ...(preparedForAdvertiser ? { advertiser_id: req.body.advertiser_id } : {}),
+            // The rate is struck now and billed later: re-tiering a Store never
+            // re-prices a Campaign already booked against it.
+            agreed_cpm: await resolveAgreedCpm(submittedData),
+            agreed_cpm_at: bookedAt,
             // Every Campaign awaits Retailer approval; no administrative override.
             status: 'pending_approval',
-            created_at: new Date().toISOString()
+            created_at: bookedAt
         };
         const campaign = brandCaller
             ? await campaignRepository.createForBrand(id, campaignData, brandOwnerId)

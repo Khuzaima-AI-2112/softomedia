@@ -24,6 +24,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
     let storage;
     let brandToken;
     let secondaryBrandToken;
+    let adminToken;
     const createdCampaignIds = [];
     const createdMediaIds = [];
     const createdObjectNames = [];
@@ -50,9 +51,10 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
 
         const { provisionDemoPersonas } = await import('../src/services/DemoPersonaProvisioner.js');
         await provisionDemoPersonas({ password, expectedProjectId: 'softomedia-demo' });
-        [brandToken, secondaryBrandToken] = await Promise.all([
+        [brandToken, secondaryBrandToken, adminToken] = await Promise.all([
             signIn('brand@demo.softomedia.test', password),
             signIn('brand-secondary@demo.softomedia.test', password),
+            signIn('admin@demo.softomedia.test', password),
         ]);
         ({ default: app } = await import('../index.js'));
     });
@@ -189,6 +191,82 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
             expect(loweredNorth.booking_price.traffic_tiers.find(tier => tier.id === 'medium').price).toBe(8);
         } finally {
             await storeRef.set({ cpm_traffic_tier: originalTier, traffic_level: null }, { merge: true });
+        }
+    });
+
+    // AC4: re-tiering a Store must not re-price a Campaign already booked.
+    test('a Campaign is invoiced at the CPM it was booked at, not the tier in force later', async () => {
+        const pricingRef = firestore.collection('pricing_config').doc('global');
+        const storeRef = firestore.collection('stores').doc('demo-store-mtl-north');
+        const { cpm_traffic_tier: originalTier = null } = (await storeRef.get()).data() || {};
+
+        await pricingRef.set({
+            baseCPM: 10,
+            storeTrafficTiers: {
+                low: { multiplier: 0.8, label: 'Low traffic' },
+                medium: { multiplier: 1.0, label: 'Standard traffic' },
+                high: { multiplier: 1.5, label: 'High traffic' },
+            },
+            retailerOverrides: {},
+        }, { merge: true });
+
+        let bookedCampaignId = null;
+        try {
+            await storeRef.set({ cpm_traffic_tier: 'high' }, { merge: true });
+
+            const upload = await request(app).post('/api/assets/upload')
+                .set('Authorization', `Bearer ${brandToken}`)
+                .field('title', 'Booked rate creative')
+                .field('category', 'paid')
+                .field('duration', '5')
+                .attach('file', Buffer.from([
+                    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+                    ...Buffer.from('booked rate creative'),
+                ]), { filename: 'booked.png', contentType: 'image/png' });
+            expect(upload.status).toBe(201);
+            createdMediaIds.push(upload.body.id);
+
+            const booked = await request(app).post('/api/campaigns')
+                .set('Authorization', `Bearer ${brandToken}`)
+                .send({
+                    name: 'Booked at the high tier',
+                    media_id: upload.body.id,
+                    start_date: '2030-01-16',
+                    end_date: '2030-01-17',
+                    budget: 500,
+                    inventory_selection: [{
+                        retailer_id: 'demo-retailer-freshmart',
+                        store_id: 'demo-store-mtl-north',
+                        location_id: 'demo-location-mtl-entrance',
+                        screen_id: 'demo-screen-north-1',
+                    }],
+                });
+            expect(booked.status).toBe(201);
+            bookedCampaignId = booked.body.id;
+            // base 10 x store tier 1.5
+            expect(booked.body.agreed_cpm).toBe(15);
+            expect(booked.body.agreed_cpm_at).toEqual(expect.any(String));
+
+            // The Store is re-tiered downward and the Campaign completes.
+            await storeRef.set({ cpm_traffic_tier: 'low' }, { merge: true });
+            await firestore.collection('campaigns').doc(booked.body.id)
+                .set({ status: 'completed', impressionsDelivered: 2000 }, { merge: true });
+
+            const invoice = await request(app).post('/api/invoices/generate')
+                .set('Authorization', `Bearer ${adminToken}`)
+                .send({ campaignId: booked.body.id });
+            expect(invoice.status).toBe(201);
+            // Billed at the booked 15.00, not the 8.00 the Store is worth now.
+            expect(invoice.body.cpmRate).toBe(15);
+            expect(invoice.body.amount).toBe(30); // 2000 x 15 / 1000
+            await firestore.collection('invoices').doc(invoice.body.invoiceId).delete();
+        } finally {
+            await storeRef.set({ cpm_traffic_tier: originalTier }, { merge: true });
+            // Removed here, not in afterAll: a sibling test asserts this Brand
+            // owns exactly one Campaign.
+            if (bookedCampaignId) {
+                await firestore.collection('campaigns').doc(bookedCampaignId).delete();
+            }
         }
     });
 

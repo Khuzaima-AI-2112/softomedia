@@ -47,16 +47,21 @@ router.post('/generate', requirePermission(PERMISSIONS.INVOICE_GENERATE), async 
             return res.status(400).json({ error: 'Campaign must be completed' });
         }
 
-        // Fetch CPM rate from pricing config
-        let cpmRate = 15.00; // safe default
-        try {
-            const pricingConfig = await PricingRepository.getConfig();
-            const screenType = campaign.screen_type || 'default';
-            cpmRate = pricingConfig?.cpm_rates?.[screenType]
-                   ?? pricingConfig?.baseCPM
-                   ?? 15.00;
-        } catch {
-            // Use default rate if pricing config unavailable
+        // Bill the rate struck when the Campaign was booked, so re-tiering a
+        // Store never re-prices a Campaign that has already run. Campaigns
+        // booked before the rate was recorded keep the configured rate.
+        let cpmRate = campaign.agreed_cpm;
+        if (typeof cpmRate !== 'number') {
+            cpmRate = 15.00; // safe default
+            try {
+                const pricingConfig = await PricingRepository.getConfig();
+                const screenType = campaign.screen_type || 'default';
+                cpmRate = pricingConfig?.cpm_rates?.[screenType]
+                       ?? pricingConfig?.baseCPM
+                       ?? 15.00;
+            } catch {
+                // Use default rate if pricing config unavailable
+            }
         }
 
         const impressionsDelivered = campaign.impressionsDelivered ?? campaign.impressions_delivered ?? 0;
