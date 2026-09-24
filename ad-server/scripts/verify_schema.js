@@ -41,6 +41,7 @@ async function verifySchema() {
         const map = {
             'base_cpm': 'baseCPM',
             'traffic_tiers': 'trafficTiers',
+            'store_traffic_tiers': 'storeTrafficTiers',
             'date_overrides': 'dateOverrides',
             'retailer_overrides': 'retailerOverrides',
             'updated_at': 'updatedAt'

@@ -1,5 +1,6 @@
 import express from 'express';
 import StoreRepository from '../repositories/StoreRepository.js';
+import PricingRepository from '../repositories/PricingRepository.js';
 import { BusinessHoursService } from '../services/BusinessHoursService.js';
 import { authenticate } from '../middleware/auth.js';
 import { PERMISSIONS, userHasPermission } from '../middleware/requireRole.js';
@@ -21,6 +22,21 @@ const DEFAULT_WEEKLY_HOURS = Object.freeze(
 );
 
 router.use(authenticate);
+
+/**
+ * An unrecognised tier would price silently at 1.0x, so a Store is only ever
+ * assigned a tier the pricing configuration actually defines. `null` clears the
+ * assignment and returns the Store to the standard rate.
+ */
+async function invalidCpmTier(tier) {
+    if (tier === null) return null;
+    const { storeTrafficTiers } = await PricingRepository.getConfig();
+    const configured = Object.keys(storeTrafficTiers || {});
+    if (typeof tier !== 'string' || !configured.includes(tier)) {
+        return `cpm_traffic_tier must be null or one of: ${configured.join(', ')}`;
+    }
+    return null;
+}
 
 function isValidTimeZone(timeZone) {
     if (typeof timeZone !== 'string' || !timeZone.trim()) return false;
@@ -102,6 +118,17 @@ async function updateStore(req, res) {
         if (req.body.retailer_id && req.body.retailer_id !== store.retailer_id) return denyStoreAccess(res);
         if (req.body.time_zone && !isValidTimeZone(req.body.time_zone)) {
             return res.status(400).json({ error: 'time_zone must be a valid IANA time zone' });
+        }
+        // The CPM traffic tier prices this Store's Slots, so only platform
+        // governance assigns it. Re-submitting the current tier is not a change.
+        const changesCpmTier = req.body.cpm_traffic_tier !== undefined
+            && req.body.cpm_traffic_tier !== store.cpm_traffic_tier;
+        if (changesCpmTier) {
+            if (!userHasPermission(req.user, PERMISSIONS.PLATFORM_GOVERNANCE)) {
+                return denyStoreAccess(res);
+            }
+            const tierError = await invalidCpmTier(req.body.cpm_traffic_tier);
+            if (tierError) return res.status(400).json({ error: tierError });
         }
         return res.json(await StoreRepository.update(store.id, req.body));
     } catch (error) {

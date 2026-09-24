@@ -121,4 +121,94 @@ describeWithAuthEmulator('Retailer Administrator store management', () => {
         expect(administratorRead.status).toBe(200);
         expect(administratorRead.body.name).toBe('Secondary Retailer Store');
     });
+
+    // A Store's CPM traffic tier prices its Slots, so only the Super
+    // Administrator sets it — a Retailer must not rate its own inventory.
+    it('lets only a Super Administrator assign a Store’s CPM traffic tier', async () => {
+        const { headers: superadminHeaders } = await signInAs('superadmin');
+        const created = await request(app)
+            .post('/api/stores')
+            .set(retailerHeaders)
+            .send({
+                name: 'Tiered Store',
+                retailer_id: retailerId,
+                time_zone: 'America/Toronto',
+                // Creation must not be a way around the assignment guard.
+                cpm_traffic_tier: 'high',
+            });
+        expect(created.status).toBe(201);
+        // A new Store carries no tier, so it prices at the standard rate.
+        expect(created.body.cpm_traffic_tier).toBeUndefined();
+
+        const byRetailer = await request(app)
+            .patch(`/api/stores/${created.body.id}`)
+            .set(retailerHeaders)
+            .send({ cpm_traffic_tier: 'high' });
+        expect(byRetailer.status).toBe(403);
+
+        const byAdmin = await request(app)
+            .patch(`/api/stores/${created.body.id}`)
+            .set(adminHeaders)
+            .send({ cpm_traffic_tier: 'high' });
+        expect(byAdmin.status).toBe(403);
+
+        const bySuperadmin = await request(app)
+            .patch(`/api/stores/${created.body.id}`)
+            .set(superadminHeaders)
+            .send({ cpm_traffic_tier: 'high' });
+        expect(bySuperadmin.status).toBe(200);
+        expect(bySuperadmin.body.cpm_traffic_tier).toBe('high');
+
+        // An unchanged tier echoed back with an ordinary edit is not a change.
+        const unrelatedEdit = await request(app)
+            .patch(`/api/stores/${created.body.id}`)
+            .set(retailerHeaders)
+            .send({ name: 'Tiered Store Renamed', cpm_traffic_tier: 'high' });
+        expect(unrelatedEdit.status).toBe(200);
+        expect(unrelatedEdit.body.name).toBe('Tiered Store Renamed');
+
+        // Clearing the assignment returns the Store to the standard rate.
+        const cleared = await request(app)
+            .patch(`/api/stores/${created.body.id}`)
+            .set(superadminHeaders)
+            .send({ cpm_traffic_tier: null });
+        expect(cleared.status).toBe(200);
+        expect(cleared.body.cpm_traffic_tier).toBeNull();
+    });
+
+    // An unrecognised tier would price silently at 1.0x — INC-2026-01-12.
+    it('refuses a CPM traffic tier the pricing configuration does not define', async () => {
+        const { headers: superadminHeaders } = await signInAs('superadmin');
+        const created = await request(app)
+            .post('/api/stores')
+            .set(retailerHeaders)
+            .send({ name: 'Mistyped Tier Store', retailer_id: retailerId, time_zone: 'America/Toronto' });
+
+        const mistyped = await request(app)
+            .patch(`/api/stores/${created.body.id}`)
+            .set(superadminHeaders)
+            .send({ cpm_traffic_tier: 'hgih' });
+        expect(mistyped.status).toBe(400);
+        expect(mistyped.body.error).toMatch(/cpm_traffic_tier must be null or one of/);
+
+        const reread = await request(app).get(`/api/stores/${created.body.id}`).set(superadminHeaders);
+        expect(reread.body.cpm_traffic_tier).toBeUndefined();
+    });
+
+    // The Store's descriptive traffic level never moved a price and still does not.
+    it('leaves the descriptive traffic_level freely editable and non-pricing', async () => {
+        const created = await request(app)
+            .post('/api/stores')
+            .set(retailerHeaders)
+            .send({ name: 'Descriptor Store', retailer_id: retailerId, time_zone: 'America/Toronto' });
+
+        const described = await request(app)
+            .patch(`/api/stores/${created.body.id}`)
+            .set(retailerHeaders)
+            .send({ traffic_level: 'high' });
+        expect(described.status).toBe(200);
+        expect(described.body.traffic_level).toBe('high');
+        // Describing foot traffic does not assign a pricing tier.
+        expect(described.body.cpm_traffic_tier).toBeUndefined();
+    });
 });

@@ -52,12 +52,19 @@ router.get('/', async (req, res) => {
 
             const baseCPM = pricing.retailerOverrides?.[retailer.id]?.baseCPM
                 || pricing.baseCPM;
+            // The Store's assigned foot-traffic tier prices on top of the
+            // hour-of-day tier and the retailer base CPM override. It is the
+            // explicitly assigned `cpm_traffic_tier`, never the Store's
+            // descriptive `traffic_level`, so no Store reprices until an
+            // administrator assigns it a tier.
+            const storeTrafficMultiplier = PricingRepository
+                .storeTrafficMultiplier(pricing, store.cpm_traffic_tier);
             const trafficTiers = Object.entries(pricing.trafficTiers || {}).map(([id, tier]) => ({
                 id,
                 label: tier.label,
                 multiplier: tier.multiplier,
                 hours: tier.hours,
-                price: Math.round(baseCPM * tier.multiplier * 100) / 100,
+                price: Math.round(baseCPM * tier.multiplier * storeTrafficMultiplier * 100) / 100,
             }));
 
             return [{
@@ -69,6 +76,7 @@ router.get('/', async (req, res) => {
                     city: store.city || '',
                     country: store.country || '',
                     time_zone: store.time_zone,
+                    cpm_traffic_tier: store.cpm_traffic_tier || null,
                 },
                 location: { id: location.id, name: location.name },
                 screen: {
@@ -84,7 +92,10 @@ router.get('/', async (req, res) => {
                 booking_price: {
                     currency: pricing.currency,
                     unit: 'CPM',
+                    // `base` is the unmultiplied CPM; each traffic_tiers[].price
+                    // is already fully resolved, store tier included.
                     base: baseCPM,
+                    store_traffic_multiplier: storeTrafficMultiplier,
                     traffic_tiers: trafficTiers,
                     date_overrides: Object.fromEntries(Object.entries(pricing.dateOverrides || {})
                         .map(([date, override]) => [date, {
