@@ -38,11 +38,12 @@ function RetailerDashboard() {
     const loadStats = async () => {
         setLoading(true);
         try {
-            const [stores, screens, loops] = await Promise.all([
+            const [stores, screens, loopsResponse] = await Promise.all([
                 apiService.getStores(),
                 apiService.getScreens(),
                 apiService.getLoops()
             ]);
+            const loops = Array.isArray(loopsResponse) ? loopsResponse : (loopsResponse?.loops || []);
 
             setStats({
                 stores: stores.length,

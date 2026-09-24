@@ -38,12 +38,6 @@ function AdminOverview() {
         try {
             setLoading(true);
 
-            try {
-                await pricingService.init();
-            } catch (err) {
-                console.error('[AdminOverview] PricingService init failed:', err);
-            }
-
             const [allRetailers, allAdvertisers, allScreens, allLoops, allUsers] = await Promise.all([
                 apiService.getRetailers().catch(() => []),
                 apiService.getAdvertisers().catch(() => []),
@@ -57,7 +51,7 @@ function AdminOverview() {
             const safeRetailers = Array.isArray(allRetailers) ? allRetailers : [];
             const safeAdvertisers = Array.isArray(allAdvertisers) ? allAdvertisers : [];
             const safeScreens = Array.isArray(allScreens) ? allScreens : [];
-            const safeLoops = Array.isArray(allLoops) ? allLoops : [];
+            const safeLoops = Array.isArray(allLoops) ? allLoops : (allLoops?.loops || []);
             const safeUsers = Array.isArray(allUsers) ? allUsers : [];
 
             setRetailers(safeRetailers.slice(0, 4));

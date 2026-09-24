@@ -355,6 +355,10 @@ class ApiService {
     // BUSINESS HOURS
     // ============================================
 
+    async getEffectiveHours(storeId, date) {
+        return apiClient.get(`/api/stores/${storeId}/hours?date=${date}`);
+    }
+
     async getWeeklyHours(storeId) {
         return apiClient.get(`/api/stores/${storeId}/weekly-hours`);
     }

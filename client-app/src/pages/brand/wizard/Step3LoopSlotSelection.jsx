@@ -29,6 +29,8 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
     const [loading, setLoading] = useState(true);
     const [loops, setLoops] = useState([]);
     const [hasRealInventory, setHasRealInventory] = useState(true);
+    // Loops name the campaigns in each slot, so the API refuses them to Brands (#24).
+    const [loopsUnavailable, setLoopsUnavailable] = useState(null); // null | 'forbidden' | 'error'
     const [businessHoursRange, setBusinessHoursRange] = useState({ start: 8, end: 22, is_closed: false });
 
     const businessHours = useMemo(() => {
@@ -71,6 +73,7 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
             const activeLoops = Array.isArray(response) ? response : (response.loops || []);
             const newRange = response.business_hours || FALLBACK_HOURS;
 
+            setLoopsUnavailable(null);
             setHasRealInventory(activeLoops.length > 0);
 
             setBusinessHoursRange(newRange);
@@ -81,6 +84,8 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
 
         } catch (error) {
             console.error('[Diagnostic] Failed to load loops:', error);
+            setLoops([]);
+            setLoopsUnavailable(error.status === 403 ? 'forbidden' : 'error');
         }
     };
 
@@ -239,7 +244,7 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
                 ))}
             </div>
 
-            {!hasRealInventory && !businessHoursRange.is_closed && (
+            {!loopsUnavailable && !hasRealInventory && !businessHoursRange.is_closed && (
                 <div className="bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 p-4 rounded-xl border border-amber-200 dark:border-amber-800 flex items-center gap-3">
                     <span className="material-symbols-outlined text-2xl">warning</span>
                     <div>
@@ -249,7 +254,22 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
                 </div>
             )}
 
-            {businessHoursRange.is_closed ? (
+            {loopsUnavailable ? (
+                <GlassCard className="py-12 text-center" data-testid="slots-unavailable">
+                    <h3 className="text-lg font-bold mb-2">
+                        {loopsUnavailable === 'forbidden'
+                            ? 'Slot times are assigned after approval'
+                            : 'Slot availability could not be loaded'}
+                    </h3>
+                    <p className="text-slate-500">
+                        {loopsUnavailable === 'forbidden'
+                            ? "Individual slot availability isn't shown for this account. "
+                            : 'Try another date, or come back later. '}
+                        You can continue to book the selected screens for your campaign dates; the
+                        network scheduler places your ad in hourly loops once the retailer approves it.
+                    </p>
+                </GlassCard>
+            ) : businessHoursRange.is_closed ? (
                 <GlassCard className="py-16 text-center">
                     <h3 className="text-xl font-bold mb-2 text-red-500">Store is Closed</h3>
                     <p className="text-slate-500">Pick another date.</p>
