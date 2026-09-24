@@ -6,6 +6,7 @@ import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import apiService from '../../services/ApiService';
 import pricingService from '../../services/PricingService';
+import { loopListFrom } from '../../services/loopList';
 
 function AdminOverview() {
     const navigate = useNavigate();
@@ -51,7 +52,7 @@ function AdminOverview() {
             const safeRetailers = Array.isArray(allRetailers) ? allRetailers : [];
             const safeAdvertisers = Array.isArray(allAdvertisers) ? allAdvertisers : [];
             const safeScreens = Array.isArray(allScreens) ? allScreens : [];
-            const safeLoops = Array.isArray(allLoops) ? allLoops : (allLoops?.loops || []);
+            const safeLoops = loopListFrom(allLoops);
             const safeUsers = Array.isArray(allUsers) ? allUsers : [];
 
             setRetailers(safeRetailers.slice(0, 4));
@@ -93,14 +94,15 @@ function AdminOverview() {
 
     // Phase 3: Users quick-action tile only shown to superadmin
     const baseActions = [
-        { label: 'CPM Pricing', icon: 'attach_money', path: '/dashboard/admin/pricing', color: 'emerald' },
         { label: 'Retailers', icon: 'storefront', path: '/dashboard/admin/retailers', color: 'amber' },
         { label: 'Advertisers', icon: 'campaign', path: '/dashboard/admin/advertisers', color: 'rose' },
         { label: 'Store Hours', icon: 'schedule', path: '/dashboard/admin/hours', color: 'indigo' },
         { label: 'Network Map', icon: 'map', path: '/dashboard/admin/map', color: 'cyan' },
     ];
 
+    // Pricing needs platform.governance, which Admin does not hold (#23).
     const superAdminOnlyActions = [
+        { label: 'CPM Pricing', icon: 'attach_money', path: '/dashboard/admin/pricing', color: 'emerald' },
         { label: 'Screens', icon: 'monitor', path: '/dashboard/admin/screens', color: 'slate' },
         { label: 'Users', icon: 'people', path: '/dashboard/admin/users', color: 'blue' },
     ];

@@ -6,6 +6,7 @@ import SupportTicketModal from '../../components/SupportTicketModal';
 import LocationManager from '../../components/LocationManager';
 import CampaignApprovalList from '../../components/CampaignApprovalList';
 import apiService from '../../services/ApiService';
+import { loopListFrom } from '../../services/loopList';
 
 /**
  * RetailerDashboard
@@ -43,7 +44,7 @@ function RetailerDashboard() {
                 apiService.getScreens(),
                 apiService.getLoops()
             ]);
-            const loops = Array.isArray(loopsResponse) ? loopsResponse : (loopsResponse?.loops || []);
+            const loops = loopListFrom(loopsResponse);
 
             setStats({
                 stores: stores.length,

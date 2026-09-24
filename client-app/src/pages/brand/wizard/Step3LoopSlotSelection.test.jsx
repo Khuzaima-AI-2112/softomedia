@@ -33,7 +33,9 @@ describe('Brand wizard slot step', () => {
 
         renderStep();
 
-        expect(await screen.findByText('Slot times are assigned after approval')).toBeTruthy();
+        expect(await screen.findByText('Slot times are set when the schedule is prepared')).toBeTruthy();
+        // Phase 1 order: the schedule is prepared first, then the Retailer approves it.
+        expect(screen.getByText(/when the store's schedule is prepared, and the retailer then approves/)).toBeTruthy();
         expect(screen.queryByText(/0\/0 slots/)).toBeNull();
         expect(screen.getByRole('button', { name: 'Continue with selected screens' })).toBeTruthy();
     });
@@ -56,6 +58,6 @@ describe('Brand wizard slot step', () => {
         renderStep();
 
         expect(await screen.findByText('12/12 slots')).toBeTruthy();
-        expect(screen.queryByText('Slot times are assigned after approval')).toBeNull();
+        expect(screen.queryByTestId('slots-unavailable')).toBeNull();
     });
 });
