@@ -3,6 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import { campaignRepository, mediaRepository } from '../repositories/index.js';
+import { loopRepository } from '../repositories/LoopRepository.js';
 import { deleteMediaObject, uploadMediaObject } from '../utils/storage.js';
 import { ROLES, normalizeRole } from '../constants/roles.js';
 import { sendMediaContent } from './mediaContent.js';
@@ -148,6 +149,13 @@ async function isUnderReviewBy(asset, retailerId) {
         && campaignRepository.targetsRetailer(campaign, retailerId));
 }
 
+/** A Retailer previews any asset currently assigned to a Slot in one of its Loops. */
+async function isAssignedToRetailerLoop(asset, retailerId) {
+    if (!retailerId) return false;
+    const loops = await loopRepository.findAll({ where: [['retailer_id', '==', retailerId]] });
+    return loops.some(loop => (loop.slots || []).some(slot => slot.asset_id === asset.id));
+}
+
 /**
  * GET /api/assets/:id/content
  * The asset's file, for a signed-in user allowed to see the asset. Media that
@@ -160,7 +168,8 @@ router.get('/:id/content', async (req, res) => {
     const visible = asset && (
         PLATFORM_MEDIA_ROLES.has(role)
         || (role === ROLES.BRAND && asset.owner_type === 'brand' && asset.owner_id === ownerId)
-        || (role === ROLES.RETAILERADMIN && await isUnderReviewBy(asset, ownerId))
+        || (role === ROLES.RETAILERADMIN
+            && (await isUnderReviewBy(asset, ownerId) || await isAssignedToRetailerLoop(asset, ownerId)))
     );
     if (!visible) return res.status(404).json({ error: 'Media not found' });
     return sendMediaContent(res, asset);
