@@ -6,6 +6,7 @@ import SupportTicketModal from '../../components/SupportTicketModal';
 import LocationManager from '../../components/LocationManager';
 import CampaignApprovalList from '../../components/CampaignApprovalList';
 import apiService from '../../services/ApiService';
+import { loopListFrom } from '../../services/loopList';
 
 /**
  * RetailerDashboard
@@ -38,11 +39,12 @@ function RetailerDashboard() {
     const loadStats = async () => {
         setLoading(true);
         try {
-            const [stores, screens, loops] = await Promise.all([
+            const [stores, screens, loopsResponse] = await Promise.all([
                 apiService.getStores(),
                 apiService.getScreens(),
                 apiService.getLoops()
             ]);
+            const loops = loopListFrom(loopsResponse);
 
             setStats({
                 stores: stores.length,

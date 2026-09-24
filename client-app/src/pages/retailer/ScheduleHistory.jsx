@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import apiService from '../../services/ApiService';
+import { loopListFrom } from '../../services/loopList';
 import { useAuth } from '../../contexts/AuthContext';
 
 function ScheduleHistory() {
@@ -38,10 +39,7 @@ function ScheduleHistory() {
             ]);
 
             setCurrentRetailer(retailer);
-            const loopsArray = Array.isArray(allLoops)
-                ? allLoops
-                : (allLoops?.loops || []);
-            setLoops(loopsArray);
+            setLoops(loopListFrom(allLoops));
 
             // Task 2.6: expanded event types — edits, overrides, cancellations added.
             // Backend tracking note: slot_edited, slot_overridden, loop_cancelled must

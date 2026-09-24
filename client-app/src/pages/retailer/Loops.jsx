@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import apiService from '../../services/ApiService';
+import { loopListFrom } from '../../services/loopList';
 
 /**
  * Loops.jsx — Retailer Loop Library
@@ -32,7 +33,7 @@ export default function RetailerLoops() {
 
     useEffect(() => {
         apiService.getLoops()
-            .then(data => setLoops(Array.isArray(data) ? data : (data.loops || [])))
+            .then(data => setLoops(loopListFrom(data)))
             .catch(err => setError(err.message))
             .finally(() => setLoading(false));
     }, []);

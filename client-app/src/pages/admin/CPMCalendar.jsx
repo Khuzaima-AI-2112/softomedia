@@ -49,6 +49,7 @@ function CPMCalendar() {
     const [retailers, setRetailers] = useState([]);
     const [stores, setStores] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(null);
     const [editingTier, setEditingTier] = useState(null);
     const [storeHours, setStoreHours] = useState(null);
 
@@ -98,6 +99,7 @@ function CPMCalendar() {
 
     const loadData = async () => {
         setLoading(true);
+        setLoadError(null);
         try {
             const [config, retailersData, storesData] = await Promise.all([
                 apiService.getPricingConfig(),
@@ -110,6 +112,9 @@ function CPMCalendar() {
             setEditedBaseCPM(config.baseCPM || 15.00);
         } catch (error) {
             console.error('Failed to load pricing data:', error);
+            setLoadError(error.status === 403
+                ? 'Pricing is managed by the Super Administrator. Your account cannot view it.'
+                : 'Pricing configuration could not be loaded. Try again later.');
         } finally {
             setLoading(false);
         }
@@ -290,6 +295,10 @@ function CPMCalendar() {
 
         return pricingService.getDailyPricingSummary(selectedDate, range);
     }, [selectedDate, pricingConfig, storeHours]);
+
+    if (!pricingConfig && loadError) {
+        return <div role="alert" className="text-red-600">{loadError}</div>;
+    }
 
     if (!pricingConfig) {
         return <div className="animate-pulse">Loading pricing configuration...</div>;

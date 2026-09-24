@@ -5,9 +5,27 @@ import TrafficTierBadge from '../../../components/TrafficTierBadge';
 import { PriceSummary } from '../../../components/PriceDisplay';
 import apiService from '../../../services/ApiService';
 import pricingService from '../../../services/PricingService';
+import { loopListFrom } from '../../../services/loopList';
 
 // Constants for fallback business hours
 const FALLBACK_HOURS = { START: 8, END: 22 };
+
+// Loops name the campaign in each slot, so the API refuses them to Brands (#24).
+// Phase 1 books a Brand's campaign by screen: Admin prepares the store's loops,
+// then the Retailer approves that schedule.
+const SCREEN_BOOKING_NOTE = 'You can continue to book the selected screens for your campaign dates. '
+    + 'Your ad is placed in hourly loops when the store\'s schedule is prepared, and the retailer then approves that schedule.';
+
+const SLOTS_UNAVAILABLE = {
+    refused: {
+        title: 'Slot times are set when the schedule is prepared',
+        body: `Individual slot availability isn't shown for this account. ${SCREEN_BOOKING_NOTE}`,
+    },
+    failed: {
+        title: 'Slot availability could not be loaded',
+        body: `Try another date, or come back later. ${SCREEN_BOOKING_NOTE}`,
+    },
+};
 
 const formatHour = (hour) => {
     const suffix = hour >= 12 ? 'PM' : 'AM';
@@ -29,6 +47,8 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
     const [loading, setLoading] = useState(true);
     const [loops, setLoops] = useState([]);
     const [hasRealInventory, setHasRealInventory] = useState(true);
+    // One of SLOTS_UNAVAILABLE when loops can't be shown, otherwise null.
+    const [loopsUnavailable, setLoopsUnavailable] = useState(null);
     const [businessHoursRange, setBusinessHoursRange] = useState({ start: 8, end: 22, is_closed: false });
 
     const businessHours = useMemo(() => {
@@ -68,9 +88,10 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
                 screenId: (data.selectedScreens || []).join(',')
             });
 
-            const activeLoops = Array.isArray(response) ? response : (response.loops || []);
+            const activeLoops = loopListFrom(response);
             const newRange = response.business_hours || FALLBACK_HOURS;
 
+            setLoopsUnavailable(null);
             setHasRealInventory(activeLoops.length > 0);
 
             setBusinessHoursRange(newRange);
@@ -81,6 +102,8 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
 
         } catch (error) {
             console.error('[Diagnostic] Failed to load loops:', error);
+            setLoops([]);
+            setLoopsUnavailable(error.status === 403 ? SLOTS_UNAVAILABLE.refused : SLOTS_UNAVAILABLE.failed);
         }
     };
 
@@ -239,7 +262,7 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
                 ))}
             </div>
 
-            {!hasRealInventory && !businessHoursRange.is_closed && (
+            {!loopsUnavailable && !hasRealInventory && !businessHoursRange.is_closed && (
                 <div className="bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 p-4 rounded-xl border border-amber-200 dark:border-amber-800 flex items-center gap-3">
                     <span className="material-symbols-outlined text-2xl">warning</span>
                     <div>
@@ -249,7 +272,12 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
                 </div>
             )}
 
-            {businessHoursRange.is_closed ? (
+            {loopsUnavailable ? (
+                <GlassCard className="py-12 text-center" data-testid="slots-unavailable">
+                    <h3 className="text-lg font-bold mb-2">{loopsUnavailable.title}</h3>
+                    <p className="text-slate-500">{loopsUnavailable.body}</p>
+                </GlassCard>
+            ) : businessHoursRange.is_closed ? (
                 <GlassCard className="py-16 text-center">
                     <h3 className="text-xl font-bold mb-2 text-red-500">Store is Closed</h3>
                     <p className="text-slate-500">Pick another date.</p>
