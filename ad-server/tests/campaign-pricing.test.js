@@ -1,6 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 
-const { agreedCpmFor } = await import('../src/services/CampaignPricingService.js');
+const { agreedCpmFor, slotQuote } = await import('../src/services/CampaignPricingService.js');
 
 const CONFIG = {
     baseCPM: 10,
@@ -10,6 +10,12 @@ const CONFIG = {
         high: { multiplier: 1.5, label: 'High traffic' },
     },
     retailerOverrides: {},
+    trafficTiers: {
+        low: { multiplier: 0.7, hours: [8, 9] },
+        medium: { multiplier: 1.0, hours: [14] },
+        high: { multiplier: 1.5, hours: [12, 13] },
+    },
+    dateOverrides: {},
 };
 
 const storesById = (...stores) => new Map(stores.map(store => [store.id, store]));
@@ -128,5 +134,37 @@ describe('the CPM a Campaign is booked at', () => {
 
         // (9.99 x 1.5 + 9.99 x 0.8) / 2 = 11.4885
         expect(agreed).toBe(11.49);
+    });
+});
+
+describe('the price of one Slot', () => {
+    const quote = args => slotQuote({ config: CONFIG, retailerId: 'ret-1', date: '2030-01-07', ...args });
+
+    test('is the Store tier times the hour tier on the base CPM', () => {
+        expect(quote({ storeTier: 'high', hour: 12 })).toEqual({ price: 22.5, tier: 'high' }); // 10 x 1.5 x 1.5
+        expect(quote({ storeTier: 'low', hour: 8 })).toEqual({ price: 5.6, tier: 'low' }); // 10 x 0.8 x 0.7
+        expect(quote({ storeTier: null, hour: 14 })).toEqual({ price: 10, tier: 'medium' });
+    });
+
+    test('prices an hour with no tier as medium', () => {
+        expect(quote({ storeTier: 'high', hour: 22 })).toEqual({ price: 15, tier: 'medium' });
+    });
+
+    test('uses the Retailer base CPM override', () => {
+        const config = { ...CONFIG, retailerOverrides: { 'ret-1': { baseCPM: 20 } } };
+
+        expect(slotQuote({ config, retailerId: 'ret-1', storeTier: null, date: '2030-01-07', hour: 14 }).price)
+            .toBe(20);
+    });
+
+    test('honours a date override of the hour tier and the date multiplier', () => {
+        const config = {
+            ...CONFIG,
+            dateOverrides: { '2030-01-07': { multiplier: 1.2, hourlyTiers: { 14: 'high' } } },
+        };
+        const at = date => slotQuote({ config, retailerId: 'ret-1', storeTier: null, date, hour: 14 });
+
+        expect(at('2030-01-07')).toEqual({ price: 18, tier: 'high' }); // 10 x 1.5 x 1.2
+        expect(at('2030-01-08')).toEqual({ price: 10, tier: 'medium' });
     });
 });
