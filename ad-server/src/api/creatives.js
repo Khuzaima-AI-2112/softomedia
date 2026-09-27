@@ -1,5 +1,10 @@
 import express from 'express';
-import { CREATIVE_STATUS, creativeRepository, mediaRepository } from '../repositories/index.js';
+import {
+    CREATIVE_STATUS,
+    CreativeStatusConflictError,
+    creativeRepository,
+    mediaRepository,
+} from '../repositories/index.js';
 import { brandIdFor, normalizeRole, ROLES } from '../constants/roles.js';
 import { assetContentPath } from '../constants/mediaPaths.js';
 import { requireCreativeApproval } from '../middleware/requireRole.js';
@@ -51,18 +56,19 @@ for (const [action, { from, to, reasonRequired }] of Object.entries(DECISIONS)) 
         const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
         if (reasonRequired && !reason) return res.status(400).json({ error: 'A reason is required' });
 
-        const creative = await creativeRepository.findById(req.params.id);
-        if (!creative) return res.status(404).json({ error: 'Creative not found' });
-        if (creative.approval_status !== from) {
+        let decided;
+        try {
+            decided = await creativeRepository.decide(req.params.id, from, {
+                approval_status: to,
+                decided_by: req.user.uid || req.user.id,
+                decided_at: new Date().toISOString(),
+                reason: reason || null,
+            });
+        } catch (error) {
+            if (!(error instanceof CreativeStatusConflictError)) throw error;
             return res.status(409).json({ error: `Only a ${from} Creative can be ${to}` });
         }
-
-        const decided = await creativeRepository.update(creative.id, {
-            approval_status: to,
-            decided_by: req.user.uid || req.user.id,
-            decided_at: new Date().toISOString(),
-            reason: reason || null,
-        });
+        if (!decided) return res.status(404).json({ error: 'Creative not found' });
         return res.json(await presentCreative(decided));
     });
 }

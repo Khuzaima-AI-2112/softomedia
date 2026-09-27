@@ -170,4 +170,20 @@ describeWithEmulators('Creatives with Firebase emulators', () => {
         expect((await decide(rejected.creative.id, 'revoke', { reason: 'x' })).status).toBe(409);
         expect((await decide('crv_missing', 'approve')).status).toBe(404);
     });
+
+    test('two decisions on one pending Creative at once: exactly one wins', async () => {
+        const { headers } = await signInAs('superadmin', { permissions: ['creatives.approve'] });
+        const asset = await brandUpload('Contested');
+        const decide = (action, body = {}) => request(app)
+            .post(`/api/creatives/${asset.creative.id}/${action}`).set(headers).send(body);
+
+        const [approval, rejection] = await Promise.all([
+            decide('approve'), decide('reject', { reason: 'Logo is cropped' }),
+        ]);
+
+        expect([approval.status, rejection.status].sort()).toEqual([200, 409]);
+        const winner = approval.status === 200 ? 'approved' : 'rejected';
+        const stored = await firestore.collection('creatives').doc(asset.creative.id).get();
+        expect(stored.data().approval_status).toBe(winner);
+    });
 });

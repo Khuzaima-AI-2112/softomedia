@@ -35,6 +35,11 @@ function BrandCreatives() {
                                 <span className="font-medium">
                                     {creative.files.map(file => file.title).join(' + ')}
                                 </span>
+                                {creative.created_at && (
+                                    <span className="text-xs text-slate-500">
+                                        Uploaded {new Date(creative.created_at).toLocaleDateString()}
+                                    </span>
+                                )}
                                 <span className={`rounded-full px-3 py-0.5 text-xs font-semibold ${approval.className}`}>
                                     {approval.label}
                                 </span>

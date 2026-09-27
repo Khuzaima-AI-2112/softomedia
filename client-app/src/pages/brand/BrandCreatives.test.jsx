@@ -38,6 +38,23 @@ describe('Brand Creatives', () => {
         expect(within(revoked).getByText('Offer has ended')).toBeTruthy();
     });
 
+    it('tells apart two uploads of the same file by when each was uploaded', async () => {
+        getCreatives.mockResolvedValue([
+            creative('latte', 'pending', { created_at: '2030-01-15T10:30:00.000Z' }),
+            creative('latte-again', 'pending', {
+                created_at: '2030-01-16T10:30:00.000Z',
+                files: [{ id: 'ast_again', title: 'latte title', content_path: '/api/assets/ast_again/content' }],
+            }),
+        ]);
+        render(<BrandCreatives />);
+
+        const rows = await screen.findAllByText('latte title');
+        expect(rows.map(title => within(title.closest('li')).getByText(/^Uploaded /).textContent)).toEqual([
+            `Uploaded ${new Date('2030-01-15T10:30:00.000Z').toLocaleDateString()}`,
+            `Uploaded ${new Date('2030-01-16T10:30:00.000Z').toLocaleDateString()}`,
+        ]);
+    });
+
     it('says when the Brand has no Creatives yet', async () => {
         getCreatives.mockResolvedValue([]);
         render(<BrandCreatives />);

@@ -36,6 +36,9 @@ export const commitMockStorage = (records) => {
 /** Whether a memory-only record exists, read without yielding to the event loop. */
 export const hasMockRecord = (collectionName, id) => MOCK_STORAGE[collectionName]?.has(id) ?? false;
 
+/** A memory-only record, read without yielding to the event loop, or null. */
+export const readMockRecord = (collectionName, id) => MOCK_STORAGE[collectionName]?.get(id) ?? null;
+
 export class BaseRepository {
     constructor(collectionName) {
         this.collectionName = collectionName;
