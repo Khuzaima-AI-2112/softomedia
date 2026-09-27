@@ -12,8 +12,11 @@ const api = vi.hoisted(() => ({
     getStores: vi.fn(),
 }));
 
+const firebaseAuth = vi.hoisted(() => ({ changed: null }));
+
 vi.mock('firebase/auth', () => ({
     onAuthStateChanged: (_auth, callback) => {
+        firebaseAuth.changed = callback;
         callback(null);
         return () => {};
     },
@@ -38,9 +41,7 @@ function renderAuth() {
 describe('AuthProvider logout', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        pricingService.config = null;
-        pricingService.screens = [];
-        pricingService.stores = [];
+        pricingService.reset();
         authAPI.login.mockResolvedValue({ user: { id: 'brand-1', role: 'brand' } });
         authAPI.logout.mockResolvedValue();
         api.getScreens.mockResolvedValue([]);
@@ -78,5 +79,21 @@ describe('AuthProvider logout', () => {
         expect(pricingService.config).toBeNull();
         expect(pricingService.screens).toEqual([]);
         expect(pricingService.stores).toEqual([]);
+    });
+
+    // Firebase signs the tab out on its own when the session ends, or when
+    // the user signs out in another tab.
+    it('clears pricing when Firebase ends the session without a logout here', async () => {
+        authAPI.getProfile.mockResolvedValue({ id: 'brand-1', role: 'brand' });
+        const session = renderAuth();
+        await act(() => firebaseAuth.changed({ uid: 'brand-1' }));
+        expect(session.user).toEqual({ id: 'brand-1', role: 'brand' });
+        api.getPricingConfig.mockResolvedValue({ baseCPM: 10 });
+        await pricingService.init();
+
+        await act(() => firebaseAuth.changed(null));
+
+        expect(session.user).toBeNull();
+        expect(pricingService.config).toBeNull();
     });
 });

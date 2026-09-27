@@ -10,10 +10,17 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
+    // The next user to sign in on this tab must not see these prices.
+    const endSession = () => {
+        pricingService.reset();
+        setUser(null);
+    };
+
     useEffect(() => {
+        // Also fires when the session ends or the user signs out in another tab.
         return onAuthStateChanged(auth, async (firebaseUser) => {
             if (!firebaseUser) {
-                setUser(null);
+                endSession();
                 setLoading(false);
                 return;
             }
@@ -22,7 +29,7 @@ export const AuthProvider = ({ children }) => {
                 setUser(await authAPI.getProfile());
             } catch {
                 await authAPI.logout();
-                setUser(null);
+                endSession();
             } finally {
                 setLoading(false);
             }
@@ -44,10 +51,8 @@ export const AuthProvider = ({ children }) => {
         try {
             await authAPI.logout();
         } finally {
-            // The next user to sign in on this tab must not see these prices.
-            pricingService.reset();
+            endSession();
         }
-        setUser(null);
     };
 
     const persona = user?.role || null;

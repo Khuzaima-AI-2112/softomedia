@@ -139,11 +139,8 @@ router.get('/', async (req, res) => {
 
 /** Stored media is addressed by its API content path; its Storage location stays internal. */
 function presentAsset(asset) {
-    if (!asset) return asset;
-    // Media uploaded before #20 was fixed is stored with a garbled filename.
-    const presented = { ...asset, filename: decodeUploadFilename(asset.filename) };
-    if (!asset.storage_path) return presented;
-    presented.content_path = assetContentPath(asset.id);
+    if (!asset?.storage_path) return asset;
+    const presented = { ...asset, content_path: assetContentPath(asset.id) };
     delete presented.url;
     return presented;
 }
