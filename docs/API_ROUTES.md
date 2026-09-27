@@ -60,7 +60,7 @@
 |---|---|---|---|---|---|
 | GET | `/api/loops` | — | `requireAuth` | `loops.js` | List loops; scoped by retailer_id query param |
 | GET | `/api/loops/:id` | — | `requireAuth` | `loops.js` | Single loop |
-| POST | `/api/loops/generate` | `{ targetDate, retailerId, locationId }` | `requireAuth` + `authenticate` | `loops.js` | Generates 24-hour loop set for a screen |
+| POST | `/api/loops/generate` | `{ targetDate, retailerId, storeId }` | `requireAuth` + `authenticate` | `loops.js` | Generates the Store's hourly loops for each operating hour of `targetDate` |
 | PATCH | `/api/loops/:id/approve` | — | `requireAuth` + `authenticate` | `loops.js` | Approves a single loop. Sets status to `APPROVED`. |
 | PATCH | `/api/loops/:id/slots/:position/reject` | `{ reason }` | `requireAuth` + `authenticate` | `loops.js` | Rejects a single slot within a loop. |
 | PATCH | `/api/loops/:id/slots/:position/replace` | `{ assetId }` | `requireAuth` + `authenticate` | `loops.js` | Replaces a slot asset; clones loop if currently APPROVED. |

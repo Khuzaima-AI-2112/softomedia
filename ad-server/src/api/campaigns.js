@@ -8,7 +8,6 @@ import {
     screenRepository,
     StoreRepository,
 } from '../repositories/index.js';
-import { campaignService } from '../services/CampaignService.js';
 import { resolveAgreedCpm } from '../services/CampaignPricingService.js';
 import { authenticate } from '../middleware/auth.js';
 import {
@@ -347,7 +346,7 @@ router.patch('/:id/status', authenticate, requireCampaignApproval, async (req, r
             });
         }
 
-        const updated = await campaignService.updateStatus(id, requestedStatus);
+        const updated = await campaignRepository.update(id, { status: requestedStatus });
         res.json(updated);
     } catch (error) {
         const statusCode = error.message === 'Campaign not found' ? 404 : 500;

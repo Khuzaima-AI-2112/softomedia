@@ -29,6 +29,11 @@ DEMO_ASSETS_BUCKET=softomedia-demo.firebasestorage.app FIRESTORE_EMULATOR_HOST=1
 STORAGE_EMULATOR_HOST=http://127.0.0.1:9199 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099`.
 Suites that need the emulators skip themselves without these variables.
 
+The coverage gates are checked only on a full run with coverage on: drop `--coverage=false`
+from the command above, or use `npm --prefix ad-server run test:coverage` (and
+`npm --prefix client-app run test:coverage` for the frontend). Both measure every source file.
+Keep `--coverage=false` for partial runs, which would otherwise fail the gates.
+
 ## 2. Firestore and Storage security rules
 
 ```bash
