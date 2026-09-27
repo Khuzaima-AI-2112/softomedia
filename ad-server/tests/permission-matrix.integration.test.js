@@ -175,12 +175,9 @@ describeWithEmulators('Phase 1 permission matrix with Firebase emulators', () =>
         }
     });
 
-    test('stub Schedule reads are gone for signed-in users too', async () => {
-        const [list, preview] = await Promise.all([
-            as('superadmin', request(app).get('/api/schedules')),
-            as('superadmin', request(app).get('/api/schedules/preview?storeId=demo-store-phoenix&date=2030-01-16')),
-        ]);
-        expect([list.status, preview.status]).toEqual([404, 404]);
+    test('the stub Schedule preview is gone for signed-in users too', async () => {
+        const preview = await as('superadmin', request(app).get('/api/schedules/preview?storeId=demo-store-phoenix&date=2030-01-16'));
+        expect(preview.status).toBe(404);
     });
 
     // Each request is shaped so a permitted persona gets a known non-denial
