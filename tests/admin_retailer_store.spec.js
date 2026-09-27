@@ -28,6 +28,7 @@ test('Admin adds a Store to a newly created Retailer and it persists after a rel
         await storeForm.getByTestId('input-store-name').fill(storeName);
         await storeForm.getByTestId('input-store-address').fill('123 Main Street');
         await storeForm.getByTestId('input-store-city').fill('Montreal');
+        await storeForm.getByTestId('input-store-time-zone').fill(' America/Toronto ');
         await storeForm.getByTestId('btn-store-form-submit').click();
         await expect(storeForm).toHaveCount(0);
         await expect(page.getByTestId('stores-list').getByText(storeName)).toBeVisible();

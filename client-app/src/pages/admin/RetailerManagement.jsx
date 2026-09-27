@@ -286,7 +286,8 @@ function RetailerManagement() {
                 address: store.address,
                 city: store.city,
                 traffic_level: store.traffic_level || 'medium',
-                time_zone: store.time_zone || browserTimeZone,
+                // A Store without a time zone gets an explicit choice, not the editor's own zone.
+                time_zone: store.time_zone || '',
             });
         } else {
             setEditingStore(null);
@@ -323,12 +324,14 @@ function RetailerManagement() {
 
         setStoreSubmitting(true);
         setStoreModalError('');
+        // The server validates the time zone exactly as sent.
+        const storeData = { ...storeFormData, time_zone: storeFormData.time_zone.trim() };
         try {
             if (editingStore) {
-                await apiService.updateStore(editingStore.id, storeFormData);
+                await apiService.updateStore(editingStore.id, storeData);
                 addToast(`Store "${storeFormData.name}" updated.`, 'success');
             } else {
-                const payload = { ...storeFormData, retailer_id: storeParentRetailer.id };
+                const payload = { ...storeData, retailer_id: storeParentRetailer.id };
                 const created = await apiService.createStore(payload);
                 addToast(`Store "${created?.name || storeFormData.name}" added to ${storeParentRetailer.name}.`, 'success');
             }
