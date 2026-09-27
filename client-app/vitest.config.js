@@ -9,12 +9,14 @@ export default defineConfig({
         coverage: {
             provider: 'v8',
             reporter: ['text', 'json', 'html'],
-            exclude: ['node_modules', 'dist', 'src/pages/**', 'src/layouts/**', 'src/contexts/**'],
+            include: ['src/**/*.{js,jsx}'],
+            exclude: ['src/**/*.test.{js,jsx}'],
+            // Ratchet: just under the measured baseline (#29); raised to 90% lines by #48.
             thresholds: {
-                lines: 15,
-                functions: 15,
-                branches: 15,
-                statements: 15
+                lines: 25,
+                functions: 33,
+                branches: 60,
+                statements: 25
             }
         }
     }

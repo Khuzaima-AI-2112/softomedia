@@ -241,7 +241,7 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.LOOP_INJECT, ROLES.
  */
 router.post('/generate', authenticate, requirePermission(PERMISSIONS.LOOP_GENERATE), async (req, res) => {
     try {
-        const { targetDate, retailerId, storeId, mock } = req.body;
+        const { targetDate, retailerId, storeId } = req.body;
 
         if (!targetDate || !retailerId || !storeId) {
             return res.status(400).json({
@@ -249,19 +249,10 @@ router.post('/generate', authenticate, requirePermission(PERMISSIONS.LOOP_GENERA
             });
         }
 
-        logger.info('[Loops API] Generating loops', { targetDate, retailerId, storeId, mock });
+        logger.info('[Loops API] Generating loops', { targetDate, retailerId, storeId });
 
-        let loops;
-        let operatingHours;
-        if (mock) {
-            loops = await loopGenerationService.generateMockLoops(targetDate, retailerId, storeId);
-            const effectiveHours = await BusinessHoursService.getEffectiveHours(storeId, targetDate);
-            operatingHours = BusinessHoursService.getOperatingHourRange(effectiveHours);
-        } else {
-            const schedule = await loopGenerationService.generateDailySchedule(targetDate, retailerId, storeId);
-            loops = schedule.loops;
-            operatingHours = schedule.operatingHours;
-        }
+        const { loops, operatingHours } = await loopGenerationService
+            .generateDailySchedule(targetDate, retailerId, storeId);
 
         // Strict 12-Ad Loop Capacity & 60s Limit Validation (MVP Rule 4.1)
         for (const loop of loops) {
