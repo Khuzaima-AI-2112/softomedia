@@ -35,6 +35,15 @@ const formatHour = (hour) => {
     return `${displayHour}:00 ${period}`;
 };
 
+const OVERRIDE_DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+const OVERRIDE_TYPE_LABELS = { blocked: 'Blocked (No Ads)', forced: 'Forced Playlist' };
+
+const byWeekThenStart = (a, b) =>
+    OVERRIDE_DAYS.indexOf(a.day) - OVERRIDE_DAYS.indexOf(b.day) || a.start.localeCompare(b.start);
+
+const formatOverride = ({ day, start, end, type }) =>
+    `${day.charAt(0).toUpperCase()}${day.slice(1)} ${start}–${end} · ${OVERRIDE_TYPE_LABELS[type] || type}`;
+
 // Get status styling
 const getStatusStyle = (status) => {
     switch (status?.toLowerCase()) {
@@ -84,7 +93,7 @@ function ScheduleCalendar() {
         type: 'blocked'
     });
     const [overrideError, setOverrideError] = useState('');
-    const [hasMockOverride, setHasMockOverride] = useState(false);
+    const [overrides, setOverrides] = useState([]);
 
     const loopHours = loops.map(loop => loop.hour);
     const businessHours = loopHours.length > 0
@@ -132,6 +141,16 @@ function ScheduleCalendar() {
         fetchLoops();
     }, [fetchLoops]);
 
+    useEffect(() => {
+        if (!selectedStore) return undefined;
+        let active = true;
+        setOverrides([]);
+        apiClient.get(`/api/schedules?store_id=${encodeURIComponent(selectedStore.id)}`)
+            .then(saved => { if (active) setOverrides(saved || []); })
+            .catch(error => { if (active) setActionError(error.message || 'Failed to load schedule overrides'); });
+        return () => { active = false; };
+    }, [selectedStore]);
+
     const getLoopForHour = (hour) => {
         return loops.find(l => l.hour === hour) || null;
     };
@@ -162,14 +181,12 @@ function ScheduleCalendar() {
         }
         
         try {
-            await apiClient.post('/api/schedules', overrideForm);
+            const saved = await apiClient.post('/api/schedules', { store_id: selectedStore?.id, ...overrideForm });
+            setOverrides(current => [...current, saved].sort(byWeekThenStart));
             setShowOverrideModal(false);
-            if (overrideForm.day === 'sunday' && overrideForm.type === 'blocked') {
-                setHasMockOverride(true);
-            }
             setOverrideForm({ day: 'monday', start: '', end: '', type: 'blocked' });
         } catch (error) {
-            setOverrideError('Failed to save override');
+            setOverrideError(error.message || 'Failed to save override');
         }
     };
 
@@ -273,6 +290,23 @@ function ScheduleCalendar() {
                         </p>
                     )}
                 </div>
+            )}
+
+            {selectedStore && (
+                <GlassCard data-testid="schedule-overrides">
+                    <h3 className="font-bold text-lg mb-3">Schedule Overrides</h3>
+                    {overrides.length === 0 ? (
+                        <p className="text-sm text-slate-500">No schedule overrides for this Store.</p>
+                    ) : (
+                        <ul className="space-y-1 text-sm">
+                            {overrides.map(override => (
+                                <li key={override.id} data-testid={`schedule-override-${override.id}`}>
+                                    {formatOverride(override)}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </GlassCard>
             )}
 
             {actionError && (
@@ -519,11 +553,6 @@ function ScheduleCalendar() {
                         </div>
                     </div>
                 </div>
-            )}
-            
-            {/* Hidden marker for E2E tests asserting override existence */}
-            {hasMockOverride && !showOverrideModal && (
-                <div data-testid="schedule-override-blocked" className="opacity-0 absolute">Mock Blocked Override</div>
             )}
         </div>
     );

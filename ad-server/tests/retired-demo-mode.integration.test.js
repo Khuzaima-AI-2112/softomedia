@@ -42,7 +42,8 @@ describeWithAuthEmulator('the retired demo mode switch', () => {
 
         expect(history.status).toBe(404);
         expect(history.body).not.toEqual(expect.arrayContaining([expect.objectContaining({ actorId: 'demo-freshmart' })]));
+        // A malformed override is refused rather than echoed back as saved.
+        expect(override.status).toBe(400);
         expect(override.headers['x-demo-source']).toBeUndefined();
-        expect(override.body.id).not.toMatch(/^sched_demo_/);
     });
 });
