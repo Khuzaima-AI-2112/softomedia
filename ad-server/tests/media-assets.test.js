@@ -226,4 +226,29 @@ describeWithAuthEmulator('classified media API', () => {
         expect(storedObjects.size).toBe(0);
         expect(storedMedia.size).toBe(0);
     });
+
+    describe('filenames outside ASCII (#20)', () => {
+        const ORIGINAL = '—Pngtree—up to 20 off price_8775259.png';
+        const INTERNAL = {
+            title: 'Stock photo',
+            category: 'internal',
+            owner_type: 'platform',
+            approval_status: 'approved',
+            duration: '5',
+        };
+
+        it('stores the filename exactly as uploaded', async () => {
+            const response = await upload(await appAs('admin'), INTERNAL, ORIGINAL);
+
+            expect(response.status).toBe(201);
+            expect(response.body.filename).toBe(ORIGINAL);
+            expect(storedMedia.get(response.body.id).filename).toBe(ORIGINAL);
+        });
+
+        it('stores an accented filename exactly as uploaded', async () => {
+            const response = await upload(await appAs('admin'), INTERNAL, 'Café Montréal.png');
+
+            expect(response.body.filename).toBe('Café Montréal.png');
+        });
+    });
 });

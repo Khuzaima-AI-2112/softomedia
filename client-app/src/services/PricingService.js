@@ -3,6 +3,11 @@ import { UNASSIGNED_STORE_TIER, storeTierLabel } from '../constants/storeTraffic
 
 class PricingService {
     constructor() {
+        this.reset();
+    }
+
+    /** Forget everything loaded, so the next init() fetches current pricing. */
+    reset() {
         this.config = null;
         this.screens = [];
         this.stores = [];
