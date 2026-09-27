@@ -187,6 +187,22 @@ describeWithAuthEmulator('Retailer promotions by time of day', () => {
         expect(new Set(assetsIn(retailerSlots(loops[11])))).toEqual(new Set(['fallback-media']));
     });
 
+    test('the turn carries across the day, so more promotions than an hour has Retailer Slots all play', async () => {
+        // An hour has two or three Retailer Slots; breakfast here has seven in all.
+        const names = ['muffin-media', 'bagel-media', 'soup-media', 'scone-media'];
+        await mediaRepository.create('scone-media', approvedMedia({
+            title: 'Scone upsell', category: 'retailer', owner_type: 'retailer', owner_id: 'retailer-one',
+        }));
+        for (const mediaId of names) await schedule({ name: mediaId, media_id: mediaId });
+
+        const loops = await generate();
+
+        const breakfastPlays = [8, 9, 10].flatMap(hour => assetsIn(retailerSlots(loops[hour])));
+        const plays = names.map(name => breakfastPlays.filter(asset => asset === name).length);
+        expect(Math.min(...plays)).toBeGreaterThan(0);
+        expect(Math.max(...plays) - Math.min(...plays)).toBeLessThanOrEqual(1);
+    });
+
     test('a promotion follows the Dayparts the Super Administrator sets later', async () => {
         await schedule();
         const saved = await request(app).put('/api/dayparts').set(await headersFor('superadmin')).send({

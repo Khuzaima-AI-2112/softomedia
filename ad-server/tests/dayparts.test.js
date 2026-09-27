@@ -4,7 +4,6 @@ import {
     daypartsError,
     isPromotionScheduledAt,
     promotionScheduleError,
-    scheduledHours,
 } from '../src/services/Dayparts.js';
 
 describe('Dayparts', () => {
@@ -27,14 +26,6 @@ describe('Dayparts', () => {
         ['overlapping Dayparts', { ...DEFAULT_DAYPARTS, lunch: { start: 10, end: 15 } }],
     ])('refuse %s', (_name, dayparts) => {
         expect(daypartsError(dayparts)).toEqual(expect.any(String));
-    });
-
-    test('are trimmed to the Store\'s opening hours', () => {
-        const schedule = { dates: ['2030-01-07'], dayparts: ['breakfast'], hours: [] };
-
-        expect(scheduledHours(schedule, DEFAULT_DAYPARTS, { start: 8, end: 22 })).toEqual([8, 9, 10]);
-        expect(scheduledHours(schedule, DEFAULT_DAYPARTS, { start: 12, end: 22 })).toEqual([]);
-        expect(scheduledHours(schedule, DEFAULT_DAYPARTS, { is_closed: true })).toEqual([]);
     });
 });
 
@@ -62,7 +53,6 @@ describe('a Retailer promotion schedule', () => {
         expect(isPromotionScheduledAt(schedule, DEFAULT_DAYPARTS, '2030-01-07', 14)).toBe(true);
         expect(isPromotionScheduledAt(schedule, DEFAULT_DAYPARTS, '2030-01-07', 18)).toBe(true);
         expect(isPromotionScheduledAt(schedule, DEFAULT_DAYPARTS, '2030-01-07', 13)).toBe(false);
-        expect(scheduledHours(schedule, DEFAULT_DAYPARTS, { start: 8, end: 20 })).toEqual([14, 17, 18, 19]);
     });
 
     test('without a schedule plays every hour, as promotions did before Dayparts', () => {

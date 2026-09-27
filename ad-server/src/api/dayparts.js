@@ -16,7 +16,8 @@ const router = express.Router();
 router.get('/', authenticate, async (_req, res) => {
     try {
         res.json(await daypartRepository.get());
-    } catch {
+    } catch (error) {
+        console.error('Failed to fetch Dayparts:', error);
         res.status(500).json({ error: 'Failed to fetch Dayparts' });
     }
 });
@@ -31,15 +32,16 @@ router.put('/', authenticate, requirePlatformGovernance, async (req, res) => {
     if (error) return res.status(400).json({ error });
 
     try {
-        const dayparts = await daypartRepository.save(req.body);
-        await platformAuditRepository.record({
+        // daypartsError admits exactly breakfast, lunch and dinner.
+        const dayparts = await daypartRepository.saveWithAudit(req.body, platformAuditRepository, {
             action: 'dayparts_updated',
             actor_id: req.user.id || req.user.uid,
             actor_role: req.user.role,
-            changes: dayparts,
+            changes: req.body,
         });
         res.json(dayparts);
-    } catch {
+    } catch (error) {
+        console.error('Failed to save Dayparts:', error);
         res.status(500).json({ error: 'Failed to save Dayparts' });
     }
 });

@@ -4,7 +4,8 @@
  * A Daypart is a network-wide range of whole hours, start inclusive and end
  * exclusive: breakfast 06–11 covers the loops at 06:00 to 10:00. A promotion
  * names Dayparts rather than copying their hours, so it follows the Super
- * Administrator's later changes. Store opening hours trim both.
+ * Administrator's later changes. Store opening hours trim both, because loops
+ * are generated only for the hours a Store is open.
  */
 
 export const DAYPART_NAMES = Object.freeze(['breakfast', 'lunch', 'dinner']);
@@ -76,14 +77,4 @@ function scheduledForHour(schedule, dayparts, hour) {
 export function isPromotionScheduledAt(schedule, dayparts, date, hour) {
     if (!schedule) return true;
     return (schedule.dates || []).includes(date) && scheduledForHour(schedule, dayparts, hour);
-}
-
-/** The hours a schedule plays in on an open day, trimmed to the Store's opening hours. */
-export function scheduledHours(schedule, dayparts, operatingHours) {
-    if (operatingHours?.is_closed) return [];
-    const hours = [];
-    for (let hour = operatingHours.start; hour < operatingHours.end; hour++) {
-        if (scheduledForHour(schedule, dayparts, hour)) hours.push(hour);
-    }
-    return hours;
 }

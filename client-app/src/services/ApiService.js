@@ -396,16 +396,6 @@ class ApiService {
      *
      * @returns {Promise<object>} Pricing config document
      */
-    /** The network's breakfast, lunch and dinner hours; readable by every signed-in role. */
-    async getDayparts() {
-        return apiClient.get('/api/dayparts');
-    }
-
-    /** Set the network's Dayparts — Super Administrator only. */
-    async updateDayparts(dayparts) {
-        return apiClient.put('/api/dayparts', dayparts);
-    }
-
     async getPricingConfig() {
         return apiClient.get('/api/pricing/config');
     }
@@ -424,6 +414,20 @@ class ApiService {
 
     async getAuditLogs() {
         return apiClient.get('/api/audit');
+    }
+
+    // ============================================
+    // DAYPARTS
+    // ============================================
+
+    /** The network's breakfast, lunch and dinner hours; readable by every signed-in role. */
+    async getDayparts() {
+        return apiClient.get('/api/dayparts');
+    }
+
+    /** Set the network's Dayparts — Super Administrator only. */
+    async updateDayparts(dayparts) {
+        return apiClient.put('/api/dayparts', dayparts);
     }
 
     // ============================================

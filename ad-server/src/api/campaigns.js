@@ -103,9 +103,9 @@ async function validateBrandSubmission(body, ownerId) {
 }
 
 /**
- * A Retailer promotion an Admin schedules: the Retailer's own media, in its own
- * Stores, on chosen dates in chosen hours or Dayparts. It plays only in the
- * Retailer's positions (LoopGenerationService).
+ * A Retailer promotion is a Retailer-category Campaign an Admin schedules: the
+ * Retailer's own media, in its own Stores, on chosen dates in chosen hours or
+ * Dayparts. It plays only in the Retailer's Slots (LoopGenerationService).
  */
 async function preparePromotion(body) {
     const scheduleError = promotionScheduleError(body.schedule);

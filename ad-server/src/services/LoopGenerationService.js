@@ -138,8 +138,10 @@ export class LoopGenerationService {
     }
 
     /**
-     * Build 12 slots. A Paid position plays its reserved Creative or Fallback
-     * Content; Retailer and Internal positions share the eligible content.
+     * Build 12 slots. A Paid Slot plays its reserved Creative or Fallback
+     * Content; Retailer and Internal Slots share the eligible content in turn.
+     * The turn carries on from the day's earlier Slots of the same category, so
+     * content outnumbering one hour's Slots still plays across the day.
      * @param {Array} content - Eligible Retailer and Internal content
      * @param {Map} reserved - This hour's Reservations with an approved Creative, by position
      * @returns {Array} 12 slots
@@ -150,6 +152,10 @@ export class LoopGenerationService {
             content.filter(item => item.type?.toLowerCase() === category),
         ]));
         const categoryIndexes = { retailer: 0, internal: 0 };
+        for (let earlier = 0; earlier < sequenceStart; earlier++) {
+            const category = allocatedCategory(earlier);
+            if (category in categoryIndexes) categoryIndexes[category]++;
+        }
 
         return Array.from({ length: SLOT_CONFIG.SLOTS_PER_LOOP }, (_, position) => {
             const sequencePosition = sequenceStart + position;
@@ -182,7 +188,7 @@ export class LoopGenerationService {
     /**
      * Get the eligible Retailer promotions, Internal Campaigns and Internal
      * media for a Store and date. Paid Campaigns play only through
-     * Reservations; Retailer positions play only the Retailer's own promotions,
+     * Reservations; Retailer Slots play only the Retailer's own promotions,
      * each carrying its schedule of hours.
      */
     async getAvailableContent(retailerId, storeId, targetDate) {
