@@ -15,6 +15,7 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
     const screenId = `player-screen-${suffix}`;
     const loopId = `player-loop-${suffix}`;
     const assetId = `browser-asset-${suffix}`;
+    const creativeId = `browser-creative-${suffix}`;
     const campaignId = `browser-campaign-${suffix}`;
     const brandId = 'demo-advertiser-bonvie';
     const fallbackId = `browser-fallback-${suffix}`;
@@ -35,6 +36,7 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
     const { loopRepository, LOOP_STATUS } = await import('../ad-server/src/repositories/LoopRepository.js');
     const { dailyScheduleRepository } = await import('../ad-server/src/repositories/DailyScheduleRepository.js');
     const { mediaRepository } = await import('../ad-server/src/repositories/MediaRepository.js');
+    const { creativeRepository } = await import('../ad-server/src/repositories/CreativeRepository.js');
     const { campaignRepository } = await import('../ad-server/src/repositories/CampaignRepository.js');
     const { impressionRepository } = await import('../ad-server/src/repositories/ImpressionRepository.js');
     const { playbackObservationRepository } = await import('../ad-server/src/repositories/PlaybackObservationRepository.js');
@@ -57,9 +59,13 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
             category: 'paid',
             owner_type: 'brand',
             owner_id: brandId,
-            approval_status: 'approved',
-            eligible_for_playback: true,
+            creative_id: creativeId,
             status: 'ready',
+        });
+        await creativeRepository.create(creativeId, {
+            brand_id: brandId,
+            media_ids: [assetId],
+            approval_status: 'approved',
         });
         await campaignRepository.create(campaignId, {
             status: 'approved',
@@ -223,6 +229,7 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
         await Promise.all(personaPages.map(persona => persona.context().close()));
         // Not demo-scoped, so the reset would leave it for the Screen form of later journeys.
         await retailerRepository.delete(retailerId).catch(() => null);
+        await creativeRepository.delete(creativeId).catch(() => null);
         await demo.reset();
     }
 });

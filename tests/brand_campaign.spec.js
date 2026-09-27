@@ -100,24 +100,28 @@ test('Brand books Slots on the grid through a conflict and the Booking Cutoff, a
         await page.getByTestId('btn-submit-campaign').click();
 
         await expect(page).toHaveURL(/\/dashboard\/brand$/);
-        await expect(page.getByText(title)).toBeVisible();
+        await expect(page.getByText(title, { exact: true })).toBeVisible();
         await expect(page.getByTestId('campaign-status').filter({ hasText: 'Pending' })).toBeVisible();
         await expect(page.getByText('0 Proofs of Play')).toBeVisible();
         await expect(page.getByText('demo-screen-secondary-1')).toBeVisible();
         await expect(page.getByRole('img', { name: `${title} creative` })).toBeVisible();
+        // The Brand sees its Creative waiting for approval.
+        await expect(page.getByTestId('brand-creatives').getByRole('listitem').filter({ hasText: `${title} creative` }))
+            .toContainText('Pending approval');
 
         await page.reload();
-        await expect(page.getByText(title)).toBeVisible();
+        await expect(page.getByText(title, { exact: true })).toBeVisible();
         await expect(page.getByText('demo-screen-secondary-1')).toBeVisible();
         await expect(page.getByRole('img', { name: `${title} creative` })).toBeVisible();
 
         await signOut(page);
         await signIn(page, secondaryBrand.email, BRAND_DASHBOARD);
+        // Neither the Campaign nor its Creative.
         await expect(page.getByText(title)).toHaveCount(0);
 
         await signOut(page);
         await signIn(page, brand.email, BRAND_DASHBOARD);
-        await expect(page.getByText(title)).toBeVisible();
+        await expect(page.getByText(title, { exact: true })).toBeVisible();
         await expect(page.getByText('demo-screen-secondary-1')).toBeVisible();
         await expect(page.getByRole('img', { name: `${title} creative` })).toBeVisible();
     } finally {

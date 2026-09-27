@@ -28,6 +28,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
     let adminToken;
     const createdCampaignIds = [];
     const createdMediaIds = [];
+    const createdCreativeIds = [];
     const createdObjectNames = [];
     const createdProofOfPlayIds = [];
     const createdLoopIds = [];
@@ -86,6 +87,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
         }
         await Promise.all(createdCampaignIds.map(id => firestore.collection('campaigns').doc(id).delete()));
         await Promise.all(createdMediaIds.map(id => firestore.collection('media').doc(id).delete()));
+        await Promise.all(createdCreativeIds.map(id => firestore.collection('creatives').doc(id).delete()));
         await Promise.all(createdProofOfPlayIds.map(id => firestore.collection('impressions').doc(id).delete()));
         await Promise.all(createdLoopIds.map(id => firestore.collection('loops').doc(id).delete()));
         await Promise.all(createdScheduleIds.map(id => firestore.collection('daily_schedules').doc(id).delete()));
@@ -247,6 +249,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
                 .attach('file', VALID_PNG, { filename: 'booked.png', contentType: 'image/png' });
             expect(upload.status).toBe(201);
             createdMediaIds.push(upload.body.id);
+            createdCreativeIds.push(upload.body.creative.id);
 
             const booked = await request(app).post('/api/campaigns')
                 .set('Authorization', `Bearer ${brandToken}`)
@@ -365,9 +368,10 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
         expect(upload.body).toMatchObject({
             owner_type: 'brand',
             owner_id: 'demo-advertiser-bonvie',
-            approval_status: 'pending_approval',
+            creative: { approval_status: 'pending' },
         });
         createdMediaIds.push(upload.body.id);
+        createdCreativeIds.push(upload.body.creative.id);
         createdObjectNames.push(upload.body.storage_path.split('/').slice(3).join('/'));
 
         const inventorySelection = [{
@@ -454,16 +458,15 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
         const afterBookingAttempt = await firestore.collection('campaigns').doc(creation.body.id).get();
         expect(afterBookingAttempt.data().status).toBe('pending_approval');
 
-        // Stand in for Retailer approval (#9) and Allocation Window generation (#8): Proof of Play
+        // Stand in for Creative approval (#37), Retailer approval (#9) and Allocation Window generation (#8): Proof of Play
         // is accepted only for an approved Campaign that the Screen is scheduled to present at the
         // supplied time, and never for a future presentation, so anchor the fixture to the real clock.
         const { storeLocalDateAndHour } = await import('../src/services/PlaybackService.js');
         const presentationStartedAt = new Date(Date.now() - 1_000);
         const proofStore = await firestore.collection('stores').doc('demo-store-phoenix').get();
         const broadcast = storeLocalDateAndHour(presentationStartedAt, proofStore.data().time_zone);
-        await firestore.collection('media').doc(upload.body.id).update({
+        await firestore.collection('creatives').doc(upload.body.creative.id).update({
             approval_status: 'approved',
-            eligible_for_playback: true,
         });
         await firestore.collection('campaigns').doc(creation.body.id).update({
             status: 'approved',

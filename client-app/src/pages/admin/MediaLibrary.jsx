@@ -5,7 +5,8 @@ import { ACCEPTED_MEDIA } from '../../services/mediaFile';
 import useChosenMediaFile from '../../hooks/useChosenMediaFile';
 
 const CATEGORY_DETAILS = {
-    paid: { label: 'Paid campaign', ownerType: 'brand', needsOwner: true },
+    // A Brand's paid file is approved as part of its Creative, never on upload.
+    paid: { label: 'Paid campaign', ownerType: 'brand', needsOwner: true, approvedAsCreative: true },
     retailer: { label: 'Retailer campaign', ownerType: 'retailer', needsOwner: true },
     internal: { label: 'Internal campaign', ownerType: 'platform', needsOwner: false },
     fallback: { label: 'Neutral fallback', ownerType: 'platform', needsOwner: false },
@@ -44,7 +45,7 @@ function MediaLibrary() {
         payload.append('category', form.category);
         payload.append('owner_type', category.ownerType);
         payload.append('owner_id', category.needsOwner ? form.ownerId : '');
-        payload.append('approval_status', form.approvalStatus);
+        if (!category.approvedAsCreative) payload.append('approval_status', form.approvalStatus);
 
         setUploading(true);
         try {
@@ -92,7 +93,7 @@ function MediaLibrary() {
                                 className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800" />
                         </label>
                     )}
-                    <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {!category.approvedAsCreative && <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
                         Approval status
                         <select value={form.approvalStatus} onChange={event => setForm({ ...form, approvalStatus: event.target.value })}
                             className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800">
@@ -100,7 +101,7 @@ function MediaLibrary() {
                             <option value="pending_approval">Pending approval</option>
                             <option value="rejected">Rejected</option>
                         </select>
-                    </label>
+                    </label>}
                     <label className="text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
                         Media file
                         <input type="file" accept={ACCEPTED_MEDIA} onChange={event => chooseFile(event.target.files?.[0] || null)}
@@ -134,7 +135,9 @@ function MediaLibrary() {
                                 </div>
                                 <dl className="mt-3 space-y-1 text-xs text-slate-500">
                                     <div><dt className="inline font-medium">Owner: </dt><dd className="inline">{asset.owner_id || 'Softomedia platform'}</dd></div>
-                                    <div><dt className="inline font-medium">Eligibility: </dt><dd className="inline">{asset.eligible_for_playback ? 'Eligible' : asset.approval_status}</dd></div>
+                                    <div><dt className="inline font-medium">Eligibility: </dt><dd className="inline">{asset.creative
+                                        ? `Creative ${asset.creative.approval_status}`
+                                        : asset.eligible_for_playback ? 'Eligible' : asset.approval_status}</dd></div>
                                     <div><dt className="inline font-medium">Playback: </dt><dd className="inline">{asset.duration}s · {asset.filename}</dd></div>
                                 </dl>
                             </article>

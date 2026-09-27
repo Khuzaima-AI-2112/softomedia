@@ -28,6 +28,7 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
     const [creativeAssetId, setCreativeAssetId] = useState(data.creativeAssetId || null);
     const [uploading, setUploading] = useState(false);
     const [uploadSuccess, setUploadSuccess] = useState('');
+    const [approvalStatus, setApprovalStatus] = useState(null);
     const { file: creativeFile, checkingFile, chooseFile } = useChosenMediaFile(setError);
 
     const handleSelectDemo = (url) => {
@@ -48,6 +49,7 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
     const handleFileUpload = async () => {
         setError('');
         setUploadSuccess('');
+        setApprovalStatus(null);
         if (!creativeTitle.trim() || !creativeFile) {
             setError('Enter a creative title and choose a file');
             return;
@@ -65,6 +67,7 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
             setCreativeAssetId(asset.id);
             setCustomUrl('');
             setUploadSuccess('Creative uploaded successfully.');
+            setApprovalStatus(asset.creative?.approval_status ?? null);
         } catch (err) {
             setError(err.message || 'Creative could not be uploaded');
         } finally {
@@ -144,6 +147,9 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
                     {uploading ? 'Uploading…' : 'Upload creative'}
                 </button>
                 {uploadSuccess && <p role="status" className="mt-2 text-sm text-emerald-600">{uploadSuccess}</p>}
+                {approvalStatus === 'pending' && (
+                    <p className="mt-1 text-sm text-amber-700">Pending approval: it plays once approved.</p>
+                )}
             </GlassCard>
 
             {/* Demo Creatives */}

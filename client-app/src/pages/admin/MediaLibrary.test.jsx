@@ -68,6 +68,29 @@ describe('Admin media library', () => {
         expect(within(screen.getByTestId('media-ast_fallback')).getByText('Neutral fallback')).toBeTruthy();
     });
 
+    it('approves paid media only as a Creative: no approval choice on upload, and its Creative\'s status shown', async () => {
+        uploadAsset.mockResolvedValue({
+            id: 'ast_paid', title: 'Brand latte', category: 'paid', owner_type: 'brand', owner_id: 'brand-1',
+            creative_id: 'crv_paid', creative: { id: 'crv_paid', approval_status: 'pending' },
+            status: 'ready', duration: 5, filename: 'latte.png',
+        });
+        render(<MediaLibrary />);
+
+        await screen.findByText('No media has been uploaded yet.');
+        fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'paid' } });
+        expect(screen.queryByLabelText('Approval status')).toBeNull();
+        fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Brand latte' } });
+        fireEvent.change(screen.getByLabelText('Brand ID'), { target: { value: 'brand-1' } });
+        fireEvent.change(screen.getByLabelText('Media file'), {
+            target: { files: [new File(['pixels'], 'latte.png', { type: 'image/png' })] },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Upload media' }));
+
+        await waitFor(() => expect(uploadAsset).toHaveBeenCalled());
+        expect(uploadAsset.mock.calls[0][0].has('approval_status')).toBe(false);
+        expect(await within(await screen.findByTestId('media-ast_paid')).findByText('Creative pending')).toBeTruthy();
+    });
+
     it('shows a truthful error and does not add an asset when persistence fails', async () => {
         uploadAsset.mockRejectedValue(new Error('Media could not be saved; no success was recorded'));
         render(<MediaLibrary />);

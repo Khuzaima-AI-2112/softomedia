@@ -2,7 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import { randomUUID } from 'crypto';
-import { campaignRepository, mediaRepository } from '../repositories/index.js';
+import { campaignRepository, CREATIVE_STATUS, creativeRepository, mediaRepository } from '../repositories/index.js';
 import { loopRepository } from '../repositories/LoopRepository.js';
 import { deleteMediaObject, uploadMediaObject } from '../utils/storage.js';
 import { ROLES, normalizeRole } from '../constants/roles.js';
@@ -65,7 +65,6 @@ function resolveUploadMetadata(req, category) {
         return {
             ownerType: 'brand',
             ownerId: req.user.linked_entity_id || req.user.organization_id || null,
-            approvalStatus: 'pending_approval',
         };
     }
     return null;
@@ -139,7 +138,10 @@ function validateMetadata(req, file) {
 
     const uploadMetadata = resolveUploadMetadata(req, category);
     if (!uploadMetadata) return { status: 403, error: 'This role cannot upload media in the selected category' };
-    if (!APPROVAL_STATES.has(uploadMetadata.approvalStatus)) return { error: 'Approval status is required' };
+    // Paid media is a Creative's file; its approval belongs to the Creative.
+    if (category !== 'paid' && !APPROVAL_STATES.has(uploadMetadata.approvalStatus)) {
+        return { error: 'Approval status is required' };
+    }
 
     const expectedOwnerType = category === 'paid'
         ? 'brand'
@@ -169,25 +171,36 @@ router.get('/', async (req, res) => {
         if (!mediaRepository.isDurable()) {
             return res.status(503).json({ error: 'Persistent media metadata is unavailable' });
         }
-        const assets = await mediaRepository.findAllDurable();
+        const [assets, creatives] = await Promise.all([
+            mediaRepository.findAllDurable(),
+            creativeRepository.findAll(),
+        ]);
+        const creativesById = new Map(creatives.map(creative => [creative.id, creative]));
+        const present = asset => presentAsset(asset, creativesById.get(asset.creative_id));
         if (role === ROLES.BRAND) {
             const ownerId = req.user.linked_entity_id || req.user.organization_id;
             return res.json(assets
                 .filter(asset => asset.owner_type === 'brand' && asset.owner_id === ownerId)
-                .map(presentAsset));
+                .map(present));
         }
-        return res.json(assets.map(presentAsset));
+        return res.json(assets.map(present));
     } catch {
         return res.status(500).json({ error: 'Media could not be loaded' });
     }
 });
 
-/** Stored media is addressed by its API content path; its Storage location stays internal. */
-function presentAsset(asset) {
-    if (!asset?.storage_path) return asset;
-    const presented = { ...asset, content_path: assetContentPath(asset.id) };
-    delete presented.url;
-    return presented;
+/**
+ * Stored media is addressed by its API content path; its Storage location stays
+ * internal. A paid file carries the approval status of the Creative it belongs to.
+ */
+function presentAsset(asset, creative = null) {
+    const presented = creative
+        ? { ...asset, creative: { id: creative.id, approval_status: creative.approval_status } }
+        : asset;
+    if (!presented?.storage_path) return presented;
+    const addressed = { ...presented, content_path: assetContentPath(asset.id) };
+    delete addressed.url;
+    return addressed;
 }
 
 /** A Retailer reviews the creative of any Campaign booked at its Stores. */
@@ -235,6 +248,7 @@ router.post('/upload', receiveFile, async (req, res) => {
     const extension = path.extname(req.file.originalname).toLowerCase();
     const destination = `phase-1-demo/uploads/${id}${extension}`;
     let storedObject = null;
+    let creative = null;
 
     try {
         storedObject = await uploadMediaObject({
@@ -244,6 +258,23 @@ router.post('/upload', receiveFile, async (req, res) => {
             metadata: { mediaCategory: metadata.category, assetId: id },
         });
 
+        // Every paid upload is a new Creative, even of a file uploaded before.
+        if (metadata.category === 'paid') {
+            creative = await creativeRepository.create(creativeRepository.newId(), {
+                brand_id: metadata.ownerId,
+                media_ids: [id],
+                approval_status: CREATIVE_STATUS.PENDING,
+                decided_by: null,
+                decided_at: null,
+                reason: null,
+            });
+        }
+        const approval = creative
+            ? { creative_id: creative.id }
+            : {
+                approval_status: metadata.approvalStatus,
+                eligible_for_playback: metadata.approvalStatus === 'approved',
+            };
         const asset = await mediaRepository.create(id, {
             id,
             title: metadata.title,
@@ -252,8 +283,7 @@ router.post('/upload', receiveFile, async (req, res) => {
             content_kind: metadata.category === 'fallback' ? 'neutral_fallback' : 'campaign',
             owner_type: metadata.ownerType,
             owner_id: metadata.ownerId,
-            approval_status: metadata.approvalStatus,
-            eligible_for_playback: metadata.approvalStatus === 'approved',
+            ...approval,
             duration: metadata.duration,
             width: metadata.width ?? null,
             height: metadata.height ?? null,
@@ -263,8 +293,9 @@ router.post('/upload', receiveFile, async (req, res) => {
             storage_path: storedObject.storage_path,
             status: 'ready',
         });
-        return res.status(201).json(presentAsset(asset));
+        return res.status(201).json(presentAsset(asset, creative));
     } catch (error) {
+        if (creative) await creativeRepository.delete(creative.id);
         if (storedObject?.storage_path) {
             try {
                 await deleteMediaObject(storedObject.object_ref);

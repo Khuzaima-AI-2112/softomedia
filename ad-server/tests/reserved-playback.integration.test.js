@@ -10,6 +10,7 @@ const { createTestApp } = await import('./fixtures/test-app.js');
 const { clearMockStorage } = await import('../src/repositories/BaseRepository.js');
 const {
     campaignRepository,
+    creativeRepository,
     impressionRepository,
     locationRepository,
     mediaRepository,
@@ -20,7 +21,6 @@ const {
 const { default: BusinessHoursRepository } = await import('../src/repositories/BusinessHoursRepository.js');
 const { deviceCredentialService } = await import('../src/services/DeviceCredentialService.js');
 const { describeWithAuthEmulator, signInAs } = await import('./fixtures/emulator-sign-in.js');
-
 const app = createTestApp(apiRouter, '/api');
 
 jest.setTimeout(30_000);
@@ -82,19 +82,22 @@ async function seedMedia() {
     await mediaRepository.create('internal-media', approvedMedia({
         title: 'Softomedia house ad', category: 'internal', owner_type: 'platform', owner_id: null,
     }));
-    // Creative approval is seeded: the approval workflow is a separate ticket.
-    await mediaRepository.create('brand-one-creative', approvedMedia({
-        title: 'Brand One latte', category: 'paid', owner_type: 'brand', owner_id: 'brand-one',
-        mime_type: 'image/png', duration: 5,
-    }));
-    await mediaRepository.create('brand-two-creative', {
-        title: 'Brand Two muffin', category: 'paid', owner_type: 'brand', owner_id: 'brand-two',
-        mime_type: 'image/png', duration: 5, approval_status: 'pending_approval', eligible_for_playback: false,
+    // Creative approval is seeded: granting it is a separate ticket.
+    await seedCreative('brand-one', 'Brand One latte', 'approved');
+    await seedCreative('brand-two', 'Brand Two muffin', 'pending');
+    await seedCreative('brand-three', 'Brand Three bagel', 'approved');
+}
+
+/** A Brand's paid file, and the Creative whose status decides whether it plays. */
+async function seedCreative(brandId, title, approvalStatus, fileFields = {}) {
+    const mediaId = `${brandId}-creative`;
+    await creativeRepository.create(`crv-${brandId}`, {
+        brand_id: brandId, media_ids: [mediaId], approval_status: approvalStatus,
     });
-    await mediaRepository.create('brand-three-creative', approvedMedia({
-        title: 'Brand Three bagel', category: 'paid', owner_type: 'brand', owner_id: 'brand-three',
-        mime_type: 'image/png', duration: 5,
-    }));
+    await mediaRepository.create(mediaId, {
+        title, category: 'paid', owner_type: 'brand', owner_id: brandId, status: 'ready',
+        mime_type: 'image/png', duration: 5, creative_id: `crv-${brandId}`, ...fileFields,
+    });
 }
 
 /** Moves the clock and signs everyone in afresh, so their tokens are valid at the new time. */
@@ -242,6 +245,51 @@ describeWithAuthEmulator('Reserved Slots on the Screen', () => {
         })]);
         const recorded = await impressionRepository.findAll();
         expect(recorded.map(proof => proof.event_id)).toEqual(['reserved-play']);
+    });
+
+    test('a reserved file plays only once its Creative is approved, whatever the file record says', async () => {
+        // A file marked approved on its own record, but whose Creative is pending.
+        await seedCreative('brand-four', 'Brand Four scone', 'pending', {
+            approval_status: 'approved', eligible_for_playback: true,
+        });
+        // A file marked approved with no Creative at all.
+        await mediaRepository.create('brand-five-creative', approvedMedia({
+            title: 'Brand Five tea', category: 'paid', owner_type: 'brand', owner_id: 'brand-five',
+            mime_type: 'image/png', duration: 5,
+        }));
+
+        let as = await signInAllAt(BOOKED);
+        const brandFour = await signInAs('brand', { organizationId: 'brand-four', fakeClock: true });
+        const brandFive = await signInAs('brand', { organizationId: 'brand-five', fakeClock: true });
+        const pendingCreative = await book(brandFour.headers, 'brand-four', UNAPPROVED_CREATIVE);
+        const noCreative = await book(brandFive.headers, 'brand-five', LATE_APPROVAL);
+        expect([pendingCreative.status, noCreative.status]).toEqual([201, 201]);
+
+        const generate = async () => {
+            as = await signInAllAt(GENERATED);
+            const generated = await request(app).post('/api/loops/generate').set(as.admin)
+                .send({ targetDate: DATE, retailerId: 'retailer-one', storeId: 'store-one' });
+            expect(generated.status).toBe(201);
+            return generated.body.loops.find(loop => loop.hour === 8).slots;
+        };
+
+        let slots = await generate();
+        for (const position of [UNAPPROVED_CREATIVE, LATE_APPROVAL]) {
+            expect({ position, slot: slots[position] }).toMatchObject({
+                position, slot: { is_fallback: true, asset_id: 'fallback-media', campaign_id: null },
+            });
+        }
+        // Nor will the Screen fetch the file of an unapproved Creative.
+        const media = await request(app).get('/api/device/media/brand-four-creative').set('Authorization', device());
+        expect(media.status).toBe(404);
+
+        // Once the Creative is approved, its reserved Slot is placed.
+        await creativeRepository.update('crv-brand-four', { approval_status: 'approved' });
+        slots = await generate();
+        expect(slots[UNAPPROVED_CREATIVE]).toMatchObject({
+            is_fallback: false, campaign_id: pendingCreative.body.id, asset_id: 'brand-four-creative',
+        });
+        expect(slots[LATE_APPROVAL]).toMatchObject({ is_fallback: true });
     });
 
     test('Paid positions are never shared out among approved Paid Campaigns without a Reservation', async () => {

@@ -26,6 +26,8 @@ export const PERMISSIONS = Object.freeze({
     CAMPAIGN_DELETE: 'campaigns.delete',
     CAMPAIGN_APPROVAL: 'campaigns.approve',
     CAMPAIGN_VIEW_NETWORK: 'campaigns.view_network',
+    // Approve, reject and revoke a Creative. Granted to no role until Chris names the approver (#37).
+    CREATIVE_APPROVAL: 'creatives.approve',
     LOOP_INJECT: 'loops.inject',
     LOOP_GENERATE: 'loops.generate',
     SCHEDULE_OVERRIDE: 'schedules.override',
@@ -148,6 +150,10 @@ export const requireScreenManagement = requirePermission(
 );
 export const requireCampaignApproval = requirePermission(
     PERMISSIONS.CAMPAIGN_APPROVAL,
+    null,
+);
+export const requireCreativeApproval = requirePermission(
+    PERMISSIONS.CREATIVE_APPROVAL,
     null,
 );
 export const requireOrganizationManagement = requirePermission(

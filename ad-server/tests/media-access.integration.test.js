@@ -37,6 +37,7 @@ describeWithEmulators('media access with Firebase emulators', () => {
     let storage;
     const tokens = {};
     const createdMediaIds = [];
+    const createdCreativeIds = [];
 
     const as = (persona, pending) => pending.set('Authorization', `Bearer ${tokens[persona]}`);
 
@@ -75,6 +76,7 @@ describeWithEmulators('media access with Firebase emulators', () => {
 
     afterAll(async () => {
         await Promise.all(createdMediaIds.map(id => firestore.collection('media').doc(id).delete()));
+        await Promise.all(createdCreativeIds.map(id => firestore.collection('creatives').doc(id).delete()));
         await firestore?.terminate();
     });
 
@@ -86,6 +88,7 @@ describeWithEmulators('media access with Firebase emulators', () => {
             .attach('file', PNG, { filename: 'creative.png', contentType: 'image/png' });
         expect(upload.status).toBe(201);
         createdMediaIds.push(upload.body.id);
+        createdCreativeIds.push(upload.body.creative.id);
         return upload.body;
     }
 

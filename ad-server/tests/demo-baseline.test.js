@@ -1,6 +1,7 @@
 import { describe, expect, test } from '@jest/globals';
 
 const {
+    DEMO_BUSINESS_COLLECTIONS,
     DEMO_RESET_SCOPE,
     DEMO_STORAGE_PREFIX,
     buildDemoBaseline,
@@ -46,6 +47,18 @@ describe('deterministic Phase 1 demo baseline', () => {
             baseline.storageObjects.map(object => `gs://softomedia-demo-assets/${object.name}`)
         );
         expect(baseline.storageObjects.every(object => object.name.startsWith(DEMO_STORAGE_PREFIX))).toBe(true);
+
+        // The demo's paid file belongs to an approved Creative of its Brand.
+        const paid = media.find(({ data }) => data.category === 'paid').data;
+        expect(recordsByCollection(baseline, 'creatives').map(({ data }) => data)).toEqual([
+            expect.objectContaining({
+                id: paid.creative_id,
+                brand_id: paid.owner_id,
+                media_ids: [paid.id],
+                approval_status: 'approved',
+            }),
+        ]);
+        expect(DEMO_BUSINESS_COLLECTIONS).toContain('creatives');
 
         expect(campaigns).toHaveLength(2);
         expect(campaigns.every(({ data }) => data.advertiser_id === 'demo-advertiser-secondary')).toBe(true);

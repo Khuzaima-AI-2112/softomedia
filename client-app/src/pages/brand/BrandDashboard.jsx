@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import KPICard from '../../components/KPICard';
 import DataTable from '../../components/DataTable';
 import GlassCard from '../../components/GlassCard';
+import BrandCreatives from './BrandCreatives';
 import ProtectedImage from '../../components/ProtectedImage';
 import { assetContentPath } from '../../hooks/useMediaSource';
 import apiService from '../../services/ApiService';
@@ -240,6 +241,8 @@ const BrandDashboard = () => {
                     data={campaigns}
                 />
             )}
+
+            <BrandCreatives />
         </div>
     );
 };
