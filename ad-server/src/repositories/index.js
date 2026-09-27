@@ -15,3 +15,4 @@ export * from './StoreRepository.js';
 export * from './PricingRepository.js';
 export * from './DemoOrganizationRepository.js';
 export * from './PlatformAuditRepository.js';
+export * from './SlotReservationRepository.js';

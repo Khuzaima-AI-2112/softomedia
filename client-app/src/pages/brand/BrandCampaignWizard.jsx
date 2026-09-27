@@ -63,6 +63,7 @@ const BrandCampaignWizard = () => {
         if (submitting) return;
 
         setSubmitting(true);
+        updateWizardData({ slotConflict: null });
         try {
             const campaignData = {
                 name: wizardData.campaignName || 'New Campaign',
@@ -72,13 +73,30 @@ const BrandCampaignWizard = () => {
                 end_date: wizardData.dateRange.end,
                 budget: wizardData.budget,
                 inventory_selection: wizardData.selectedInventory,
-                selected_slots: wizardData.selectedSlots,
+                // The server prices each Slot; the quoted price is for display only.
+                slots: wizardData.selectedSlots.map(({ store_id, date, hour, position }) => ({
+                    store_id, date, hour, position,
+                })),
             };
 
             await apiService.createCampaign(campaignData);
 
             navigate('/dashboard/brand');
         } catch (error) {
+            const code = error.response?.code;
+            if (code === 'SLOT_TAKEN' || code === 'BOOKING_CLOSED') {
+                // Back to the grid, which reloads and shows the Slot as taken or the date as closed.
+                const taken = error.response.slots || [];
+                setWizardData(prev => ({
+                    ...prev,
+                    slotConflict: error.message,
+                    selectedSlots: prev.selectedSlots.filter(slot => !taken.some(other =>
+                        other.store_id === slot.store_id && other.date === slot.date
+                        && other.hour === slot.hour && other.position === slot.position)),
+                }));
+                setCurrentStep(3);
+                return;
+            }
             console.error('Failed to book campaign:', error);
             alert('An error occurred while booking your campaign. Please try again.');
         } finally {

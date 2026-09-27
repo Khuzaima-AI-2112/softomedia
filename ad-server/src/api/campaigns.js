@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import express from 'express';
 import {
     campaignRepository,
@@ -6,9 +7,12 @@ import {
     mediaRepository,
     retailerRepository,
     screenRepository,
+    slotReservationRepository,
+    SlotTakenError,
     StoreRepository,
 } from '../repositories/index.js';
 import { resolveAgreedCpm } from '../services/CampaignPricingService.js';
+import { prepareReservations } from '../services/SlotReservations.js';
 import { authenticate } from '../middleware/auth.js';
 import {
     PERMISSIONS,
@@ -244,30 +248,9 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, RO
             brandMedia = validation.media;
         }
 
-        // Task 2A: Full-Capacity Inventory Blocking
-        // Only enforce check if target dates and location are explicitly provided
-        if (req.body.start_date && req.body.end_date && req.body.location_id) {
-            const existingCampaigns = await campaignRepository.findAll({
-                where: [
-                    ['status', 'in', ['approved', 'live', 'pending_approval']],
-                    ['location_id', '==', req.body.location_id]
-                ]
-            });
-            const overlapping = existingCampaigns.filter(c => {
-                const overlapsStart = req.body.start_date <= c.end_date;
-                const overlapsEnd = req.body.end_date >= c.start_date;
-                return overlapsStart && overlapsEnd;
-            });
-
-            if (overlapping.length >= 12) {
-                return res.status(409).json({
-                    error: 'INVENTORY_SOLD_OUT',
-                    message: `Location ${req.body.location_id} is completely sold out for the requested date range. Maximum 12 concurrent campaigns reached.`
-                });
-            }
-        }
-
-        const id = brandCaller ? `cmp_${Date.now()}` : (req.body.id || `cmp_${Date.now()}`);
+        // Unique even when two submissions arrive in the same millisecond.
+        const generatedId = `cmp_${Date.now()}_${randomBytes(4).toString('hex')}`;
+        const id = brandCaller ? generatedId : (req.body.id || generatedId);
         const submittedData = brandCaller ? {
             name: req.body.name,
             media_id: req.body.media_id,
@@ -277,12 +260,23 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, RO
             end_date: req.body.end_date,
             budget: req.body.budget,
             inventory_selection: req.body.inventory_selection,
-            selected_slots: Array.isArray(req.body.selected_slots) ? req.body.selected_slots : [],
         } : req.body;
+
+        // A Brand reserves the Paid Slots it picked (ADR 0005).
+        let reservations = [];
+        if (brandCaller) {
+            const prepared = await prepareReservations({
+                slots: req.body.slots, campaign: submittedData, brandId: brandOwnerId,
+            });
+            if (prepared.error) {
+                return res.status(400).json({ error: prepared.error, code: prepared.code });
+            }
+            reservations = prepared.reservations;
+        }
         const bookedAt = new Date().toISOString();
         const campaignData = {
             ...submittedData,
-            // T5: a Brand's ownership is stamped by createForBrand from its identity;
+            // T5: a Brand's ownership is stamped by brandRecord from its identity;
             // a Campaign prepared for an advertiser uses the advertiser named above.
             ...(preparedForAdvertiser ? { advertiser_id: req.body.advertiser_id } : {}),
             // The rate is struck now and billed later: re-tiering a Store never
@@ -293,11 +287,29 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, RO
             status: 'pending_approval',
             created_at: bookedAt
         };
-        const campaign = brandCaller
-            ? await campaignRepository.createForBrand(id, campaignData, brandOwnerId)
-            : await campaignRepository.create(id, campaignData);
+        if (!brandCaller) {
+            return res.status(201).json(await campaignRepository.create(id, campaignData));
+        }
+
+        const campaign = await slotReservationRepository.reserveForCampaign(
+            campaignRepository,
+            {
+                ...campaignRepository.brandRecord(id, campaignData, brandOwnerId),
+                reserved_slots: reservations.map(({ store_id: storeId, date, hour, position, price }) => ({
+                    store_id: storeId, date, hour, position, price,
+                })),
+            },
+            reservations.map(reservation => ({ ...reservation, campaign_id: id })),
+        );
         res.status(201).json(campaign);
     } catch (error) {
+        if (error instanceof SlotTakenError) {
+            return res.status(409).json({
+                error: 'Another Brand reserved a Slot you picked moments ago. Choose another Slot and submit again.',
+                code: 'SLOT_TAKEN',
+                slots: error.slots,
+            });
+        }
         res.status(500).json({ error: error.message });
     }
 });

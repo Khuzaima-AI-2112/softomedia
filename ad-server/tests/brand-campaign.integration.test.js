@@ -31,6 +31,21 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
     const createdProofOfPlayIds = [];
     const createdLoopIds = [];
     const createdScheduleIds = [];
+    const createdReservationIds = [];
+
+    /** The first free Paid Slots of a Store on a date, as a Brand sees them. */
+    async function freePaidSlots(token, storeId, date, count = 1) {
+        const availability = await request(app)
+            .get(`/api/inventory/stores/${storeId}/slots?date=${date}`)
+            .set('Authorization', `Bearer ${token}`);
+        expect(availability.status).toBe(200);
+        const slots = availability.body.hours.flatMap(({ hour, slots: hourSlots }) => hourSlots
+            .filter(slot => slot.status === 'free')
+            .map(({ position }) => ({ store_id: storeId, date, hour, position })))
+            .slice(0, count);
+        createdReservationIds.push(...slots.map(slot => `${storeId}_${date}_${slot.hour}_${slot.position}`));
+        return slots;
+    }
 
     beforeAll(async () => {
         ({ default: request } = await import('supertest'));
@@ -65,6 +80,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
         await Promise.all(createdProofOfPlayIds.map(id => firestore.collection('impressions').doc(id).delete()));
         await Promise.all(createdLoopIds.map(id => firestore.collection('loops').doc(id).delete()));
         await Promise.all(createdScheduleIds.map(id => firestore.collection('daily_schedules').doc(id).delete()));
+        await Promise.all(createdReservationIds.map(id => firestore.collection('slot_reservations').doc(id).delete()));
         const bucket = storage.bucket(process.env.DEMO_ASSETS_BUCKET);
         await Promise.all(createdObjectNames.map(name => bucket.file(name).delete({ ignoreNotFound: true })));
         await firestore?.terminate();
@@ -240,6 +256,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
                         location_id: 'demo-location-mtl-entrance',
                         screen_id: 'demo-screen-north-1',
                     }],
+                    slots: await freePaidSlots(brandToken, 'demo-store-mtl-north', '2030-01-16'),
                 });
             expect(booked.status).toBe(201);
             bookedCampaignId = booked.body.id;
@@ -267,6 +284,61 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
             if (bookedCampaignId) {
                 await firestore.collection('campaigns').doc(bookedCampaignId).delete();
             }
+        }
+    });
+
+    test('two Brands submitting for one Slot at once leave exactly one Reservation in Firestore', async () => {
+        const creativeFor = async brandId => {
+            const id = `race-creative-${brandId}-${Date.now()}`;
+            createdMediaIds.push(id);
+            await firestore.collection('media').doc(id).set({
+                id, category: 'paid', owner_type: 'brand', owner_id: brandId, mime_type: 'image/png', duration: 5,
+            });
+            return id;
+        };
+        const [bonvieCreative, secondaryCreative] = await Promise.all([
+            creativeFor('demo-advertiser-bonvie'), creativeFor('demo-advertiser-secondary'),
+        ]);
+        const [contested] = await freePaidSlots(brandToken, 'demo-store-phoenix', '2030-01-18');
+        const submission = (token, media) => request(app).post('/api/campaigns')
+            .set('Authorization', `Bearer ${token}`)
+            .send({
+                name: 'Race for one Slot',
+                media_id: media,
+                start_date: '2030-01-18',
+                end_date: '2030-01-18',
+                budget: 100,
+                inventory_selection: [{
+                    retailer_id: 'demo-retailer-secondary',
+                    store_id: 'demo-store-phoenix',
+                    location_id: 'demo-location-phoenix-entrance',
+                    screen_id: 'demo-screen-secondary-1',
+                }],
+                slots: [contested],
+            });
+
+        const responses = await Promise.all([
+            submission(brandToken, bonvieCreative),
+            submission(secondaryBrandToken, secondaryCreative),
+        ]);
+        const winner = responses.find(response => response.status === 201);
+        // Removed here, not in afterAll: sibling tests count each Brand's Campaigns.
+        try {
+            expect(responses.map(response => response.status).sort()).toEqual([201, 409]);
+            expect(responses.find(response => response.status === 409).body)
+                .toMatchObject({ code: 'SLOT_TAKEN' });
+
+            const reservations = await firestore.collection('slot_reservations')
+                .where('store_id', '==', 'demo-store-phoenix').where('date', '==', '2030-01-18').get();
+            expect(reservations.docs.map(document => document.data())).toEqual([
+                expect.objectContaining({ ...contested, campaign_id: winner.body.id, status: 'held' }),
+            ]);
+            const raceCampaigns = await firestore.collection('campaigns')
+                .where('name', '==', 'Race for one Slot').get();
+            expect(raceCampaigns.docs.map(document => document.id)).toEqual([winner.body.id]);
+        } finally {
+            await Promise.all(responses.filter(response => response.status === 201)
+                .map(response => firestore.collection('campaigns').doc(response.body.id).delete()));
         }
     });
 
@@ -315,6 +387,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
                 budget: 1200,
                 status: 'approved',
                 inventory_selection: inventorySelection,
+                slots: await freePaidSlots(brandToken, 'demo-store-phoenix', '2030-01-16'),
             });
 
         expect(creation.status).toBe(201);

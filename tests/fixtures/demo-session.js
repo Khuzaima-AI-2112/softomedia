@@ -41,6 +41,21 @@ export const test = base.extend({
                 resetAt: new Date('2030-01-15T10:30:00.000Z'),
             }),
             provisionPersonas: () => provisionDemoPersonas({ password: PASSWORD, expectedProjectId: 'softomedia-demo' }),
+            // Stands in for another Brand reserving a Slot first, between a pick and its submission.
+            holdSlot: ({ store_id: storeId, date, hour, position }, brandId) => getFirestore()
+                .collection('slot_reservations').doc(`${storeId}_${date}_${hour}_${position}`)
+                .set({
+                    store_id: storeId, date, hour, position, brand_id: brandId,
+                    campaign_id: `held-by-${brandId}`, status: 'held', price: 0,
+                }),
+            // Demo reset does not yet clear Reservations (#46), so journeys remove their own.
+            releaseSlots: async (storeId, dates) => {
+                const reservations = await getFirestore().collection('slot_reservations')
+                    .where('store_id', '==', storeId).get();
+                await Promise.all(reservations.docs
+                    .filter(document => dates.includes(document.data().date))
+                    .map(document => document.ref.delete()));
+            },
         });
 
         await closeFirestore();

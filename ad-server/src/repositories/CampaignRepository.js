@@ -37,13 +37,15 @@ export class CampaignRepository extends BaseRepository {
             && (!status || campaign.status === status));
     }
 
-    createForBrand(id, data, brandId) {
-        return this.create(id, {
+    /** A Brand's Campaign record, owned by the Brand's signed-in identity. */
+    brandRecord(id, data, brandId) {
+        return {
             ...data,
+            id,
             brand_id: brandId,
             // Compatibility boundary for legacy readers pending schema migration.
             advertiser_id: brandId,
-        });
+        };
     }
 }
 

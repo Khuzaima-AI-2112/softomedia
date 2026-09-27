@@ -44,6 +44,32 @@ export function agreedCpmFor({ config, storesById, inventorySelection, retailerI
     return round(rates.reduce((total, rate) => total + rate, 0) / rates.length);
 }
 
+/** The hour-of-day pricing tier in force on a date: a date override first, then the hour's tier, else medium. */
+function hourTierFor(config, date, hour) {
+    const overridden = config.dateOverrides?.[date]?.hourlyTiers?.[hour];
+    if (overridden && config.trafficTiers?.[overridden]) return overridden;
+    const [tier] = Object.entries(config.trafficTiers || {})
+        .find(([, candidate]) => candidate.hours?.includes(hour)) || ['medium'];
+    return tier;
+}
+
+/**
+ * The price of one Slot: the Retailer's base CPM times the Store's assigned
+ * foot-traffic tier and the hour's pricing tier (and any date multiplier), the
+ * same for every position in the hour.
+ * @returns {{price: number, tier: string}} The price and the hour's tier
+ */
+export function slotQuote({ config, retailerId, storeTier, date, hour }) {
+    const tier = hourTierFor(config, date, hour);
+    const hourMultiplier = config.trafficTiers?.[tier]?.multiplier ?? 1.0;
+    const dateMultiplier = config.dateOverrides?.[date]?.multiplier || 1.0;
+    const storeMultiplier = PricingRepository.storeTrafficMultiplier(config, storeTier);
+    return {
+        price: round(baseCpmFor(config, retailerId) * storeMultiplier * hourMultiplier * dateMultiplier),
+        tier,
+    };
+}
+
 /** Loads the pricing and Stores a Campaign's booked rate depends on. */
 export async function resolveAgreedCpm(campaign) {
     const config = await PricingRepository.getConfig();

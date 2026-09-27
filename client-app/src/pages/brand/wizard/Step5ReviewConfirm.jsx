@@ -31,7 +31,7 @@ function Step5ReviewConfirm({ data, onConfirm, submitting, onPrev }) {
             return acc;
         }, {});
 
-        const screens = [...new Set(slots.map(s => s.screen_id))];
+        const stores = [...new Set(slots.map(s => s.store_id))];
 
         // Bug #27 fix: append T00:00:00 so YYYY-MM-DD strings parse in local
         // time, not UTC midnight (which renders as the previous day in UTC- zones).
@@ -49,7 +49,7 @@ function Step5ReviewConfirm({ data, onConfirm, submitting, onPrev }) {
             totalImpressions,
             slots,
             byDateHour: Object.values(byDateHour),
-            screenCount: screens.length,
+            storeCount: stores.length,
             durationDays
         };
     }, [data.selectedSlots, data.dateRange]);
@@ -129,8 +129,8 @@ function Step5ReviewConfirm({ data, onConfirm, submitting, onPrev }) {
                         </h3>
                         <div className="grid grid-cols-3 gap-4 mb-4">
                             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-center">
-                                <p className="text-3xl font-black text-primary">{summary.screenCount}</p>
-                                <p className="text-xs text-slate-500">Screens</p>
+                                <p className="text-3xl font-black text-primary">{summary.storeCount}</p>
+                                <p className="text-xs text-slate-500">Stores</p>
                             </div>
                             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-center">
                                 <p className="text-3xl font-black text-primary">{summary.totalSlots}</p>

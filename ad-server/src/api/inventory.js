@@ -8,7 +8,7 @@ import {
 import PricingRepository from '../repositories/PricingRepository.js';
 import { authenticate } from '../middleware/auth.js';
 import { normalizeRole } from '../constants/roles.js';
-import { slotInventory } from '../services/SlotInventory.js';
+import { slotAvailability } from '../services/SlotReservations.js';
 
 const router = express.Router();
 
@@ -39,8 +39,9 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /api/inventory/stores/:storeId/slots?date=YYYY-MM-DD
- * Each Slot of each operating hour with only its category and status, so a
- * Brand never learns which organization holds a Slot.
+ * Each Slot of each operating hour with only its category and status (free,
+ * taken or yours), so a Brand never learns which organization holds a Slot,
+ * plus each hour's price and the date's Booking Cutoff.
  */
 router.get('/stores/:storeId/slots', async (req, res) => {
     const { date } = req.query;
@@ -53,7 +54,9 @@ router.get('/stores/:storeId/slots', async (req, res) => {
         if (!items.some(item => item.store.id === req.params.storeId)) {
             return res.status(404).json({ error: 'Store not found' });
         }
-        return res.json(await slotInventory(req.params.storeId, date));
+        const store = await StoreRepository.findById(req.params.storeId);
+        const brandId = req.user.linked_entity_id || req.user.organization_id || null;
+        return res.json(await slotAvailability(store, date, brandId));
     } catch (error) {
         console.error('Failed to load Slot availability:', error);
         return res.status(500).json({ error: 'Slot availability could not be loaded' });

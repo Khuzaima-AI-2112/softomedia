@@ -5,6 +5,7 @@
  * middleware, which resolves the profile saved here. Suites that run without
  * the emulators skip themselves with describeWithAuthEmulator.
  */
+import { randomUUID } from 'node:crypto';
 import { describe } from '@jest/globals';
 
 export const PASSWORD = 'Phase1-demo-password!';
@@ -57,7 +58,8 @@ function issuedAtSuiteClock(idToken) {
 export async function signInAs(role, { organizationId = null, permissions = [], fakeClock = false } = {}) {
     const key = JSON.stringify([role, organizationId, [...permissions].sort()]);
     if (!accounts.has(key)) {
-        const email = `${role}-${accounts.size}-${Date.now()}@jest.demo.softomedia.test`;
+        // Random, not clock-based: a faked clock repeats across runs against one emulator.
+        const email = `${role}-${accounts.size}-${randomUUID()}@jest.demo.softomedia.test`;
         const { localId, idToken } = await callIdentityToolkit('signUp', email, PASSWORD);
         accounts.set(key, { uid: localId, email, idToken });
     }
