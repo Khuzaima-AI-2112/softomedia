@@ -5,7 +5,7 @@ import { randomUUID } from 'crypto';
 import { campaignRepository, CREATIVE_STATUS, creativeRepository, mediaRepository } from '../repositories/index.js';
 import { loopRepository } from '../repositories/LoopRepository.js';
 import { deleteMediaObject, uploadMediaObject } from '../utils/storage.js';
-import { ROLES, normalizeRole } from '../constants/roles.js';
+import { ROLES, brandIdFor, normalizeRole } from '../constants/roles.js';
 import { sendMediaContent } from './mediaContent.js';
 import { assetContentPath } from '../constants/mediaPaths.js';
 import { decodeUploadFilename } from '../utils/uploadFilename.js';
@@ -64,7 +64,7 @@ function resolveUploadMetadata(req, category) {
     if (role === ROLES.BRAND && category === 'paid') {
         return {
             ownerType: 'brand',
-            ownerId: req.user.linked_entity_id || req.user.organization_id || null,
+            ownerId: brandIdFor(req.user),
         };
     }
     return null;

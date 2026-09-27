@@ -106,16 +106,18 @@ describe('guarded demo reset', () => {
         const unrelatedDocument = firestore.collection('campaigns').doc('unrelated-customer-record');
         const staleDemoDocument = firestore.collection('campaigns').doc('demo-stale-record');
         const staleDemoLoop = firestore.collection('loops').doc('demo-stale-loop');
+        const staleDemoCreative = firestore.collection('creatives').doc('demo-stale-creative');
         const scopedUserProfile = firestore.collection('users').doc('demo-preserved-user-profile');
         const unrelatedObject = bucket.file('unrelated/customer-object.txt');
         const staleDemoObject = bucket.file(`${DEMO_STORAGE_PREFIX}stale-object.txt`);
-        cleanupDocuments.push(unrelatedDocument, staleDemoDocument, staleDemoLoop, scopedUserProfile);
+        cleanupDocuments.push(unrelatedDocument, staleDemoDocument, staleDemoLoop, staleDemoCreative, scopedUserProfile);
         cleanupObjects.push(unrelatedObject, staleDemoObject);
 
         await Promise.all([
             unrelatedDocument.set({ value: 'preserve' }),
             staleDemoDocument.set({ demo_reset_scope: DEMO_RESET_SCOPE, value: 'replace' }),
             staleDemoLoop.set({ demo_reset_scope: DEMO_RESET_SCOPE, value: 'replace' }),
+            staleDemoCreative.set({ demo_reset_scope: DEMO_RESET_SCOPE, value: 'replace' }),
             scopedUserProfile.set({ demo_reset_scope: DEMO_RESET_SCOPE, value: 'preserve' }),
             unrelatedObject.save('preserve', { contentType: 'text/plain' }),
             staleDemoObject.save('replace', { contentType: 'text/plain' }),
@@ -139,6 +141,7 @@ describe('guarded demo reset', () => {
         });
         expect((await staleDemoDocument.get()).exists).toBe(false);
         expect((await staleDemoLoop.get()).exists).toBe(false);
+        expect((await staleDemoCreative.get()).exists).toBe(false);
         expect((await unrelatedDocument.get()).data()).toEqual({ value: 'preserve' });
         expect((await scopedUserProfile.get()).data()).toEqual({
             demo_reset_scope: DEMO_RESET_SCOPE,

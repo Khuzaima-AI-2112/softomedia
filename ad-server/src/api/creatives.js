@@ -1,4 +1,5 @@
 import express from 'express';
+import logger from '../utils/logger.js';
 import {
     CREATIVE_STATUS,
     CreativeStatusConflictError,
@@ -28,16 +29,19 @@ async function presentCreative(creative) {
  */
 router.get('/', async (req, res) => {
     const role = normalizeRole(req.user?.role);
-    let creatives;
-    if (role === ROLES.BRAND) {
-        const brandId = brandIdFor(req.user);
-        creatives = brandId ? await creativeRepository.findForBrand(brandId) : [];
-    } else if (NETWORK_ROLES.has(role)) {
-        creatives = await creativeRepository.findAll();
-    } else {
+    if (role !== ROLES.BRAND && !NETWORK_ROLES.has(role)) {
         return res.status(403).json({ error: 'Access denied' });
     }
-    return res.json(await Promise.all(creatives.map(presentCreative)));
+    try {
+        const brandId = brandIdFor(req.user);
+        const creatives = role !== ROLES.BRAND
+            ? await creativeRepository.findAll()
+            : brandId ? await creativeRepository.findForBrand(brandId) : [];
+        return res.json(await Promise.all(creatives.map(presentCreative)));
+    } catch (error) {
+        logger.error('[Creatives] Listing failed', { error: error.message });
+        return res.status(500).json({ error: 'Creatives could not be loaded' });
+    }
 });
 
 // Each decision moves a Creative from one status to the next.
@@ -56,20 +60,22 @@ for (const [action, { from, to, reasonRequired }] of Object.entries(DECISIONS)) 
         const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
         if (reasonRequired && !reason) return res.status(400).json({ error: 'A reason is required' });
 
-        let decided;
         try {
-            decided = await creativeRepository.decide(req.params.id, from, {
+            const decided = await creativeRepository.decide(req.params.id, from, {
                 approval_status: to,
                 decided_by: req.user.uid || req.user.id,
                 decided_at: new Date().toISOString(),
                 reason: reason || null,
             });
+            if (!decided) return res.status(404).json({ error: 'Creative not found' });
+            return res.json(await presentCreative(decided));
         } catch (error) {
-            if (!(error instanceof CreativeStatusConflictError)) throw error;
-            return res.status(409).json({ error: `Only a ${from} Creative can be ${to}` });
+            if (error instanceof CreativeStatusConflictError) {
+                return res.status(409).json({ error: `Only a ${from} Creative can be ${to}` });
+            }
+            logger.error('[Creatives] Decision failed', { action, creativeId: req.params.id, error: error.message });
+            return res.status(500).json({ error: 'The decision could not be saved' });
         }
-        if (!decided) return res.status(404).json({ error: 'Creative not found' });
-        return res.json(await presentCreative(decided));
     });
 }
 

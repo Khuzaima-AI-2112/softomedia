@@ -1,3 +1,5 @@
+import { CREATIVE_STATUS } from '../constants/creatives.js';
+
 export const DEMO_RESET_SCOPE = 'phase-1-demo';
 export const DEMO_RESET_SCOPE_FIELD = 'demo_reset_scope';
 export const DEMO_STORAGE_PREFIX = 'phase-1-demo/';
@@ -211,7 +213,7 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
         record('creatives', 'demo-creative-paid', {
             brand_id: 'demo-advertiser-secondary',
             media_ids: ['demo-media-paid'],
-            approval_status: 'approved',
+            approval_status: CREATIVE_STATUS.APPROVED,
             decided_by: null,
             decided_at: resetAtIso,
             reason: null,

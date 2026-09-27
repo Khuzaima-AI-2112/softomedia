@@ -134,7 +134,8 @@ describeWithAuthEmulator('classified media API', () => {
     });
 
     it('makes an Admin paid upload a pending Creative of the Brand, whatever approval it claims', async () => {
-        const response = await upload(await appAs('admin'), {
+        const admin = await appAs('admin');
+        const response = await upload(admin, {
             title: 'paid creative',
             category: 'paid',
             owner_type: 'brand',
@@ -146,8 +147,8 @@ describeWithAuthEmulator('classified media API', () => {
         expect(response.body).toMatchObject({ category: 'paid', owner_type: 'brand', owner_id: 'brand-1' });
         expect(response.body).not.toHaveProperty('approval_status');
         expect(response.body.creative).toEqual({ id: response.body.creative_id, approval_status: 'pending' });
-        expect(storedCreatives.get(response.body.creative_id))
-            .toMatchObject({ brand_id: 'brand-1', media_ids: [response.body.id], approval_status: 'pending' });
+        const listed = (await admin.get('/api/assets')).body.find(({ id }) => id === response.body.id);
+        expect(listed.creative).toEqual({ id: response.body.creative_id, approval_status: 'pending' });
     });
 
     it('lets Brand use the same upload contract while enforcing Brand ownership', async () => {
@@ -210,17 +211,6 @@ describeWithAuthEmulator('classified media API', () => {
         expect(response.body.error).toMatch(/could not be saved/i);
         expect(storedObjects.size).toBe(0);
         expect(storedMedia.size).toBe(0);
-    });
-
-    it('leaves no Creative behind when a Brand upload cannot be saved', async () => {
-        const response = await upload(await appAs('brand', 'brand-owned-org'), {
-            title: 'Metadata failure',
-            category: 'paid',
-        });
-
-        expect(response.status).toBe(500);
-        expect(storedObjects.size).toBe(0);
-        expect(storedCreatives.size).toBe(0);
     });
 
     it('reports storage failure without recording metadata or success', async () => {

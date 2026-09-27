@@ -90,7 +90,7 @@ async function seedMedia() {
 
 /** A Brand's paid file, and the Creative whose status decides whether it plays. */
 async function seedCreative(brandId, title, approvalStatus, fileFields = {}) {
-    const mediaId = `${brandId}-creative`;
+    const mediaId = `${brandId}-file`;
     await creativeRepository.create(`crv-${brandId}`, {
         brand_id: brandId, media_ids: [mediaId], approval_status: approvalStatus,
     });
@@ -116,7 +116,7 @@ async function signInAllAt(now) {
 
 const book = (headers, brandId, position) => request(app).post('/api/campaigns').set(headers).send({
     name: `${brandId} breakfast`,
-    media_id: `${brandId}-creative`,
+    media_id: `${brandId}-file`,
     start_date: DATE,
     end_date: DATE,
     budget: 100,
@@ -177,11 +177,11 @@ describeWithAuthEmulator('Reserved Slots on the Screen', () => {
 
         expect(slotAt(RESERVED)).toMatchObject({
             allocated_category: 'paid', content_kind: 'campaign', is_fallback: false,
-            campaign_id: booked.body.id, asset_id: 'brand-one-creative',
+            campaign_id: booked.body.id, asset_id: 'brand-one-file',
         });
         // A Reservation is placed when its Creative is approved; its Campaign's approval is checked at play time.
         expect(slotAt(LATE_APPROVAL)).toMatchObject({
-            content_kind: 'campaign', campaign_id: lateApproval.body.id, asset_id: 'brand-three-creative',
+            content_kind: 'campaign', campaign_id: lateApproval.body.id, asset_id: 'brand-three-file',
         });
         for (const position of [UNAPPROVED_CREATIVE, ...UNRESERVED_PAID]) {
             expect({ position, slot: slotAt(position) }).toMatchObject({
@@ -212,7 +212,7 @@ describeWithAuthEmulator('Reserved Slots on the Screen', () => {
         const played = playback.body.slots;
         expect(played[RESERVED]).toMatchObject({
             presentation_type: 'campaign', counts_as_delivery: true,
-            campaign_id: booked.body.id, asset_id: 'brand-one-creative',
+            campaign_id: booked.body.id, asset_id: 'brand-one-file',
         });
         for (const position of [UNAPPROVED_CREATIVE, LATE_APPROVAL, ...UNRESERVED_PAID]) {
             expect({ position, presentation_type: played[position].presentation_type, counts: played[position].counts_as_delivery })
@@ -225,14 +225,14 @@ describeWithAuthEmulator('Reserved Slots on the Screen', () => {
         expect(approvedLate.status).toBe(200);
         const replayed = await request(app).get('/api/device/playback').set('Authorization', device());
         expect(replayed.body.slots[LATE_APPROVAL]).toMatchObject({
-            presentation_type: 'campaign', campaign_id: lateApproval.body.id, asset_id: 'brand-three-creative',
+            presentation_type: 'campaign', campaign_id: lateApproval.body.id, asset_id: 'brand-three-file',
         });
 
         // Proof of Play is recorded for the reserved play, and never for Fallback Content.
         const reported = await proofOfPlay(eightAm.id, played[RESERVED], 'reserved-play');
         expect(reported.status).toBe(201);
         const fallbackClaim = await proofOfPlay(eightAm.id, {
-            position: UNAPPROVED_CREATIVE, campaign_id: unapprovedCreative.body.id, asset_id: 'brand-two-creative',
+            position: UNAPPROVED_CREATIVE, campaign_id: unapprovedCreative.body.id, asset_id: 'brand-two-file',
         }, 'fallback-play');
         expect(fallbackClaim.status).toBe(422);
         expect(fallbackClaim.body.error).toBe('The presented Slot is not Campaign delivery');
@@ -240,7 +240,7 @@ describeWithAuthEmulator('Reserved Slots on the Screen', () => {
         const proofs = await request(app).get(`/api/campaigns/${booked.body.id}/proofs-of-play`).set(as.brand);
         expect(proofs.status).toBe(200);
         expect(proofs.body).toEqual([expect.objectContaining({
-            event_id: 'reserved-play', campaign_id: booked.body.id, asset_id: 'brand-one-creative',
+            event_id: 'reserved-play', campaign_id: booked.body.id, asset_id: 'brand-one-file',
             loop_id: eightAm.id, slot_position: RESERVED,
         })]);
         const recorded = await impressionRepository.findAll();
@@ -253,7 +253,7 @@ describeWithAuthEmulator('Reserved Slots on the Screen', () => {
             approval_status: 'approved', eligible_for_playback: true,
         });
         // A file marked approved with no Creative at all.
-        await mediaRepository.create('brand-five-creative', approvedMedia({
+        await mediaRepository.create('brand-five-file', approvedMedia({
             title: 'Brand Five tea', category: 'paid', owner_type: 'brand', owner_id: 'brand-five',
             mime_type: 'image/png', duration: 5,
         }));
@@ -280,14 +280,14 @@ describeWithAuthEmulator('Reserved Slots on the Screen', () => {
             });
         }
         // Nor will the Screen fetch the file of an unapproved Creative.
-        const media = await request(app).get('/api/device/media/brand-four-creative').set('Authorization', device());
+        const media = await request(app).get('/api/device/media/brand-four-file').set('Authorization', device());
         expect(media.status).toBe(404);
 
         // Once the Creative is approved, its reserved Slot is placed.
         await creativeRepository.update('crv-brand-four', { approval_status: 'approved' });
         slots = await generate();
         expect(slots[UNAPPROVED_CREATIVE]).toMatchObject({
-            is_fallback: false, campaign_id: pendingCreative.body.id, asset_id: 'brand-four-creative',
+            is_fallback: false, campaign_id: pendingCreative.body.id, asset_id: 'brand-four-file',
         });
         expect(slots[LATE_APPROVAL]).toMatchObject({ is_fallback: true });
     });
@@ -295,7 +295,7 @@ describeWithAuthEmulator('Reserved Slots on the Screen', () => {
     test('Paid positions are never shared out among approved Paid Campaigns without a Reservation', async () => {
         const as = await signInAllAt(GENERATED);
         await campaignRepository.create('unreserved-campaign', {
-            type: 'paid', status: 'approved', media_id: 'brand-one-creative', brand_id: 'brand-one',
+            type: 'paid', status: 'approved', media_id: 'brand-one-file', brand_id: 'brand-one',
             advertiser_id: 'brand-one', inventory_selection: SELECTION, start_date: DATE, end_date: DATE,
         });
 

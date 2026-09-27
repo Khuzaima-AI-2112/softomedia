@@ -78,7 +78,7 @@ describeWithEmulators('Creatives with Firebase emulators', () => {
             .attach('file', VALID_PNG, { filename: 'creative.png', contentType: 'image/png' });
         expect(upload.status).toBe(201);
         createdMediaIds.push(upload.body.id);
-        createdCreativeIds.push(upload.body.creative?.id);
+        if (upload.body.creative) createdCreativeIds.push(upload.body.creative.id);
         return upload.body;
     }
 
@@ -183,7 +183,41 @@ describeWithEmulators('Creatives with Firebase emulators', () => {
 
         expect([approval.status, rejection.status].sort()).toEqual([200, 409]);
         const winner = approval.status === 200 ? 'approved' : 'rejected';
-        const stored = await firestore.collection('creatives').doc(asset.creative.id).get();
-        expect(stored.data().approval_status).toBe(winner);
+        const [creative] = (await listCreatives('brand')).filter(({ id }) => id === asset.creative.id);
+        expect(creative.approval_status).toBe(winner);
+    });
+
+    test('a Brand upload that cannot be saved leaves no Creative behind', async () => {
+        const { mediaRepository } = await import('../src/repositories/index.js');
+        const before = (await listCreatives('brand')).length;
+        const failing = jest.spyOn(mediaRepository, 'create').mockRejectedValueOnce(new Error('Firestore unavailable'));
+        try {
+            const upload = await as('brand', request(app).post('/api/assets/upload'))
+                .field('title', 'Never saved')
+                .field('category', 'paid')
+                .attach('file', VALID_PNG, { filename: 'creative.png', contentType: 'image/png' });
+            expect(upload.status).toBe(500);
+        } finally {
+            failing.mockRestore();
+        }
+
+        expect(await listCreatives('brand')).toHaveLength(before);
+    });
+
+    test('a storage failure answers 500 instead of stopping the server', async () => {
+        const { creativeRepository } = await import('../src/repositories/index.js');
+        const { headers } = await signInAs('superadmin', { permissions: ['creatives.approve'] });
+        const unavailable = new Error('Firestore unavailable');
+        const lists = jest.spyOn(creativeRepository, 'findForBrand').mockRejectedValueOnce(unavailable);
+        const decides = jest.spyOn(creativeRepository, 'decide').mockRejectedValueOnce(unavailable);
+        try {
+            const list = await as('brand', request(app).get('/api/creatives'));
+            expect(list.status).toBe(500);
+            const approval = await request(app).post('/api/creatives/crv_any/approve').set(headers);
+            expect(approval.status).toBe(500);
+        } finally {
+            lists.mockRestore();
+            decides.mockRestore();
+        }
     });
 });

@@ -1,7 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 
 const {
-    DEMO_BUSINESS_COLLECTIONS,
     DEMO_RESET_SCOPE,
     DEMO_STORAGE_PREFIX,
     buildDemoBaseline,
@@ -58,7 +57,6 @@ describe('deterministic Phase 1 demo baseline', () => {
                 approval_status: 'approved',
             }),
         ]);
-        expect(DEMO_BUSINESS_COLLECTIONS).toContain('creatives');
 
         expect(campaigns).toHaveLength(2);
         expect(campaigns.every(({ data }) => data.advertiser_id === 'demo-advertiser-secondary')).toBe(true);

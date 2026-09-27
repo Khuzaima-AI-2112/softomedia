@@ -27,15 +27,13 @@ describe('Brand Creatives', () => {
         ]);
         render(<BrandCreatives />);
 
-        const row = async title => (await screen.findByText(title)).closest('li');
-        expect(within(await row('latte title')).getByText('Pending approval')).toBeTruthy();
-        expect(within(await row('muffin title')).getByText('Approved')).toBeTruthy();
-        const rejected = await row('bagel title');
-        expect(within(rejected).getByText('Rejected')).toBeTruthy();
-        expect(within(rejected).getByText('Logo is cropped')).toBeTruthy();
-        const revoked = await row('scone title');
-        expect(within(revoked).getByText('Revoked')).toBeTruthy();
-        expect(within(revoked).getByText('Offer has ended')).toBeTruthy();
+        const status = async id => (await screen.findByTestId(`creative-status-${id}`)).textContent;
+        expect(await status('latte')).toBe('Pending approval');
+        expect(await status('muffin')).toBe('Approved');
+        expect(await status('bagel')).toBe('Rejected');
+        expect(within(screen.getByTestId('creative-row-bagel')).getByText('Logo is cropped')).toBeTruthy();
+        expect(await status('scone')).toBe('Revoked');
+        expect(within(screen.getByTestId('creative-row-scone')).getByText('Offer has ended')).toBeTruthy();
     });
 
     it('tells apart two uploads of the same file by when each was uploaded', async () => {
@@ -48,8 +46,8 @@ describe('Brand Creatives', () => {
         ]);
         render(<BrandCreatives />);
 
-        const rows = await screen.findAllByText('latte title');
-        expect(rows.map(title => within(title.closest('li')).getByText(/^Uploaded /).textContent)).toEqual([
+        const uploaded = async id => within(await screen.findByTestId(`creative-row-${id}`)).getByText(/^Uploaded /).textContent;
+        expect([await uploaded('latte'), await uploaded('latte-again')]).toEqual([
             `Uploaded ${new Date('2030-01-15T10:30:00.000Z').toLocaleDateString()}`,
             `Uploaded ${new Date('2030-01-16T10:30:00.000Z').toLocaleDateString()}`,
         ]);
@@ -59,7 +57,7 @@ describe('Brand Creatives', () => {
         getCreatives.mockResolvedValue([]);
         render(<BrandCreatives />);
 
-        expect(await screen.findByText('No creatives uploaded yet.')).toBeTruthy();
+        expect((await screen.findByTestId('brand-creatives-empty')).textContent).toBe('No creatives uploaded yet.');
     });
 
     it('says when the Creatives could not be loaded', async () => {

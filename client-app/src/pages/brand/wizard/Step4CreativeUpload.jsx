@@ -148,7 +148,9 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
                 </button>
                 {uploadSuccess && <p role="status" className="mt-2 text-sm text-emerald-600">{uploadSuccess}</p>}
                 {approvalStatus === 'pending' && (
-                    <p className="mt-1 text-sm text-amber-700">Pending approval: it plays once approved.</p>
+                    <p data-testid="creative-approval-status" className="mt-1 text-sm text-amber-700">
+                        Pending approval: it plays once approved.
+                    </p>
                 )}
             </GlassCard>
 
