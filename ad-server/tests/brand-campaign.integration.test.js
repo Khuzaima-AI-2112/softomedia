@@ -79,6 +79,10 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
     });
 
     afterAll(async () => {
+        if (pricingBeforeSuite) {
+            const pricingRef = firestore.collection('pricing_config').doc('global');
+            await (pricingBeforeSuite.exists ? pricingRef.set(pricingBeforeSuite.data()) : pricingRef.delete());
+        }
         await Promise.all(createdCampaignIds.map(id => firestore.collection('campaigns').doc(id).delete()));
         await Promise.all(createdMediaIds.map(id => firestore.collection('media').doc(id).delete()));
         await Promise.all(createdProofOfPlayIds.map(id => firestore.collection('impressions').doc(id).delete()));
@@ -87,10 +91,6 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
         await Promise.all(createdReservationIds.map(id => firestore.collection('slot_reservations').doc(id).delete()));
         const bucket = storage.bucket(process.env.DEMO_ASSETS_BUCKET);
         await Promise.all(createdObjectNames.map(name => bucket.file(name).delete({ ignoreNotFound: true })));
-        if (pricingBeforeSuite) {
-            const pricingRef = firestore.collection('pricing_config').doc('global');
-            await (pricingBeforeSuite.exists ? pricingRef.set(pricingBeforeSuite.data()) : pricingRef.delete());
-        }
         await firestore?.terminate();
     });
 
