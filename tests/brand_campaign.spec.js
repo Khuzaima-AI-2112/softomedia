@@ -106,8 +106,8 @@ test('Brand books Slots on the grid through a conflict and the Booking Cutoff, a
         await expect(page.getByText('demo-screen-secondary-1')).toBeVisible();
         await expect(page.getByRole('img', { name: `${title} creative` })).toBeVisible();
         // The Brand sees its Creative waiting for approval.
-        await expect(page.getByTestId('brand-creatives').getByRole('listitem').filter({ hasText: `${title} creative` }))
-            .toContainText('Pending approval');
+        await expect(page.locator('[data-testid^="creative-row-"]').filter({ hasText: `${title} creative` })
+            .locator('[data-testid^="creative-status-"]')).toHaveText('Pending approval');
 
         await page.reload();
         await expect(page.getByText(title, { exact: true })).toBeVisible();

@@ -23,15 +23,17 @@ function BrandCreatives() {
     return (
         <GlassCard>
             <h2 className="font-bold text-lg mb-4">Your Creatives</h2>
-            {error && <p role="alert" className="text-sm text-rose-600">{error}</p>}
-            {creatives?.length === 0 && <p className="text-sm text-slate-500">No creatives uploaded yet.</p>}
+            {error && <p role="alert" data-testid="brand-creatives-error" className="text-sm text-rose-600">{error}</p>}
+            {creatives?.length === 0 && (
+                <p data-testid="brand-creatives-empty" className="text-sm text-slate-500">No creatives uploaded yet.</p>
+            )}
             {creatives?.length > 0 && (
                 <ul className="divide-y divide-slate-200 dark:divide-slate-700" data-testid="brand-creatives">
                     {creatives.map(creative => {
                         const approval = APPROVAL[creative.approval_status]
                             ?? { label: creative.approval_status, className: 'bg-slate-100 text-slate-700' };
                         return (
-                            <li key={creative.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
+                            <li key={creative.id} data-testid={`creative-row-${creative.id}`} className="flex flex-wrap items-center justify-between gap-2 py-3">
                                 <span className="font-medium">
                                     {creative.files.map(file => file.title).join(' + ')}
                                 </span>
@@ -40,7 +42,8 @@ function BrandCreatives() {
                                         Uploaded {new Date(creative.created_at).toLocaleDateString()}
                                     </span>
                                 )}
-                                <span className={`rounded-full px-3 py-0.5 text-xs font-semibold ${approval.className}`}>
+                                <span data-testid={`creative-status-${creative.id}`}
+                                    className={`rounded-full px-3 py-0.5 text-xs font-semibold ${approval.className}`}>
                                     {approval.label}
                                 </span>
                                 {creative.reason && (

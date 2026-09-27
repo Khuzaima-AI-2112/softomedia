@@ -9,13 +9,13 @@ import { loopRepository, LOOP_STATUS } from '../repositories/LoopRepository.js';
 import { campaignRepository } from '../repositories/CampaignRepository.js';
 import { dailyScheduleRepository } from '../repositories/DailyScheduleRepository.js';
 import { mediaRepository } from '../repositories/MediaRepository.js';
-import { creativeRepository } from '../repositories/CreativeRepository.js';
 import { slotReservationRepository } from '../repositories/SlotReservationRepository.js';
 import { BusinessHoursService } from './BusinessHoursService.js';
 import logger from '../utils/logger.js';
 import {
     isApprovedFallbackAsset,
     isApprovedPlaybackAsset,
+    isPlayableStoredAsset,
 } from './PlaybackEligibility.js';
 import { allocatedCategory, firstPositionOfHour, SLOTS_PER_LOOP } from './SlotInventory.js';
 
@@ -247,7 +247,7 @@ export class LoopGenerationService {
         await Promise.all(reservations.map(async reservation => {
             const campaign = await campaignRepository.findById(reservation.campaign_id);
             const asset = campaign && await mediaRepository.findById(campaign.media_id || campaign.asset_id);
-            if (!isApprovedPlaybackAsset(asset, await creativeRepository.findForAsset(asset))) return;
+            if (!(await isPlayableStoredAsset(asset))) return;
 
             if (!byHour.has(reservation.hour)) byHour.set(reservation.hour, new Map());
             byHour.get(reservation.hour).set(reservation.position, {

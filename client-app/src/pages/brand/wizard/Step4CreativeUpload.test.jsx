@@ -69,7 +69,7 @@ describe('Brand creative upload', () => {
         expect(form.get('category')).toBe('paid');
         expect(form.get('title')).toBe('Autumn offer');
         expect(await screen.findByText('Creative uploaded successfully.')).toBeTruthy();
-        expect(screen.getByText('Pending approval: it plays once approved.')).toBeTruthy();
+        expect(screen.getByTestId('creative-approval-status').textContent.trim()).toBe('Pending approval: it plays once approved.');
 
         fireEvent.click(screen.getByTestId('wizard-next-step'));
         expect(updateData).toHaveBeenCalledWith({

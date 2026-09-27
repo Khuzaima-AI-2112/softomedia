@@ -1,21 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { BaseRepository, commitMockStorage, readMockRecord } from './BaseRepository.js';
 
+export { CREATIVE_STATUS } from '../constants/creatives.js';
+
 /** The Creative's status changed before this decision could be made. */
 export class CreativeStatusConflictError extends Error {
-    constructor(status) {
-        super(`The Creative is ${status}`);
+    constructor(currentStatus) {
+        super(`The Creative is ${currentStatus}`);
         this.name = 'CreativeStatusConflictError';
-        this.status = status;
     }
 }
-
-export const CREATIVE_STATUS = Object.freeze({
-    PENDING: 'pending',
-    APPROVED: 'approved',
-    REJECTED: 'rejected',
-    REVOKED: 'revoked',
-});
 
 /**
  * A Creative is a Brand's advertisement: its uploaded file(s) in order, and
