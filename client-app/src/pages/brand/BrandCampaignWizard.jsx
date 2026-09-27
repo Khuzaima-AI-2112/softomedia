@@ -36,6 +36,7 @@ const BrandCampaignWizard = () => {
         budget: 1000,
         // Step 3: Slots
         selectedSlots: [],
+        repeatDaily: true,
         // Step 4: Creative
         creativeUrl: '',
         creativeAssetId: null,

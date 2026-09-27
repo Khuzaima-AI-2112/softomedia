@@ -44,6 +44,11 @@ test('Brand books Slots on the grid through a conflict and the Booking Cutoff, a
         await expect(page.getByRole('row', { name: '8:00 AM' }).getByRole('button')).toHaveCount(0);
         await expect(page.getByTestId('step-3-next-btn')).toBeDisabled();
 
+        // This journey books one date; repeating Slots on every date is covered by the component and HTTP tests.
+        const repeatDaily = page.getByRole('checkbox', { name: 'Same Slots every day of the Campaign' });
+        await expect(repeatDaily).toBeChecked();
+        await repeatDaily.uncheck();
+
         await page.getByTestId(`calendar-day-${bookable}`).click();
         await expect(page.getByTestId('booking-cutoff')).toContainText('Booking for this date closes at 18:00');
 
