@@ -136,8 +136,8 @@ const Step2ScheduleUpload = ({ data, updateData, onNext, onPrev }) => {
                             <span className="material-symbols-outlined text-primary">tv</span>
                         </div>
                         <div>
-                            <p className="font-bold">{(data.selectedScreens || []).length} Screens Selected</p>
-                            <p className="text-sm text-slate-500">{(data.selectedStores || []).length} Stores</p>
+                            <p className="font-bold">{(data.selectedStores || []).length} Stores Selected</p>
+                            <p className="text-sm text-slate-500">{(data.selectedInventory || []).length} Screens</p>
                         </div>
                     </div>
                     <button

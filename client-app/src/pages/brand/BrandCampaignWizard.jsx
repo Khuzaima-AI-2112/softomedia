@@ -9,7 +9,7 @@ import GlassCard from '../../components/GlassCard';
 import apiService from '../../services/ApiService';
 
 const STEPS = [
-    { id: 1, name: 'Location', icon: 'location_on', description: 'Select stores & screens' },
+    { id: 1, name: 'Location', icon: 'location_on', description: 'Select stores' },
     { id: 2, name: 'Schedule', icon: 'calendar_month', description: 'Choose campaign dates' },
     { id: 3, name: 'Slots', icon: 'view_module', description: 'Select hourly loops' },
     { id: 4, name: 'Creative', icon: 'image', description: 'Upload your ad' },
@@ -23,9 +23,8 @@ const BrandCampaignWizard = () => {
     const [currentStep, setCurrentStep] = useState(1);
     const [wizardData, setWizardData] = useState({
         // Step 1: Location
-        selectedRetailers: [],
         selectedStores: [],
-        selectedScreens: [],
+        storeNames: {},
         selectedInventory: [],
         // Step 2: Schedule
         campaignName: '',

@@ -13,15 +13,6 @@ export class DailyScheduleRepository extends BaseRepository {
         return this.findById(this.idFor(storeId, date));
     }
 
-    async findLatestBefore(storeId, date) {
-        const schedules = await this.findAll({
-            where: [['store_id', '==', storeId]],
-        });
-        return schedules
-            .filter(schedule => schedule.date < date)
-            .sort((a, b) => b.date.localeCompare(a.date))[0] || null;
-    }
-
     async save(storeId, date, data) {
         const id = this.idFor(storeId, date);
         const document = {
