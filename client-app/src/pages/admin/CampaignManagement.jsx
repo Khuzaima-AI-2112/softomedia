@@ -5,8 +5,9 @@ import StatusBadge from '../../components/StatusBadge';
 import DataTable from '../../components/DataTable';
 import apiService from '../../services/ApiService';
 import { useAuth } from '../../contexts/AuthContext';
-import { Trash2, X, PlusCircle } from 'lucide-react';
+import { Trash2, X, PlusCircle, CalendarClock } from 'lucide-react';
 import { PERMISSIONS } from '../../constants/permissions';
+import RetailerPromotionForm from './RetailerPromotionForm';
 
 const CAMPAIGN_STATUSES = [
     { value: 'all',              label: 'All' },
@@ -47,6 +48,8 @@ function CampaignManagement() {
     const [createForm,       setCreateForm]       = useState(EMPTY_FORM);
     const [createSubmitting, setCreateSubmitting] = useState(false);
     const [createError,      setCreateError]      = useState('');
+
+    const [showPromotionForm, setShowPromotionForm] = useState(false);
 
     // Detail modal state for E2E
     const [selectedCampaign, setSelectedCampaign] = useState(null);
@@ -165,6 +168,12 @@ function CampaignManagement() {
         }
     };
 
+    const handlePromotionCreated = (promotion) => {
+        setShowPromotionForm(false);
+        setSuccessMsg(`Promotion "${promotion.name}" scheduled. It plays once the Retailer approves it.`);
+        loadData();
+    };
+
     const advertiserName = (id) =>
         advertisers.find(a => a.id === id)?.name || id || '—';
 
@@ -189,8 +198,10 @@ function CampaignManagement() {
         {
             key: 'advertiser_id',
             label: 'Advertiser',
-            render: (value) => (
-                <span className="text-slate-300">{advertiserName(value)}</span>
+            render: (value, row) => (
+                <span className="text-slate-300">
+                    {row.type === 'retailer' ? 'Retailer promotion' : advertiserName(value)}
+                </span>
             )
         },
         {
@@ -275,8 +286,25 @@ function CampaignManagement() {
                             Create Campaign
                         </button>
                     )}
+                    {canCreate && (
+                        <button
+                            data-testid="schedule-promotion-btn"
+                            onClick={() => setShowPromotionForm(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium rounded-lg transition-colors"
+                        >
+                            <CalendarClock size={16} />
+                            Schedule Retailer Promotion
+                        </button>
+                    )}
                 </div>
             </div>
+
+            {showPromotionForm && (
+                <RetailerPromotionForm
+                    onClose={() => setShowPromotionForm(false)}
+                    onCreated={handlePromotionCreated}
+                />
+            )}
 
             {pageError && (
                 <div className="p-3 bg-red-900/40 border border-red-700 text-red-300 rounded-lg">

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import apiService from '../../services/ApiService';
+import DaypartSettings from './DaypartSettings';
 import {
     DEFAULT_STORE_TRAFFIC_TIERS,
     STORE_TIER_ORDER,
@@ -291,6 +292,8 @@ export default function PricingConfig() {
                     </button>
                 </div>
             </form>
+
+            <DaypartSettings />
         </div>
     );
 }

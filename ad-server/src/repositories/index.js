@@ -18,3 +18,4 @@ export * from './PlatformAuditRepository.js';
 export * from './SlotReservationRepository.js';
 export * from './ScheduleOverrideRepository.js';
 export * from './CreativeRepository.js';
+export * from './DaypartRepository.js';

@@ -18,5 +18,6 @@ Instead, a Loop is a finite, hourly cycle of digital advertising slots scheduled
 ## Loop Management (Admin Portal)
 - Loops are generated automatically using the **Generate Loops** engine in the Admin portal.
 - The Generation Engine pulls active bookings and injects them into the correct 12-slot cycles for the specified dates.
-- A Paid slot plays only the Creative a Brand reserved for that exact Store, date, hour and position, when its Campaign and Creative are approved. Any other Paid slot plays Fallback Content; Paid slots are never shared out among Campaigns (ADR 0005). Retailer and Internal slots share the eligible Retailer promotions and Softomedia content in turn.
+- A Paid slot plays only the Creative a Brand reserved for that exact Store, date, hour and position, when its Campaign and Creative are approved. Any other Paid slot plays Fallback Content; Paid slots are never shared out among Campaigns (ADR 0005). Internal slots share the eligible Softomedia content in turn.
+- A Retailer slot plays that Retailer's own approved promotions scheduled for the date and hour, shared in turn, or Fallback Content when none is. Retailer media outside a promotion doesn't play (#40). A promotion is scheduled by Dayparts, which the Super Administrator sets for the whole network, or by hours; the Store's opening hours trim both.
 - Fallback content plays automatically for any hour that lacks an approved advertising Loop.
