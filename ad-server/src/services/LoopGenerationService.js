@@ -5,7 +5,7 @@
  * Each loop: 12 ads × 5 seconds = 60 second loop
  */
 
-import { loopRepository, BUSINESS_HOURS, LOOP_STATUS } from '../repositories/LoopRepository.js';
+import { loopRepository, LOOP_STATUS } from '../repositories/LoopRepository.js';
 import { campaignRepository } from '../repositories/CampaignRepository.js';
 import { dailyScheduleRepository } from '../repositories/DailyScheduleRepository.js';
 import { mediaRepository } from '../repositories/MediaRepository.js';
@@ -276,43 +276,6 @@ export class LoopGenerationService {
     isDateInRange(targetDate, startDate, endDate) {
         if (!startDate || !endDate) return true; // No date restrictions
         return targetDate >= startDate && targetDate <= endDate;
-    }
-
-    /**
-     * Quick generation for testing - creates mock loops without campaign data
-     */
-    async generateMockLoops(targetDate, retailerId, storeId) {
-        const loops = [];
-
-        for (let hour = BUSINESS_HOURS.START; hour < BUSINESS_HOURS.END; hour++) {
-            const loopId = `${targetDate}_${hour}_${storeId}`;
-            const mockImages = [
-                'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1920&q=80',
-                'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1920&q=80',
-                'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1920&q=80',
-                'https://images.unsplash.com/photo-1491553895911-0055eca6402d?auto=format&fit=crop&w=1920&q=80'
-            ];
-            const slots = Array.from({ length: SLOT_CONFIG.SLOTS_PER_LOOP }, (_, i) => ({
-                position: i,
-                url: mockImages[i % mockImages.length],
-                asset_id: `mock_asset_${i}`,
-                campaign_id: `mock_campaign_${i % 3}`,
-                duration: SLOT_CONFIG.SLOT_DURATION_SECONDS,
-                status: 'PENDING'
-            }));
-
-            const loop = await loopRepository.create(loopId, {
-                date: targetDate,
-                hour,
-                retailer_id: retailerId,
-                store_id: storeId,
-                status: LOOP_STATUS.PENDING_APPROVAL,
-                slots
-            });
-            loops.push(loop);
-        }
-
-        return loops;
     }
 }
 

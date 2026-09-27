@@ -5,14 +5,16 @@ export default {
         '^(\\.{1,2}/.*)\\.js$': '$1'
     },
     collectCoverage: true,
+    // Measure every server source file, loaded by a test or not; test fixtures are not source.
+    collectCoverageFrom: ['index.js', 'src/**/*.js'],
     coverageDirectory: 'coverage',
     coverageReporters: ['text', 'lcov', 'clover'],
     coverageThreshold: {
         global: {
-            branches: 25,
-            functions: 30,
-            lines: 35,
-            statements: 35
+            branches: 62,
+            functions: 81,
+            lines: 71,
+            statements: 69
         }
     },
     testMatch: ['**/tests/**/*.test.js'],
