@@ -1,31 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import GlassCard from '../../../components/GlassCard';
-import SlotGrid, { BookFullLoopButton } from '../../../components/SlotGrid';
 import TrafficTierBadge from '../../../components/TrafficTierBadge';
-import { PriceSummary } from '../../../components/PriceDisplay';
 import apiService from '../../../services/ApiService';
 import pricingService from '../../../services/PricingService';
-import { loopListFrom } from '../../../services/loopList';
 
-// Constants for fallback business hours
-const FALLBACK_HOURS = { START: 8, END: 22 };
-
-// Loops name the campaign in each slot, so the API refuses them to Brands (#24).
-// Phase 1 books a Brand's campaign by screen: Admin prepares the store's loops,
-// then the Retailer approves that schedule.
-const SCREEN_BOOKING_NOTE = 'You can continue to book the selected screens for your campaign dates. '
-    + 'Your ad is placed in hourly loops when the store\'s schedule is prepared, and the retailer then approves that schedule.';
-
-const SLOTS_UNAVAILABLE = {
-    refused: {
-        title: 'Slot times are set when the schedule is prepared',
-        body: `Individual slot availability isn't shown for this account. ${SCREEN_BOOKING_NOTE}`,
-    },
-    failed: {
-        title: 'Slot availability could not be loaded',
-        body: `Try another date, or come back later. ${SCREEN_BOOKING_NOTE}`,
-    },
-};
+const CATEGORY_LABELS = { paid: 'Paid', retailer: 'Retailer', internal: 'Internal' };
 
 const formatHour = (hour) => {
     const suffix = hour >= 12 ? 'PM' : 'AM';
@@ -33,317 +12,184 @@ const formatHour = (hour) => {
     return `${displayHour}:00 ${suffix}`;
 };
 
-function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
-    const getLocalISO = (date = new Date()) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
+const toISODate = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
 
-    const [selectedDate, setSelectedDate] = useState(data.dateRange?.start || getLocalISO());
-    const [expandedHour, setExpandedHour] = useState(null);
-    const [selections, setSelections] = useState(data.selectedSlots || []);
-    const [loading, setLoading] = useState(true);
-    const [loops, setLoops] = useState([]);
-    const [hasRealInventory, setHasRealInventory] = useState(true);
-    // One of SLOTS_UNAVAILABLE when loops can't be shown, otherwise null.
-    const [loopsUnavailable, setLoopsUnavailable] = useState(null);
-    const [businessHoursRange, setBusinessHoursRange] = useState({ start: 8, end: 22, is_closed: false });
+// Parsed as a local date so the strip never shifts a day in western time zones.
+const localDate = (isoDate) => {
+    const [year, month, day] = isoDate.split('-').map(Number);
+    return new Date(year, month - 1, day);
+};
 
-    const businessHours = useMemo(() => {
-        if (businessHoursRange.is_closed) return [];
-        const hours = [];
-        for (let h = businessHoursRange.start; h < businessHoursRange.end; h++) {
-            hours.push(h);
-        }
-        return hours;
-    }, [businessHoursRange]);
+function SlotCell({ slot, hour }) {
+    // Retailer and Internal Slots are never bookable and carry no status.
+    const free = slot.status === 'free';
+    const label = `Slot ${slot.position + 1} at ${formatHour(hour)}: `
+        + `${CATEGORY_LABELS[slot.category]}, ${free ? 'free' : 'reserved'}`;
+    return (
+        <td
+            aria-label={label}
+            title={label}
+            className={`h-10 min-w-10 rounded-lg border text-center text-[10px] font-medium ${free
+                ? 'bg-emerald-100 dark:bg-emerald-900/30 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300'
+                : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-400'}`}
+        >
+            {free ? slot.position + 1 : 'reserved'}
+        </td>
+    );
+}
+
+function Step3LoopSlotSelection({ data, onNext, onPrev }) {
+    const stores = data.selectedStores || [];
+    const firstDate = data.dateRange?.start || toISODate(new Date());
+    const [storeId, setStoreId] = useState(stores[0]);
+    const [selectedDate, setSelectedDate] = useState(firstDate);
+    const [availability, setAvailability] = useState(null);
+    const [failed, setFailed] = useState(false);
 
     useEffect(() => {
-        const init = async () => {
-
-            setLoading(true);
-            try {
-                await pricingService.init();
-                await loadLoops();
-
-            } catch (err) {
-                console.error('[Diagnostic] Step 3 Init failed:', err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        init();
-    }, [selectedDate, data.selectedScreens]);
-
-    const loadLoops = async () => {
-        try {
-            // Get loops for selected screens and date from backend
-            const locationId = (data.selectedStores || [])[0];
-
-            const response = await apiService.getLoops({
-                date: selectedDate,
-                location_id: locationId,
-                screenId: (data.selectedScreens || []).join(',')
+        let current = true;
+        setAvailability(null);
+        setFailed(false);
+        Promise.all([pricingService.init(), apiService.getSlotAvailability(storeId, selectedDate)])
+            .then(([, response]) => { if (current) setAvailability(response); })
+            .catch(error => {
+                console.error('[Diagnostic] Failed to load Slot availability:', error);
+                if (current) setFailed(true);
             });
+        return () => { current = false; };
+    }, [storeId, selectedDate]);
 
-            const activeLoops = loopListFrom(response);
-            const newRange = response.business_hours || FALLBACK_HOURS;
-
-            setLoopsUnavailable(null);
-            setHasRealInventory(activeLoops.length > 0);
-
-            setBusinessHoursRange(newRange);
-
-            // Only show allocation records that actually exist. Screen-level
-            // Campaign submission can continue while final slots await review.
-            setLoops(activeLoops);
-
-        } catch (error) {
-            console.error('[Diagnostic] Failed to load loops:', error);
-            setLoops([]);
-            setLoopsUnavailable(error.status === 403 ? SLOTS_UNAVAILABLE.refused : SLOTS_UNAVAILABLE.failed);
-        }
-    };
-
-    // Group loops by hour
-    const loopsByHour = useMemo(() => {
-        const grouped = {};
-        businessHours.forEach(hour => {
-            grouped[hour] = loops.filter(l => l.hour === hour);
-        });
-        return grouped;
-    }, [loops, businessHours]);
-
-    const getHourSummary = (hour) => {
-        const hourLoops = loopsByHour[hour] || [];
-        const totalSlots = hourLoops.length * 12;
-        const availableSlots = hourLoops.reduce((sum, loop) =>
-            sum + loop.slots.filter(s => s.status === 'available').length, 0
-        );
-        const trafficTier = pricingService.getTrafficTier(hour);
-
-        let avgPrice = 0;
-        if (hourLoops.length > 0) {
-            const prices = hourLoops.map(loop =>
-                pricingService.getSlotPrice(loop.screen_id, selectedDate, hour).price
-            );
-            avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
-        }
-
+    const weekDays = Array.from({ length: 7 }, (_, offset) => {
+        const date = localDate(firstDate);
+        date.setDate(date.getDate() + offset);
         return {
-            totalSlots,
-            availableSlots,
-            trafficTier,
-            avgPrice,
-            loopCount: hourLoops.length
+            date: toISODate(date),
+            dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
+            dayNum: date.getDate(),
         };
-    };
+    });
 
-    const handleSlotToggle = (loopId, slotIndex) => {
-        const key = `${loopId}_${slotIndex}`;
-        const existing = selections.find(s => s.key === key);
-
-        if (existing) {
-            setSelections(selections.filter(s => s.key !== key));
-        } else {
-            const loop = loops.find(l => l.id === loopId);
-            if (loop) {
-                const pricing = pricingService.getSlotPrice(loop.screen_id, selectedDate, loop.hour);
-                setSelections([...selections, {
-                    key,
-                    loopId,
-                    slotIndex,
-                    screen_id: loop.screen_id,
-                    date: selectedDate,
-                    hour: loop.hour,
-                    price: pricing.price
-                }]);
-            }
+    const renderAvailability = () => {
+        if (failed) {
+            return (
+                <GlassCard className="py-12 text-center" data-testid="slots-unavailable">
+                    <h3 className="text-lg font-bold mb-2">Slot availability could not be loaded</h3>
+                    <p className="text-slate-500">Try another date, or come back later.</p>
+                </GlassCard>
+            );
         }
-    };
-
-    const handleBookFullLoop = (loopId) => {
-        const loop = loops.find(l => l.id === loopId);
-        if (!loop) return;
-
-        const newSelections = selections.filter(s => !s.loopId.startsWith(loopId));
-        const pricing = pricingService.getSlotPrice(loop.screen_id, selectedDate, loop.hour);
-        loop.slots.forEach((slot, index) => {
-            if (slot.status === 'available') {
-                newSelections.push({
-                    key: `${loopId}_${index}`,
-                    loopId,
-                    slotIndex: index,
-                    screen_id: loop.screen_id,
-                    date: selectedDate,
-                    hour: loop.hour,
-                    price: pricing.price
-                });
-            }
-        });
-        setSelections(newSelections);
-    };
-
-    const getLoopSelections = (loopId) => {
-        return selections.filter(s => s.loopId === loopId).map(s => s.slotIndex);
-    };
-
-    const totals = useMemo(() => {
-        const totalCost = selections.reduce((sum, s) => sum + s.price, 0);
-        const totalSlots = selections.length;
-        let totalImpressions = 0;
-        selections.forEach(s => {
-            totalImpressions += pricingService.getEstimatedImpressions(s.screen_id, s.hour);
-        });
-        return { totalCost, totalSlots, totalImpressions };
-    }, [selections]);
-
-    const getWeekDays = () => {
-        const days = [];
-        const startDate = new Date(data.dateRange?.start || new Date());
-        for (let i = 0; i < 7; i++) {
-            const date = new Date(startDate);
-            date.setDate(date.getDate() + i);
-            days.push({
-                date: getLocalISO(date),
-                dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
-                dayNum: date.getDate(),
-                isToday: getLocalISO(date) === getLocalISO(),
-                isSelected: getLocalISO(date) === selectedDate
-            });
+        if (!availability) {
+            return (
+                <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+                    <p>Loading Slots...</p>
+                </div>
+            );
         }
-        return days;
-    };
-
-    const handleContinue = () => {
-
-        updateData({ selectedSlots: selections });
-        onNext();
-    };
-
-    if (loading) {
+        if (availability.is_closed) {
+            return (
+                <GlassCard className="py-16 text-center">
+                    <h3 className="text-xl font-bold mb-2 text-red-500">Store is closed on this date</h3>
+                    <p className="text-slate-500">Pick another date.</p>
+                </GlassCard>
+            );
+        }
         return (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
-                <p>Loading loops and pricing...</p>
-            </div>
+            <GlassCard className="overflow-x-auto">
+                <table className="w-full border-separate border-spacing-1" aria-label="Slots by hour">
+                    <tbody>
+                        {availability.hours.map(({ hour, slots }) => (
+                            <tr key={hour} aria-label={formatHour(hour)} data-testid={`hour-row-${hour}`}>
+                                <th scope="row" className="pr-3 text-left text-sm font-semibold whitespace-nowrap">
+                                    <div className="flex items-center gap-2">
+                                        <span>{formatHour(hour)}</span>
+                                        <TrafficTierBadge tier={pricingService.getTrafficTier(hour).key} size="small" />
+                                    </div>
+                                </th>
+                                {slots.map(slot => <SlotCell key={slot.position} slot={slot} hour={hour} />)}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                <div className="mt-4 flex flex-wrap gap-4 text-xs text-slate-500">
+                    <span className="flex items-center gap-1.5">
+                        <span className="size-3 rounded border border-emerald-300 bg-emerald-100"></span>
+                        Free Paid Slot
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                        <span className="size-3 rounded border border-slate-300 bg-slate-100"></span>
+                        Reserved for the Retailer or Softomedia
+                    </span>
+                </div>
+            </GlassCard>
         );
-    }
+    };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 pb-24">
             <GlassCard className="border-l-4 border-l-primary">
                 <div className="flex items-center gap-4">
                     <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center">
                         <span className="material-symbols-outlined text-primary text-2xl">calendar_month</span>
                     </div>
                     <div>
-                        <h2 className="text-xl font-bold">Step 3: Select Loops & Slots</h2>
+                        <h2 className="text-xl font-bold">Step 3: Slots</h2>
                         <p className="text-slate-500 dark:text-slate-400">
-                            Choose which hourly loops and time slots to book
+                            Each hourly loop has twelve five-second Slots. Free Paid Slots are shown in green.
                         </p>
                     </div>
                 </div>
             </GlassCard>
 
+            {stores.length > 1 && (
+                <div role="tablist" aria-label="Stores" className="flex gap-2 overflow-x-auto pb-2">
+                    {stores.map(id => (
+                        <button
+                            key={id}
+                            role="tab"
+                            aria-selected={id === storeId}
+                            onClick={() => setStoreId(id)}
+                            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap border ${id === storeId
+                                ? 'bg-primary text-white border-primary'
+                                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}
+                        >
+                            {data.storeNames?.[id] || id}
+                        </button>
+                    ))}
+                </div>
+            )}
+
             <div className="flex gap-2 overflow-x-auto pb-2">
-                {getWeekDays().map(day => (
+                {weekDays.map(day => (
                     <button
                         key={day.date}
                         onClick={() => setSelectedDate(day.date)}
                         data-testid={`calendar-day-${day.date}`}
-                        className={`flex-shrink-0 flex flex-col items-center justify-center w-16 h-20 rounded-xl border transition-all ${day.isSelected ? 'bg-primary text-white border-primary shadow-lg' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}
+                        className={`flex-shrink-0 flex flex-col items-center justify-center w-16 h-20 rounded-xl border transition-all ${day.date === selectedDate ? 'bg-primary text-white border-primary shadow-lg' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}
                     >
-                        <span className={`text-xs ${day.isSelected ? 'text-white/80' : 'text-slate-500'}`}>{day.dayName}</span>
+                        <span className={`text-xs ${day.date === selectedDate ? 'text-white/80' : 'text-slate-500'}`}>{day.dayName}</span>
                         <span className="text-2xl font-bold">{day.dayNum}</span>
                     </button>
                 ))}
             </div>
 
-            {!loopsUnavailable && !hasRealInventory && !businessHoursRange.is_closed && (
-                <div className="bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 p-4 rounded-xl border border-amber-200 dark:border-amber-800 flex items-center gap-3">
-                    <span className="material-symbols-outlined text-2xl">warning</span>
-                    <div>
-                        <p className="font-bold">Inventory Validation Failed</p>
-                        <p className="text-sm">No hourly loops have been generated for {selectedDate} by the network operator yet. You cannot book active slots until inventory is generated.</p>
-                    </div>
-                </div>
-            )}
-
-            {loopsUnavailable ? (
-                <GlassCard className="py-12 text-center" data-testid="slots-unavailable">
-                    <h3 className="text-lg font-bold mb-2">{loopsUnavailable.title}</h3>
-                    <p className="text-slate-500">{loopsUnavailable.body}</p>
-                </GlassCard>
-            ) : businessHoursRange.is_closed ? (
-                <GlassCard className="py-16 text-center">
-                    <h3 className="text-xl font-bold mb-2 text-red-500">Store is Closed</h3>
-                    <p className="text-slate-500">Pick another date.</p>
-                </GlassCard>
-            ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-24">
-                    {businessHours.map(hour => {
-                        const summary = getHourSummary(hour);
-                        const isExpanded = expandedHour === hour;
-                        return (
-                            <GlassCard key={hour} className={`cursor-pointer transition-all ${isExpanded ? 'lg:col-span-2 ring-2 ring-primary' : ''}`}>
-                                <div className="flex items-center justify-between" onClick={() => setExpandedHour(isExpanded ? null : hour)} data-testid={`hour-row-${hour}`}>
-                                    <div className="flex items-center gap-4">
-                                        <div className="size-10 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-bold">{hour}</div>
-                                        <div>
-                                            <p className="font-semibold">{formatHour(hour)}</p>
-                                            <p className="text-xs text-slate-500">{summary.availableSlots}/{summary.totalSlots} slots</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <TrafficTierBadge tier={summary.trafficTier.key} size="small" />
-                                        <span className="material-symbols-outlined transition-transform" style={{ transform: isExpanded ? 'rotate(180deg)' : '' }}>expand_more</span>
-                                    </div>
-                                </div>
-                                {isExpanded && (
-                                    <div className="mt-4 pt-4 border-t space-y-4">
-                                        {loopsByHour[hour]?.map(loop => (
-                                            <div key={loop.id} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                                                <div className="mb-3 font-medium text-sm">{loop.screen_id}</div>
-                                                <SlotGrid
-                                                    slots={loop.slots}
-                                                    trafficTier={summary.trafficTier}
-                                                    pricePerSlot={pricingService.getSlotPrice(loop.screen_id, selectedDate, hour).price}
-                                                    selectedSlots={getLoopSelections(loop.id)}
-                                                    onSlotClick={(index) => handleSlotToggle(loop.id, index)}
-                                                />
-                                                <div className="mt-3">
-                                                    <BookFullLoopButton onClick={() => handleBookFullLoop(loop.id)} pricePerSlot={pricingService.getSlotPrice(loop.screen_id, selectedDate, hour).price} />
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </GlassCard>
-                        );
-                    })}
-                </div>
-            )}
+            {renderAvailability()}
 
             <div className="sticky bottom-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-lg border-t p-4 -mx-4">
-                <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
-                    <PriceSummary
-                        totalPrice={totals.totalCost}
-                        totalSlots={totals.totalSlots}
-                        totalImpressions={totals.totalImpressions}
-                    />
-                    <div className="flex gap-3">
-                        <button onClick={onPrev} className="px-6 py-3 rounded-xl border">Back</button>
-                        <button
-                            onClick={handleContinue}
-                            data-testid="step-3-next-btn"
-                            className="px-8 py-3 rounded-xl bg-primary text-white font-bold"
-                        >
-                            {selections.length === 0 ? 'Continue with selected screens' : 'Continue'}
-                        </button>
-                    </div>
+                <div className="max-w-4xl mx-auto flex items-center justify-end gap-3">
+                    <button onClick={onPrev} className="px-6 py-3 rounded-xl border">Back</button>
+                    <button
+                        onClick={onNext}
+                        data-testid="step-3-next-btn"
+                        className="px-8 py-3 rounded-xl bg-primary text-white font-bold"
+                    >
+                        Continue
+                    </button>
                 </div>
             </div>
         </div>

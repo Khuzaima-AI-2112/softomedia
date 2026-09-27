@@ -17,15 +17,26 @@ test('Brand discovers inventory, uploads a creative, and retains only its Campai
         await page.getByTestId('new-campaign-btn').click();
 
         await expect(page.getByText('HarborCart Synthetic Retailer')).toBeVisible();
-        await page.getByTestId('store-harborcart-desert-synthetic-store').click();
-        await expect(page.getByText('Entrance Placement').first()).toBeVisible();
-        await expect(page.getByText('1920x1080').first()).toBeVisible();
-        await expect(page.getByText('$15.00 CPM').first()).toBeVisible();
-
-        await page.getByTestId('screen-desert-entrance-synthetic-screen').click();
+        // A Brand books whole Stores, never individual Screens.
+        const desertStore = page.getByTestId('store-harborcart-desert-synthetic-store');
+        await expect(desertStore).toContainText('1 Screen');
+        await expect(desertStore).toContainText('$15.00 CPM');
+        await desertStore.click();
+        await expect(page.getByText('1 Store', { exact: true })).toBeVisible();
         await page.getByTestId('step-1-next-btn').click();
         await page.getByTestId('input-campaign-name').fill(title);
         await page.getByTestId('step-2-next-btn').click();
+
+        // The slot grid shows all twelve Slots of each hour before any schedule exists.
+        const eightAm = page.getByRole('row', { name: '8:00 AM' });
+        await expect(eightAm.getByRole('cell')).toHaveCount(12);
+        await expect(eightAm.getByRole('cell', { name: 'Slot 1 at 8:00 AM: Paid, free' }))
+            .toHaveClass(/emerald/);
+        const retailerSlot = eightAm.getByRole('cell', { name: 'Slot 3 at 8:00 AM: Retailer, reserved' });
+        await expect(retailerSlot).toHaveClass(/slate/);
+        await expect(retailerSlot).toHaveText('reserved');
+        await expect(eightAm.getByRole('cell', { name: 'Slot 6 at 8:00 AM: Internal, reserved' }))
+            .toHaveText('reserved');
         await page.getByTestId('step-3-next-btn').click();
 
         await page.getByLabel('Creative title').fill(`${title} creative`);

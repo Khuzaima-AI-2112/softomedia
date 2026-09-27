@@ -15,10 +15,11 @@ import {
     isApprovedFallbackAsset,
     isApprovedPlaybackAsset,
 } from './PlaybackEligibility.js';
+import { allocatedCategory, firstPositionOfHour, SLOTS_PER_LOOP } from './SlotInventory.js';
 
 // Slot configuration
 export const SLOT_CONFIG = {
-    SLOTS_PER_LOOP: 12,
+    SLOTS_PER_LOOP,
     SLOT_DURATION_SECONDS: 5,
     LOOP_DURATION_SECONDS: 60
 };
@@ -29,13 +30,6 @@ export const CAMPAIGN_PRIORITY = {
     RETAILER: 2,    // Retailer-owned promotions
     INTERNAL: 3     // Softomedia internal/filler
 };
-
-// Repeating ten-position cadence. Six repetitions form a five-loop
-// Allocation Window (60 positions) with the exact accepted 70/20/10 split.
-export const ALLOCATION_SEQUENCE = Object.freeze([
-    'paid', 'paid', 'retailer', 'paid', 'paid',
-    'internal', 'paid', 'paid', 'retailer', 'paid'
-]);
 
 export class LoopGenerationService {
     /**
@@ -68,22 +62,12 @@ export class LoopGenerationService {
             isClosed: effectiveHours?.is_closed
         });
 
-        const existingSchedule = await dailyScheduleRepository.findByStoreAndDate(storeId, targetDate);
-        const previousSchedule = existingSchedule
-            ? null
-            : await dailyScheduleRepository.findLatestBefore(storeId, targetDate);
-        const sequenceStart = existingSchedule?.sequence_start_position
-            ?? previousSchedule?.sequence_end_position
-            ?? 0;
-
         if (effectiveHours?.is_closed) {
             await dailyScheduleRepository.save(storeId, targetDate, {
                 retailer_id: retailerId,
                 is_closed: true,
                 operating_hours: [],
                 loop_ids: [],
-                sequence_start_position: sequenceStart,
-                sequence_end_position: sequenceStart,
             });
             return { loops, operatingHours };
         }
@@ -100,14 +84,13 @@ export class LoopGenerationService {
         // Generate loop for each business hour (PARALLELIZED)
         const hourPromises = [];
         for (let hour = startHour; hour < endHour; hour++) {
-            const hourOffset = (hour - startHour) * SLOT_CONFIG.SLOTS_PER_LOOP;
             hourPromises.push(this.generateHourlyLoop(
                 targetDate,
                 hour,
                 retailerId,
                 storeId,
                 content,
-                sequenceStart + hourOffset,
+                firstPositionOfHour(hour, startHour),
                 fallback
             ));
         }
@@ -120,8 +103,6 @@ export class LoopGenerationService {
             is_closed: false,
             operating_hours: loops.map(loop => loop.hour),
             loop_ids: loops.map(loop => loop.id),
-            sequence_start_position: sequenceStart,
-            sequence_end_position: sequenceStart + loops.length * SLOT_CONFIG.SLOTS_PER_LOOP,
         });
 
         logger.info(`[LoopGeneration] Generated ${loops.length} loops for ${targetDate}`);
@@ -170,16 +151,16 @@ export class LoopGenerationService {
 
         return Array.from({ length: SLOT_CONFIG.SLOTS_PER_LOOP }, (_, position) => {
             const sequencePosition = sequenceStart + position;
-            const allocatedCategory = ALLOCATION_SEQUENCE[sequencePosition % ALLOCATION_SEQUENCE.length];
-            const eligible = byCategory.get(allocatedCategory);
+            const category = allocatedCategory(sequencePosition);
+            const eligible = byCategory.get(category);
             const item = eligible.length > 0
-                ? eligible[categoryIndexes[allocatedCategory]++ % eligible.length]
+                ? eligible[categoryIndexes[category]++ % eligible.length]
                 : null;
 
             return {
                 position,
                 allocation_sequence_position: sequencePosition,
-                allocated_category: allocatedCategory,
+                allocated_category: category,
                 asset_id: item?.asset_id || fallback?.id || null,
                 asset_name: item?.asset_name || fallback?.title || fallback?.filename || null,
                 campaign_id: item?.campaign_id ?? null,

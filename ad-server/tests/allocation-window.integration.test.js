@@ -82,7 +82,7 @@ describeWithAuthEmulator('POST /api/loops/generate Allocation Window', () => {
         expect(regenerated.body.loops.flatMap(loop => loop.slots)).toEqual(firstSlots);
     });
 
-    test('preserves continuity through a closed day and reports deficient-category fallback', async () => {
+    test('restarts the pattern after a closed day and reports deficient-category fallback', async () => {
         clearMockStorage();
         ({ headers: auth } = await signInAs('admin', { fakeClock: true }));
         BusinessHoursService.getEffectiveHours.mockImplementation(async (_storeId, date) => {
@@ -141,8 +141,31 @@ describeWithAuthEmulator('POST /api/loops/generate Allocation Window', () => {
             start: null, end: null, is_closed: true, total_loops: 0,
         });
 
+        // ADR 0004: each broadcast day restarts the pattern at position 0.
         const thirdDay = await generate('2030-01-03');
         expect(thirdDay.body.loops.map(loop => loop.slots[0].allocation_sequence_position))
-            .toEqual([24, 36, 48]);
+            .toEqual([0, 12, 24]);
+    });
+
+    test('a 14-hour day has 118 Paid positions and an exact split in each five-loop window', async () => {
+        BusinessHoursService.getEffectiveHours.mockResolvedValue({
+            is_closed: false, open_time: '08:00', close_time: '22:00',
+        });
+
+        const day = await request(app).post('/api/loops/generate').set(auth).send({
+            targetDate: '2030-01-06', retailerId: 'retailer-1', storeId: 'store-1',
+        });
+
+        expect(day.status).toBe(201);
+        expect(day.body.loops).toHaveLength(14);
+        const countCategories = loops => loops.flatMap(loop => loop.slots).reduce((counts, slot) => ({
+            ...counts,
+            [slot.allocated_category]: (counts[slot.allocated_category] || 0) + 1,
+        }), {});
+        expect(countCategories(day.body.loops)).toEqual({ paid: 118, retailer: 33, internal: 17 });
+        for (const windowStart of [0, 5]) {
+            expect(countCategories(day.body.loops.slice(windowStart, windowStart + 5)))
+                .toEqual({ paid: 42, retailer: 12, internal: 6 });
+        }
     });
 });

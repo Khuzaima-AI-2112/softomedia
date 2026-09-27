@@ -44,7 +44,7 @@ describe('five-loop Allocation Window', () => {
         }), {})).toEqual({ paid: 42, retailer: 12, internal: 6 });
     });
 
-    test('continues persisted sequence across open hours and a closed day', async () => {
+    test('restarts the sequence at position 0 on each broadcast day (ADR 0004)', async () => {
         const campaigns = [
             { id: 'paid-1', type: 'paid', asset_id: 'paid-asset' },
             { id: 'retailer-1', type: 'retailer', asset_id: 'retailer-asset' },
@@ -65,7 +65,7 @@ describe('five-loop Allocation Window', () => {
         expect(await reloadedService.generateDailyLoops('2030-01-02', 'retailer-1', 'store-1')).toEqual([]);
 
         const thirdDay = await reloadedService.generateDailyLoops('2030-01-03', 'retailer-1', 'store-1');
-        expect(thirdDay.map(loop => loop.slots[0].allocation_sequence_position)).toEqual([24, 36, 48]);
+        expect(thirdDay.map(loop => loop.slots[0].allocation_sequence_position)).toEqual([0, 12, 24]);
     });
 
     test('uses approved neutral fallback without reassigning a deficient category', async () => {

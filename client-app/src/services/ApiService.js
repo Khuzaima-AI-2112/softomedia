@@ -302,6 +302,11 @@ class ApiService {
         return apiClient.get('/api/inventory');
     }
 
+    async getSlotAvailability(storeId, date) {
+        const query = new URLSearchParams({ date }).toString();
+        return apiClient.get(`/api/inventory/stores/${encodeURIComponent(storeId)}/slots?${query}`);
+    }
+
     async getCampaigns(params = {}) {
         const query = new URLSearchParams(params).toString();
         return apiClient.get(`/api/campaigns${query ? '?' + query : ''}`);
