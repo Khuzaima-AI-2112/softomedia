@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import GlassCard from '../../components/GlassCard';
 import apiService from '../../services/ApiService';
+import { ACCEPTED_MEDIA, needsPlaybackCheck, refusalForChosenFile } from '../../services/mediaFile';
 
 const CATEGORY_DETAILS = {
     paid: { label: 'Paid campaign', ownerType: 'brand', needsOwner: true },
@@ -15,6 +16,7 @@ function MediaLibrary() {
     const [file, setFile] = useState(null);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
+    const [checkingFile, setCheckingFile] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
 
@@ -26,6 +28,19 @@ function MediaLibrary() {
     }, []);
 
     const category = CATEGORY_DETAILS[form.category];
+
+    async function handleFileChosen(chosen) {
+        setError('');
+        setFile(chosen);
+        if (!needsPlaybackCheck(chosen)) return;
+        setCheckingFile(true);
+        const refusal = await refusalForChosenFile(chosen);
+        setCheckingFile(false);
+        if (refusal) {
+            setFile(null);
+            setError(refusal);
+        }
+    }
 
     async function handleSubmit(event) {
         event.preventDefault();
@@ -43,7 +58,6 @@ function MediaLibrary() {
         payload.append('owner_type', category.ownerType);
         payload.append('owner_id', category.needsOwner ? form.ownerId : '');
         payload.append('approval_status', form.approvalStatus);
-        payload.append('duration', '5');
 
         setUploading(true);
         try {
@@ -102,15 +116,15 @@ function MediaLibrary() {
                     </label>
                     <label className="text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
                         Media file
-                        <input type="file" accept=".png,.jpg,.jpeg,.mp4" onChange={event => setFile(event.target.files?.[0] || null)}
+                        <input type="file" accept={ACCEPTED_MEDIA} onChange={event => handleFileChosen(event.target.files?.[0] || null)}
                             className="mt-1 block w-full rounded-xl border border-dashed border-slate-300 p-3 dark:border-slate-600" />
                     </label>
                     <div className="md:col-span-2 flex items-center gap-4">
-                        <button type="submit" disabled={uploading}
+                        <button type="submit" disabled={uploading || checkingFile}
                             className="rounded-xl bg-primary px-5 py-2.5 font-semibold text-white disabled:opacity-60">
                             {uploading ? 'Uploading…' : 'Upload media'}
                         </button>
-                        <span className="text-xs text-slate-500">PNG, JPG, or 5-second MP4 · maximum 5 MB</span>
+                        <span className="text-xs text-slate-500">16:9 PNG or JPG, or 5-second MP4 or MOV · at least 1280×720 · maximum 20 MB</span>
                     </div>
                 </form>
                 {error && <p className="mt-4 text-sm text-rose-600" role="alert">{error}</p>}

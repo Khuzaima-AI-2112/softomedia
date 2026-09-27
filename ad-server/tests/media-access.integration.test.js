@@ -17,7 +17,7 @@ const { PASSWORD, signIn } = await import('./fixtures/emulator-sign-in.js');
 
 jest.setTimeout(30_000);
 
-const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...Buffer.from('media access creative')]);
+const { VALID_PNG: PNG } = await import('./fixtures/media-files.js');
 
 // supertest buffers an image/png response body.
 const binary = pending => pending.buffer(true).parse((response, done) => {

@@ -74,7 +74,7 @@ test('Brand books Slots on the grid through a conflict and the Booking Cutoff, a
         await page.getByLabel('Creative file').setInputFiles({
             name: 'bonvie-creative.jpg',
             mimeType: 'image/jpeg',
-            buffer: fs.readFileSync('ads/demo_ad_1.png'),
+            buffer: fs.readFileSync('ad-server/tests/fixtures/media/frame-16x9.jpg'),
         });
         await page.getByRole('button', { name: 'Upload creative' }).click();
         await expect(page.getByRole('status')).toHaveText('Creative uploaded successfully.');

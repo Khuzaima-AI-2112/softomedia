@@ -14,6 +14,7 @@ const hasEmulators = Boolean(
 const describeWithEmulators = hasEmulators ? describe : describe.skip;
 
 const { PASSWORD: password, signIn } = await import('./fixtures/emulator-sign-in.js');
+const { VALID_PNG } = await import('./fixtures/media-files.js');
 
 jest.setTimeout(30_000);
 
@@ -243,10 +244,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
                 .field('title', 'Booked rate creative')
                 .field('category', 'paid')
                 .field('duration', '5')
-                .attach('file', Buffer.from([
-                    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-                    ...Buffer.from('booked rate creative'),
-                ]), { filename: 'booked.png', contentType: 'image/png' });
+                .attach('file', VALID_PNG, { filename: 'booked.png', contentType: 'image/png' });
             expect(upload.status).toBe(201);
             createdMediaIds.push(upload.body.id);
 
@@ -351,10 +349,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
     });
 
     test('Brand submission persists identity-owned creative, Campaign, selection, and Proof-of-Play visibility', async () => {
-        const pngBytes = Buffer.from([
-            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-            ...Buffer.from('brand campaign creative'),
-        ]);
+        const pngBytes = VALID_PNG;
         const upload = await request(app)
             .post('/api/assets/upload')
             .set('Authorization', `Bearer ${brandToken}`)
