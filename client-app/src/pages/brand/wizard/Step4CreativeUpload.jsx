@@ -7,6 +7,8 @@ import { useState } from 'react';
 import GlassCard from '../../../components/GlassCard';
 import ProtectedImage from '../../../components/ProtectedImage';
 import apiService from '../../../services/ApiService';
+import { ACCEPTED_MEDIA } from '../../../services/mediaFile';
+import useChosenMediaFile from '../../../hooks/useChosenMediaFile';
 
 // Demo creative URLs for quick selection
 const DEMO_CREATIVES = [
@@ -23,10 +25,10 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
     const [customUrl, setCustomUrl] = useState('');
     const [error, setError] = useState('');
     const [creativeTitle, setCreativeTitle] = useState('');
-    const [creativeFile, setCreativeFile] = useState(null);
     const [creativeAssetId, setCreativeAssetId] = useState(data.creativeAssetId || null);
     const [uploading, setUploading] = useState(false);
     const [uploadSuccess, setUploadSuccess] = useState('');
+    const { file: creativeFile, checkingFile, chooseFile } = useChosenMediaFile(setError);
 
     const handleSelectDemo = (url) => {
         setSelectedCreative(url);
@@ -55,7 +57,6 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
         payload.append('file', creativeFile);
         payload.append('title', creativeTitle.trim());
         payload.append('category', 'paid');
-        payload.append('duration', '5');
 
         setUploading(true);
         try {
@@ -104,7 +105,7 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
                     <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-center">
                         <span className="material-symbols-outlined text-2xl text-primary mb-1">aspect_ratio</span>
                         <p className="text-sm font-medium">16:9 Ratio</p>
-                        <p className="text-xs text-slate-500">1920×1080 px</p>
+                        <p className="text-xs text-slate-500">At least 1280×720 px</p>
                     </div>
                     <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-center">
                         <span className="material-symbols-outlined text-2xl text-primary mb-1">timer</span>
@@ -114,12 +115,12 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
                     <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-center">
                         <span className="material-symbols-outlined text-2xl text-primary mb-1">image</span>
                         <p className="text-sm font-medium">JPG/PNG</p>
-                        <p className="text-xs text-slate-500">Max 5MB</p>
+                        <p className="text-xs text-slate-500">Max 20 MB</p>
                     </div>
                     <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-center">
                         <span className="material-symbols-outlined text-2xl text-primary mb-1">movie</span>
-                        <p className="text-sm font-medium">MP4/WebM</p>
-                        <p className="text-xs text-slate-500">Coming soon</p>
+                        <p className="text-sm font-medium">MP4/MOV</p>
+                        <p className="text-xs text-slate-500">Max 20 MB</p>
                     </div>
                 </div>
             </GlassCard>
@@ -134,11 +135,11 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
                     </label>
                     <label className="text-sm font-medium">
                         Creative file
-                        <input type="file" accept=".png,.jpg,.jpeg,.mp4" onChange={event => setCreativeFile(event.target.files?.[0] || null)}
+                        <input type="file" accept={ACCEPTED_MEDIA} onChange={event => chooseFile(event.target.files?.[0] || null)}
                             className="mt-1 block w-full rounded-xl border border-dashed border-slate-300 p-3 dark:border-slate-600" />
                     </label>
                 </div>
-                <button type="button" onClick={handleFileUpload} disabled={uploading}
+                <button type="button" onClick={handleFileUpload} disabled={uploading || checkingFile}
                     className="mt-4 rounded-xl bg-primary px-5 py-3 font-semibold text-white disabled:opacity-60">
                     {uploading ? 'Uploading…' : 'Upload creative'}
                 </button>

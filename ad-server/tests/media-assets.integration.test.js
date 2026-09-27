@@ -1,6 +1,7 @@
 import { jest } from '@jest/globals';
 
 const { PASSWORD, signIn } = await import('./fixtures/emulator-sign-in.js');
+const { VALID_PNG } = await import('./fixtures/media-files.js');
 
 jest.setTimeout(30_000);
 
@@ -10,7 +11,7 @@ const hasEmulators = Boolean(
 const describeWithEmulators = hasEmulators ? describe : describe.skip;
 
 describeWithEmulators('classified media API with Firebase emulators', () => {
-    const pngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...Buffer.from('emulator media bytes')]);
+    const pngBytes = VALID_PNG;
     let request;
     let app;
     let firestore;

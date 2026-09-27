@@ -12,7 +12,7 @@ test('Admin uploads neutral fallback media and still sees it after reload withou
 
     await page.getByLabel('Title').fill(title);
     await page.getByLabel('Category').selectOption('fallback');
-    await page.getByLabel('Media file').setInputFiles('tests/test-ad.png');
+    await page.getByLabel('Media file').setInputFiles('ad-server/tests/fixtures/media/frame-16x9.png');
     await page.getByRole('button', { name: 'Upload media' }).click();
 
     await expect(page.getByRole('status')).toHaveText('Media uploaded successfully.');

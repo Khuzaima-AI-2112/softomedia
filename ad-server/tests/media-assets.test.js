@@ -3,6 +3,7 @@ import request from 'supertest';
 import { createTestApp } from './fixtures/test-app.js';
 import { createInMemoryUserRepository } from './fixtures/in-memory-users.js';
 import { describeWithAuthEmulator, signInAs } from './fixtures/emulator-sign-in.js';
+import { VALID_PNG, mediaAttachment, mediaFile } from './fixtures/media-files.js';
 
 jest.setTimeout(30_000);
 
@@ -64,13 +65,8 @@ async function appAs(role, organizationId = `entity-${role}`) {
 function upload(client, fields = {}, filename = 'creative.png') {
     let pending = client.post('/api/assets/upload');
     for (const [key, value] of Object.entries(fields)) pending = pending.field(key, value);
-    const bytes = filename.endsWith('.mp4')
-        ? Buffer.concat([Buffer.alloc(4), Buffer.from('ftypisom')])
-        : Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...Buffer.from('image')]);
-    return pending.attach('file', bytes, {
-        filename,
-        contentType: filename.endsWith('.mp4') ? 'video/mp4' : 'image/png',
-    });
+    const fixture = filename.endsWith('.mp4') ? 'five-seconds-16x9.mp4' : 'frame-16x9.png';
+    return pending.attach('file', mediaFile(fixture), { ...mediaAttachment(fixture), filename });
 }
 
 function uploadBytes(client, fields, bytes, filename = 'creative.png') {
@@ -116,7 +112,7 @@ describeWithAuthEmulator('classified media API', () => {
         });
         expect(response.body.id).toMatch(/^ast_/);
         expect(response.body.storage_path).toContain(response.body.id);
-        expect(response.body.size_bytes).toBe(13);
+        expect(response.body.size_bytes).toBe(VALID_PNG.length);
     });
 
     it('lets Brand use the same upload contract while enforcing Brand ownership', async () => {
@@ -188,7 +184,7 @@ describeWithAuthEmulator('classified media API', () => {
             owner_type: 'platform',
             approval_status: 'approved',
             duration: '5',
-        }, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...Buffer.from('storage failure')]));
+        }, Buffer.concat([VALID_PNG, Buffer.from('storage failure')]));
 
         expect(response.status).toBe(500);
         expect(response.body.error).toMatch(/no success was recorded/i);

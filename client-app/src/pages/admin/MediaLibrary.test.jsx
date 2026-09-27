@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { getAssets, uploadAsset } = vi.hoisted(() => ({
     getAssets: vi.fn(),
@@ -9,11 +9,32 @@ const { getAssets, uploadAsset } = vi.hoisted(() => ({
 vi.mock('../../services/ApiService', () => ({ default: { getAssets, uploadAsset } }));
 
 import MediaLibrary from './MediaLibrary';
+import { browserCanPlayVideo } from '../../../test-support/browserVideo';
 
 describe('Admin media library', () => {
+    let restoreBrowser = () => {};
     beforeEach(() => {
         vi.clearAllMocks();
         getAssets.mockResolvedValue([]);
+    });
+    afterEach(() => restoreBrowser());
+
+    it('refuses a .mov the browser cannot play, before uploading it', async () => {
+        restoreBrowser = browserCanPlayVideo(false);
+        render(<MediaLibrary />);
+
+        await screen.findByText('No media has been uploaded yet.');
+        fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Store opening' } });
+        fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'internal' } });
+        fireEvent.change(screen.getByLabelText('Media file'), {
+            target: { files: [new File(['frames'], 'opening.mov', { type: 'video/quicktime' })] },
+        });
+
+        expect((await screen.findByRole('alert')).textContent)
+            .toBe('This browser can\'t play opening.mov. Export it as an .mp4 and try again.');
+        fireEvent.click(screen.getByRole('button', { name: 'Upload media' }));
+        expect((await screen.findByRole('alert')).textContent).toBe('Choose a media file');
+        expect(uploadAsset).not.toHaveBeenCalled();
     });
 
     it('uploads classified fallback media and only shows success after persistence', async () => {

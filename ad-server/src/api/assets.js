@@ -9,6 +9,7 @@ import { ROLES, normalizeRole } from '../constants/roles.js';
 import { sendMediaContent } from './mediaContent.js';
 import { assetContentPath } from '../constants/mediaPaths.js';
 import { decodeUploadFilename } from '../utils/uploadFilename.js';
+import { readMediaHeader } from '../utils/mediaHeaders.js';
 
 const router = express.Router();
 const CATEGORIES = new Set(['paid', 'retailer', 'internal', 'fallback']);
@@ -18,13 +19,24 @@ const ACCEPTED_FILES = new Map([
     ['.jpg', 'image/jpeg'],
     ['.jpeg', 'image/jpeg'],
     ['.mp4', 'video/mp4'],
+    ['.mov', 'video/quicktime'],
 ]);
 const PLATFORM_MEDIA_ROLES = new Set([ROLES.ADMIN, ROLES.SUPERADMIN]);
+const MAXIMUM_FILE_MB = 20;
+const SLOT_SECONDS = 5;
+// Compared in whole milliseconds, so both edges of 5.0 s ± 0.1 s are accepted.
+const DURATION_TOLERANCE_MS = 100;
+const WIDESCREEN = 16 / 9;
+const FRAME_TOLERANCE = 0.01;
+const MINIMUM_WIDTH = 1280;
+const MINIMUM_HEIGHT = 720;
+// A QuickTime file opens with one of these boxes; older files have no 'ftyp'.
+const QUICKTIME_FIRST_BOXES = new Set(['ftyp', 'moov', 'mdat', 'wide', 'free', 'skip', 'pnot']);
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024, fieldSize: 2 * 1024 * 1024, files: 1 },
+    limits: { fileSize: MAXIMUM_FILE_MB * 1024 * 1024, fieldSize: 2 * 1024 * 1024, files: 1 },
 });
 
 function receiveFile(req, res, next) {
@@ -34,7 +46,7 @@ function receiveFile(req, res, next) {
             return next();
         }
         const message = error.code === 'LIMIT_FILE_SIZE'
-            ? 'File must be 5 MB or smaller'
+            ? `File must be ${MAXIMUM_FILE_MB} MB or smaller`
             : error.message;
         return res.status(400).json({ error: message });
     });
@@ -72,7 +84,45 @@ function hasExpectedSignature(file, extension) {
     if (extension === '.mp4') {
         return file.buffer.length >= 8 && file.buffer.subarray(4, 8).toString('ascii') === 'ftyp';
     }
+    if (extension === '.mov') {
+        return file.buffer.length >= 8 && QUICKTIME_FIRST_BOXES.has(file.buffer.subarray(4, 8).toString('ascii'));
+    }
     return false;
+}
+
+/** Why a frame can't be shown on a Screen, or null when it can. */
+function frameRefusal({ width, height }) {
+    const size = `${Math.round(width)}×${Math.round(height)}`;
+    if (!height || Math.abs(width / height / WIDESCREEN - 1) > FRAME_TOLERANCE) {
+        return `Media must be 16:9; this file is ${size}`;
+    }
+    if (width < MINIMUM_WIDTH || height < MINIMUM_HEIGHT) {
+        return `Media must be at least ${MINIMUM_WIDTH}×${MINIMUM_HEIGHT}; this file is ${size}`;
+    }
+    return null;
+}
+
+/**
+ * The file's duration and frame, read from its own header. A still image plays
+ * for one five-second Slot; the duration a client declares is ignored.
+ */
+function measureMedia(file, extension) {
+    const isVideo = file.mimetype.startsWith('video/');
+    const header = readMediaHeader(file.buffer, extension);
+    if (!header) {
+        return { error: isVideo
+            ? 'The video could not be read. Upload a playable .mp4 or .mov file'
+            : 'The image could not be read. Upload a valid .png, .jpg or .jpeg file' };
+    }
+    if (isVideo && Math.abs(Math.round(header.duration * 1000) - SLOT_SECONDS * 1000) > DURATION_TOLERANCE_MS) {
+        return {
+            error: `A video must last ${SLOT_SECONDS} seconds (±${DURATION_TOLERANCE_MS / 1000} s); `
+                + `this one lasts ${header.duration.toFixed(1)} s`,
+        };
+    }
+    const refusal = frameRefusal(header);
+    if (refusal) return { error: refusal };
+    return { duration: isVideo ? header.duration : SLOT_SECONDS, width: header.width, height: header.height };
 }
 
 function validateMetadata(req, file) {
@@ -82,7 +132,7 @@ function validateMetadata(req, file) {
     const extension = path.extname(file.originalname).toLowerCase();
     const expectedMimeType = ACCEPTED_FILES.get(extension);
     if (!expectedMimeType || expectedMimeType !== file.mimetype || !hasExpectedSignature(file, extension)) {
-        return { error: 'Invalid file type. Allowed: .png, .jpg, .jpeg, .mp4' };
+        return { error: 'Invalid file type. Allowed: .png, .jpg, .jpeg, .mp4, .mov' };
     }
     if (!title) return { error: 'Media title is required' };
     if (!CATEGORIES.has(category)) return { error: 'Media category must be paid, retailer, internal, or fallback' };
@@ -106,15 +156,10 @@ function validateMetadata(req, file) {
         return { error: `${category} media cannot have an organization owner` };
     }
 
-    if (file.mimetype === 'video/mp4' && !req.body.duration) {
-        return { error: 'Asset duration must be exactly 5 seconds for video files' };
-    }
-    const duration = Number(req.body.duration || 5);
-    if (!Number.isFinite(duration) || duration !== 5) {
-        return { error: 'Asset duration must be exactly 5 seconds' };
-    }
+    const measured = measureMedia(file, extension);
+    if (measured.error) return measured;
 
-    return { title, category, duration, ...uploadMetadata };
+    return { title, category, ...measured, ...uploadMetadata };
 }
 
 router.get('/', async (req, res) => {
@@ -210,6 +255,8 @@ router.post('/upload', receiveFile, async (req, res) => {
             approval_status: metadata.approvalStatus,
             eligible_for_playback: metadata.approvalStatus === 'approved',
             duration: metadata.duration,
+            width: metadata.width ?? null,
+            height: metadata.height ?? null,
             mime_type: req.file.mimetype,
             file_type: req.file.mimetype,
             size_bytes: req.file.size,
