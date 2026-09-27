@@ -13,7 +13,8 @@ test('Retailer Administrator reports a Support Ticket that the Technical Operato
 
         await signIn(page, 'retaileradmin@demo.softomedia.test', /\/dashboard\/retailer$/);
         await page.getByTestId('nav-tickets').click();
-        await page.getByTestId('btn-create-ticket').click();
+        // The Retailer dashboard has its own btn-create-ticket, so click the Support Tickets page's.
+        await page.getByTestId('ticket-dashboard').getByTestId('btn-create-ticket').click();
         await page.getByLabel('Subject').fill(subject);
         await page.getByLabel('Category').selectOption('network');
         await page.getByLabel('Description').fill('The checkout screen shows a disconnected icon.');
