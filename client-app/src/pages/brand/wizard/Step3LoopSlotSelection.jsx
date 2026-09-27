@@ -74,8 +74,7 @@ function BookingCutoff({ open, cutoff }) {
             </p>
         );
     }
-    const day = localDate(cutoff.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    const when = `${cutoff.time} on ${day}, Store time (${cutoff.time_zone})`;
+    const when = `${cutoff.time} on ${formatDay(cutoff.date)}, Store time (${cutoff.time_zone})`;
     return (
         <p
             data-testid="booking-cutoff"
@@ -190,9 +189,28 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
         return () => { current = false; };
     }, [storesKey, datesKey]);
 
+    // Picks made on an earlier Campaign range are repeated onto the dates added since.
+    useEffect(() => {
+        if (!repeatDaily || !data.slotDates) return;
+        const addedDates = datesKey.split(',').filter(date => !data.slotDates.includes(date));
+        if (addedDates.length === 0) return;
+        const repeated = selectedSlots.flatMap(pick => addedDates.map(date => ({ ...pick, date, price: undefined })))
+            .filter((pick, index, all) => all.findIndex(other => sameSlot(pick, other)) === index);
+        setPicks([...selectedSlots, ...repeated]);
+        // Only a change of Campaign dates repeats picks; later picks are handled as they are made.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [datesKey]);
+
     const shown = days[dayKey(storeId, selectedDate)];
     const availability = shown?.availability;
     const failed = shown?.failed;
+
+    // Each pick is priced from its own day's availability, once that day has loaded.
+    const priceOf = pick => hourOf(days[dayKey(pick.store_id, pick.date)], pick.hour)?.price ?? pick.price;
+    const priced = selectedSlots.map(pick => ({ ...pick, price: priceOf(pick) }));
+
+    // The dates are kept with the picks, so dates added to the Campaign later can be told apart.
+    const setPicks = (picks, update = {}) => updateData({ selectedSlots: picks, slotDates: dates, ...update });
 
     // With the option on, a Slot is picked or unpicked on every Campaign date at once.
     const toggle = (hour, position) => {
@@ -202,14 +220,7 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
             ? dates.map(date => ({ ...slot, date }))
             : [slot];
         const others = selectedSlots.filter(candidate => !affected.some(other => sameSlot(candidate, other)));
-        updateData({
-            selectedSlots: alreadyPicked ? others : [
-                ...others,
-                ...affected.map(pick => ({
-                    ...pick, price: hourOf(days[dayKey(storeId, pick.date)], hour)?.price,
-                })),
-            ],
-        });
+        setPicks(alreadyPicked ? others : [...others, ...affected.map(pick => ({ ...pick, price: priceOf(pick) }))]);
     };
 
     // Turning the option on repeats every Slot already picked, on any date, onto every date.
@@ -217,24 +228,33 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
         if (!on) return updateData({ repeatDaily: false });
         const repeated = selectedSlots.flatMap(pick => dates.map(date => ({ ...pick, date })))
             .filter((pick, index, all) => all.findIndex(other => sameSlot(pick, other)) === index)
-            .map(pick => selectedSlots.find(candidate => sameSlot(candidate, pick)) || {
-                ...pick, price: hourOf(days[dayKey(pick.store_id, pick.date)], pick.hour)?.price,
-            });
-        return updateData({ repeatDaily: true, selectedSlots: repeated });
+            .map(pick => ({ ...pick, price: priceOf(pick) }));
+        return setPicks(repeated, { repeatDaily: true });
     };
 
-    const drop = picks => updateData({
-        selectedSlots: selectedSlots.filter(candidate => !picks.some(pick => sameSlot(candidate, pick))),
-    });
+    const drop = picks => setPicks(selectedSlots.filter(candidate => !picks.some(pick => sameSlot(candidate, pick))));
 
     // Every pick is checked on its own day, so no day of a repeated Slot is skipped silently.
-    const checked = selectedSlots.map(pick => ({ pick, problem: pickProblem(days[dayKey(pick.store_id, pick.date)], pick) }));
-    const problems = checked.filter(({ problem }) => problem)
+    // A pick left outside the Campaign by an earlier step is listed too, so it can be dropped.
+    const inCampaign = pick => stores.includes(pick.store_id) && dates.includes(pick.date);
+    const pickChecks = selectedSlots.map(pick => ({
+        pick,
+        problem: inCampaign(pick)
+            ? pickProblem(days[dayKey(pick.store_id, pick.date)], pick)
+            : 'is outside the Campaign’s Stores or dates',
+    }));
+    const problems = pickChecks.filter(({ problem }) => problem)
         .sort((left, right) => left.pick.date.localeCompare(right.pick.date)
             || left.pick.hour - right.pick.hour || left.pick.position - right.pick.position);
-    const checking = checked.some(({ problem }) => problem === undefined);
+    const checking = pickChecks.some(({ problem }) => problem === undefined);
 
-    const total = selectedSlots.reduce((sum, slot) => sum + (slot.price ?? 0), 0);
+    const total = priced.reduce((sum, slot) => sum + (slot.price ?? 0), 0);
+
+    // The prices shown here are passed on for review; the server prices each Slot itself.
+    const next = () => {
+        updateData({ selectedSlots: priced });
+        onNext();
+    };
 
     const campaignDays = dates.map(isoDate => {
         const date = localDate(isoDate);
@@ -406,7 +426,7 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
                     <div className="flex gap-3">
                         <button onClick={onPrev} className="px-6 py-3 rounded-xl border">Back</button>
                         <button
-                            onClick={onNext}
+                            onClick={next}
                             disabled={selectedSlots.length === 0 || problems.length > 0 || checking}
                             data-testid="step-3-next-btn"
                             className="px-8 py-3 rounded-xl bg-primary text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed"
