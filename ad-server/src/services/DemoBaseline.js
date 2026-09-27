@@ -18,6 +18,7 @@ export const DEMO_BUSINESS_COLLECTIONS = Object.freeze([
     'notifications',
     'playlists',
     'playback_observations',
+    'platform_config',
     'pricing_config',
     'platform_audits',
     'proof_of_play',

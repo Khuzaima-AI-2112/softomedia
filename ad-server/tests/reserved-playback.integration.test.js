@@ -192,8 +192,8 @@ describeWithAuthEmulator('Reserved Slots on the Screen', () => {
                 },
             });
         }
-        // Retailer and Internal positions are filled as before.
-        expect(slotAt(2)).toMatchObject({ allocated_category: 'retailer', asset_id: 'retailer-media' });
+        // Retailer media plays only in a scheduled promotion; Internal positions are filled as before.
+        expect(slotAt(2)).toMatchObject({ allocated_category: 'retailer', asset_id: 'fallback-media', is_fallback: true });
         expect(slotAt(5)).toMatchObject({ allocated_category: 'internal', asset_id: 'internal-media' });
         // A Reservation plays only in its own hour.
         const nineAm = generated.body.loops.find(loop => loop.hour === 9);

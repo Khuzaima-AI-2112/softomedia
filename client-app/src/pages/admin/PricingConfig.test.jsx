@@ -14,7 +14,16 @@ vi.mock('../../contexts/AuthContext', () => ({
     useAuth: () => ({ user: superadmin, loading: false }),
 }));
 vi.mock('../../services/ApiService', () => ({
-    default: { getPricingConfig, updatePricingConfig, getStores, updateStore },
+    default: {
+        getPricingConfig,
+        updatePricingConfig,
+        getStores,
+        updateStore,
+        // The page also holds the network Dayparts (DaypartSettings.test.jsx).
+        getDayparts: vi.fn(async () => ({
+            breakfast: { start: 6, end: 11 }, lunch: { start: 11, end: 15 }, dinner: { start: 17, end: 21 },
+        })),
+    },
 }));
 
 import PricingConfig from './PricingConfig';

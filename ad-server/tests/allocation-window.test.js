@@ -115,7 +115,7 @@ describe('five-loop Allocation Window', () => {
         });
     });
 
-    test('offers eligible Retailer and Internal media, and leaves Paid positions to Reservations', async () => {
+    test('offers promotions of this Retailer and Internal media, and leaves Paid positions to Reservations', async () => {
         await mediaRepository.create('local-paid', {
             category: 'paid', approval_status: 'approved', eligible_for_playback: true,
             owner_type: 'brand', owner_id: 'brand-1', status: 'ready',
@@ -142,6 +142,15 @@ describe('five-loop Allocation Window', () => {
             start_date: '2030-01-01', end_date: '2030-01-31',
             inventory_selection: [{ retailer_id: 'retailer-2', store_id: 'store-2' }],
         });
+        await campaignRepository.create('retailer-promotion', {
+            type: 'retailer', retailer_id: 'retailer-1', media_id: 'retailer-media', status: 'approved',
+            start_date: '2030-01-01', end_date: '2030-01-31',
+            schedule: { dates: ['2030-01-04'], dayparts: ['breakfast'], hours: [] },
+        });
+        await campaignRepository.create('other-retailer-promotion', {
+            type: 'retailer', retailer_id: 'retailer-2', media_id: 'retailer-media', status: 'approved',
+            start_date: '2030-01-01', end_date: '2030-01-31',
+        });
         await campaignRepository.create('missing-media-campaign', {
             media_id: 'missing-media', status: 'approved',
             start_date: '2030-01-01', end_date: '2030-01-31',
@@ -153,8 +162,10 @@ describe('five-loop Allocation Window', () => {
         expect(content.map(item => item.asset_id).sort()).toEqual([
             'internal-media', 'retailer-media'
         ]);
+        // Retailer media plays only through its Retailer's own promotion, which keeps its schedule.
         expect(content.find(item => item.asset_id === 'retailer-media')).toMatchObject({
-            type: 'retailer', campaign_id: null, content_kind: 'media',
+            type: 'retailer', campaign_id: 'retailer-promotion',
+            schedule: { dates: ['2030-01-04'], dayparts: ['breakfast'], hours: [] },
         });
         expect(content.some(item => item.asset_id === 'missing-media')).toBe(false);
     });

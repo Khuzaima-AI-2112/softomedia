@@ -13,6 +13,7 @@ import {
 } from '../repositories/index.js';
 import { resolveAgreedCpm } from '../services/CampaignPricingService.js';
 import { prepareReservations } from '../services/SlotReservations.js';
+import { promotionScheduleError } from '../services/Dayparts.js';
 import { authenticate } from '../middleware/auth.js';
 import {
     PERMISSIONS,
@@ -99,6 +100,49 @@ async function validateBrandSubmission(body, ownerId) {
     }
 
     return { media };
+}
+
+/**
+ * A Retailer promotion is a Retailer-category Campaign an Admin schedules: the
+ * Retailer's own media, in its own Stores, on chosen dates in chosen hours or
+ * Dayparts. It plays only in the Retailer's Slots (LoopGenerationService).
+ */
+async function preparePromotion(body) {
+    const scheduleError = promotionScheduleError(body.schedule);
+    if (scheduleError) return { error: scheduleError };
+
+    const retailer = await retailerRepository.findById(body.retailer_id);
+    if (!retailer || retailer.status !== 'active' || retailer.deleted_at) {
+        return { error: 'The Retailer is unavailable' };
+    }
+    const media = await mediaRepository.findById(body.media_id);
+    if (!media || media.category !== 'retailer' || media.owner_type !== 'retailer' || media.owner_id !== retailer.id) {
+        return { error: 'The promotion\'s media must be this Retailer\'s own' };
+    }
+    if (body.store_id) {
+        const store = await StoreRepository.findById(body.store_id);
+        if (!store || store.retailer_id !== retailer.id || store.deleted_at) {
+            return { error: 'The Store must belong to this Retailer' };
+        }
+    }
+
+    const dates = [...new Set(body.schedule.dates)].sort();
+    return {
+        promotion: {
+            type: 'retailer',
+            name: body.name,
+            retailer_id: retailer.id,
+            ...(body.store_id ? { store_id: body.store_id } : {}),
+            media_id: media.id,
+            schedule: {
+                dates,
+                dayparts: [...new Set(body.schedule.dayparts || [])],
+                hours: [...new Set(body.schedule.hours || [])].sort((a, b) => a - b),
+            },
+            start_date: dates[0],
+            end_date: dates[dates.length - 1],
+        },
+    };
 }
 
 /**
@@ -207,7 +251,8 @@ router.get('/:id', authenticate, requireCampaignRead, async (req, res) => {
  * Create a new campaign (defaults to pending_approval).
  *
  * Requires campaigns.create: a Brand creates for its own organization; Admin
- * and Super Administrator create on behalf of a named advertiser.
+ * and Super Administrator create on behalf of a named advertiser, or schedule
+ * a Retailer promotion with `type: 'retailer'` (#40).
  *
  * T1 fix: Admin and Super Administrator callers MUST supply advertiser_id
  *   in the request body — returns 400 if missing. Prevents orphaned
@@ -228,6 +273,22 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, RO
             return res.status(403).json({ error: 'Brand account has no organization assignment' });
         }
 
+        // Unique even when two submissions arrive in the same millisecond.
+        const generatedId = `cmp_${Date.now()}_${randomBytes(4).toString('hex')}`;
+
+        // A Retailer promotion has no advertiser; Retailer Administrators lack
+        // campaigns.create, so only Admin and Super Administrator reach this.
+        if (preparedForAdvertiser && req.body.type === 'retailer') {
+            const { promotion, error } = await preparePromotion(req.body);
+            if (error) return res.status(400).json({ error });
+            return res.status(201).json(await campaignRepository.create(generatedId, {
+                ...promotion,
+                // The Retailer approves its promotion like any other content.
+                status: 'pending_approval',
+                created_at: new Date().toISOString(),
+            }));
+        }
+
         // T1: a Campaign prepared for an advertiser must name that advertiser
         if (preparedForAdvertiser && !req.body.advertiser_id) {
             return res.status(400).json({
@@ -244,8 +305,6 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, RO
             brandMedia = validation.media;
         }
 
-        // Unique even when two submissions arrive in the same millisecond.
-        const generatedId = `cmp_${Date.now()}_${randomBytes(4).toString('hex')}`;
         const id = brandCaller ? generatedId : (req.body.id || generatedId);
         const submittedData = brandCaller ? {
             name: req.body.name,

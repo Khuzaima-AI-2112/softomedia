@@ -10,7 +10,9 @@ import { campaignRepository } from '../repositories/CampaignRepository.js';
 import { dailyScheduleRepository } from '../repositories/DailyScheduleRepository.js';
 import { mediaRepository } from '../repositories/MediaRepository.js';
 import { slotReservationRepository } from '../repositories/SlotReservationRepository.js';
+import { daypartRepository } from '../repositories/DaypartRepository.js';
 import { BusinessHoursService } from './BusinessHoursService.js';
+import { isPromotionScheduledAt } from './Dayparts.js';
 import logger from '../utils/logger.js';
 import {
     isApprovedFallbackAsset,
@@ -69,16 +71,20 @@ export class LoopGenerationService {
 
         // Paid positions play only what was reserved (ADR 0005); the shared
         // content fills Retailer and Internal positions.
-        const [content, reserved, fallback] = await Promise.all([
+        const [content, reserved, fallback, dayparts] = await Promise.all([
             this.getAvailableContent(retailerId, storeId, targetDate),
             this.getReservedCreatives(storeId, targetDate),
             this.getApprovedFallbackAsset(),
+            daypartRepository.get(),
         ]);
 
         // Generate loop for each business hour (PARALLELIZED)
         const hourPromises = [];
         for (let hour = startHour; hour < endHour; hour++) {
-            hourPromises.push(this.generateHourlyLoop(targetDate, hour, retailerId, storeId, content, {
+            // A Retailer promotion plays only in the hours it is scheduled for.
+            const hourContent = content.filter(item => item.type !== 'retailer'
+                || isPromotionScheduledAt(item.schedule, dayparts, targetDate, hour));
+            hourPromises.push(this.generateHourlyLoop(targetDate, hour, retailerId, storeId, hourContent, {
                 sequenceStart: firstPositionOfHour(hour, startHour),
                 fallback,
                 reserved: reserved.get(hour) || new Map(),
@@ -132,8 +138,10 @@ export class LoopGenerationService {
     }
 
     /**
-     * Build 12 slots. A Paid position plays its reserved Creative or Fallback
-     * Content; Retailer and Internal positions share the eligible content.
+     * Build 12 slots. A Paid Slot plays its reserved Creative or Fallback
+     * Content; Retailer and Internal Slots share the eligible content in turn.
+     * The turn carries on from the day's earlier Slots of the same category, so
+     * content outnumbering one hour's Slots still plays across the day.
      * @param {Array} content - Eligible Retailer and Internal content
      * @param {Map} reserved - This hour's Reservations with an approved Creative, by position
      * @returns {Array} 12 slots
@@ -144,6 +152,10 @@ export class LoopGenerationService {
             content.filter(item => item.type?.toLowerCase() === category),
         ]));
         const categoryIndexes = { retailer: 0, internal: 0 };
+        for (let earlier = 0; earlier < sequenceStart; earlier++) {
+            const category = allocatedCategory(earlier);
+            if (category in categoryIndexes) categoryIndexes[category]++;
+        }
 
         return Array.from({ length: SLOT_CONFIG.SLOTS_PER_LOOP }, (_, position) => {
             const sequencePosition = sequenceStart + position;
@@ -174,8 +186,10 @@ export class LoopGenerationService {
     }
 
     /**
-     * Get the eligible Retailer and Internal Campaign and category-media content
-     * for a Store and date. Paid Campaigns play only through Reservations.
+     * Get the eligible Retailer promotions, Internal Campaigns and Internal
+     * media for a Store and date. Paid Campaigns play only through
+     * Reservations; Retailer Slots play only the Retailer's own promotions,
+     * each carrying its schedule of hours.
      */
     async getAvailableContent(retailerId, storeId, targetDate) {
         try {
@@ -210,15 +224,15 @@ export class LoopGenerationService {
                     campaign_id: campaign.id,
                 };
             // An untyped Campaign is Paid, and Paid Campaigns play only through Reservations.
-            }).filter(campaign => campaign.asset_id && campaign.type !== 'paid');
+            }).filter(campaign => campaign.asset_id && campaign.type !== 'paid'
+                // A promotion names its own Retailer; it never plays for every Retailer.
+                && (campaign.type !== 'retailer' || this.namesRetailer(campaign, retailerId)));
 
-            const categoryMedia = media.filter(asset => {
-                const category = asset.category?.toLowerCase();
-                const correctOwner = category === 'retailer'
-                    ? asset.owner_type === 'retailer' && asset.owner_id === retailerId
-                    : category === 'internal' && asset.owner_type === 'platform';
-                return isApprovedPlaybackAsset(asset) && correctOwner;
-            }).map(asset => ({
+            // Retailer media plays only through a scheduled promotion.
+            const categoryMedia = media.filter(asset => isApprovedPlaybackAsset(asset)
+                && asset.category?.toLowerCase() === 'internal'
+                && asset.owner_type === 'platform'
+            ).map(asset => ({
                 id: `media:${asset.id}`,
                 type: asset.category.toLowerCase(),
                 asset_id: asset.id,
@@ -258,6 +272,11 @@ export class LoopGenerationService {
             });
         }));
         return byHour;
+    }
+
+    namesRetailer(campaign, retailerId) {
+        return campaign.retailer_id === retailerId
+            || (campaign.inventory_selection || []).some(selection => selection.retailer_id === retailerId);
     }
 
     async getApprovedFallbackAsset() {

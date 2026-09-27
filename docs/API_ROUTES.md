@@ -35,7 +35,7 @@
 |---|---|---|---|---|---|
 | GET | `/api/campaigns` | — | `requireAuth` | `campaigns.js` | Returns campaigns scoped to caller's role |
 | GET | `/api/campaigns/:id` | — | `requireAuth` | `campaigns.js` | Single campaign |
-| POST | `/api/campaigns` | Brand: `{ name, media_id, start_date, end_date, budget, inventory_selection, slots: [{ store_id, date, hour, position }] }`; Admin: `{ …, advertiser_id }` | `requireRole('brandmanager')` | `campaigns.js` | Creates campaign; status set to `pending_approval`. A Brand's `slots` become Slot Reservations in the same transaction (#31, ADR 0005), each priced server-side and listed in `reserved_slots`. `400 { error, code: 'INVALID_SLOTS' }` for a pick that is not a Paid Slot in an operating hour of a booked Store and Campaign date; `400 { error, code: 'BOOKING_CLOSED' }` from 18:00 two days before the date, Store time; `409 { error, code: 'SLOT_TAKEN', slots }` when another Brand holds a picked Slot. |
+| POST | `/api/campaigns` | Brand: `{ name, media_id, start_date, end_date, budget, inventory_selection, slots: [{ store_id, date, hour, position }] }`; Admin: `{ …, advertiser_id }` | `requireRole('brandmanager')` | `campaigns.js` | Creates campaign; status set to `pending_approval`. A Brand's `slots` become Slot Reservations in the same transaction (#31, ADR 0005), each priced server-side and listed in `reserved_slots`. `400 { error, code: 'INVALID_SLOTS' }` for a pick that is not a Paid Slot in an operating hour of a booked Store and Campaign date; `400 { error, code: 'BOOKING_CLOSED' }` from 18:00 two days before the date, Store time; `409 { error, code: 'SLOT_TAKEN', slots }` when another Brand holds a picked Slot. Admin Retailer promotion (#40): `{ type: 'retailer', name, retailer_id, store_id?, media_id, schedule: { dates: ['YYYY-MM-DD'], dayparts?: ['breakfast' / 'lunch' / 'dinner'], hours?: [0–23] } }`, with no `advertiser_id`; the media must be that Retailer's own, else `400 { error }`. Retailer Administrators can't create promotions. |
 | PATCH | `/api/campaigns/:id` | `{ name?, start_date?, end_date?, budget? }` | `requireRole('brandmanager')` | `campaigns.js` | Partial update of mutable fields |
 | PATCH | `/api/campaigns/:id/status` | `{ status }` | `requireRole('retaileradmin')` | `campaigns.js` | Allowed values: `approved`, `rejected`, `pending_approval`. Normalises to lowercase before write. |
 | DELETE | `/api/campaigns/:id` | — | `requireRole('superadmin')` | `campaigns.js` | Soft-delete only. **S13-3: corrected from `admin` → `superadmin` to match live code at L187.** |
@@ -119,6 +119,15 @@
 | GET | `/api/pricing/config` | — | `authenticate` + `requireRole('admin')` | `pricing.js` | Admin-only read of raw config doc. **S15-1: hardened from public.** |
 | PUT | `/api/pricing/config` | `{ baseCPM?, allocation?: { paid, retailer, internal }, ...overrides? }` | `authenticate` + `requireRole('admin')` | `pricing.js` | Overwrites config. `allocation` values must sum to 100 (integer) — returns `400` otherwise. **S15-1: role guard added.** |
 | POST | `/api/pricing/overrides` | `{ date, multiplier }` | `authenticate` + `requirePlatformGovernance` | `pricing.js` | Add a date-specific override. Super Administrator only (global pricing). |
+
+---
+
+## Dayparts (`ad-server/src/api/dayparts.js`)
+
+| Method | Path | Request body | Auth guard | Source file | Notes |
+|---|---|---|---|---|---|
+| GET | `/api/dayparts` | — | `authenticate` | `dayparts.js` | The network's Dayparts, `{ breakfast, lunch, dinner }`, each `{ start, end }` in whole hours with `end` exclusive. Defaults 06–11, 11–15, 17–21 until set. |
+| PUT | `/api/dayparts` | `{ breakfast: { start, end }, lunch: {…}, dinner: {…} }` | `authenticate` + `requirePlatformGovernance` | `dayparts.js` | Super Administrator only (#40). `400` for overlapping Dayparts or hours outside 0–24. Writes a `dayparts_updated` platform audit record. |
 
 ---
 

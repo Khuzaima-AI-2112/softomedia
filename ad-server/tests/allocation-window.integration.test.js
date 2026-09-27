@@ -119,6 +119,10 @@ describeWithAuthEmulator('POST /api/loops/generate Allocation Window', () => {
             owner_type: 'retailer', owner_id: 'retailer-1', approval_status: 'approved',
             eligible_for_playback: true, status: 'ready',
         });
+        await campaignRepository.create('retailer-promotion', {
+            type: 'retailer', retailer_id: 'retailer-1', media_id: 'retailer-media', status: 'approved',
+            start_date: '2030-01-01', end_date: '2030-01-31',
+        });
         await mediaRepository.create('fallback-media', {
             title: 'Neutral fallback', category: 'fallback', content_kind: 'neutral_fallback',
             owner_type: 'platform', owner_id: null, approval_status: 'approved',
@@ -134,7 +138,7 @@ describeWithAuthEmulator('POST /api/loops/generate Allocation Window', () => {
         const firstSlots = firstDay.body.loops.flatMap(loop => loop.slots);
         expect(firstSlots.some(slot => slot.asset_id === 'other-store-asset')).toBe(false);
         expect(firstSlots.find(slot => slot.allocated_category === 'retailer')).toMatchObject({
-            asset_id: 'retailer-media', campaign_id: null, content_kind: 'media', is_fallback: false,
+            asset_id: 'retailer-media', campaign_id: 'retailer-promotion', content_kind: 'campaign', is_fallback: false,
         });
         expect(firstSlots.find(slot => slot.allocated_category === 'internal')).toMatchObject({
             asset_id: 'fallback-media', content_kind: 'fallback', is_fallback: true,

@@ -417,6 +417,20 @@ class ApiService {
     }
 
     // ============================================
+    // DAYPARTS
+    // ============================================
+
+    /** The network's breakfast, lunch and dinner hours; readable by every signed-in role. */
+    async getDayparts() {
+        return apiClient.get('/api/dayparts');
+    }
+
+    /** Set the network's Dayparts — Super Administrator only. */
+    async updateDayparts(dayparts) {
+        return apiClient.put('/api/dayparts', dayparts);
+    }
+
+    // ============================================
     // GENERIC REQUEST (used by Invoices.jsx)
     // ============================================
 
