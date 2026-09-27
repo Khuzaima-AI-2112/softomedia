@@ -44,6 +44,12 @@ describeWithAuthEmulator('POST /api/loops/generate Allocation Window', () => {
                 end_date: '2030-01-31',
             });
         }
+        // Unreserved Paid positions play Fallback Content (ADR 0005).
+        await mediaRepository.create('fallback-media', {
+            title: 'Neutral fallback', category: 'fallback', content_kind: 'neutral_fallback',
+            owner_type: 'platform', owner_id: null, approval_status: 'approved',
+            eligible_for_playback: true, status: 'ready',
+        });
     });
 
     afterEach(() => {
