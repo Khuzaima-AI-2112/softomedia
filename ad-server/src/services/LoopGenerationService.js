@@ -25,13 +25,6 @@ export const SLOT_CONFIG = {
     LOOP_DURATION_SECONDS: 60
 };
 
-// Priority order for filling slots
-export const CAMPAIGN_PRIORITY = {
-    PAID: 1,        // Paid advertiser campaigns
-    RETAILER: 2,    // Retailer-owned promotions
-    INTERNAL: 3     // Softomedia internal/filler
-};
-
 export class LoopGenerationService {
     /**
      * Generate all loops for a target date (D-1 scheduling)
@@ -84,16 +77,11 @@ export class LoopGenerationService {
         // Generate loop for each business hour (PARALLELIZED)
         const hourPromises = [];
         for (let hour = startHour; hour < endHour; hour++) {
-            hourPromises.push(this.generateHourlyLoop(
-                targetDate,
-                hour,
-                retailerId,
-                storeId,
-                content,
-                firstPositionOfHour(hour, startHour),
+            hourPromises.push(this.generateHourlyLoop(targetDate, hour, retailerId, storeId, content, {
+                sequenceStart: firstPositionOfHour(hour, startHour),
                 fallback,
-                reserved.get(hour) || new Map()
-            ));
+                reserved: reserved.get(hour) || new Map(),
+            }));
         }
 
         const generatedLoops = await Promise.all(hourPromises);
@@ -113,11 +101,18 @@ export class LoopGenerationService {
     /**
      * Generate a single hourly loop
      */
-    async generateHourlyLoop(date, hour, retailerId, storeId, content, sequenceStart = 0, fallback = null, reserved = new Map()) {
+    async generateHourlyLoop(date, hour, retailerId, storeId, content, placement = {}) {
         const loopId = `${date}_${hour}_${storeId}`;
-
-        // Build 12 slots using priority algorithm
-        const slots = this.buildSlots(content, { sequenceStart, fallback, reserved });
+        const slots = this.buildSlots(content, placement);
+        // A Reservation whose position is no longer Paid (say, after opening hours
+        // changed) cannot play; say so rather than dropping it silently.
+        for (const [position, reservation] of placement.reserved || []) {
+            if (slots[position]?.allocated_category !== 'paid') {
+                logger.warn('[LoopGeneration] Reservation is not on a Paid Slot', {
+                    storeId, date, hour, position, campaignId: reservation.campaign_id,
+                });
+            }
+        }
 
         const data = {
             date,
@@ -139,30 +134,27 @@ export class LoopGenerationService {
      * Build 12 slots. A Paid position plays its reserved Creative or Fallback
      * Content; Retailer and Internal positions share the eligible content.
      * @param {Array} content - Eligible Retailer and Internal content
-     * @param {Map} reserved - This hour's playable Reservations, by position
+     * @param {Map} reserved - This hour's Reservations with an approved Creative, by position
      * @returns {Array} 12 slots
      */
     buildSlots(content, { sequenceStart = 0, fallback = null, reserved = new Map() } = {}) {
-        const prioritized = this.prioritizeContent(content);
-        const byCategory = new Map(['paid', 'retailer', 'internal'].map(category => [
+        const byCategory = new Map(['retailer', 'internal'].map(category => [
             category,
-            prioritized.filter(item =>
-                item.type?.toLowerCase() === category
-            )
+            content.filter(item => item.type?.toLowerCase() === category),
         ]));
-        const categoryIndexes = { paid: 0, retailer: 0, internal: 0 };
+        const categoryIndexes = { retailer: 0, internal: 0 };
 
         return Array.from({ length: SLOT_CONFIG.SLOTS_PER_LOOP }, (_, position) => {
             const sequencePosition = sequenceStart + position;
             const category = allocatedCategory(sequencePosition);
-            const eligible = byCategory.get(category);
+            const eligible = byCategory.get(category) || [];
             const item = category === 'paid'
                 ? reserved.get(position) || null
                 : eligible.length > 0
                     ? eligible[categoryIndexes[category]++ % eligible.length]
                     : null;
             if (!item && !fallback) {
-                throw new Error('An approved neutral fallback asset is required for unoccupied reserved positions');
+                throw new Error('An approved neutral fallback asset is required for Slots without playable content');
             }
 
             return {
@@ -177,17 +169,6 @@ export class LoopGenerationService {
                 duration: SLOT_CONFIG.SLOT_DURATION_SECONDS,
                 status: 'PENDING'
             };
-        });
-    }
-
-    /**
-     * Sort eligible content by allocation category priority.
-     */
-    prioritizeContent(content) {
-        return [...content].sort((a, b) => {
-            const priorityA = CAMPAIGN_PRIORITY[a.type?.toUpperCase()] || 99;
-            const priorityB = CAMPAIGN_PRIORITY[b.type?.toUpperCase()] || 99;
-            return priorityA - priorityB;
         });
     }
 
@@ -227,6 +208,7 @@ export class LoopGenerationService {
                     asset_name: campaign.asset_name || asset?.title || asset?.filename || null,
                     campaign_id: campaign.id,
                 };
+            // An untyped Campaign is Paid, and Paid Campaigns play only through Reservations.
             }).filter(campaign => campaign.asset_id && campaign.type !== 'paid');
 
             const categoryMedia = media.filter(asset => {
@@ -252,9 +234,10 @@ export class LoopGenerationService {
     }
 
     /**
-     * The held Reservations for a Store and date that can play, by hour then
-     * position: the Campaign is approved and its Creative is approved. Any
-     * other Reservation's Slot plays Fallback Content.
+     * A Store's Reservations for a date whose Creative is approved, by hour then
+     * position. Any other Reservation's Slot gets Fallback Content. The Campaign's
+     * own approval is checked when the Slot plays, so one approved after
+     * generation still plays.
      * @returns {Promise<Map<number, Map<number, object>>>}
      */
     async getReservedCreatives(storeId, targetDate) {
@@ -263,7 +246,7 @@ export class LoopGenerationService {
         await Promise.all(reservations.map(async reservation => {
             const campaign = await campaignRepository.findById(reservation.campaign_id);
             const asset = campaign && await mediaRepository.findById(campaign.media_id || campaign.asset_id);
-            if (campaign?.status !== 'approved' || !isApprovedPlaybackAsset(asset)) return;
+            if (!isApprovedPlaybackAsset(asset)) return;
 
             if (!byHour.has(reservation.hour)) byHour.set(reservation.hour, new Map());
             byHour.get(reservation.hour).set(reservation.position, {

@@ -9,6 +9,7 @@ const { default: apiRouter } = await import('../src/api/index.js');
 const { createTestApp } = await import('./fixtures/test-app.js');
 const { clearMockStorage } = await import('../src/repositories/BaseRepository.js');
 const {
+    campaignRepository,
     impressionRepository,
     locationRepository,
     mediaRepository,
@@ -30,13 +31,13 @@ jest.setTimeout(30_000);
 const DATE = '2030-01-07';
 const MONDAY = 1;
 const BOOKED = new Date('2030-01-01T12:00:00.000Z');
-const GENERATED = new Date('2030-01-05T14:00:00.000Z'); // D-2, after the Booking Cutoff
+const GENERATED = new Date('2030-01-05T14:00:00.000Z'); // 09:00 on D-2, while bookings are still open
 const APPROVED = new Date('2030-01-06T15:00:00.000Z'); // before the 18:00 D-1 approval deadline
 const PLAYING = new Date('2030-01-07T13:00:30.000Z'); // 08:00:30 in Toronto
 
 const RESERVED = 3; // Brand One's approved Creative
 const UNAPPROVED_CREATIVE = 4; // Brand Two's Creative, not approved
-const UNAPPROVED_CAMPAIGN = 6; // Brand Three's Campaign, not approved by the Retailer
+const LATE_APPROVAL = 6; // Brand Three's Campaign, approved by the Retailer only after generation
 const UNRESERVED_PAID = [0, 1, 7, 9, 10, 11];
 
 const SELECTION = [{
@@ -96,7 +97,8 @@ async function seedMedia() {
     }));
 }
 
-async function at(now) {
+/** Moves the clock and signs everyone in afresh, so their tokens are valid at the new time. */
+async function signInAllAt(now) {
     jest.setSystemTime(now);
     const headersFor = async (role, organizationId = null) =>
         (await signInAs(role, { organizationId, fakeClock: true })).headers;
@@ -151,11 +153,11 @@ describeWithAuthEmulator('Reserved Slots on the Screen', () => {
 
     test('book → generate → the Screen plays the reserved Creative in its exact Slot → Proof of Play', async () => {
         // Book.
-        let as = await at(BOOKED);
+        let as = await signInAllAt(BOOKED);
         const booked = await book(as.brand, 'brand-one', RESERVED);
         const unapprovedCreative = await book(as.brandTwo, 'brand-two', UNAPPROVED_CREATIVE);
-        const unapprovedCampaign = await book(as.brandThree, 'brand-three', UNAPPROVED_CAMPAIGN);
-        expect([booked.status, unapprovedCreative.status, unapprovedCampaign.status]).toEqual([201, 201, 201]);
+        const lateApproval = await book(as.brandThree, 'brand-three', LATE_APPROVAL);
+        expect([booked.status, unapprovedCreative.status, lateApproval.status]).toEqual([201, 201, 201]);
         for (const campaign of [booked, unapprovedCreative]) {
             const approval = await request(app).patch(`/api/campaigns/${campaign.body.id}/status`)
                 .set(as.retailer).send({ status: 'approved' });
@@ -163,7 +165,7 @@ describeWithAuthEmulator('Reserved Slots on the Screen', () => {
         }
 
         // Generate.
-        as = await at(GENERATED);
+        as = await signInAllAt(GENERATED);
         const generated = await request(app).post('/api/loops/generate').set(as.admin)
             .send({ targetDate: DATE, retailerId: 'retailer-one', storeId: 'store-one' });
         expect(generated.status).toBe(201);
@@ -174,7 +176,11 @@ describeWithAuthEmulator('Reserved Slots on the Screen', () => {
             allocated_category: 'paid', content_kind: 'campaign', is_fallback: false,
             campaign_id: booked.body.id, asset_id: 'brand-one-creative',
         });
-        for (const position of [UNAPPROVED_CREATIVE, UNAPPROVED_CAMPAIGN, ...UNRESERVED_PAID]) {
+        // A Reservation is placed when its Creative is approved; its Campaign's approval is checked at play time.
+        expect(slotAt(LATE_APPROVAL)).toMatchObject({
+            content_kind: 'campaign', campaign_id: lateApproval.body.id, asset_id: 'brand-three-creative',
+        });
+        for (const position of [UNAPPROVED_CREATIVE, ...UNRESERVED_PAID]) {
             expect({ position, slot: slotAt(position) }).toMatchObject({
                 position,
                 slot: {
@@ -191,12 +197,12 @@ describeWithAuthEmulator('Reserved Slots on the Screen', () => {
         expect(nineAm.slots.filter(slot => slot.campaign_id)).toEqual([]);
 
         // The Retailer approves the hour.
-        as = await at(APPROVED);
+        as = await signInAllAt(APPROVED);
         const loopApproval = await request(app).patch(`/api/loops/${eightAm.id}/approve`).set(as.retailer);
         expect(loopApproval.status).toBe(200);
 
         // The Screen plays.
-        as = await at(PLAYING);
+        as = await signInAllAt(PLAYING);
         const playback = await request(app).get('/api/device/playback').set('Authorization', device());
         expect(playback.status).toBe(200);
         expect(playback.body).toMatchObject({ broadcast_date: DATE, hour: 8, loop_id: eightAm.id });
@@ -205,10 +211,19 @@ describeWithAuthEmulator('Reserved Slots on the Screen', () => {
             presentation_type: 'campaign', counts_as_delivery: true,
             campaign_id: booked.body.id, asset_id: 'brand-one-creative',
         });
-        for (const position of [UNAPPROVED_CREATIVE, UNAPPROVED_CAMPAIGN, ...UNRESERVED_PAID]) {
+        for (const position of [UNAPPROVED_CREATIVE, LATE_APPROVAL, ...UNRESERVED_PAID]) {
             expect({ position, presentation_type: played[position].presentation_type, counts: played[position].counts_as_delivery })
                 .toEqual({ position, presentation_type: 'fallback', counts: false });
         }
+
+        // Once the Retailer approves Brand Three's Campaign, its already-generated Slot plays.
+        const approvedLate = await request(app).patch(`/api/campaigns/${lateApproval.body.id}/status`)
+            .set(as.retailer).send({ status: 'approved' });
+        expect(approvedLate.status).toBe(200);
+        const replayed = await request(app).get('/api/device/playback').set('Authorization', device());
+        expect(replayed.body.slots[LATE_APPROVAL]).toMatchObject({
+            presentation_type: 'campaign', campaign_id: lateApproval.body.id, asset_id: 'brand-three-creative',
+        });
 
         // Proof of Play is recorded for the reserved play, and never for Fallback Content.
         const reported = await proofOfPlay(eightAm.id, played[RESERVED], 'reserved-play');
@@ -230,8 +245,7 @@ describeWithAuthEmulator('Reserved Slots on the Screen', () => {
     });
 
     test('Paid positions are never shared out among approved Paid Campaigns without a Reservation', async () => {
-        const as = await at(GENERATED);
-        const { campaignRepository } = await import('../src/repositories/index.js');
+        const as = await signInAllAt(GENERATED);
         await campaignRepository.create('unreserved-campaign', {
             type: 'paid', status: 'approved', media_id: 'brand-one-creative', brand_id: 'brand-one',
             advertiser_id: 'brand-one', inventory_selection: SELECTION, start_date: DATE, end_date: DATE,
