@@ -10,12 +10,24 @@ import { PERMISSIONS } from '../../constants/permissions';
 
 const TRAFFIC_OPTIONS = ['low', 'medium', 'high'];
 
+const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
 const EMPTY_STORE_FORM = {
     name: '',
     address: '',
     city: '',
-    traffic_level: 'medium'
+    traffic_level: 'medium',
+    time_zone: browserTimeZone,
 };
+
+function isValidTimeZone(timeZone) {
+    try {
+        Intl.DateTimeFormat('en-US', { timeZone }).format();
+        return true;
+    } catch {
+        return false;
+    }
+}
 
 /** Returns an object of field-level error strings. Empty object = valid. */
 function validateStoreForm(data) {
@@ -46,6 +58,13 @@ function validateStoreForm(data) {
         errors.city = 'City must contain only letters, spaces, or hyphens.';
     } else if (city.length > 60) {
         errors.city = 'City must be 60 characters or fewer.';
+    }
+
+    const timeZone = data.time_zone.trim();
+    if (!timeZone) {
+        errors.time_zone = 'Time zone is required.';
+    } else if (!isValidTimeZone(timeZone)) {
+        errors.time_zone = 'Time zone must be an IANA time zone, such as America/Toronto.';
     }
 
     return errors;
@@ -266,7 +285,8 @@ function RetailerManagement() {
                 name: store.name,
                 address: store.address,
                 city: store.city,
-                traffic_level: store.traffic_level || 'medium'
+                traffic_level: store.traffic_level || 'medium',
+                time_zone: store.time_zone || browserTimeZone,
             });
         } else {
             setEditingStore(null);
@@ -913,6 +933,20 @@ function RetailerManagement() {
                                     aria-invalid={!!storeFieldErrors.city}
                                 />
                                 <FieldError message={storeFieldErrors.city} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1" htmlFor="store-time-zone">Time Zone</label>
+                                <input
+                                    id="store-time-zone"
+                                    type="text"
+                                    data-testid="input-store-time-zone"
+                                    value={storeFormData.time_zone}
+                                    onChange={(e) => updateStoreField('time_zone', e.target.value)}
+                                    className={inputClass(storeFieldErrors.time_zone)}
+                                    placeholder="America/Toronto"
+                                    aria-invalid={!!storeFieldErrors.time_zone}
+                                />
+                                <FieldError message={storeFieldErrors.time_zone} />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium mb-1" htmlFor="store-traffic">Traffic Level</label>

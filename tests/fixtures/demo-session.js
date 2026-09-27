@@ -56,6 +56,21 @@ export const test = base.extend({
                     .filter(document => dates.includes(document.data().date))
                     .map(document => document.ref.delete()));
             },
+            // Demo reset does not yet clear app-created Retailers (#46), so journeys remove
+            // their own, with the Stores and Store hours created under them.
+            removeRetailersNamed: async (name) => {
+                const firestore = getFirestore();
+                const retailers = await firestore.collection('retailers').where('name', '==', name).get();
+                for (const retailer of retailers.docs) {
+                    const stores = await firestore.collection('stores').where('retailer_id', '==', retailer.id).get();
+                    for (const store of stores.docs) {
+                        const hours = await firestore.collection('store_default_hours').where('store_id', '==', store.id).get();
+                        await Promise.all(hours.docs.map(document => document.ref.delete()));
+                        await store.ref.delete();
+                    }
+                    await retailer.ref.delete();
+                }
+            },
         });
 
         await closeFirestore();
