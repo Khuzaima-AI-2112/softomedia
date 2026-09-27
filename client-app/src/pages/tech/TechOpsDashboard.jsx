@@ -343,7 +343,7 @@ function TechOpsDashboard() {
                     <div className="flex flex-wrap gap-2">
                         <input
                             type="text"
-                            placeholder="Search screen ID\u2026"
+                            placeholder="Search screen ID…"
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                             className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/20"

@@ -8,6 +8,7 @@ import { deleteMediaObject, uploadMediaObject } from '../utils/storage.js';
 import { ROLES, normalizeRole } from '../constants/roles.js';
 import { sendMediaContent } from './mediaContent.js';
 import { assetContentPath } from '../constants/mediaPaths.js';
+import { decodeUploadFilename } from '../utils/uploadFilename.js';
 
 const router = express.Router();
 const CATEGORIES = new Set(['paid', 'retailer', 'internal', 'fallback']);
@@ -28,7 +29,10 @@ const upload = multer({
 
 function receiveFile(req, res, next) {
     upload.single('file')(req, res, error => {
-        if (!error) return next();
+        if (!error) {
+            if (req.file) req.file.originalname = decodeUploadFilename(req.file.originalname);
+            return next();
+        }
         const message = error.code === 'LIMIT_FILE_SIZE'
             ? 'File must be 5 MB or smaller'
             : error.message;
@@ -135,8 +139,11 @@ router.get('/', async (req, res) => {
 
 /** Stored media is addressed by its API content path; its Storage location stays internal. */
 function presentAsset(asset) {
-    if (!asset?.storage_path) return asset;
-    const presented = { ...asset, content_path: assetContentPath(asset.id) };
+    if (!asset) return asset;
+    // Media uploaded before #20 was fixed is stored with a garbled filename.
+    const presented = { ...asset, filename: decodeUploadFilename(asset.filename) };
+    if (!asset.storage_path) return presented;
+    presented.content_path = assetContentPath(asset.id);
     delete presented.url;
     return presented;
 }

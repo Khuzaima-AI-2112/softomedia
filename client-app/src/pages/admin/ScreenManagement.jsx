@@ -12,6 +12,10 @@ const SCREEN_STATUS = Object.freeze({ ACTIVE: 'active', INACTIVE: 'inactive' });
 const ERR_STATUS_ACTIVE_CAMPAIGNS = 'SCREEN_STATUS_CHANGE_REJECTED_ACTIVE_CAMPAIGNS';
 const ERR_DELETE_ACTIVE_CAMPAIGNS = 'SCREEN_DELETE_REJECTED_ACTIVE_CAMPAIGNS';
 
+// Seeded Screens carry a name and no screen_id; Screens registered on this
+// page carry a screen_id and no name.
+const screenLabel = screen => screen.name || screen.screen_id || screen.id;
+
 function ScreenManagement() {
     const [screens, setScreens] = useState([]);
     const [retailers, setRetailers] = useState([]);
@@ -87,7 +91,7 @@ function ScreenManagement() {
         try {
             await apiService.updateScreenStatus(screen.id, nextStatus);
             addToast(
-                `Screen "${screen.screen_id}" is now ${nextStatus}.`,
+                `Screen "${screenLabel(screen)}" is now ${nextStatus}.`,
                 'success'
             );
         } catch (error) {
@@ -99,7 +103,7 @@ function ScreenManagement() {
             const errorCode = error?.data?.error ?? error?.code ?? '';
             if (errorCode === ERR_STATUS_ACTIVE_CAMPAIGNS) {
                 addToast(
-                    `Cannot set "${screen.screen_id}" to inactive — it is part of active or upcoming campaigns. ` +
+                    `Cannot set "${screenLabel(screen)}" to inactive — it is part of active or upcoming campaigns. ` +
                     'Adjust those campaigns first.',
                     'error',
                     8000
@@ -131,18 +135,18 @@ function ScreenManagement() {
      *  3c. Other error → row stays, show generic error toast.
      */
     const handleDelete = useCallback(async (screen) => {
-        if (!confirm(`Delete screen "${screen.screen_id}"? This action cannot be undone.`)) return;
+        if (!confirm(`Delete screen "${screenLabel(screen)}"? This action cannot be undone.`)) return;
 
         try {
             await apiService.deleteScreen(screen.id);
             setScreens(prev => prev.filter(s => s.id !== screen.id));
-            addToast(`Screen "${screen.screen_id}" deleted.`, 'success');
+            addToast(`Screen "${screenLabel(screen)}" deleted.`, 'success');
         } catch (error) {
             const errorCode = error?.data?.error ?? error?.code ?? '';
 
             if (errorCode === ERR_DELETE_ACTIVE_CAMPAIGNS) {
                 addToast(
-                    `"${screen.screen_id}" can't be deleted — it's used by an active or upcoming campaign. End or reassign those campaigns first.`,
+                    `"${screenLabel(screen)}" can't be deleted — it's used by an active or upcoming campaign. End or reassign those campaigns first.`,
                     'error',
                     8000
                 );
@@ -191,11 +195,11 @@ function ScreenManagement() {
     }, [newScreen, loadData, addToast]);
 
     const handleRotateDeviceKey = useCallback(async (screen) => {
-        if (!confirm(`Issue a new device key for "${screen.screen_id}"? Its current Player link will stop working.`)) return;
+        if (!confirm(`Issue a new device key for "${screenLabel(screen)}"? Its current Player link will stop working.`)) return;
         try {
             const rotated = await apiService.rotateScreenDeviceKey(screen.id);
             setIssuedCredential({ screenId: rotated.screen_id, deviceKey: rotated.device_key });
-            addToast(`New device key issued for "${screen.screen_id}".`, 'success');
+            addToast(`New device key issued for "${screenLabel(screen)}".`, 'success');
         } catch (error) {
             addToast(error?.message || 'Failed to issue a new device key.', 'error');
         }
@@ -308,7 +312,7 @@ function ScreenManagement() {
                                             className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                                         >
                                             <td className="py-3 px-4 font-medium text-slate-900 dark:text-white">
-                                                {screen.screen_id}
+                                                {screenLabel(screen)}
                                             </td>
                                             <td className="py-3 px-4 text-slate-600 dark:text-slate-400">
                                                 {getStoreName(screen)}
@@ -328,8 +332,8 @@ function ScreenManagement() {
                                                     disabled={togglingIds.has(screen.id)}
                                                     aria-label={
                                                         screen.status === SCREEN_STATUS.ACTIVE
-                                                            ? `Set "${screen.screen_id}" inactive`
-                                                            : `Set "${screen.screen_id}" active`
+                                                            ? `Set "${screenLabel(screen)}" inactive`
+                                                            : `Set "${screenLabel(screen)}" active`
                                                     }
                                                     className={[
                                                         'p-2 rounded-lg transition-colors mr-1',
@@ -351,7 +355,7 @@ function ScreenManagement() {
                                                 {/* Device key rotation */}
                                                 <button
                                                     onClick={() => handleRotateDeviceKey(screen)}
-                                                    aria-label={`Issue new device key for "${screen.screen_id}"`}
+                                                    aria-label={`Issue new device key for "${screenLabel(screen)}"`}
                                                     className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors mr-1"
                                                 >
                                                     <span className="material-symbols-outlined text-[20px]" aria-hidden="true">key</span>
@@ -360,7 +364,7 @@ function ScreenManagement() {
                                                 {/* Delete */}
                                                 <button
                                                     onClick={() => handleDelete(screen)}
-                                                    aria-label={`Delete screen "${screen.screen_id}"`}
+                                                    aria-label={`Delete screen "${screenLabel(screen)}"`}
                                                     className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-500 transition-colors"
                                                 >
                                                     <span className="material-symbols-outlined text-[20px]" aria-hidden="true">delete</span>

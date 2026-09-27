@@ -226,4 +226,44 @@ describeWithAuthEmulator('classified media API', () => {
         expect(storedObjects.size).toBe(0);
         expect(storedMedia.size).toBe(0);
     });
+
+    describe('filenames outside ASCII (#20)', () => {
+        const ORIGINAL = '—Pngtree—up to 20 off price_8775259.png';
+        // The same name read back as Latin-1, as it was stored before the fix.
+        const GARBLED = Buffer.from(ORIGINAL, 'utf8').toString('latin1');
+        const INTERNAL = {
+            title: 'Stock photo',
+            category: 'internal',
+            owner_type: 'platform',
+            approval_status: 'approved',
+            duration: '5',
+        };
+
+        it('stores the filename exactly as uploaded', async () => {
+            const response = await upload(await appAs('admin'), INTERNAL, ORIGINAL);
+
+            expect(response.status).toBe(201);
+            expect(response.body.filename).toBe(ORIGINAL);
+            expect(storedMedia.get(response.body.id).filename).toBe(ORIGINAL);
+        });
+
+        it('stores an accented filename exactly as uploaded', async () => {
+            const response = await upload(await appAs('admin'), INTERNAL, 'Café Montréal.png');
+
+            expect(response.body.filename).toBe('Café Montréal.png');
+        });
+
+        it('shows the original name for media stored garbled before the fix', async () => {
+            storedMedia.set('ast_legacy', {
+                id: 'ast_legacy',
+                filename: GARBLED,
+                storage_path: 'gs://softomedia-demo.firebasestorage.app/phase-1-demo/uploads/ast_legacy.png',
+            });
+
+            const response = await (await appAs('admin')).get('/api/assets');
+
+            expect(response.status).toBe(200);
+            expect(response.body.find(asset => asset.id === 'ast_legacy').filename).toBe(ORIGINAL);
+        });
+    });
 });

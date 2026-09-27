@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase';
 import { authAPI } from '../services/authAPI';
+import pricingService from '../services/PricingService';
 
 const AuthContext = createContext(null);
 
@@ -40,7 +41,12 @@ export const AuthProvider = ({ children }) => {
     };
 
     const logout = async () => {
-        await authAPI.logout();
+        try {
+            await authAPI.logout();
+        } finally {
+            // The next user to sign in on this tab must not see these prices.
+            pricingService.reset();
+        }
         setUser(null);
     };
 
