@@ -19,8 +19,8 @@ export function mediaFile(name) {
 }
 
 /** Supertest attach() options for a fixture. */
-export function mediaAttachment(name, filename = name) {
-    return { filename, contentType: CONTENT_TYPES[name.slice(name.lastIndexOf('.'))] };
+export function mediaAttachment(name) {
+    return { filename: name, contentType: CONTENT_TYPES[name.slice(name.lastIndexOf('.'))] };
 }
 
 /** A valid 1280×720 PNG, for tests that upload media but don't test the media rules. */

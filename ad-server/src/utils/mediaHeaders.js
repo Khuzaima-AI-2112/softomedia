@@ -25,18 +25,23 @@ function* boxes(buffer, start = 0, end = buffer.length) {
     }
 }
 
-const child = (buffer, parent, type) => {
+const childBox = (buffer, parent, type) => {
     for (const box of boxes(buffer, parent.content, parent.end)) if (box.type === type) return box;
     return null;
 };
 
-function readMovieHeader(buffer, mvhd) {
-    const version = buffer[mvhd.content];
-    const timescale = buffer.readUInt32BE(mvhd.content + (version === 1 ? 20 : 12));
+/**
+ * A track's own duration in seconds, from its media header ('mdhd'). The movie
+ * header would give the longest track, such as a longer audio track. A
+ * fragmented file records no duration here, and reads as unknown.
+ */
+function readTrackDuration(buffer, mdhd) {
+    const version = buffer[mdhd.content];
+    const timescale = buffer.readUInt32BE(mdhd.content + (version === 1 ? 20 : 12));
     const duration = version === 1
-        ? Number(buffer.readBigUInt64BE(mvhd.content + 24))
-        : buffer.readUInt32BE(mvhd.content + 16);
-    return timescale ? duration / timescale : null;
+        ? Number(buffer.readBigUInt64BE(mdhd.content + 24))
+        : buffer.readUInt32BE(mdhd.content + 16);
+    return timescale && duration ? duration / timescale : null;
 }
 
 /** The presented frame of a track, turned when its matrix rotates it a quarter turn. */
@@ -51,8 +56,8 @@ function readTrackFrame(buffer, tkhd) {
 }
 
 function isVideoTrack(buffer, trak) {
-    const mdia = child(buffer, trak, 'mdia');
-    const hdlr = mdia && child(buffer, mdia, 'hdlr');
+    const mdia = childBox(buffer, trak, 'mdia');
+    const hdlr = mdia && childBox(buffer, mdia, 'hdlr');
     return Boolean(hdlr) && buffer.toString('latin1', hdlr.content + 8, hdlr.content + 12) === 'vide';
 }
 
@@ -60,12 +65,12 @@ function readVideo(buffer) {
     let moov = null;
     for (const box of boxes(buffer)) if (box.type === 'moov') moov = box;
     if (!moov) return null;
-    const mvhd = child(buffer, moov, 'mvhd');
-    const duration = mvhd && readMovieHeader(buffer, mvhd);
     for (const trak of boxes(buffer, moov.content, moov.end)) {
         if (trak.type !== 'trak' || !isVideoTrack(buffer, trak)) continue;
-        const tkhd = child(buffer, trak, 'tkhd');
-        if (!tkhd || duration === null) return null;
+        const tkhd = childBox(buffer, trak, 'tkhd');
+        const mdhd = childBox(buffer, childBox(buffer, trak, 'mdia'), 'mdhd');
+        const duration = mdhd && readTrackDuration(buffer, mdhd);
+        if (!tkhd || !duration) return null;
         return { duration, ...readTrackFrame(buffer, tkhd) };
     }
     return null;

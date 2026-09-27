@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import GlassCard from '../../components/GlassCard';
 import apiService from '../../services/ApiService';
-import { ACCEPTED_MEDIA, needsPlaybackCheck, refusalForChosenFile } from '../../services/mediaFile';
+import { ACCEPTED_MEDIA } from '../../services/mediaFile';
+import useChosenMediaFile from '../../hooks/useChosenMediaFile';
 
 const CATEGORY_DETAILS = {
     paid: { label: 'Paid campaign', ownerType: 'brand', needsOwner: true },
@@ -13,11 +14,10 @@ const CATEGORY_DETAILS = {
 function MediaLibrary() {
     const [assets, setAssets] = useState([]);
     const [form, setForm] = useState({ title: '', category: 'paid', ownerId: '', approvalStatus: 'approved' });
-    const [file, setFile] = useState(null);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
-    const [checkingFile, setCheckingFile] = useState(false);
     const [error, setError] = useState('');
+    const { file, checkingFile, chooseFile, clearFile } = useChosenMediaFile(setError);
     const [success, setSuccess] = useState('');
 
     useEffect(() => {
@@ -28,19 +28,6 @@ function MediaLibrary() {
     }, []);
 
     const category = CATEGORY_DETAILS[form.category];
-
-    async function handleFileChosen(chosen) {
-        setError('');
-        setFile(chosen);
-        if (!needsPlaybackCheck(chosen)) return;
-        setCheckingFile(true);
-        const refusal = await refusalForChosenFile(chosen);
-        setCheckingFile(false);
-        if (refusal) {
-            setFile(null);
-            setError(refusal);
-        }
-    }
 
     async function handleSubmit(event) {
         event.preventDefault();
@@ -65,7 +52,7 @@ function MediaLibrary() {
             setAssets(current => [persisted, ...current]);
             setSuccess('Media uploaded successfully.');
             setForm(current => ({ ...current, title: '', ownerId: '' }));
-            setFile(null);
+            clearFile();
         } catch (err) {
             setError(err.message || 'Media could not be saved');
         } finally {
@@ -116,7 +103,7 @@ function MediaLibrary() {
                     </label>
                     <label className="text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
                         Media file
-                        <input type="file" accept={ACCEPTED_MEDIA} onChange={event => handleFileChosen(event.target.files?.[0] || null)}
+                        <input type="file" accept={ACCEPTED_MEDIA} onChange={event => chooseFile(event.target.files?.[0] || null)}
                             className="mt-1 block w-full rounded-xl border border-dashed border-slate-300 p-3 dark:border-slate-600" />
                     </label>
                     <div className="md:col-span-2 flex items-center gap-4">

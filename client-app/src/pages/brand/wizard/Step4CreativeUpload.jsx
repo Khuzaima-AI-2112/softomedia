@@ -7,7 +7,8 @@ import { useState } from 'react';
 import GlassCard from '../../../components/GlassCard';
 import ProtectedImage from '../../../components/ProtectedImage';
 import apiService from '../../../services/ApiService';
-import { ACCEPTED_MEDIA, needsPlaybackCheck, refusalForChosenFile } from '../../../services/mediaFile';
+import { ACCEPTED_MEDIA } from '../../../services/mediaFile';
+import useChosenMediaFile from '../../../hooks/useChosenMediaFile';
 
 // Demo creative URLs for quick selection
 const DEMO_CREATIVES = [
@@ -24,11 +25,10 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
     const [customUrl, setCustomUrl] = useState('');
     const [error, setError] = useState('');
     const [creativeTitle, setCreativeTitle] = useState('');
-    const [creativeFile, setCreativeFile] = useState(null);
     const [creativeAssetId, setCreativeAssetId] = useState(data.creativeAssetId || null);
     const [uploading, setUploading] = useState(false);
-    const [checkingFile, setCheckingFile] = useState(false);
     const [uploadSuccess, setUploadSuccess] = useState('');
+    const { file: creativeFile, checkingFile, chooseFile } = useChosenMediaFile(setError);
 
     const handleSelectDemo = (url) => {
         setSelectedCreative(url);
@@ -43,19 +43,6 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
         }
         setSelectedCreative(customUrl);
         setError('');
-    };
-
-    const handleFileChosen = async (file) => {
-        setError('');
-        setCreativeFile(file);
-        if (!needsPlaybackCheck(file)) return;
-        setCheckingFile(true);
-        const refusal = await refusalForChosenFile(file);
-        setCheckingFile(false);
-        if (refusal) {
-            setCreativeFile(null);
-            setError(refusal);
-        }
     };
 
     const handleFileUpload = async () => {
@@ -148,7 +135,7 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
                     </label>
                     <label className="text-sm font-medium">
                         Creative file
-                        <input type="file" accept={ACCEPTED_MEDIA} onChange={event => handleFileChosen(event.target.files?.[0] || null)}
+                        <input type="file" accept={ACCEPTED_MEDIA} onChange={event => chooseFile(event.target.files?.[0] || null)}
                             className="mt-1 block w-full rounded-xl border border-dashed border-slate-300 p-3 dark:border-slate-600" />
                     </label>
                 </div>

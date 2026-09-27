@@ -22,20 +22,21 @@ const ACCEPTED_FILES = new Map([
     ['.mov', 'video/quicktime'],
 ]);
 const PLATFORM_MEDIA_ROLES = new Set([ROLES.ADMIN, ROLES.SUPERADMIN]);
-const MAXIMUM_FILE_BYTES = 20 * 1024 * 1024;
+const MAXIMUM_FILE_MB = 20;
 const SLOT_SECONDS = 5;
-const DURATION_TOLERANCE_SECONDS = 0.1;
+// Compared in whole milliseconds, so both edges of 5.0 s ± 0.1 s are accepted.
+const DURATION_TOLERANCE_MS = 100;
 const WIDESCREEN = 16 / 9;
 const FRAME_TOLERANCE = 0.01;
 const MINIMUM_WIDTH = 1280;
 const MINIMUM_HEIGHT = 720;
 // A QuickTime file opens with one of these boxes; older files have no 'ftyp'.
 const QUICKTIME_FIRST_BOXES = new Set(['ftyp', 'moov', 'mdat', 'wide', 'free', 'skip', 'pnot']);
-const PNG_SIGNATURE =Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: MAXIMUM_FILE_BYTES, fieldSize: 2 * 1024 * 1024, files: 1 },
+    limits: { fileSize: MAXIMUM_FILE_MB * 1024 * 1024, fieldSize: 2 * 1024 * 1024, files: 1 },
 });
 
 function receiveFile(req, res, next) {
@@ -45,7 +46,7 @@ function receiveFile(req, res, next) {
             return next();
         }
         const message = error.code === 'LIMIT_FILE_SIZE'
-            ? 'File must be 20 MB or smaller'
+            ? `File must be ${MAXIMUM_FILE_MB} MB or smaller`
             : error.message;
         return res.status(400).json({ error: message });
     });
@@ -90,7 +91,7 @@ function hasExpectedSignature(file, extension) {
 }
 
 /** Why a frame can't be shown on a Screen, or null when it can. */
-function checkFrame({ width, height }) {
+function frameRefusal({ width, height }) {
     const size = `${Math.round(width)}×${Math.round(height)}`;
     if (!height || Math.abs(width / height / WIDESCREEN - 1) > FRAME_TOLERANCE) {
         return `Media must be 16:9; this file is ${size}`;
@@ -113,11 +114,14 @@ function measureMedia(file, extension) {
             ? 'The video could not be read. Upload a playable .mp4 or .mov file'
             : 'The image could not be read. Upload a valid .png, .jpg or .jpeg file' };
     }
-    if (isVideo && Math.abs(header.duration - SLOT_SECONDS) > DURATION_TOLERANCE_SECONDS) {
-        return { error: `A video must last 5 seconds (±0.1 s); this one lasts ${header.duration.toFixed(1)} s` };
+    if (isVideo && Math.abs(Math.round(header.duration * 1000) - SLOT_SECONDS * 1000) > DURATION_TOLERANCE_MS) {
+        return {
+            error: `A video must last ${SLOT_SECONDS} seconds (±${DURATION_TOLERANCE_MS / 1000} s); `
+                + `this one lasts ${header.duration.toFixed(1)} s`,
+        };
     }
-    const frameError = checkFrame(header);
-    if (frameError) return { error: frameError };
+    const refusal = frameRefusal(header);
+    if (refusal) return { error: refusal };
     return { duration: isVideo ? header.duration : SLOT_SECONDS, width: header.width, height: header.height };
 }
 

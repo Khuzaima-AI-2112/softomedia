@@ -52,6 +52,11 @@ function uploadAsBrand(bytes, attachment, fields = {}) {
 
 const uploadFixture = (name, fields) => uploadAsBrand(mediaFile(name), mediaAttachment(name), fields);
 
+/** The media the Brand sees in its library. */
+async function brandLibrary() {
+    return (await request(app).get('/api/assets').set(brandHeaders)).body;
+}
+
 describeWithAuthEmulator('Stricter media rules (#35)', () => {
     beforeAll(async () => {
         ({ headers: brandHeaders } = await signInAs('brand', { organizationId: 'test_brand_id' }));
@@ -75,12 +80,22 @@ describeWithAuthEmulator('Stricter media rules (#35)', () => {
         expect(response.body.duration).toBeCloseTo(5, 1);
     });
 
+    it.each([
+        ['four-point-nine-seconds-16x9.mp4', 4.9],
+        ['five-seconds-with-longer-audio.mp4', 5],
+    ])('accepts %s, whose video lasts %s s', async (name, seconds) => {
+        const response = await uploadFixture(name);
+
+        expect(response.status).toBe(201);
+        expect(response.body.duration).toBeCloseTo(seconds, 2);
+    });
+
     it('rejects a 6 s video, saying how long it lasts, even when 5 s is declared', async () => {
         const response = await uploadFixture('six-seconds-16x9.mp4', { duration: '5' });
 
         expect(response.status).toBe(400);
         expect(response.body.error).toBe('A video must last 5 seconds (±0.1 s); this one lasts 6.0 s');
-        expect(storedMedia.size).toBe(0);
+        expect(await brandLibrary()).toEqual([]);
     });
 
     it('rejects a 4:3 frame, naming its size', async () => {
@@ -131,7 +146,14 @@ describeWithAuthEmulator('Stricter media rules (#35)', () => {
 
         expect(response.status).toBe(400);
         expect(response.body.error).toBe('File must be 20 MB or smaller');
-        expect(storedMedia.size).toBe(0);
+        expect(await brandLibrary()).toEqual([]);
+    });
+
+    it('rejects a 16:9 image smaller than 1280×720, naming its size', async () => {
+        const response = await uploadFixture('frame-640x360.png');
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toBe('Media must be at least 1280×720; this file is 640×360');
     });
 
     it('rejects a 4:3 image, naming its size', async () => {

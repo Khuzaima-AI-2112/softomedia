@@ -41,7 +41,7 @@ describe('Brand creative upload', () => {
         render(<Step4CreativeUpload data={{}} updateData={vi.fn()} onNext={vi.fn()} onPrev={vi.fn()} />);
 
         chooseCreative(new File(['frames'], 'creative.mov', { type: 'video/quicktime' }));
-        await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalled());
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Upload creative' }).disabled).toBe(false));
         fireEvent.click(screen.getByRole('button', { name: 'Upload creative' }));
 
         await waitFor(() => expect(uploadAsset).toHaveBeenCalled());
