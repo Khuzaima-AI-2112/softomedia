@@ -32,6 +32,9 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
     const createdLoopIds = [];
     const createdScheduleIds = [];
     const createdReservationIds = [];
+    // Pricing tests rewrite the global pricing document, which demo reset does
+    // not own; it is put back as found so later suites price at the real default.
+    let pricingBeforeSuite;
 
     /** The first free Paid Slots of a Store on a date, as a Brand sees them. */
     async function freePaidSlots(token, storeId, date, count = 1) {
@@ -63,6 +66,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
             bucketName: process.env.DEMO_ASSETS_BUCKET,
             resetAt: new Date('2030-01-15T10:30:00.000Z'),
         });
+        pricingBeforeSuite = await firestore.collection('pricing_config').doc('global').get();
 
         const { provisionDemoPersonas } = await import('../src/services/DemoPersonaProvisioner.js');
         await provisionDemoPersonas({ password, expectedProjectId: 'softomedia-demo' });
@@ -75,6 +79,10 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
     });
 
     afterAll(async () => {
+        if (pricingBeforeSuite) {
+            const pricingRef = firestore.collection('pricing_config').doc('global');
+            await (pricingBeforeSuite.exists ? pricingRef.set(pricingBeforeSuite.data()) : pricingRef.delete());
+        }
         await Promise.all(createdCampaignIds.map(id => firestore.collection('campaigns').doc(id).delete()));
         await Promise.all(createdMediaIds.map(id => firestore.collection('media').doc(id).delete()));
         await Promise.all(createdProofOfPlayIds.map(id => firestore.collection('impressions').doc(id).delete()));
