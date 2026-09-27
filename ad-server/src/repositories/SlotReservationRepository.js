@@ -56,8 +56,10 @@ export class SlotReservationRepository extends BaseRepository {
                     transaction.create(campaignRepository.collection.doc(campaignRecord.id), campaignRecord);
                 });
             } catch (error) {
-                if (error.code === ALREADY_EXISTS) throw new SlotTakenError([]);
-                throw error;
+                if (error.code !== ALREADY_EXISTS) throw error;
+                // Lost a race after the read: name the Slots that are now held.
+                const existing = await Promise.all(records.map(record => this.collection.doc(record.id).get()));
+                throw new SlotTakenError(records.filter((_, index) => existing[index].exists).map(slotOf));
             }
         } else {
             // Memory mode: the check and the write run without yielding, so no

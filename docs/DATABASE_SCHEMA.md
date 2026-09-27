@@ -218,6 +218,25 @@ Advertiser ad campaigns. Managed via `CampaignRepository.js`.
 | `screen_type` | string? | Used for CPM rate lookup |
 | `impressionsDelivered` | number? | camelCase variant |
 | `impressions_delivered` | number? | snake_case variant (legacy) |
+| `reserved_slots` | array? | A Brand Campaign's Slots, `{ store_id, date, hour, position, price }`, as reserved on submission (#31) |
+
+---
+
+### `slot_reservations`
+
+A Brand's exclusive hold on one Paid Slot (ADR 0005). Managed via `SlotReservationRepository.js`. The document ID is the Slot itself, `{store_id}_{date}_{hour}_{position}`, so a Slot can be held only once; a Campaign and its Reservations are created in one transaction.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | `{store_id}_{date}_{hour}_{position}` |
+| `store_id` | string | FK → `stores` |
+| `date` | string | Broadcast date, `YYYY-MM-DD` |
+| `hour` | number | Store-local hour, 0–23 |
+| `position` | number | 0–11 within the hourly loop |
+| `campaign_id` | string | FK → `campaigns` |
+| `brand_id` | string | Holder; never shown to other Brands |
+| `status` | string | `held` |
+| `price` | number | Store tier × hour tier quote at submission |
 
 ---
 
@@ -323,6 +342,7 @@ therefore ghost records and are safe to backfill.
 
 | Sprint | Change |
 |---|---|
+| #31 (2026-09-27) | **Slot Reservations:** `slot_reservations` collection added, keyed by Slot; `campaigns.reserved_slots` added; the unused `campaigns.selected_slots` is no longer written. |
 | S21 (2026-06-16) | **Soft-delete hardening and scheduler endpoint (S21-1 through S21-7):** Backfill script headers updated with Option A strategy decisions. `PATCH /api/advertisers/:id` field allowlist added — `deleted_at` and `status` stripped; only `name`, `logo`, `industry`, `contactemail`, `budget` patchable (S21-2 / SEC-S21-1). Caller audit confirmed `admin` role sufficient for all retailer/advertiser mutation routes — `superadmin` inherits same access (S21-3). `GET /api/retailers?for=campaign` branch added: filters `status='active'` AND `deleted_at==null` for scheduler use (S21-4). `ApiService.getRetailersForCampaign()` wired to new endpoint (S21-5). `seed-test-retailer-a.js` seed script added; `soft-delete-lifecycle.test.js` (10 assertions) and `scheduler-campaign-flow.test.js` (5 assertions) added to `ad-server/tests/` (S21-6). `DATABASE_SCHEMA.md` updated with all authoritative decisions (S21-7). |
 | S17 (2026-06-08) | **Soft-delete visibility fix (S17-1 through S17-6):** `deleted_at` ISO timestamp field added to `retailers` and `advertisers` as canonical deletion marker. `GET /api/retailers` and `GET /api/advertisers` now filter `where deleted_at == null`. `BaseRepository.findAll()` memory comparator fixed (`?? null`). `GET /:id` returns 404 for soft-deleted records. Backfill scripts: `backfill-deleted-retailers.js`, `backfill-deleted-advertisers.js`. `PlaylistRepository` ACTIVE query fixed to lowercase `'active'` (RISK-S16-9 closed). Playlist backfill: `backfill-playlist-status.js`. |
 | S16 (2026-06-08) | **Status normalization (S16-1/S16-2):** `LOOP_STATUS` and `SLOT_STATUS` enum values changed to lowercase. Backfill: `ad-server/scripts/migrate-loop-status-lowercase.js`. |

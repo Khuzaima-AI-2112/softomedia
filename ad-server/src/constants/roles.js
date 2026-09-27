@@ -27,3 +27,8 @@ export function toCanonicalRole(raw) {
 export function normalizeRole(raw) {
     return toCanonicalRole(raw) || raw;
 }
+
+/** The Brand organization a signed-in Brand user acts for. */
+export function brandIdFor(user) {
+    return user?.linked_entity_id || user?.organization_id || null;
+}

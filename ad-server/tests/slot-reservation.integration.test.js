@@ -214,6 +214,16 @@ describeWithAuthEmulator('Slot Reservations', () => {
         expect((await slotsFor(brand, '2030-01-08')).body.booking_open).toBe(true);
     });
 
+    test('a Store with no time zone takes no Reservations, since its Booking Cutoff is unknown', async () => {
+        await StoreRepository.update('store-one', { time_zone: null });
+
+        expect((await slotsFor(brand)).body.booking_open).toBe(false);
+        const refused = await submit(brand, 'brand-one', [slot(8, 0)]);
+        expect(refused.status).toBe(400);
+        expect(refused.body.code).toBe('BOOKING_CLOSED');
+        expect(await slotReservationRepository.findAll()).toEqual([]);
+    });
+
     test('only free Paid Slots in the Campaign and its Stores can be reserved', async () => {
         const refusals = [
             [],

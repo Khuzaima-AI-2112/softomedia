@@ -147,6 +147,17 @@ describe('Brand wizard slot grid', () => {
         expect(screen.queryByRole('button', { name: /^Slot / })).toBeNull();
     });
 
+    it('says a Store with no time zone is not taking bookings', async () => {
+        const noTimeZone = availability([8], { bookingOpen: false });
+        noTimeZone.booking_cutoff.time_zone = null;
+        getSlotAvailability.mockResolvedValue(noTimeZone);
+        renderStep();
+
+        expect(await screen.findByTestId('booking-cutoff'))
+            .toHaveProperty('textContent', 'This Store is not taking bookings yet.');
+        expect(screen.queryByRole('button', { name: /^Slot / })).toBeNull();
+    });
+
     it('explains a conflict and shows the Slot as taken after another Brand reserved it first', async () => {
         getSlotAvailability.mockResolvedValue(availability([8], { statuses: { '8_0': 'taken' } }));
         renderStep({

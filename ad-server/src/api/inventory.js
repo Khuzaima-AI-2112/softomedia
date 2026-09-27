@@ -7,8 +7,8 @@ import {
 } from '../repositories/index.js';
 import PricingRepository from '../repositories/PricingRepository.js';
 import { authenticate } from '../middleware/auth.js';
-import { normalizeRole } from '../constants/roles.js';
-import { slotAvailability } from '../services/SlotReservations.js';
+import { brandIdFor, normalizeRole } from '../constants/roles.js';
+import { isCalendarDate, slotAvailability } from '../services/SlotReservations.js';
 
 const router = express.Router();
 
@@ -21,12 +21,6 @@ router.use((req, res, next) => {
     }
     return next();
 });
-
-const isCalendarDate = value => {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? '')) return false;
-    const parsed = new Date(`${value}T00:00:00Z`);
-    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value);
-};
 
 router.get('/', async (req, res) => {
     try {
@@ -55,8 +49,7 @@ router.get('/stores/:storeId/slots', async (req, res) => {
             return res.status(404).json({ error: 'Store not found' });
         }
         const store = await StoreRepository.findById(req.params.storeId);
-        const brandId = req.user.linked_entity_id || req.user.organization_id || null;
-        return res.json(await slotAvailability(store, date, brandId));
+        return res.json(await slotAvailability(store, date, brandIdFor(req.user)));
     } catch (error) {
         console.error('Failed to load Slot availability:', error);
         return res.status(500).json({ error: 'Slot availability could not be loaded' });

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import GlassCard from '../../../components/GlassCard';
 import TrafficTierBadge from '../../../components/TrafficTierBadge';
 import apiService from '../../../services/ApiService';
+import { sameSlot } from './slots';
 
 const CATEGORY_LABELS = { paid: 'Paid', retailer: 'Retailer', internal: 'Internal' };
 
@@ -27,9 +28,6 @@ const localDate = (isoDate) => {
     const [year, month, day] = isoDate.split('-').map(Number);
     return new Date(year, month - 1, day);
 };
-
-const sameSlot = (left, right) => left.store_id === right.store_id && left.date === right.date
-    && left.hour === right.hour && left.position === right.position;
 
 // Picked is the Brand's unsubmitted choice; yours and taken are held Reservations.
 const PAID_STYLES = {
@@ -69,6 +67,13 @@ function SlotCell({ slot, hour, isPicked, canPick, onToggle }) {
 }
 
 function BookingCutoff({ open, cutoff }) {
+    if (!cutoff.time_zone) {
+        return (
+            <p data-testid="booking-cutoff" className="mb-3 text-sm font-semibold text-red-500">
+                This Store is not taking bookings yet.
+            </p>
+        );
+    }
     const day = localDate(cutoff.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     const when = `${cutoff.time} on ${day}, Store time (${cutoff.time_zone})`;
     return (

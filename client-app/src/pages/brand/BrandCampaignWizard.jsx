@@ -5,6 +5,7 @@ import Step2ScheduleUpload from './wizard/Step2ScheduleUpload';
 import Step3LoopSlotSelection from './wizard/Step3LoopSlotSelection';
 import Step4CreativeUpload from './wizard/Step4CreativeUpload';
 import Step5ReviewConfirm from './wizard/Step5ReviewConfirm';
+import { sameSlot } from './wizard/slots';
 import GlassCard from '../../components/GlassCard';
 import apiService from '../../services/ApiService';
 
@@ -90,9 +91,7 @@ const BrandCampaignWizard = () => {
                 setWizardData(prev => ({
                     ...prev,
                     slotConflict: error.message,
-                    selectedSlots: prev.selectedSlots.filter(slot => !taken.some(other =>
-                        other.store_id === slot.store_id && other.date === slot.date
-                        && other.hour === slot.hour && other.position === slot.position)),
+                    selectedSlots: prev.selectedSlots.filter(slot => !taken.some(other => sameSlot(slot, other))),
                 }));
                 setCurrentStep(3);
                 return;

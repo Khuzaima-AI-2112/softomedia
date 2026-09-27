@@ -13,7 +13,7 @@ import { SLOTS_PER_LOOP, slotInventory } from './SlotInventory.js';
 export const BOOKING_CUTOFF_TIME = '18:00';
 const BOOKING_CUTOFF_DAYS_BEFORE = 2;
 
-const isCalendarDate = value => {
+export const isCalendarDate = value => {
     if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
     const parsed = new Date(`${value}T00:00:00Z`);
     return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value);
@@ -42,14 +42,23 @@ export function bookingCutoff(date, timeZone) {
     return { date: cutoffDate.toISOString().slice(0, 10), time: BOOKING_CUTOFF_TIME, time_zone: timeZone };
 }
 
-/** Whether Reservations for this date may still be made; they are refused from the cutoff on. */
+/**
+ * Whether Reservations for this date may still be made; they are refused from
+ * the cutoff on, and always at a Store with no time zone, whose cutoff is unknown.
+ */
 export function isBookingOpen(date, timeZone, now = new Date()) {
+    if (!timeZone) return false;
     const cutoff = bookingCutoff(date, timeZone);
     const local = storeLocalNow(now, timeZone);
     return `${local.date} ${local.time}` < `${cutoff.date} ${cutoff.time}`;
 }
 
 const cutoffDescription = ({ date, time, time_zone: timeZone }) => `${time} on ${date} (${timeZone})`;
+
+/** The price of each Slot in an hour at this Store. */
+const quoteFor = (config, store, date, hour) => slotQuote({
+    config, retailerId: store.retailer_id, storeTier: store.cpm_traffic_tier, date, hour,
+});
 
 /**
  * Every Slot of a Store on a date as one Brand may see it. A Paid Slot is
@@ -77,9 +86,7 @@ export async function slotAvailability(store, date, brandId) {
         currency: config.currency,
         hours: inventory.hours.map(({ hour, slots }) => ({
             hour,
-            ...slotQuote({
-                config, retailerId: store.retailer_id, storeTier: store.cpm_traffic_tier, date, hour,
-            }),
+            ...quoteFor(config, store, date, hour),
             slots: slots.map(slot => (slot.category === 'paid'
                 ? { ...slot, status: statusOf(hour, slot.position) }
                 : slot)),
@@ -125,10 +132,15 @@ export async function prepareReservations({ slots, campaign, brandId }) {
             if (date < campaign.start_date || date > campaign.end_date) {
                 throw new ReservationRefused('A picked Slot is outside the Campaign’s dates');
             }
-            const key = `${storeId}_${date}_${hour}_${position}`;
+            const key = slotReservationRepository.idFor(pick);
             if (keys.has(key)) throw new ReservationRefused('A Slot was picked twice');
             keys.add(key);
 
+            if (!store.time_zone) {
+                throw new ReservationRefused(
+                    'This Store is not taking bookings yet: its time zone is not set.', 'BOOKING_CLOSED',
+                );
+            }
             if (!isBookingOpen(date, store.time_zone)) {
                 throw new ReservationRefused(
                     `Booking for ${date} closed at ${cutoffDescription(bookingCutoff(date, store.time_zone))}. `
@@ -145,9 +157,7 @@ export async function prepareReservations({ slots, campaign, brandId }) {
                 throw new ReservationRefused('Only Paid Slots in the Store’s opening hours can be reserved');
             }
 
-            const { price } = slotQuote({
-                config, retailerId: store.retailer_id, storeTier: store.cpm_traffic_tier, date, hour,
-            });
+            const { price } = quoteFor(config, store, date, hour);
             reservations.push({ store_id: storeId, date, hour, position, brand_id: brandId, status: 'held', price });
         }
         return { reservations };

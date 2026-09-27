@@ -20,16 +20,12 @@ import {
     requirePermission,
     userHasPermission,
 } from '../middleware/requireRole.js';
-import { ROLES, normalizeRole } from '../constants/roles.js';
+import { ROLES, brandIdFor, normalizeRole } from '../constants/roles.js';
 
 const router = express.Router();
 
 function isBrand(user) {
     return normalizeRole(user?.role) === ROLES.BRAND;
-}
-
-function brandIdFor(user) {
-    return user?.linked_entity_id || user?.organization_id || null;
 }
 
 function isRetailer(user) {
