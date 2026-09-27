@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { APIError } from '../../../services/api';
 
 const { getSlotAvailability, getPricingConfig } = vi.hoisted(() => ({
@@ -46,6 +47,8 @@ const renderStep = (props = {}) => {
     );
     return { ...view, updateData };
 };
+
+afterEach(() => vi.restoreAllMocks());
 
 const picked = (hour, position, price, overrides = {}) => ({
     store_id: 'store_1', date: '2030-01-07', hour, position, price, ...overrides,
@@ -99,14 +102,15 @@ describe('Brand wizard slot grid', () => {
         expect(updateData).not.toHaveBeenCalled();
     });
 
-    it('picks and unpicks a free Paid Slot at its hour’s price', async () => {
-        const { updateData, rerender } = renderStep();
+    it('with the option off, picks and unpicks a free Paid Slot on the shown date only, at its hour’s price', async () => {
+        const single = { ...wizardData, repeatDaily: false };
+        const { updateData, rerender } = renderStep({ data: single });
 
         fireEvent.click(await screen.findByRole('button', { name: 'Slot 4 at 8:00 AM' }));
         expect(updateData).toHaveBeenLastCalledWith({ selectedSlots: [picked(8, 3, 15.75)] });
 
         rerender(<Step3LoopSlotSelection
-            data={{ ...wizardData, selectedSlots: [picked(8, 3, 15.75)] }}
+            data={{ ...single, selectedSlots: [picked(8, 3, 15.75)] }}
             updateData={updateData} onNext={vi.fn()} onPrev={vi.fn()}
         />);
         const pickedButton = screen.getByRole('button', { name: 'Slot 4 at 8:00 AM' });
@@ -200,6 +204,7 @@ describe('Brand wizard slot grid', () => {
 
     it('says availability failed to load when the request fails', async () => {
         getSlotAvailability.mockRejectedValue(new APIError('Server error', 500));
+        vi.spyOn(console, 'error').mockImplementation(() => {});
 
         renderStep();
 
@@ -220,5 +225,160 @@ describe('Brand wizard slot grid', () => {
         />);
         fireEvent.click(screen.getByTestId('step-3-next-btn'));
         expect(onNext).toHaveBeenCalled();
+    });
+});
+
+describe('Same Slots every day of the Campaign', () => {
+    const THREE_DAYS = { start: '2030-01-07', end: '2030-01-09' };
+
+    // Holds the wizard's data as the real wizard does, so picks accumulate across clicks.
+    function Wizard({ initial, onNext = vi.fn() }) {
+        const [data, setData] = useState({ ...wizardData, dateRange: THREE_DAYS, ...initial });
+        return (
+            <Step3LoopSlotSelection
+                data={data}
+                updateData={update => setData(previous => ({ ...previous, ...update }))}
+                onNext={onNext}
+                onPrev={vi.fn()}
+            />
+        );
+    }
+
+    // Availability per date for store_1; any other Store or date is all free at 8:00 and 9:00.
+    const byDate = (days) => getSlotAvailability.mockImplementation(async (storeId, date) =>
+        (storeId === 'store_1' && days[date]) || availability());
+
+    const summary = () => screen.getByTestId('slot-selection-summary').textContent;
+    const conflicts = () => screen.queryByRole('region', { name: 'Days with unavailable Slots' });
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getSlotAvailability.mockResolvedValue(availability());
+    });
+
+    it('is on by default and picks the chosen Slot on every Campaign date, at each day’s price', async () => {
+        const pricier = availability();
+        pricier.hours[0].price = 20;
+        byDate({ '2030-01-09': pricier });
+        render(<Wizard />);
+
+        expect((await screen.findByRole('checkbox', { name: 'Same Slots every day of the Campaign' })).checked)
+            .toBe(true);
+        expect(screen.getAllByTestId(/^calendar-day-/).map(day => day.dataset.testid)).toEqual([
+            'calendar-day-2030-01-07', 'calendar-day-2030-01-08', 'calendar-day-2030-01-09',
+        ]);
+        fireEvent.click(await screen.findByRole('button', { name: 'Slot 4 at 8:00 AM' }));
+
+        expect(summary()).toContain('3 Slots');
+        expect(summary()).toContain('$51.50');
+        for (const date of ['2030-01-08', '2030-01-09']) {
+            fireEvent.click(screen.getByTestId(`calendar-day-${date}`));
+            expect((await screen.findByRole('button', { name: 'Slot 4 at 8:00 AM' })).getAttribute('aria-pressed'))
+                .toBe('true');
+        }
+        expect(conflicts()).toBeNull();
+        expect(screen.getByTestId('step-3-next-btn').disabled).toBe(false);
+    });
+
+    it('lists the days a repeated Slot is taken and holds Continue until the Brand adjusts', async () => {
+        byDate({ '2030-01-08': availability([8, 9], { statuses: { '8_3': 'taken' } }) });
+        const onNext = vi.fn();
+        render(<Wizard onNext={onNext} />);
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Slot 4 at 8:00 AM' }));
+
+        const listed = await screen.findByRole('region', { name: 'Days with unavailable Slots' });
+        expect(within(listed).getAllByRole('listitem').map(item => item.textContent)).toEqual([
+            expect.stringContaining('Tue, Jan 8: Slot 4 at 8:00 AM, Downtown Café, is taken by another Brand'),
+        ]);
+        expect(screen.getByTestId('step-3-next-btn').disabled).toBe(true);
+
+        fireEvent.click(within(listed).getByRole('button', { name: 'Drop Slot 4 at 8:00 AM on Tue, Jan 8 at Downtown Café' }));
+
+        expect(conflicts()).toBeNull();
+        expect(summary()).toContain('2 Slots');
+        fireEvent.click(screen.getByTestId('step-3-next-btn'));
+        expect(onNext).toHaveBeenCalled();
+    });
+    it('lists days a repeated Slot cannot be had for any other reason, never skipping them', async () => {
+        // On 8 Jan the Store opens an hour later, so Slot 4 at 9:00 is a Retailer Slot that day.
+        const laterOpening = availability([9]);
+        laterOpening.hours[0].slots[3] = { position: 3, category: 'retailer', status: null };
+        byDate({
+            '2030-01-07': availability([8, 9], { bookingOpen: false }),
+            '2030-01-08': laterOpening,
+            '2030-01-09': { ...availability([]), is_closed: true },
+            '2030-01-10': availability([10]),
+        });
+        render(<Wizard initial={{ dateRange: { start: '2030-01-07', end: '2030-01-11' } }} />);
+
+        fireEvent.click(screen.getByTestId('calendar-day-2030-01-11'));
+        fireEvent.click(await screen.findByRole('button', { name: 'Slot 4 at 9:00 AM' }));
+
+        const listed = await screen.findByRole('region', { name: 'Days with unavailable Slots' });
+        expect(within(listed).getAllByRole('listitem').map(item => item.textContent.replace(/Drop$/, ''))).toEqual([
+            'Mon, Jan 7: Slot 4 at 9:00 AM, Downtown Café, is past the Booking Cutoff.',
+            'Tue, Jan 8: Slot 4 at 9:00 AM, Downtown Café, is reserved for the Retailer or Softomedia that day.',
+            'Wed, Jan 9: Slot 4 at 9:00 AM, Downtown Café, falls on a day the Store is closed.',
+            'Thu, Jan 10: Slot 4 at 9:00 AM, Downtown Café, is outside the Store’s opening hours.',
+        ]);
+        expect(summary()).toContain('5 Slots');
+        expect(screen.getByTestId('step-3-next-btn').disabled).toBe(true);
+
+        fireEvent.click(within(listed).getByRole('button', { name: 'Drop all' }));
+
+        expect(conflicts()).toBeNull();
+        expect(summary()).toContain('1 Slot');
+        expect(summary()).toContain('$15.75');
+        expect(screen.getByTestId('step-3-next-btn').disabled).toBe(false);
+    });
+
+    it('lists a day whose availability could not be checked', async () => {
+        getSlotAvailability.mockImplementation(async (storeId, date) => {
+            if (date === '2030-01-09') throw new APIError('Server error', 500);
+            return availability();
+        });
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        render(<Wizard />);
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Slot 1 at 8:00 AM' }));
+
+        expect(within(await screen.findByRole('region', { name: 'Days with unavailable Slots' }))
+            .getByRole('listitem').textContent)
+            .toContain('Wed, Jan 9: Slot 1 at 8:00 AM, Downtown Café, could not be checked. Try again later.');
+        expect(screen.getByTestId('step-3-next-btn').disabled).toBe(true);
+    });
+
+    it('unpicks the Slot on every date, and with the option off picks it on the shown date only', async () => {
+        render(<Wizard />);
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Slot 1 at 8:00 AM' }));
+        expect(summary()).toContain('3 Slots');
+        fireEvent.click(screen.getByRole('button', { name: 'Slot 1 at 8:00 AM' }));
+        expect(summary()).toContain('0 Slots');
+
+        fireEvent.click(screen.getByRole('checkbox', { name: 'Same Slots every day of the Campaign' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Slot 1 at 8:00 AM' }));
+        expect(summary()).toContain('1 Slot');
+        fireEvent.click(screen.getByTestId('calendar-day-2030-01-08'));
+        expect((await screen.findByRole('button', { name: 'Slot 1 at 8:00 AM' })).getAttribute('aria-pressed'))
+            .toBe('false');
+    });
+
+    it('turned back on, repeats every Slot already picked onto every Campaign date', async () => {
+        render(<Wizard initial={{ repeatDaily: false }} />);
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Slot 1 at 8:00 AM' }));
+        fireEvent.click(screen.getByTestId('calendar-day-2030-01-08'));
+        fireEvent.click(await screen.findByRole('button', { name: 'Slot 2 at 9:00 AM' }));
+        expect(summary()).toContain('2 Slots');
+
+        fireEvent.click(screen.getByRole('checkbox', { name: 'Same Slots every day of the Campaign' }));
+
+        expect(summary()).toContain('6 Slots');
+        fireEvent.click(screen.getByTestId('calendar-day-2030-01-09'));
+        for (const name of ['Slot 1 at 8:00 AM', 'Slot 2 at 9:00 AM']) {
+            expect((await screen.findByRole('button', { name })).getAttribute('aria-pressed')).toBe('true');
+        }
     });
 });

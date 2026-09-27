@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import GlassCard from '../../../components/GlassCard';
 import TrafficTierBadge from '../../../components/TrafficTierBadge';
 import apiService from '../../../services/ApiService';
-import { sameSlot } from './slots';
+import { campaignDates, sameSlot } from './slots';
 
 const CATEGORY_LABELS = { paid: 'Paid', retailer: 'Retailer', internal: 'Internal' };
 
@@ -88,47 +88,158 @@ function BookingCutoff({ open, cutoff }) {
     );
 }
 
+const dayKey = (storeId, date) => `${storeId}|${date}`;
+
+const hourOf = (day, hour) => day?.availability?.hours.find(candidate => candidate.hour === hour);
+
+const formatDay = (isoDate) => localDate(isoDate)
+    .toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+/**
+ * Why a picked Slot cannot be reserved on its day, or null if it can. A day
+ * still loading has no answer yet (undefined).
+ */
+function pickProblem(day, pick) {
+    if (!day) return undefined;
+    if (day.failed) return 'could not be checked. Try again later';
+    if (day.availability.is_closed) return 'falls on a day the Store is closed';
+    if (!day.availability.booking_open) return 'is past the Booking Cutoff';
+    const slot = hourOf(day, pick.hour)?.slots[pick.position];
+    if (!slot) return 'is outside the Store’s opening hours';
+    if (slot.category !== 'paid') return 'is reserved for the Retailer or Softomedia that day';
+    if (slot.status === 'taken') return 'is taken by another Brand';
+    if (slot.status === 'yours') return 'is already reserved by you';
+    return null;
+}
+
+function UnavailablePicks({ problems, storeNames, onDrop }) {
+    return (
+        <section
+            aria-label="Days with unavailable Slots"
+            className="rounded-xl border border-red-300 bg-red-50 dark:bg-red-900/20 p-4 text-sm text-red-700 dark:text-red-300"
+        >
+            <div className="mb-2 flex items-start justify-between gap-3">
+                <h3 className="font-bold">
+                    These picks can’t be reserved. Drop them, or choose other Slots on those days, before you continue.
+                </h3>
+                {problems.length > 1 && (
+                    <button
+                        type="button"
+                        onClick={() => onDrop(problems.map(({ pick }) => pick))}
+                        className="shrink-0 rounded-lg border border-red-300 px-3 py-1 font-medium"
+                    >
+                        Drop all
+                    </button>
+                )}
+            </div>
+            <ul className="space-y-1">
+                {problems.map(({ pick, problem }) => {
+                    const slotName = `Slot ${pick.position + 1} at ${formatHour(pick.hour)}`;
+                    const day = formatDay(pick.date);
+                    const storeName = storeNames?.[pick.store_id] || pick.store_id;
+                    return (
+                        <li key={`${pick.store_id}_${pick.date}_${pick.hour}_${pick.position}`} className="flex items-center justify-between gap-3">
+                            <span>{`${day}: ${slotName}, ${storeName}, ${problem}.`}</span>
+                            <button
+                                type="button"
+                                onClick={() => onDrop([pick])}
+                                aria-label={`Drop ${slotName} on ${day} at ${storeName}`}
+                                className="shrink-0 rounded-lg border border-red-300 px-3 py-1 font-medium"
+                            >
+                                Drop
+                            </button>
+                        </li>
+                    );
+                })}
+            </ul>
+        </section>
+    );
+}
+
 function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
     const stores = data.selectedStores || [];
     const selectedSlots = data.selectedSlots || [];
-    const firstDate = data.dateRange?.start || toISODate(new Date());
+    const repeatDaily = data.repeatDaily ?? true;
+    const dates = campaignDates(data.dateRange);
+    if (dates.length === 0) dates.push(toISODate(new Date()));
     const [storeId, setStoreId] = useState(stores[0]);
-    const [selectedDate, setSelectedDate] = useState(firstDate);
-    const [availability, setAvailability] = useState(null);
-    const [failed, setFailed] = useState(false);
+    const [selectedDate, setSelectedDate] = useState(dates[0]);
+    // Availability of every Campaign date at every Store, keyed by dayKey:
+    // { availability } once loaded, { failed: true } if it could not be.
+    const [days, setDays] = useState({});
 
+    const storesKey = stores.join(',');
+    const datesKey = dates.join(',');
     useEffect(() => {
         let current = true;
-        setAvailability(null);
-        setFailed(false);
+        setDays({});
         // Prices come with availability: a Brand may not read the pricing
         // configuration, and after a reload nothing else has loaded it (#27).
-        apiService.getSlotAvailability(storeId, selectedDate)
-            .then(response => { if (current) setAvailability(response); })
-            .catch(error => {
-                console.error('[Diagnostic] Failed to load Slot availability:', error);
-                if (current) setFailed(true);
-            });
+        for (const store of storesKey.split(',')) {
+            for (const date of datesKey.split(',')) {
+                apiService.getSlotAvailability(store, date)
+                    .then(response => {
+                        if (current) setDays(loaded => ({ ...loaded, [dayKey(store, date)]: { availability: response } }));
+                    })
+                    .catch(error => {
+                        console.error('[Diagnostic] Failed to load Slot availability:', error);
+                        if (current) setDays(loaded => ({ ...loaded, [dayKey(store, date)]: { failed: true } }));
+                    });
+            }
+        }
         return () => { current = false; };
-    }, [storeId, selectedDate]);
+    }, [storesKey, datesKey]);
 
-    const toggle = (hour, price, position) => {
+    const shown = days[dayKey(storeId, selectedDate)];
+    const availability = shown?.availability;
+    const failed = shown?.failed;
+
+    // With the option on, a Slot is picked or unpicked on every Campaign date at once.
+    const toggle = (hour, position) => {
         const slot = { store_id: storeId, date: selectedDate, hour, position };
         const alreadyPicked = selectedSlots.some(candidate => sameSlot(candidate, slot));
+        const affected = repeatDaily
+            ? dates.map(date => ({ ...slot, date }))
+            : [slot];
+        const others = selectedSlots.filter(candidate => !affected.some(other => sameSlot(candidate, other)));
         updateData({
-            selectedSlots: alreadyPicked
-                ? selectedSlots.filter(candidate => !sameSlot(candidate, slot))
-                : [...selectedSlots, { ...slot, price }],
+            selectedSlots: alreadyPicked ? others : [
+                ...others,
+                ...affected.map(pick => ({
+                    ...pick, price: hourOf(days[dayKey(storeId, pick.date)], hour)?.price,
+                })),
+            ],
         });
     };
 
-    const total = selectedSlots.reduce((sum, slot) => sum + slot.price, 0);
+    // Turning the option on repeats every Slot already picked, on any date, onto every date.
+    const setRepeatDaily = on => {
+        if (!on) return updateData({ repeatDaily: false });
+        const repeated = selectedSlots.flatMap(pick => dates.map(date => ({ ...pick, date })))
+            .filter((pick, index, all) => all.findIndex(other => sameSlot(pick, other)) === index)
+            .map(pick => selectedSlots.find(candidate => sameSlot(candidate, pick)) || {
+                ...pick, price: hourOf(days[dayKey(pick.store_id, pick.date)], pick.hour)?.price,
+            });
+        return updateData({ repeatDaily: true, selectedSlots: repeated });
+    };
 
-    const weekDays = Array.from({ length: 7 }, (_, offset) => {
-        const date = localDate(firstDate);
-        date.setDate(date.getDate() + offset);
+    const drop = picks => updateData({
+        selectedSlots: selectedSlots.filter(candidate => !picks.some(pick => sameSlot(candidate, pick))),
+    });
+
+    // Every pick is checked on its own day, so no day of a repeated Slot is skipped silently.
+    const checked = selectedSlots.map(pick => ({ pick, problem: pickProblem(days[dayKey(pick.store_id, pick.date)], pick) }));
+    const problems = checked.filter(({ problem }) => problem)
+        .sort((left, right) => left.pick.date.localeCompare(right.pick.date)
+            || left.pick.hour - right.pick.hour || left.pick.position - right.pick.position);
+    const checking = checked.some(({ problem }) => problem === undefined);
+
+    const total = selectedSlots.reduce((sum, slot) => sum + (slot.price ?? 0), 0);
+
+    const campaignDays = dates.map(isoDate => {
+        const date = localDate(isoDate);
         return {
-            date: toISODate(date),
+            date: isoDate,
             dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
             dayNum: date.getDate(),
         };
@@ -184,7 +295,7 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
                                             store_id: storeId, date: selectedDate, hour, position: slot.position,
                                         }))}
                                         canPick={availability.booking_open}
-                                        onToggle={() => toggle(hour, price, slot.position)}
+                                        onToggle={() => toggle(hour, slot.position)}
                                     />
                                 ))}
                             </tr>
@@ -234,6 +345,10 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
                 </div>
             )}
 
+            {problems.length > 0 && (
+                <UnavailablePicks problems={problems} storeNames={data.storeNames} onDrop={drop} />
+            )}
+
             {stores.length > 1 && (
                 <div role="tablist" aria-label="Stores" className="flex gap-2 overflow-x-auto pb-2">
                     {stores.map(id => (
@@ -252,8 +367,19 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
                 </div>
             )}
 
+            <label className="flex items-center gap-2 text-sm font-medium">
+                <input
+                    type="checkbox"
+                    checked={repeatDaily}
+                    onChange={event => setRepeatDaily(event.target.checked)}
+                    data-testid="repeat-daily"
+                    className="size-4 accent-primary"
+                />
+                Same Slots every day of the Campaign
+            </label>
+
             <div className="flex gap-2 overflow-x-auto pb-2">
-                {weekDays.map(day => (
+                {campaignDays.map(day => (
                     <button
                         key={day.date}
                         onClick={() => setSelectedDate(day.date)}
@@ -281,7 +407,7 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
                         <button onClick={onPrev} className="px-6 py-3 rounded-xl border">Back</button>
                         <button
                             onClick={onNext}
-                            disabled={selectedSlots.length === 0}
+                            disabled={selectedSlots.length === 0 || problems.length > 0 || checking}
                             data-testid="step-3-next-btn"
                             className="px-8 py-3 rounded-xl bg-primary text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                         >

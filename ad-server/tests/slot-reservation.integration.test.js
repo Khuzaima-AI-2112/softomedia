@@ -1,4 +1,4 @@
-import { jest, test, expect, beforeEach, afterEach } from '@jest/globals';
+import { jest, describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import request from 'supertest';
 
 jest.unstable_mockModule('../src/utils/firestore.js', () => ({
@@ -244,6 +244,60 @@ describeWithAuthEmulator('Slot Reservations', () => {
         expect((await submit(brand, 'brand-one', undefined)).status).toBe(400);
         expect(await slotReservationRepository.findAll()).toEqual([]);
         expect(await campaignRepository.findAll()).toEqual([]);
+    });
+
+    describe('the same Slots every day of a multi-day Campaign', () => {
+        const DATES = ['2030-01-07', '2030-01-08', '2030-01-09'];
+        const everyDay = (hour, position) => DATES.map(date => slot(hour, position, { date }));
+        const submitEveryDay = (headers, brandId, slots) => submit(headers, brandId, slots, {
+            start_date: DATES[0], end_date: DATES[DATES.length - 1],
+        });
+
+        beforeEach(async () => {
+            for (const day of [2, 3]) {
+                await BusinessHoursRepository.create(`def_store-one_${day}`, {
+                    store_id: 'store-one', day_of_week: day, is_closed: false, open_time: '08:00', close_time: '22:00',
+                });
+            }
+        });
+
+        test('reserves the chosen positions on every Campaign date', async () => {
+            const response = await submitEveryDay(brand, 'brand-one', [...everyDay(8, 0), ...everyDay(12, 3)]);
+
+            expect(response.status).toBe(201);
+            expect(response.body.reserved_slots).toHaveLength(6);
+            const reservations = await slotReservationRepository.findAll();
+            expect(reservations.map(({ date, hour, position }) => `${date} ${hour}:${position}`).sort()).toEqual([
+                '2030-01-07 12:3', '2030-01-07 8:0',
+                '2030-01-08 12:3', '2030-01-08 8:0',
+                '2030-01-09 12:3', '2030-01-09 8:0',
+            ]);
+            for (const date of DATES) {
+                const availability = (await slotsFor(brand, date)).body;
+                expect([paidSlot(availability, 8, 0).status, paidSlot(availability, 12, 3).status])
+                    .toEqual(['yours', 'yours']);
+            }
+        });
+
+        test('a Slot taken on one day refuses the whole submission and names that day; nothing is skipped', async () => {
+            expect((await submit(rival, 'brand-two', [slot(8, 0, { date: '2030-01-08' })], {
+                start_date: '2030-01-08', end_date: '2030-01-08',
+            })).status).toBe(201);
+
+            const refused = await submitEveryDay(brand, 'brand-one', everyDay(8, 0));
+
+            expect(refused.status).toBe(409);
+            expect(refused.body).toMatchObject({ code: 'SLOT_TAKEN', slots: [slot(8, 0, { date: '2030-01-08' })] });
+            const held = await slotReservationRepository.findAll();
+            expect(held.map(reservation => reservation.brand_id)).toEqual(['brand-two']);
+            expect(await campaignRepository.findAll()).toHaveLength(1);
+
+            // Dropping the taken day, as the Brand does on the grid, books the others.
+            const adjusted = await submitEveryDay(brand, 'brand-one',
+                everyDay(8, 0).filter(pick => pick.date !== '2030-01-08'));
+            expect(adjusted.status).toBe(201);
+            expect(adjusted.body.reserved_slots.map(reserved => reserved.date)).toEqual(['2030-01-07', '2030-01-09']);
+        });
     });
 
     test('the retired 12-campaigns-per-location limit no longer refuses a submission', async () => {
