@@ -20,7 +20,8 @@ test('Admin generates Allocation Windows and the report matches the persisted lo
             return tomorrow.toISOString().split('T')[0];
         });
         await page.getByTestId('generate-loops-btn').click();
-        await expect(page.getByText(`Loops generated for ${targetDate} across all stores.`)).toBeVisible();
+        // Generation is scoped to the selected Store (#17); the page opens on FreshMart North.
+        await expect(page.getByText(`Loops generated for ${targetDate} at FreshMart North Synthetic Store.`)).toBeVisible();
 
         const persisted = await loopRepository.findAll({ where: [['date', '==', targetDate]] });
         const storeLoops = persisted.filter(loop => loop.store_id === 'demo-store-mtl-north');

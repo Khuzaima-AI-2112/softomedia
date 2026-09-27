@@ -56,6 +56,11 @@ describe('five-loop Allocation Window', () => {
             return { is_closed: false, open_time: '08:00', close_time: '11:00' };
         });
         jest.spyOn(service, 'getAvailableContent').mockResolvedValue(campaigns);
+        // Unreserved Paid positions play Fallback Content (ADR 0005).
+        await mediaRepository.create('fallback-asset', {
+            title: 'Neutral fallback', category: 'fallback', content_kind: 'neutral_fallback',
+            owner_type: 'platform', owner_id: null, approval_status: 'approved', eligible_for_playback: true,
+        });
 
         const firstDay = await service.generateDailyLoops('2030-01-01', 'retailer-1', 'store-1');
         expect(firstDay.map(loop => loop.slots[0].allocation_sequence_position)).toEqual([0, 12]);
@@ -110,7 +115,7 @@ describe('five-loop Allocation Window', () => {
         });
     });
 
-    test('uses eligible category media and excludes Campaigns selected for another Store', async () => {
+    test('offers eligible Retailer and Internal media, and leaves Paid positions to Reservations', async () => {
         await mediaRepository.create('local-paid', {
             category: 'paid', approval_status: 'approved', eligible_for_playback: true,
             owner_type: 'brand', owner_id: 'brand-1', status: 'ready',
@@ -146,7 +151,7 @@ describe('five-loop Allocation Window', () => {
         const content = await service.getAvailableContent('retailer-1', 'store-1', '2030-01-04');
 
         expect(content.map(item => item.asset_id).sort()).toEqual([
-            'internal-media', 'local-paid', 'retailer-media'
+            'internal-media', 'retailer-media'
         ]);
         expect(content.find(item => item.asset_id === 'retailer-media')).toMatchObject({
             type: 'retailer', campaign_id: null, content_kind: 'media',
