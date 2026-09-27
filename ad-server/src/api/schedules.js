@@ -13,13 +13,13 @@ import { OVERRIDE_DAYS, scheduleOverrideRepository } from '../repositories/Sched
 
 const router = express.Router();
 const OVERRIDE_TYPES = Object.freeze(['blocked', 'forced']);
-const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+const HH_MM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 router.use(authenticate, requirePermission(PERMISSIONS.SCHEDULE_OVERRIDE));
 
 function invalidOverride({ day, start, end, type }) {
     if (!OVERRIDE_DAYS.includes(day)) return `day must be one of: ${OVERRIDE_DAYS.join(', ')}`;
-    if (!TIME.test(start) || !TIME.test(end)) return 'start and end must be times in HH:MM';
+    if (!HH_MM.test(start) || !HH_MM.test(end)) return 'start and end must be times in HH:MM';
     if (end <= start) return 'end must be after start';
     if (!OVERRIDE_TYPES.includes(type)) return `type must be one of: ${OVERRIDE_TYPES.join(', ')}`;
     return null;

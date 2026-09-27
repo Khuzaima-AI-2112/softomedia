@@ -6,7 +6,7 @@
  * Sprint 11 — S11-5: data-testid="schedule-calendar-container" added to root div.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import LoopPreviewModal from '../../components/LoopPreviewModal';
@@ -40,6 +40,12 @@ const OVERRIDE_TYPE_LABELS = { blocked: 'Blocked (No Ads)', forced: 'Forced Play
 
 const byWeekThenStart = (a, b) =>
     OVERRIDE_DAYS.indexOf(a.day) - OVERRIDE_DAYS.indexOf(b.day) || a.start.localeCompare(b.start);
+
+/** One Store's overrides, each listed once, in week order. */
+const mergeOverrides = (current, incoming) => [
+    ...current.filter(override => !incoming.some(({ id }) => id === override.id)),
+    ...incoming,
+].sort(byWeekThenStart);
 
 const formatOverride = ({ day, start, end, type }) =>
     `${day.charAt(0).toUpperCase()}${day.slice(1)} ${start}–${end} · ${OVERRIDE_TYPE_LABELS[type] || type}`;
@@ -94,6 +100,8 @@ function ScheduleCalendar() {
     });
     const [overrideError, setOverrideError] = useState('');
     const [overrides, setOverrides] = useState([]);
+    // The Store the listed overrides belong to, checked when a save or load returns.
+    const overridesStoreId = useRef(null);
 
     const loopHours = loops.map(loop => loop.hour);
     const businessHours = loopHours.length > 0
@@ -144,9 +152,10 @@ function ScheduleCalendar() {
     useEffect(() => {
         if (!selectedStore) return undefined;
         let active = true;
+        overridesStoreId.current = selectedStore.id;
         setOverrides([]);
         apiClient.get(`/api/schedules?store_id=${encodeURIComponent(selectedStore.id)}`)
-            .then(saved => { if (active) setOverrides(saved || []); })
+            .then(saved => { if (active) setOverrides(current => mergeOverrides(current, saved || [])); })
             .catch(error => { if (active) setActionError(error.message || 'Failed to load schedule overrides'); });
         return () => { active = false; };
     }, [selectedStore]);
@@ -181,8 +190,9 @@ function ScheduleCalendar() {
         }
         
         try {
-            const saved = await apiClient.post('/api/schedules', { store_id: selectedStore?.id, ...overrideForm });
-            setOverrides(current => [...current, saved].sort(byWeekThenStart));
+            const storeId = selectedStore?.id;
+            const saved = await apiClient.post('/api/schedules', { store_id: storeId, ...overrideForm });
+            if (overridesStoreId.current === storeId) setOverrides(current => mergeOverrides(current, [saved]));
             setShowOverrideModal(false);
             setOverrideForm({ day: 'monday', start: '', end: '', type: 'blocked' });
         } catch (error) {

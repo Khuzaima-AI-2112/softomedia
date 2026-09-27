@@ -66,6 +66,48 @@ describe('ScheduleCalendar schedule overrides (#16)', () => {
         expect(screen.queryByTestId('modal-schedule-override-form')).toBeNull();
     });
 
+    it('does not list a save that finishes after the user has switched Store', async () => {
+        const other = { id: 'store-two', name: 'Northwind Uptown', time_zone: 'America/Toronto' };
+        apiClient.get.mockImplementation(async (endpoint) => {
+            if (endpoint === '/api/stores') return [STORE, other];
+            if (endpoint.startsWith('/api/loops/review/')) return { loops: [], approval_window: null };
+            if (endpoint.startsWith('/api/schedules?store_id=')) return [];
+            throw new Error(`Unexpected GET ${endpoint}`);
+        });
+        let finishSave;
+        apiClient.post.mockReturnValue(new Promise(resolve => { finishSave = resolve; }));
+
+        render(<ScheduleCalendar />);
+        await screen.findByText('No schedule overrides for this Store.');
+        await addOverride({ day: 'sunday', start: '09:00', end: '11:00', type: 'blocked' });
+        fireEvent.change(screen.getByTestId('schedule-store-select'), { target: { value: 'store-two' } });
+        await waitFor(() => expect(apiClient.get).toHaveBeenCalledWith('/api/schedules?store_id=store-two'));
+        finishSave(SAVED);
+
+        await waitFor(() => expect(screen.queryByTestId('modal-schedule-override-form')).toBeNull());
+        expect(screen.queryByText('Sunday 09:00–11:00 · Blocked (No Ads)')).toBeNull();
+    });
+
+    it('keeps an override saved before the Store\'s list finished loading', async () => {
+        let finishLoad;
+        apiClient.get.mockImplementation((endpoint) => {
+            if (endpoint === '/api/stores') return Promise.resolve([STORE]);
+            if (endpoint.startsWith('/api/loops/review/')) return Promise.resolve({ loops: [], approval_window: null });
+            return new Promise(resolve => { finishLoad = resolve; });
+        });
+        apiClient.post.mockResolvedValue(SAVED);
+
+        render(<ScheduleCalendar />);
+        await addOverride({ day: 'sunday', start: '09:00', end: '11:00', type: 'blocked' });
+        await screen.findByText('Sunday 09:00–11:00 · Blocked (No Ads)');
+        // The list was read before the save reached the server.
+        finishLoad([]);
+
+        await waitFor(() => expect(apiClient.get).toHaveBeenCalledWith('/api/schedules?store_id=store-one'));
+        expect(await screen.findByText('Sunday 09:00–11:00 · Blocked (No Ads)')).toBeTruthy();
+        expect(screen.queryByText('No schedule overrides for this Store.')).toBeNull();
+    });
+
     it('keeps the dialog open with the server\'s reason when the save is refused', async () => {
         serve([]);
         apiClient.post.mockRejectedValue(new Error('end must be after start'));
