@@ -27,8 +27,26 @@ const mediaRepository = {
     },
 };
 
+const storedCreatives = new Map();
+const creativeRepository = {
+    newId: () => `crv_${storedCreatives.size + 1}`,
+    async create(id, data) {
+        const record = { id, ...data };
+        storedCreatives.set(id, record);
+        return record;
+    },
+    async delete(id) {
+        storedCreatives.delete(id);
+    },
+    async findAll() {
+        return [...storedCreatives.values()];
+    },
+};
+
 jest.unstable_mockModule('../src/repositories/index.js', () => ({
     mediaRepository,
+    creativeRepository,
+    CREATIVE_STATUS: { PENDING: 'pending' },
     campaignRepository: { findAll: async () => [], targetsRetailer: () => false },
     userRepository: createInMemoryUserRepository(),
 }));
@@ -79,11 +97,11 @@ describeWithAuthEmulator('classified media API', () => {
     beforeEach(() => {
         storedMedia.clear();
         storedObjects.clear();
+        storedCreatives.clear();
         durableMetadataAvailable = true;
     });
 
     it.each([
-        ['paid', 'brand', 'brand-1', 'campaign'],
         ['retailer', 'retailer', 'retailer-1', 'campaign'],
         ['internal', 'platform', '', 'campaign'],
         ['fallback', 'platform', '', 'neutral_fallback'],
@@ -115,6 +133,23 @@ describeWithAuthEmulator('classified media API', () => {
         expect(response.body.size_bytes).toBe(VALID_PNG.length);
     });
 
+    it('makes an Admin paid upload a pending Creative of the Brand, whatever approval it claims', async () => {
+        const response = await upload(await appAs('admin'), {
+            title: 'paid creative',
+            category: 'paid',
+            owner_type: 'brand',
+            owner_id: 'brand-1',
+            approval_status: 'approved',
+        });
+
+        expect(response.status).toBe(201);
+        expect(response.body).toMatchObject({ category: 'paid', owner_type: 'brand', owner_id: 'brand-1' });
+        expect(response.body).not.toHaveProperty('approval_status');
+        expect(response.body.creative).toEqual({ id: response.body.creative_id, approval_status: 'pending' });
+        expect(storedCreatives.get(response.body.creative_id))
+            .toMatchObject({ brand_id: 'brand-1', media_ids: [response.body.id], approval_status: 'pending' });
+    });
+
     it('lets Brand use the same upload contract while enforcing Brand ownership', async () => {
         const brand = await appAs('brand', 'brand-owned-org');
         const response = await upload(brand, {
@@ -131,9 +166,9 @@ describeWithAuthEmulator('classified media API', () => {
             category: 'paid',
             owner_type: 'brand',
             owner_id: 'brand-owned-org',
-            approval_status: 'pending_approval',
-            eligible_for_playback: false,
+            creative: { approval_status: 'pending' },
         });
+        expect(response.body).not.toHaveProperty('approval_status');
 
         const list = await brand.get('/api/assets');
         expect(list.status).toBe(200);
@@ -175,6 +210,17 @@ describeWithAuthEmulator('classified media API', () => {
         expect(response.body.error).toMatch(/could not be saved/i);
         expect(storedObjects.size).toBe(0);
         expect(storedMedia.size).toBe(0);
+    });
+
+    it('leaves no Creative behind when a Brand upload cannot be saved', async () => {
+        const response = await upload(await appAs('brand', 'brand-owned-org'), {
+            title: 'Metadata failure',
+            category: 'paid',
+        });
+
+        expect(response.status).toBe(500);
+        expect(storedObjects.size).toBe(0);
+        expect(storedCreatives.size).toBe(0);
     });
 
     it('reports storage failure without recording metadata or success', async () => {

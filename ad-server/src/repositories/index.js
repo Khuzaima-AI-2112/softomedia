@@ -17,3 +17,4 @@ export * from './DemoOrganizationRepository.js';
 export * from './PlatformAuditRepository.js';
 export * from './SlotReservationRepository.js';
 export * from './ScheduleOverrideRepository.js';
+export * from './CreativeRepository.js';

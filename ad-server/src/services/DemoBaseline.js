@@ -5,6 +5,7 @@ export const DEMO_BUSINESS_COLLECTIONS = Object.freeze([
     'ads',
     'advertisers',
     'campaigns',
+    'creatives',
     'daily_schedules',
     'demo_organizations',
     'impressions',
@@ -53,7 +54,7 @@ function record(collection, id, data, resetAtIso) {
     };
 }
 
-function mediaFixture({ id, category, ownerType, ownerId, bucketName, resetAtIso }) {
+function mediaFixture({ id, category, ownerType, ownerId, creativeId, bucketName, resetAtIso }) {
     const objectName = `${DEMO_STORAGE_PREFIX}media/${category}.png`;
     return {
         document: record('media', id, {
@@ -65,6 +66,7 @@ function mediaFixture({ id, category, ownerType, ownerId, bucketName, resetAtIso
             file_type: 'image/png',
             owner_type: ownerType,
             owner_id: ownerId,
+            ...(creativeId ? { creative_id: creativeId } : {}),
             status: 'approved',
             is_fallback: category === 'fallback',
             storage_path: `gs://${bucketName}/${objectName}`,
@@ -94,7 +96,7 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
 
     const resetAtIso = resetAt.toISOString();
     const mediaFixtures = [
-        mediaFixture({ id: 'demo-media-paid', category: 'paid', ownerType: 'brand', ownerId: 'demo-advertiser-secondary', bucketName, resetAtIso }),
+        mediaFixture({ id: 'demo-media-paid', category: 'paid', ownerType: 'brand', ownerId: 'demo-advertiser-secondary', creativeId: 'demo-creative-paid', bucketName, resetAtIso }),
         mediaFixture({ id: 'demo-media-retailer', category: 'retailer', ownerType: 'retailer', ownerId: 'demo-retailer-freshmart', bucketName, resetAtIso }),
         mediaFixture({ id: 'demo-media-internal', category: 'internal', ownerType: 'platform', ownerId: null, bucketName, resetAtIso }),
         mediaFixture({ id: 'demo-media-fallback', category: 'fallback', ownerType: 'platform', ownerId: null, bucketName, resetAtIso }),
@@ -206,6 +208,14 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
             last_seen: null,
         }, resetAtIso),
         ...mediaFixtures.map(fixture => fixture.document),
+        record('creatives', 'demo-creative-paid', {
+            brand_id: 'demo-advertiser-secondary',
+            media_ids: ['demo-media-paid'],
+            approval_status: 'approved',
+            decided_by: null,
+            decided_at: resetAtIso,
+            reason: null,
+        }, resetAtIso),
         record('campaigns', 'demo-secondary-campaign-1', {
             name: 'Northstar Pantry Synthetic Campaign',
             advertiser_id: 'demo-advertiser-secondary',

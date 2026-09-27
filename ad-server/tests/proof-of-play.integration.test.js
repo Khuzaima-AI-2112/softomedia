@@ -26,6 +26,7 @@ describeWithEmulator('Proof of Play HTTP API with Firestore persistence', () => 
         location: `pop-location-${suffix}`,
         loop: `pop-loop-${suffix}`,
         asset: `pop-asset-${suffix}`,
+        creative: `pop-creative-${suffix}`,
         fallbackAsset: `pop-fallback-${suffix}`,
         brand: `pop-brand-${suffix}`,
         retailer: `pop-retailer-${suffix}`,
@@ -74,8 +75,13 @@ describeWithEmulator('Proof of Play HTTP API with Firestore persistence', () => 
             category: 'paid',
             owner_type: 'brand',
             owner_id: ids.brand,
+            creative_id: ids.creative,
+        });
+        await firestore.collection('creatives').doc(ids.creative).set({
+            id: ids.creative,
+            brand_id: ids.brand,
+            media_ids: [ids.asset],
             approval_status: 'approved',
-            eligible_for_playback: true,
         });
         await firestore.collection('media').doc(ids.fallbackAsset).set({
             id: ids.fallbackAsset,
@@ -152,6 +158,7 @@ describeWithEmulator('Proof of Play HTTP API with Firestore persistence', () => 
             firestore.collection('playback_observations').doc(`${ids.event}-holding-observation`).delete(),
             firestore.collection('campaigns').doc(ids.campaign).delete(),
             firestore.collection('media').doc(ids.asset).delete(),
+            firestore.collection('creatives').doc(ids.creative).delete(),
             firestore.collection('media').doc(ids.fallbackAsset).delete(),
             firestore.collection('stores').doc(ids.store).delete(),
             firestore.collection('locations').doc(ids.location).delete(),

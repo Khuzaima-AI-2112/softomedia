@@ -356,6 +356,11 @@ class ApiService {
         return apiClient.postForm('/api/assets/upload', formData);
     }
 
+    /** The signed-in Brand's Creatives, each with its files and approval status. */
+    async getCreatives() {
+        return apiClient.get('/api/creatives');
+    }
+
     // ============================================
     // BUSINESS HOURS
     // ============================================

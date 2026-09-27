@@ -3,6 +3,7 @@ import { campaignRepository } from '../repositories/CampaignRepository.js';
 import { locationRepository } from '../repositories/LocationRepository.js';
 import { loopRepository, LOOP_STATUS } from '../repositories/LoopRepository.js';
 import { mediaRepository } from '../repositories/MediaRepository.js';
+import { creativeRepository } from '../repositories/CreativeRepository.js';
 import { screenRepository } from '../repositories/ScreenRepository.js';
 import StoreRepository from '../repositories/StoreRepository.js';
 import { deviceMediaPath } from '../constants/mediaPaths.js';
@@ -104,12 +105,14 @@ export class PlaybackService {
     }
 
     async prepareSlots(slots, context) {
-        const [assets, campaigns] = await Promise.all([
+        const [assets, campaigns, creatives] = await Promise.all([
             mediaRepository.findAll(),
             campaignRepository.findAll(),
+            creativeRepository.findAll(),
         ]);
         const assetsById = new Map(assets.map(asset => [asset.id, asset]));
         const campaignsById = new Map(campaigns.map(campaign => [campaign.id, campaign]));
+        const creativesById = new Map(creatives.map(creative => [creative.id, creative]));
         const approvedFallback = assets
             .filter(isApprovedFallbackAsset)
             .sort((a, b) => a.id.localeCompare(b.id))[0] || null;
@@ -117,13 +120,14 @@ export class PlaybackService {
         const resolved = slots.map(slot => this.resolveSlot(slot, {
             assetsById,
             campaignsById,
+            creativesById,
             approvedFallback,
             context,
         }));
         return resolved.some(slot => slot === null) ? null : resolved;
     }
 
-    resolveSlot(slot, { assetsById, campaignsById, approvedFallback, context }) {
+    resolveSlot(slot, { assetsById, campaignsById, creativesById, approvedFallback, context }) {
         const isFallback = slot.is_fallback || slot.content_kind === 'fallback';
         const isCampaign = !isFallback
             && slot.content_kind === 'campaign'
@@ -136,6 +140,7 @@ export class PlaybackService {
                     slot,
                     campaignsById.get(slot.campaign_id),
                     storedAsset,
+                    creativesById.get(storedAsset?.creative_id),
                     context,
                 )
                 : this.isEligibleMediaSlot(slot, storedAsset, context);
@@ -165,7 +170,7 @@ export class PlaybackService {
         };
     }
 
-    isEligibleCampaignSlot(slot, campaign, asset, {
+    isEligibleCampaignSlot(slot, campaign, asset, creative, {
         date,
         retailerId,
         storeId,
@@ -177,7 +182,7 @@ export class PlaybackService {
         if (campaign.start_date && date < campaign.start_date) return false;
         if (campaign.end_date && date > campaign.end_date) return false;
         if ((campaign.asset_id || campaign.media_id) !== slot.asset_id) return false;
-        if (!isApprovedPlaybackAsset(asset)) return false;
+        if (!isApprovedPlaybackAsset(asset, creative)) return false;
 
         const campaignOwnerId = campaign.advertiser_id || campaign.brand_id;
         if (campaignOwnerId || asset.owner_type === 'brand') {

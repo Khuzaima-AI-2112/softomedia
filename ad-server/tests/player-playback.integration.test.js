@@ -15,6 +15,7 @@ const { loopRepository, LOOP_STATUS } = await import('../src/repositories/LoopRe
 const { dailyScheduleRepository } = await import('../src/repositories/DailyScheduleRepository.js');
 const { mediaRepository } = await import('../src/repositories/MediaRepository.js');
 const { campaignRepository } = await import('../src/repositories/CampaignRepository.js');
+const { creativeRepository } = await import('../src/repositories/CreativeRepository.js');
 const { deviceCredentialService } = await import('../src/services/DeviceCredentialService.js');
 
 const app = createTestApp(apiRouter, '/api');
@@ -61,9 +62,13 @@ async function seedLoop({
             category: 'paid',
             owner_type: 'brand',
             owner_id: 'brand-one',
-            approval_status: 'approved',
-            eligible_for_playback: true,
+            creative_id: `creative-${position}`,
             status: 'ready',
+        });
+        await creativeRepository.create(`creative-${position}`, {
+            brand_id: 'brand-one',
+            media_ids: [`asset-${position}`],
+            approval_status: 'approved',
         });
         await campaignRepository.create(`campaign-${position}`, {
             status: 'approved',

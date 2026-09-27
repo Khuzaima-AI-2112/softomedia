@@ -49,7 +49,11 @@ describe('Brand creative upload', () => {
     });
 
     it('uses the classified media contract and continues with the persisted asset', async () => {
-        uploadAsset.mockResolvedValue({ id: 'ast_brand', content_path: '/api/assets/ast_brand/content' });
+        uploadAsset.mockResolvedValue({
+            id: 'ast_brand',
+            content_path: '/api/assets/ast_brand/content',
+            creative: { id: 'crv_brand', approval_status: 'pending' },
+        });
         const updateData = vi.fn();
         const onNext = vi.fn();
         render(<Step4CreativeUpload data={{}} updateData={updateData} onNext={onNext} onPrev={vi.fn()} />);
@@ -65,6 +69,7 @@ describe('Brand creative upload', () => {
         expect(form.get('category')).toBe('paid');
         expect(form.get('title')).toBe('Autumn offer');
         expect(await screen.findByText('Creative uploaded successfully.')).toBeTruthy();
+        expect(screen.getByText('Pending approval: it plays once approved.')).toBeTruthy();
 
         fireEvent.click(screen.getByTestId('wizard-next-step'));
         expect(updateData).toHaveBeenCalledWith({

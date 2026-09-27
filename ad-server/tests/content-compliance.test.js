@@ -19,8 +19,17 @@ const mediaRepository = {
     },
 };
 
+const creativeRepository = {
+    newId: () => 'crv_test',
+    create: async (id, data) => ({ id, ...data }),
+    delete: async () => {},
+    findAll: async () => [],
+};
+
 jest.unstable_mockModule('../src/repositories/index.js', () => ({
     mediaRepository,
+    creativeRepository,
+    CREATIVE_STATUS: { PENDING: 'pending' },
     campaignRepository: { findAll: async () => [], targetsRetailer: () => false },
     userRepository: createInMemoryUserRepository(),
 }));

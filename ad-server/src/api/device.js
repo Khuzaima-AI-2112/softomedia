@@ -8,7 +8,7 @@ import { proofOfPlayService } from '../services/ProofOfPlayService.js';
 import { playbackObservationService } from '../services/PlaybackObservationService.js';
 import { PresentationEventError } from '../services/PresentationEventValidation.js';
 import { isApprovedPlaybackAsset } from '../services/PlaybackEligibility.js';
-import { mediaRepository } from '../repositories/index.js';
+import { creativeRepository, mediaRepository } from '../repositories/index.js';
 import { sendMediaContent } from './mediaContent.js';
 
 /**
@@ -52,7 +52,7 @@ router.get('/playback', async (req, res) => {
 // GET /api/device/media/:assetId — the file of approved playback media; anything else reads as not found
 router.get('/media/:assetId', async (req, res) => {
     const asset = await mediaRepository.findById(req.params.assetId);
-    if (!isApprovedPlaybackAsset(asset)) return res.status(404).json({ error: 'Media not found' });
+    if (!isApprovedPlaybackAsset(asset, await creativeRepository.findForAsset(asset))) return res.status(404).json({ error: 'Media not found' });
     return sendMediaContent(res, asset);
 });
 
