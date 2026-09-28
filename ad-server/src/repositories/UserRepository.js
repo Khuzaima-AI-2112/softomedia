@@ -1,4 +1,5 @@
 import { BaseRepository } from './BaseRepository.js';
+import { ROLES, brandIdFor, normalizeRole } from '../constants/roles.js';
 
 export class UserRepository extends BaseRepository {
     constructor() {
@@ -27,6 +28,21 @@ export class UserRepository extends BaseRepository {
         return this.findAll({
             where: [['role', '==', role]]
         });
+    }
+
+    /**
+     * The users who act for a Brand organization.
+     * @param {string} brandId
+     * @returns {Promise<Array>}
+     */
+    async findBrandUsers(brandId) {
+        const [linked, members] = await Promise.all([
+            this.findAll({ where: [['linked_entity_id', '==', brandId]] }),
+            this.findAll({ where: [['organization_id', '==', brandId]] }),
+        ]);
+        const users = new Map([...linked, ...members].map(user => [user.id, user]));
+        return [...users.values()]
+            .filter(user => normalizeRole(user.role) === ROLES.BRAND && brandIdFor(user) === brandId);
     }
 
     /**

@@ -1,4 +1,4 @@
-import { BaseRepository, commitMockStorage, hasMockRecord } from './BaseRepository.js';
+import { BaseRepository, commitMockStorage, readMockRecord } from './BaseRepository.js';
 
 /** One or more Slots were reserved by someone else first. */
 export class SlotTakenError extends Error {
@@ -14,9 +14,12 @@ const ALREADY_EXISTS = 6;
 
 const slotOf = ({ store_id: storeId, date, hour, position }) => ({ store_id: storeId, date, hour, position });
 
+const isHeld = record => record?.status === 'held';
+
 /**
  * Slot Reservations (ADR 0005). A Reservation's document ID is its Slot's
- * Store, date, hour and position, so a Slot can be held only once.
+ * Store, date, hour and position, so a Slot can be held only once. A released
+ * Reservation keeps its record, with the reason, until the Slot is reserved again.
  */
 export class SlotReservationRepository extends BaseRepository {
     constructor() {
@@ -27,8 +30,12 @@ export class SlotReservationRepository extends BaseRepository {
         return `${storeId}_${date}_${hour}_${position}`;
     }
 
-    findForStoreAndDate(storeId, date) {
-        return this.findAll({ where: [['store_id', '==', storeId], ['date', '==', date]] });
+    findHeldForStoreAndDate(storeId, date) {
+        return this.findAll({ where: [['store_id', '==', storeId], ['date', '==', date], ['status', '==', 'held']] });
+    }
+
+    findHeldForCampaign(campaignId) {
+        return this.findAll({ where: [['campaign_id', '==', campaignId], ['status', '==', 'held']] });
     }
 
     /**
@@ -59,21 +66,24 @@ export class SlotReservationRepository extends BaseRepository {
                 await this.db.runTransaction(async transaction => {
                     const refs = records.map(record => this.collection.doc(record.id));
                     const existing = await transaction.getAll(...refs);
-                    const taken = records.filter((_, index) => existing[index].exists);
+                    const taken = records.filter((_, index) => isHeld(existing[index].data()));
                     if (taken.length > 0) throw new SlotTakenError(taken.map(slotOf));
-                    refs.forEach((ref, index) => transaction.create(ref, records[index]));
+                    // A released Reservation's record is replaced; the read above guards the replacement.
+                    refs.forEach((ref, index) => (existing[index].exists
+                        ? transaction.set(ref, records[index])
+                        : transaction.create(ref, records[index])));
                     transaction.create(campaignRepository.collection.doc(campaignRecord.id), campaignRecord);
                 });
             } catch (error) {
                 if (error.code !== ALREADY_EXISTS) throw error;
                 // Lost a race after the read: name the Slots that are now held.
                 const existing = await Promise.all(records.map(record => this.collection.doc(record.id).get()));
-                throw new SlotTakenError(records.filter((_, index) => existing[index].exists).map(slotOf));
+                throw new SlotTakenError(records.filter((_, index) => isHeld(existing[index].data())).map(slotOf));
             }
         } else {
             // Memory mode: the check and the write run without yielding, so no
             // concurrent submission can slip between them.
-            const taken = records.filter(record => hasMockRecord(this.collectionName, record.id));
+            const taken = records.filter(record => isHeld(readMockRecord(this.collectionName, record.id)));
             if (taken.length > 0) throw new SlotTakenError(taken.map(slotOf));
         }
 
@@ -82,6 +92,40 @@ export class SlotReservationRepository extends BaseRepository {
             { collectionName: campaignRepository.collectionName, id: campaignRecord.id, data: campaignRecord },
         ]);
         return campaignRecord;
+    }
+
+    /**
+     * Releases these Reservations with a reason, skipping any no longer held for
+     * the same Campaign, so a Reservation is released, and reported, only once.
+     * @returns {Promise<Array>} The Reservations this call released
+     */
+    async release(reservations, reason) {
+        const releasedAt = new Date().toISOString();
+        // The released form of each current record still held for the Reservation's Campaign, by index.
+        const releasable = currentRecords => reservations.flatMap((reservation, index) => {
+            const record = currentRecords[index];
+            if (!isHeld(record) || record.campaign_id !== reservation.campaign_id) return [];
+            return [{ index, record: {
+                ...record, status: 'released', release_reason: reason, released_at: releasedAt, updated_at: releasedAt,
+            } }];
+        });
+
+        let released = [];
+        if (this.db && reservations.length > 0) {
+            released = await this.db.runTransaction(async transaction => {
+                const refs = reservations.map(reservation => this.collection.doc(reservation.id));
+                const current = await transaction.getAll(...refs);
+                const writes = releasable(current.map(snapshot => snapshot.data()));
+                writes.forEach(({ index, record }) => transaction.set(refs[index], record));
+                return writes.map(({ record }) => record);
+            });
+        } else if (!this.db) {
+            // Memory mode: read and written without yielding, like reserveForCampaign.
+            released = releasable(reservations.map(reservation => readMockRecord(this.collectionName, reservation.id)))
+                .map(({ record }) => record);
+        }
+        commitMockStorage(released.map(record => ({ collectionName: this.collectionName, id: record.id, data: record })));
+        return released;
     }
 }
 

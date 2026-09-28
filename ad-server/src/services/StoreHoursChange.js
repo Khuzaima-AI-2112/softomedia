@@ -6,6 +6,7 @@
  */
 
 import { slotReservationRepository } from '../repositories/SlotReservationRepository.js';
+import { hasNotPlayed, releaseDueReservations } from './ReservationRelease.js';
 import { BusinessHoursService } from './BusinessHoursService.js';
 import { isPaidSlot } from './SlotInventory.js';
 import { storeLocalNow } from './SlotReservations.js';
@@ -23,11 +24,12 @@ const bySlot = (a, b) => a.date.localeCompare(b.date) || a.hour - b.hour || a.po
  *   after the change, or null when the change leaves the date as it is
  */
 async function droppedReservations(store, proposedHoursOn) {
-    // A Reservation in an hour already over today has played; only the rest can be dropped.
-    const now = storeLocalNow(new Date(), store.time_zone || 'UTC');
-    const currentHour = Number(now.time.slice(0, 2));
-    const held = (await slotReservationRepository.findHeldForStoreFrom(store.id, now.date))
-        .filter(({ date, hour }) => date > now.date || hour >= currentHour);
+    // A Reservation in an hour already over has played; only the rest can be dropped.
+    const now = new Date();
+    const today = storeLocalNow(now, store.time_zone || 'UTC').date;
+    const upcoming = (await slotReservationRepository.findHeldForStoreFrom(store.id, today))
+        .filter(reservation => hasNotPlayed(store, reservation, now));
+    const held = await releaseDueReservations(store, upcoming, now);
 
     const dates = [...new Set(held.map(reservation => reservation.date))];
     const hoursByDate = new Map(await Promise.all(dates.map(async date => {
