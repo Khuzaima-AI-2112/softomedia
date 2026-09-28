@@ -24,4 +24,11 @@ describe('role navigation', () => {
         for (const page of SUPER_ADMIN_PAGES) expect(superAdminPaths).toContain(page);
         for (const page of paths(ROLES.ADMIN)) expect(superAdminPaths).toContain(page);
     });
+
+    it('offers the delivery report to every role that holds a report grant, and not to a Technical Operator', () => {
+        for (const role of [ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.BRAND, ROLES.RETAILERADMIN]) {
+            expect(paths(role)).toContain('/dashboard/delivery-report');
+        }
+        expect(paths(ROLES.TECHOPERATOR)).not.toContain('/dashboard/delivery-report');
+    });
 });

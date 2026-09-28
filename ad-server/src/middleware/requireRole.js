@@ -38,6 +38,9 @@ export const PERMISSIONS = Object.freeze({
     INVOICE_VIEW_OWN: 'invoices.view_own',
     AUDIT_VIEW_NETWORK: 'audit.view_network',
     AUDIT_VIEW_OWN: 'audit.view_own',
+    // The Daypart delivery report (#41): the whole network, or the holder's own organization.
+    DELIVERY_REPORT_VIEW_NETWORK: 'delivery_report.view_network',
+    DELIVERY_REPORT_VIEW_OWN: 'delivery_report.view_own',
 });
 
 // The accepted Phase 1 permission matrix (docs/phase-1-demo-acceptance.md).
@@ -64,6 +67,7 @@ const ROLE_PERMISSIONS = Object.freeze({
         PERMISSIONS.INVOICE_GENERATE,
         PERMISSIONS.INVOICE_VIEW_NETWORK,
         PERMISSIONS.AUDIT_VIEW_NETWORK,
+        PERMISSIONS.DELIVERY_REPORT_VIEW_NETWORK,
     ]),
     [ROLES.ADMIN]: Object.freeze([
         PERMISSIONS.SCREEN_MANAGEMENT,
@@ -76,10 +80,12 @@ const ROLE_PERMISSIONS = Object.freeze({
         PERMISSIONS.IMPRESSION_VIEW_NETWORK,
         PERMISSIONS.INVOICE_GENERATE,
         PERMISSIONS.INVOICE_VIEW_NETWORK,
+        PERMISSIONS.DELIVERY_REPORT_VIEW_NETWORK,
     ]),
     [ROLES.BRAND]: Object.freeze([
         PERMISSIONS.CAMPAIGN_CREATE,
         PERMISSIONS.INVOICE_VIEW_OWN,
+        PERMISSIONS.DELIVERY_REPORT_VIEW_OWN,
     ]),
     [ROLES.RETAILERADMIN]: Object.freeze([
         PERMISSIONS.SUPPORT_TICKET_CREATE_OWN,
@@ -89,6 +95,7 @@ const ROLE_PERMISSIONS = Object.freeze({
         PERMISSIONS.SCHEDULE_OVERRIDE,
         PERMISSIONS.IMPRESSION_VIEW_OWN,
         PERMISSIONS.AUDIT_VIEW_OWN,
+        PERMISSIONS.DELIVERY_REPORT_VIEW_OWN,
     ]),
     [ROLES.TECHOPERATOR]: Object.freeze([
         PERMISSIONS.SUPPORT_TICKET_MANAGE_NETWORK,
