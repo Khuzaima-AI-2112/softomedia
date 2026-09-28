@@ -5,3 +5,6 @@ export const CREATIVE_STATUS = Object.freeze({
     REJECTED: 'rejected',
     REVOKED: 'revoked',
 });
+
+/** A Creative holds one, two or three five-second files, played in consecutive Slots. */
+export const MAXIMUM_CREATIVE_FILES = 3;

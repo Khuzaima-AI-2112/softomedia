@@ -9,7 +9,7 @@ import StoreRepository from '../repositories/StoreRepository.js';
 import { slotReservationRepository } from '../repositories/SlotReservationRepository.js';
 import { heldReservations } from './ReservationRelease.js';
 import { slotQuote } from './CampaignPricingService.js';
-import { SLOTS_PER_LOOP, slotInventory } from './SlotInventory.js';
+import { SLOTS_PER_LOOP, slotInventory, wholeRuns } from './SlotInventory.js';
 
 export const BOOKING_CUTOFF_TIME = '18:00';
 const BOOKING_CUTOFF_DAYS_BEFORE = 2;
@@ -61,12 +61,21 @@ const quoteFor = (config, store, date, hour) => slotQuote({
     config, retailerId: store.retailer_id, storeTier: store.cpm_traffic_tier, date, hour,
 });
 
+/** Positions where `length` free Paid Slots in a row begin, within one hour. */
+function runStarts(slots, length) {
+    const isFree = position => slots[position]?.category === 'paid' && slots[position].status === 'free';
+    return slots
+        .map(({ position }) => position)
+        .filter(start => Array.from({ length }, (_, offset) => start + offset).every(isFree));
+}
+
 /**
  * Every Slot of a Store on a date as one Brand may see it. A Paid Slot is
  * free, taken by someone else, or the Brand's own; the holder is never named.
- * Every Paid Slot in an hour carries that hour's price.
+ * Every Paid Slot in an hour carries that hour's price, and each hour lists
+ * where a run of `runLength` free Paid Slots begins, one Slot per file of the Creative.
  */
-export async function slotAvailability(store, date, brandId) {
+export async function slotAvailability(store, date, brandId, runLength = 1) {
     const [inventory, reservations, config] = await Promise.all([
         slotInventory(store.id, date),
         heldReservations(store, date),
@@ -85,13 +94,13 @@ export async function slotAvailability(store, date, brandId) {
         booking_open: isBookingOpen(date, store.time_zone),
         booking_cutoff: bookingCutoff(date, store.time_zone),
         currency: config.currency,
-        hours: inventory.hours.map(({ hour, slots }) => ({
-            hour,
-            ...quoteFor(config, store, date, hour),
-            slots: slots.map(slot => (slot.category === 'paid'
+        run_length: runLength,
+        hours: inventory.hours.map(({ hour, slots }) => {
+            const seen = slots.map(slot => (slot.category === 'paid'
                 ? { ...slot, status: statusOf(hour, slot.position) }
-                : slot)),
-        })),
+                : slot));
+            return { hour, ...quoteFor(config, store, date, hour), slots: seen, runs: runStarts(seen, runLength) };
+        }),
     };
 }
 
@@ -102,13 +111,24 @@ class ReservationRefused extends Error {
     }
 }
 
+/** Whether a Creative of `fileCount` files plays in every one of these picks, in whole runs. */
+function formsWholeRuns(picks, fileCount) {
+    const byHour = new Map();
+    for (const { store_id: storeId, date, hour, position } of picks) {
+        const key = `${storeId}_${date}_${hour}`;
+        byHour.set(key, [...(byHour.get(key) || []), position]);
+    }
+    return [...byHour.values()].every(positions => wholeRuns(positions, fileCount).flat().length === positions.length);
+}
+
 /**
  * Validates a Brand's Slot picks and prices them. Each must be a distinct
  * Paid Slot in an operating hour, at a Store the Campaign books, on a Campaign
- * date whose Booking Cutoff has not passed.
+ * date whose Booking Cutoff has not passed. A Creative of several files needs
+ * its picks in runs of that many consecutive Slots, one run per play.
  * @returns {{reservations: Array}|{error: string, code: string}}
  */
-export async function prepareReservations({ slots, campaign, brandId }) {
+export async function prepareReservations({ slots, campaign, brandId, fileCount = 1 }) {
     try {
         if (!Array.isArray(slots) || slots.length === 0) {
             throw new ReservationRefused('Choose at least one Paid Slot');
@@ -160,6 +180,10 @@ export async function prepareReservations({ slots, campaign, brandId }) {
 
             const { price } = quoteFor(config, store, date, hour);
             reservations.push({ store_id: storeId, date, hour, position, brand_id: brandId, status: 'held', price });
+        }
+        if (!formsWholeRuns(reservations, fileCount)) {
+            throw new ReservationRefused(`This Creative has ${fileCount} files, so pick its Slots in runs of ${fileCount} `
+                + 'consecutive Paid Slots in one hour');
         }
         return { reservations };
     } catch (error) {

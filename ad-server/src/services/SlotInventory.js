@@ -37,6 +37,25 @@ export function isPaidSlot(effectiveHours, hour, position) {
 }
 
 /**
+ * The runs a Creative of `fileCount` files plays in, among these positions of
+ * one hour: consecutive positions taken `fileCount` at a time, in order.
+ * Positions in a stretch that doesn't split into whole runs are left out.
+ * @returns {number[][]}
+ */
+export function wholeRuns(positions, fileCount) {
+    const stretches = [];
+    for (const position of [...positions].sort((left, right) => left - right)) {
+        const last = stretches.at(-1);
+        if (last && position === last.at(-1) + 1) last.push(position);
+        else stretches.push([position]);
+    }
+    return stretches
+        .filter(stretch => stretch.length % fileCount === 0)
+        .flatMap(stretch => Array.from({ length: stretch.length / fileCount },
+            (_, run) => stretch.slice(run * fileCount, (run + 1) * fileCount)));
+}
+
+/**
  * Every Slot of every operating hour of a Store on a date. A Paid Slot's
  * status says whether a Brand may book it; Retailer and Internal Slots are
  * never bookable and have no status.

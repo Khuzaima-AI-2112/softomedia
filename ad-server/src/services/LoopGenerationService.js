@@ -9,6 +9,7 @@ import { loopRepository, LOOP_STATUS } from '../repositories/LoopRepository.js';
 import { campaignRepository } from '../repositories/CampaignRepository.js';
 import { dailyScheduleRepository } from '../repositories/DailyScheduleRepository.js';
 import { mediaRepository } from '../repositories/MediaRepository.js';
+import { creativeRepository } from '../repositories/CreativeRepository.js';
 import StoreRepository from '../repositories/StoreRepository.js';
 import { daypartRepository } from '../repositories/DaypartRepository.js';
 import { BusinessHoursService } from './BusinessHoursService.js';
@@ -18,9 +19,8 @@ import logger from '../utils/logger.js';
 import {
     isApprovedFallbackAsset,
     isApprovedPlaybackAsset,
-    isPlayableStoredAsset,
 } from './PlaybackEligibility.js';
-import { allocatedCategory, firstPositionOfHour, SLOTS_PER_LOOP } from './SlotInventory.js';
+import { allocatedCategory, firstPositionOfHour, SLOTS_PER_LOOP, wholeRuns } from './SlotInventory.js';
 
 // Slot configuration
 export const SLOT_CONFIG = {
@@ -253,27 +253,54 @@ export class LoopGenerationService {
      * A Store's held Reservations for a date whose Creative is approved, by hour then
      * position. Any other Reservation's Slot gets Fallback Content. The Campaign's
      * own approval is checked when the Slot plays, so one approved after
-     * generation still plays.
+     * generation still plays. A Creative's files play in order across each run of
+     * its consecutive Slots; a Slot outside a whole run gets Fallback Content
+     * rather than a file out of order.
      * @returns {Promise<Map<number, Map<number, object>>>}
      */
     async getReservedCreatives(storeId, targetDate) {
         const store = await StoreRepository.findById(storeId);
         const reservations = store ? await heldReservations(store, targetDate) : [];
-        const byHour = new Map();
-        await Promise.all(reservations.map(async reservation => {
-            const campaign = await campaignRepository.findById(reservation.campaign_id);
-            const asset = campaign && await mediaRepository.findById(campaign.media_id || campaign.asset_id);
-            if (!(await isPlayableStoredAsset(asset))) return;
+        const byCampaignHour = new Map();
+        for (const reservation of reservations) {
+            const key = `${reservation.campaign_id}_${reservation.hour}`;
+            byCampaignHour.set(key, [...(byCampaignHour.get(key) || []), reservation]);
+        }
 
-            if (!byHour.has(reservation.hour)) byHour.set(reservation.hour, new Map());
-            byHour.get(reservation.hour).set(reservation.position, {
-                type: 'paid',
-                campaign_id: campaign.id,
-                asset_id: asset.id,
-                asset_name: asset.title || asset.filename || null,
-            });
+        const byHour = new Map();
+        await Promise.all([...byCampaignHour.values()].map(async held => {
+            const { campaign_id: campaignId, hour } = held[0];
+            const campaign = await campaignRepository.findById(campaignId);
+            const files = campaign ? await this.getCreativeFiles(campaign) : [];
+            if (files.length === 0) return;
+
+            const positions = held.map(reservation => reservation.position);
+            const runs = wholeRuns(positions, files.length);
+            if (runs.flat().length < positions.length) {
+                logger.warn('[LoopGeneration] Reservations do not form whole runs of the Creative', {
+                    storeId, date: targetDate, hour, campaignId, positions,
+                });
+            }
+            if (!byHour.has(hour)) byHour.set(hour, new Map());
+            for (const run of runs) {
+                run.forEach((position, index) => byHour.get(hour).set(position, {
+                    type: 'paid',
+                    campaign_id: campaign.id,
+                    asset_id: files[index].id,
+                    asset_name: files[index].title || files[index].filename || null,
+                }));
+            }
         }));
         return byHour;
+    }
+
+    /** The files of a Campaign's Creative in play order, or none unless every one may play. */
+    async getCreativeFiles(campaign) {
+        const first = await mediaRepository.findById(campaign.media_id || campaign.asset_id);
+        if (!first) return [];
+        const { creative, mediaIds } = await creativeRepository.withFilesFor(first);
+        const files = await Promise.all(mediaIds.map(id => (id === first.id ? first : mediaRepository.findById(id))));
+        return files.every(file => isApprovedPlaybackAsset(file, creative)) ? files : [];
     }
 
     namesRetailer(campaign, retailerId) {

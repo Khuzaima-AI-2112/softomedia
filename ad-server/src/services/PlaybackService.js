@@ -181,7 +181,9 @@ export class PlaybackService {
         if (campaign.retailer_id && campaign.retailer_id !== retailerId) return false;
         if (campaign.start_date && date < campaign.start_date) return false;
         if (campaign.end_date && date > campaign.end_date) return false;
-        if ((campaign.asset_id || campaign.media_id) !== slot.asset_id) return false;
+        // The Slot plays the Campaign's file, or another file of the same Creative.
+        const campaignMediaId = campaign.asset_id || campaign.media_id;
+        if (campaignMediaId !== slot.asset_id && !(creative?.media_ids || []).includes(campaignMediaId)) return false;
         if (!isApprovedPlaybackAsset(asset, creative)) return false;
 
         const campaignOwnerId = campaign.advertiser_id || campaign.brand_id;

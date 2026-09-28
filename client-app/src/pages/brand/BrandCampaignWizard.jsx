@@ -37,6 +37,8 @@ const BrandCampaignWizard = () => {
         // Step 3: Slots
         selectedSlots: [],
         repeatDaily: true,
+        // Five-second files in the Creative, one per consecutive Paid Slot
+        creativeFiles: 1,
         // Step 4: Creative
         creativeUrl: '',
         creativeAssetId: null,

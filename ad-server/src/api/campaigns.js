@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import express from 'express';
 import {
     campaignRepository,
+    creativeRepository,
     impressionRepository,
     locationRepository,
     mediaRepository,
@@ -66,10 +67,14 @@ async function validateBrandSubmission(body, ownerId) {
     if (!body.media_id) {
         return { error: 'A persisted paid creative is required', status: 400 };
     }
-    const media = await mediaRepository.findById(body.media_id);
-    if (!media || media.category !== 'paid' || media.owner_type !== 'brand' || media.owner_id !== ownerId) {
+    const named = await mediaRepository.findById(body.media_id);
+    if (!named || named.category !== 'paid' || named.owner_type !== 'brand' || named.owner_id !== ownerId) {
         return { error: 'The selected creative is unavailable', status: 403 };
     }
+    // Naming any file of a Creative books the whole Creative, from its first file.
+    const { creative, mediaIds } = await creativeRepository.withFilesFor(named);
+    const media = mediaIds[0] === named.id ? named : await mediaRepository.findById(mediaIds[0]);
+    if (!media) return { error: 'The selected creative is unavailable', status: 403 };
 
     if (!Array.isArray(body.inventory_selection) || body.inventory_selection.length === 0) {
         return { error: 'At least one Bookable Inventory selection is required', status: 400 };
@@ -104,7 +109,7 @@ async function validateBrandSubmission(body, ownerId) {
         if (!valid) return { error: 'The selected Bookable Inventory is unavailable', status: 400 };
     }
 
-    return { media };
+    return { media, creativeId: creative?.id ?? null, mediaIds };
 }
 
 /**
@@ -306,19 +311,21 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, RO
             });
         }
 
-        let brandMedia = null;
+        let submission = null;
         if (brandCaller) {
-            const validation = await validateBrandSubmission(req.body, brandOwnerId);
-            if (validation.error) {
-                return res.status(validation.status).json({ error: validation.error });
+            submission = await validateBrandSubmission(req.body, brandOwnerId);
+            if (submission.error) {
+                return res.status(submission.status).json({ error: submission.error });
             }
-            brandMedia = validation.media;
         }
 
         const id = brandCaller ? generatedId : (req.body.id || generatedId);
+        const brandMedia = submission?.media;
         const submittedData = brandCaller ? {
             name: req.body.name,
-            media_id: req.body.media_id,
+            media_id: brandMedia.id,
+            creative_id: submission.creativeId,
+            creative_media_ids: submission.mediaIds,
             creative_mime_type: brandMedia.mime_type,
             creative_duration: brandMedia.duration,
             start_date: req.body.start_date,
@@ -331,7 +338,7 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, RO
         let reservations = [];
         if (brandCaller) {
             const prepared = await prepareReservations({
-                slots: req.body.slots, campaign: submittedData, brandId: brandOwnerId,
+                slots: req.body.slots, campaign: submittedData, brandId: brandOwnerId, fileCount: submission.mediaIds.length,
             });
             if (prepared.error) {
                 return res.status(400).json({ error: prepared.error, code: prepared.code });

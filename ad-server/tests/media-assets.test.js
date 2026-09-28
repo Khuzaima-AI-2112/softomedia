@@ -146,9 +146,10 @@ describeWithAuthEmulator('classified media API', () => {
         expect(response.status).toBe(201);
         expect(response.body).toMatchObject({ category: 'paid', owner_type: 'brand', owner_id: 'brand-1' });
         expect(response.body).not.toHaveProperty('approval_status');
-        expect(response.body.creative).toEqual({ id: response.body.creative_id, approval_status: 'pending' });
+        const creative = { id: response.body.creative_id, approval_status: 'pending', media_ids: [response.body.id] };
+        expect(response.body.creative).toEqual(creative);
         const listed = (await admin.get('/api/assets')).body.find(({ id }) => id === response.body.id);
-        expect(listed.creative).toEqual({ id: response.body.creative_id, approval_status: 'pending' });
+        expect(listed.creative).toEqual(creative);
     });
 
     it('lets Brand use the same upload contract while enforcing Brand ownership', async () => {

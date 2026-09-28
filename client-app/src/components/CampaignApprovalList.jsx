@@ -153,13 +153,17 @@ export default function CampaignApprovalList() {
       {expandedCampaignId === campaign.id && (
         <div data-testid="campaign-detail" className="mt-2 pt-4 border-t border-slate-700/50 w-full space-y-4">
           <div className="flex gap-4">
-            <ProtectedImage
-              data-testid="campaign-creative-thumbnail"
-              src={assetContentPath(campaign.media_id || campaign.asset_id) || campaign.creative_url}
-              fallbackSrc={CREATIVE_PLACEHOLDER}
-              alt="Creative Preview"
-              className="w-32 h-24 object-cover rounded border border-slate-700"
-            />
+            {/* A 10- or 15-second Creative is approved whole, so every file is shown in play order. */}
+            {(campaign.creative_media_ids?.length > 1 ? campaign.creative_media_ids : [null]).map((mediaId, index, files) => (
+              <ProtectedImage
+                key={mediaId ?? 'creative'}
+                data-testid={index === 0 ? 'campaign-creative-thumbnail' : `campaign-creative-thumbnail-${index + 1}`}
+                src={assetContentPath(mediaId || campaign.media_id || campaign.asset_id) || campaign.creative_url}
+                fallbackSrc={CREATIVE_PLACEHOLDER}
+                alt={mediaId ? `Creative file ${index + 1} of ${files.length}` : 'Creative Preview'}
+                className="w-32 h-24 object-cover rounded border border-slate-700"
+              />
+            ))}
             <div data-testid="campaign-metadata" className="space-y-1 text-sm text-muted">
               <p><strong>Advertiser ID:</strong> {campaign.advertiser_id}</p>
               <p><strong>Duration:</strong> {campaign.start_date} to {campaign.end_date}</p>
