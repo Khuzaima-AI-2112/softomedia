@@ -7,6 +7,7 @@
 import PricingRepository from '../repositories/PricingRepository.js';
 import StoreRepository from '../repositories/StoreRepository.js';
 import { slotReservationRepository } from '../repositories/SlotReservationRepository.js';
+import { heldReservations } from './ReservationRelease.js';
 import { slotQuote } from './CampaignPricingService.js';
 import { SLOTS_PER_LOOP, slotInventory } from './SlotInventory.js';
 
@@ -68,7 +69,7 @@ const quoteFor = (config, store, date, hour) => slotQuote({
 export async function slotAvailability(store, date, brandId) {
     const [inventory, reservations, config] = await Promise.all([
         slotInventory(store.id, date),
-        slotReservationRepository.findForStoreAndDate(store.id, date),
+        heldReservations(store, date),
         PricingRepository.getConfig(),
     ]);
     const holders = new Map(reservations.map(reservation => [

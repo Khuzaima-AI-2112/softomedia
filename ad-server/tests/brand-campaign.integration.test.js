@@ -351,6 +351,64 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
         }
     });
 
+    test('a cancelled Campaign’s Slot is released in Firestore and another Brand can reserve it', async () => {
+        const creativeFor = async brandId => {
+            const id = `release-creative-${brandId}-${Date.now()}`;
+            createdMediaIds.push(id);
+            await firestore.collection('media').doc(id).set({
+                id, category: 'paid', owner_type: 'brand', owner_id: brandId, mime_type: 'image/png', duration: 5,
+            });
+            return id;
+        };
+        const [slot] = await freePaidSlots(brandToken, 'demo-store-phoenix', '2030-01-21');
+        const reservationRef = firestore.collection('slot_reservations')
+            .doc(`demo-store-phoenix_2030-01-21_${slot.hour}_${slot.position}`);
+        const submit = async (token, brandId) => request(app).post('/api/campaigns')
+            .set('Authorization', `Bearer ${token}`)
+            .send({
+                name: 'Released Slot',
+                media_id: await creativeFor(brandId),
+                start_date: '2030-01-21',
+                end_date: '2030-01-21',
+                budget: 100,
+                inventory_selection: [{
+                    retailer_id: 'demo-retailer-secondary',
+                    store_id: 'demo-store-phoenix',
+                    location_id: 'demo-location-phoenix-entrance',
+                    screen_id: 'demo-screen-secondary-1',
+                }],
+                slots: [slot],
+            });
+
+        const campaignIds = [];
+        // Removed here, not in afterAll: sibling tests count each Brand's Campaigns.
+        try {
+            const first = await submit(brandToken, 'demo-advertiser-bonvie');
+            expect(first.status).toBe(201);
+            campaignIds.push(first.body.id);
+            const cancelled = await request(app).post(`/api/campaigns/${first.body.id}/cancel`)
+                .set('Authorization', `Bearer ${brandToken}`);
+            expect(cancelled.status).toBe(200);
+            expect((await reservationRef.get()).data()).toMatchObject({
+                campaign_id: first.body.id, status: 'released', release_reason: 'campaign_cancelled',
+            });
+
+            const second = await submit(secondaryBrandToken, 'demo-advertiser-secondary');
+            expect(second.status).toBe(201);
+            campaignIds.push(second.body.id);
+            expect((await reservationRef.get()).data()).toMatchObject({
+                campaign_id: second.body.id, brand_id: 'demo-advertiser-secondary', status: 'held',
+            });
+        } finally {
+            const released = await firestore.collection('notifications')
+                .where('title', '==', 'Slot Reservation released').get();
+            await Promise.all([
+                ...campaignIds.map(id => firestore.collection('campaigns').doc(id).delete()),
+                ...released.docs.map(document => document.ref.delete()),
+            ]);
+        }
+    });
+
     test('Brand submission persists identity-owned creative, Campaign, selection, and Proof-of-Play visibility', async () => {
         const pngBytes = VALID_PNG;
         const upload = await request(app)

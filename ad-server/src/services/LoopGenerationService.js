@@ -9,10 +9,11 @@ import { loopRepository, LOOP_STATUS } from '../repositories/LoopRepository.js';
 import { campaignRepository } from '../repositories/CampaignRepository.js';
 import { dailyScheduleRepository } from '../repositories/DailyScheduleRepository.js';
 import { mediaRepository } from '../repositories/MediaRepository.js';
-import { slotReservationRepository } from '../repositories/SlotReservationRepository.js';
+import StoreRepository from '../repositories/StoreRepository.js';
 import { daypartRepository } from '../repositories/DaypartRepository.js';
 import { BusinessHoursService } from './BusinessHoursService.js';
 import { isPromotionScheduledAt } from './Dayparts.js';
+import { heldReservations } from './ReservationRelease.js';
 import logger from '../utils/logger.js';
 import {
     isApprovedFallbackAsset,
@@ -249,14 +250,15 @@ export class LoopGenerationService {
     }
 
     /**
-     * A Store's Reservations for a date whose Creative is approved, by hour then
+     * A Store's held Reservations for a date whose Creative is approved, by hour then
      * position. Any other Reservation's Slot gets Fallback Content. The Campaign's
      * own approval is checked when the Slot plays, so one approved after
      * generation still plays.
      * @returns {Promise<Map<number, Map<number, object>>>}
      */
     async getReservedCreatives(storeId, targetDate) {
-        const reservations = await slotReservationRepository.findForStoreAndDate(storeId, targetDate);
+        const store = await StoreRepository.findById(storeId);
+        const reservations = store ? await heldReservations(store, targetDate) : [];
         const byHour = new Map();
         await Promise.all(reservations.map(async reservation => {
             const campaign = await campaignRepository.findById(reservation.campaign_id);

@@ -13,6 +13,7 @@ import {
 } from '../repositories/index.js';
 import { resolveAgreedCpm } from '../services/CampaignPricingService.js';
 import { prepareReservations } from '../services/SlotReservations.js';
+import { RELEASE_REASONS, releaseCampaignReservations } from '../services/ReservationRelease.js';
 import { promotionScheduleError } from '../services/Dayparts.js';
 import { authenticate } from '../middleware/auth.js';
 import {
@@ -157,6 +158,7 @@ async function preparePromotion(body) {
  * paused           → live                  (ops resume)
  * completed        → (terminal)
  * rejected         → (terminal)
+ * cancelled        → (terminal; reached through POST /:id/cancel)
  */
 const VALID_TRANSITIONS = {
     pending_approval: ['approved', 'rejected'],
@@ -165,7 +167,11 @@ const VALID_TRANSITIONS = {
     paused: ['live'],
     completed: [],
     rejected: [],
+    cancelled: [],
 };
+
+/** A Campaign may be cancelled until it has finished. */
+const CANCELLABLE = ['pending_approval', 'approved', 'live', 'paused'];
 
 
 /**
@@ -414,6 +420,8 @@ router.patch('/:id/status', authenticate, requireCampaignApproval, async (req, r
         }
 
         const updated = await campaignRepository.update(id, { status: requestedStatus });
+        // A rejected Campaign's Slots go back to other Brands at once (ADR 0005).
+        if (requestedStatus === 'rejected') await releaseCampaignReservations(updated, RELEASE_REASONS.REJECTED);
         res.json(updated);
     } catch (error) {
         const statusCode = error.message === 'Campaign not found' ? 404 : 500;
@@ -460,6 +468,30 @@ router.put('/:id', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, 
         res.json(updated);
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * POST /api/campaigns/:id/cancel
+ * A Brand cancels its own Campaign, or an Admin cancels one; its Reservations
+ * are released at once and the Brand is told why.
+ */
+router.post('/:id/cancel', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, null), async (req, res) => {
+    try {
+        const campaign = await campaignRepository.findById(req.params.id);
+        if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+        if (isBrand(req.user) && !campaignRepository.isOwnedByBrand(campaign, brandIdFor(req.user))) {
+            return denyBrandAccess(res);
+        }
+        const currentStatus = campaign.status || 'pending_approval';
+        if (!CANCELLABLE.includes(currentStatus)) {
+            return res.status(400).json({ error: 'This Campaign can no longer be cancelled', from: currentStatus });
+        }
+        const updated = await campaignRepository.update(campaign.id, { status: 'cancelled' });
+        await releaseCampaignReservations(updated, RELEASE_REASONS.CANCELLED);
+        return res.json(updated);
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
     }
 });
 

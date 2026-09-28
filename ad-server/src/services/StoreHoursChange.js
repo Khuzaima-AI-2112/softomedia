@@ -6,6 +6,7 @@
  */
 
 import { slotReservationRepository } from '../repositories/SlotReservationRepository.js';
+import { stillHeld } from './ReservationRelease.js';
 import { BusinessHoursService } from './BusinessHoursService.js';
 import { isPaidSlot } from './SlotInventory.js';
 import { storeLocalNow } from './SlotReservations.js';
@@ -26,7 +27,7 @@ async function droppedReservations(store, proposedHoursOn) {
     // A Reservation in an hour already over today has played; only the rest can be dropped.
     const now = storeLocalNow(new Date(), store.time_zone || 'UTC');
     const currentHour = Number(now.time.slice(0, 2));
-    const held = (await slotReservationRepository.findHeldForStoreFrom(store.id, now.date))
+    const held = (await stillHeld(store, await slotReservationRepository.findHeldForStoreFrom(store.id, now.date)))
         .filter(({ date, hour }) => date > now.date || hour >= currentHour);
 
     const dates = [...new Set(held.map(reservation => reservation.date))];
