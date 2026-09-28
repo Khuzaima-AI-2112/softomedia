@@ -20,7 +20,7 @@ import {
     isApprovedFallbackAsset,
     isApprovedPlaybackAsset,
 } from './PlaybackEligibility.js';
-import { allocatedCategory, firstPositionOfHour, SLOTS_PER_LOOP } from './SlotInventory.js';
+import { allocatedCategory, firstPositionOfHour, SLOTS_PER_LOOP, wholeRuns } from './SlotInventory.js';
 
 // Slot configuration
 export const SLOT_CONFIG = {
@@ -253,8 +253,9 @@ export class LoopGenerationService {
      * A Store's held Reservations for a date whose Creative is approved, by hour then
      * position. Any other Reservation's Slot gets Fallback Content. The Campaign's
      * own approval is checked when the Slot plays, so one approved after
-     * generation still plays. A Creative's files play in order: its Reservations
-     * in an hour come in runs of consecutive Slots, one Slot per file.
+     * generation still plays. A Creative's files play in order across each run of
+     * its consecutive Slots; a Slot outside a whole run gets Fallback Content
+     * rather than a file out of order.
      * @returns {Promise<Map<number, Map<number, object>>>}
      */
     async getReservedCreatives(storeId, targetDate) {
@@ -268,21 +269,27 @@ export class LoopGenerationService {
 
         const byHour = new Map();
         await Promise.all([...byCampaignHour.values()].map(async held => {
-            const campaign = await campaignRepository.findById(held[0].campaign_id);
-            const parts = campaign ? await this.getCreativeFiles(campaign) : [];
-            if (parts.length === 0) return;
+            const { campaign_id: campaignId, hour } = held[0];
+            const campaign = await campaignRepository.findById(campaignId);
+            const files = campaign ? await this.getCreativeFiles(campaign) : [];
+            if (files.length === 0) return;
 
-            const { hour } = held[0];
+            const positions = held.map(reservation => reservation.position);
+            const runs = wholeRuns(positions, files.length);
+            if (runs.flat().length < positions.length) {
+                logger.warn('[LoopGeneration] Reservations do not form whole runs of the Creative', {
+                    storeId, date: targetDate, hour, campaignId, positions,
+                });
+            }
             if (!byHour.has(hour)) byHour.set(hour, new Map());
-            held.sort((a, b) => a.position - b.position).forEach((reservation, index) => {
-                const asset = parts[index % parts.length];
-                byHour.get(hour).set(reservation.position, {
+            for (const run of runs) {
+                run.forEach((position, index) => byHour.get(hour).set(position, {
                     type: 'paid',
                     campaign_id: campaign.id,
-                    asset_id: asset.id,
-                    asset_name: asset.title || asset.filename || null,
-                });
-            });
+                    asset_id: files[index].id,
+                    asset_name: files[index].title || files[index].filename || null,
+                }));
+            }
         }));
         return byHour;
     }
@@ -290,11 +297,10 @@ export class LoopGenerationService {
     /** The files of a Campaign's Creative in play order, or none unless every one may play. */
     async getCreativeFiles(campaign) {
         const first = await mediaRepository.findById(campaign.media_id || campaign.asset_id);
-        const creative = await creativeRepository.findForAsset(first);
-        const parts = creative?.media_ids?.length
-            ? await Promise.all(creative.media_ids.map(id => mediaRepository.findById(id)))
-            : [first];
-        return parts.every(part => isApprovedPlaybackAsset(part, creative)) ? parts : [];
+        if (!first) return [];
+        const { creative, mediaIds } = await creativeRepository.withFilesFor(first);
+        const files = await Promise.all(mediaIds.map(id => (id === first.id ? first : mediaRepository.findById(id))));
+        return files.every(file => isApprovedPlaybackAsset(file, creative)) ? files : [];
     }
 
     namesRetailer(campaign, retailerId) {

@@ -72,8 +72,7 @@ async function validateBrandSubmission(body, ownerId) {
         return { error: 'The selected creative is unavailable', status: 403 };
     }
     // Naming any file of a Creative books the whole Creative, from its first file.
-    const creative = await creativeRepository.findForAsset(named);
-    const mediaIds = creative?.media_ids?.length ? creative.media_ids : [named.id];
+    const { creative, mediaIds } = await creativeRepository.withFilesFor(named);
     const media = mediaIds[0] === named.id ? named : await mediaRepository.findById(mediaIds[0]);
     if (!media) return { error: 'The selected creative is unavailable', status: 403 };
 
@@ -110,7 +109,7 @@ async function validateBrandSubmission(body, ownerId) {
         if (!valid) return { error: 'The selected Bookable Inventory is unavailable', status: 400 };
     }
 
-    return { media, creativeId: creative?.id ?? null, files: mediaIds.length };
+    return { media, creativeId: creative?.id ?? null, mediaIds };
 }
 
 /**
@@ -312,21 +311,21 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, RO
             });
         }
 
-        let brandCreative = null;
+        let submission = null;
         if (brandCaller) {
-            brandCreative = await validateBrandSubmission(req.body, brandOwnerId);
-            if (brandCreative.error) {
-                return res.status(brandCreative.status).json({ error: brandCreative.error });
+            submission = await validateBrandSubmission(req.body, brandOwnerId);
+            if (submission.error) {
+                return res.status(submission.status).json({ error: submission.error });
             }
         }
 
         const id = brandCaller ? generatedId : (req.body.id || generatedId);
-        const brandMedia = brandCreative?.media;
+        const brandMedia = submission?.media;
         const submittedData = brandCaller ? {
             name: req.body.name,
             media_id: brandMedia.id,
-            creative_id: brandCreative.creativeId,
-            creative_files: brandCreative.files,
+            creative_id: submission.creativeId,
+            creative_media_ids: submission.mediaIds,
             creative_mime_type: brandMedia.mime_type,
             creative_duration: brandMedia.duration,
             start_date: req.body.start_date,
@@ -339,7 +338,7 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, RO
         let reservations = [];
         if (brandCaller) {
             const prepared = await prepareReservations({
-                slots: req.body.slots, campaign: submittedData, brandId: brandOwnerId, files: brandCreative.files,
+                slots: req.body.slots, campaign: submittedData, brandId: brandOwnerId, fileCount: submission.mediaIds.length,
             });
             if (prepared.error) {
                 return res.status(400).json({ error: prepared.error, code: prepared.code });

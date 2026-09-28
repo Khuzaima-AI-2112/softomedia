@@ -150,7 +150,7 @@ describeWithAuthEmulator('Multi-file Creatives in consecutive Paid Slots', () =>
         test.each(['0', '4', 'two'])('refuses a Creative of %s files', async files => {
             const response = await availability(await brandAt(BOOKED), files);
             expect(response.status).toBe(400);
-            expect(response.body.error).toBe('files must be 1, 2 or 3');
+            expect(response.body.error).toBe('files must be a whole number from 1 to 3');
         });
     });
 
@@ -162,7 +162,9 @@ describeWithAuthEmulator('Multi-file Creatives in consecutive Paid Slots', () =>
             const response = await book(brand, first, [slot(8, 4), slot(8, 3), slot(9, 7), slot(9, 8)]);
 
             expect(response.status).toBe(201);
-            expect(response.body).toMatchObject({ media_id: first, creative_id: 'crv-pair', creative_files: 2 });
+            expect(response.body).toMatchObject({
+                media_id: first, creative_id: 'crv-pair', creative_media_ids: ['crv-pair-part-1', 'crv-pair-part-2'],
+            });
             expect(await slotReservationRepository.findAll()).toHaveLength(4);
         });
 
@@ -204,7 +206,7 @@ describeWithAuthEmulator('Multi-file Creatives in consecutive Paid Slots', () =>
         });
     });
 
-    test('the Screen plays the parts in order in consecutive Slots, each with its own Proof of Play', async () => {
+    test('the Screen plays the files in order in consecutive Slots, each with its own Proof of Play', async () => {
         const parts = await seedCreative('crv-triple', 'brand-one', 3);
         let brand = await brandAt(BOOKED);
         const booked = await book(brand, parts[0], [slot(8, 11), slot(8, 9), slot(8, 10)]);
@@ -256,6 +258,25 @@ describeWithAuthEmulator('Multi-file Creatives in consecutive Paid Slots', () =>
         expect(proofs.body.map(({ slot_position: position, asset_id: assetId }) => ({ position, assetId }))
             .sort((a, b) => a.position - b.position))
             .toEqual(parts.map((assetId, index) => ({ position: 9 + index, assetId })));
+    });
+
+    test('a run no longer whole plays Fallback Content rather than a file out of order', async () => {
+        const [first] = await seedCreative('crv-pair', 'brand-one', 2);
+        const brand = await brandAt(BOOKED);
+        const booked = await book(brand, first, [slot(8, 0), slot(8, 1), slot(8, 3), slot(8, 4)]);
+        expect(booked.status).toBe(201);
+        const retailer = (await signInAs('retaileradmin', { organizationId: 'retailer-one', fakeClock: true })).headers;
+        await request(app).patch(`/api/campaigns/${booked.body.id}/status`).set(retailer).send({ status: 'approved' });
+        // Only one Slot of the second run is still held.
+        await slotReservationRepository.delete(slotReservationRepository.idFor(slot(8, 3)));
+
+        jest.setSystemTime(GENERATED);
+        const admin = (await signInAs('admin', { fakeClock: true })).headers;
+        const generated = await request(app).post('/api/loops/generate').set(admin)
+            .send({ targetDate: DATE, retailerId: 'retailer-one', storeId: 'store-one' });
+        const eightAm = generated.body.loops.find(loop => loop.hour === 8);
+        expect([0, 1, 4].map(position => eightAm.slots[position].asset_id))
+            .toEqual(['crv-pair-part-1', 'crv-pair-part-2', 'fallback-media']);
     });
 
     test('an unapproved multi-file Creative plays Fallback Content in every Slot of its run', async () => {

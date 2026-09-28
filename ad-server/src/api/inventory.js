@@ -47,7 +47,7 @@ router.get('/stores/:storeId/slots', async (req, res) => {
     }
     const runLength = Number(files);
     if (!/^\d+$/.test(files) || runLength < 1 || runLength > MAXIMUM_CREATIVE_FILES) {
-        return res.status(400).json({ error: 'files must be 1, 2 or 3' });
+        return res.status(400).json({ error: `files must be a whole number from 1 to ${MAXIMUM_CREATIVE_FILES}` });
     }
 
     try {

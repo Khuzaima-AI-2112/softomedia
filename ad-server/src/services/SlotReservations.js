@@ -9,7 +9,7 @@ import StoreRepository from '../repositories/StoreRepository.js';
 import { slotReservationRepository } from '../repositories/SlotReservationRepository.js';
 import { heldReservations } from './ReservationRelease.js';
 import { slotQuote } from './CampaignPricingService.js';
-import { SLOTS_PER_LOOP, slotInventory } from './SlotInventory.js';
+import { SLOTS_PER_LOOP, slotInventory, wholeRuns } from './SlotInventory.js';
 
 export const BOOKING_CUTOFF_TIME = '18:00';
 const BOOKING_CUTOFF_DAYS_BEFORE = 2;
@@ -111,21 +111,14 @@ class ReservationRefused extends Error {
     }
 }
 
-/**
- * Whether a Creative of `files` files can play in these picks: in each hour,
- * taken in position order, they fall into runs of exactly `files` consecutive Slots.
- */
-function formsWholeRuns(picks, files) {
+/** Whether a Creative of `fileCount` files plays in every one of these picks, in whole runs. */
+function formsWholeRuns(picks, fileCount) {
     const byHour = new Map();
     for (const { store_id: storeId, date, hour, position } of picks) {
         const key = `${storeId}_${date}_${hour}`;
         byHour.set(key, [...(byHour.get(key) || []), position]);
     }
-    return [...byHour.values()].every(positions => {
-        positions.sort((a, b) => a - b);
-        return positions.length % files === 0
-            && positions.every((position, index) => index % files === 0 || position === positions[index - 1] + 1);
-    });
+    return [...byHour.values()].every(positions => wholeRuns(positions, fileCount).flat().length === positions.length);
 }
 
 /**
@@ -135,7 +128,7 @@ function formsWholeRuns(picks, files) {
  * its picks in runs of that many consecutive Slots, one run per play.
  * @returns {{reservations: Array}|{error: string, code: string}}
  */
-export async function prepareReservations({ slots, campaign, brandId, files = 1 }) {
+export async function prepareReservations({ slots, campaign, brandId, fileCount = 1 }) {
     try {
         if (!Array.isArray(slots) || slots.length === 0) {
             throw new ReservationRefused('Choose at least one Paid Slot');
@@ -188,8 +181,8 @@ export async function prepareReservations({ slots, campaign, brandId, files = 1 
             const { price } = quoteFor(config, store, date, hour);
             reservations.push({ store_id: storeId, date, hour, position, brand_id: brandId, status: 'held', price });
         }
-        if (!formsWholeRuns(reservations, files)) {
-            throw new ReservationRefused(`This Creative has ${files} files, so pick its Slots in runs of ${files} `
+        if (!formsWholeRuns(reservations, fileCount)) {
+            throw new ReservationRefused(`This Creative has ${fileCount} files, so pick its Slots in runs of ${fileCount} `
                 + 'consecutive Paid Slots in one hour');
         }
         return { reservations };

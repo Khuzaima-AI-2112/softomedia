@@ -286,12 +286,21 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
     // Every pick is checked on its own day, so no day of a repeated Slot is skipped silently.
     // A pick left outside the Campaign by an earlier step is listed too, so it can be dropped.
     const inCampaign = pick => stores.includes(pick.store_id) && dates.includes(pick.date);
-    const pickChecks = selectedSlots.map(pick => ({
-        pick,
-        problem: inCampaign(pick)
-            ? pickProblem(days[dayKey(pick.store_id, pick.date)], pick)
-            : 'is outside the Campaign’s Stores or dates',
-    }));
+    // As the server reads picks: each stretch of consecutive picks in an hour must split into whole runs.
+    const inWholeRun = pick => {
+        let first = pick.position;
+        let last = pick.position;
+        while (isPicked({ ...pick, position: first - 1 })) first--;
+        while (isPicked({ ...pick, position: last + 1 })) last++;
+        return (last - first + 1) % files === 0;
+    };
+    const checkPick = pick => {
+        if (!inCampaign(pick)) return 'is outside the Campaign’s Stores or dates';
+        const problem = pickProblem(days[dayKey(pick.store_id, pick.date)], pick);
+        if (problem !== null) return problem;
+        return inWholeRun(pick) ? null : `is not in a whole run of ${files} consecutive Slots`;
+    };
+    const pickChecks = selectedSlots.map(pick => ({ pick, problem: checkPick(pick) }));
     const problems = pickChecks.filter(({ problem }) => problem)
         .sort((left, right) => left.pick.date.localeCompare(right.pick.date)
             || left.pick.hour - right.pick.hour || left.pick.position - right.pick.position);

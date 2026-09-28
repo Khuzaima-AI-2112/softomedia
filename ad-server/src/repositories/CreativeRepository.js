@@ -62,6 +62,15 @@ export class CreativeRepository extends BaseRepository {
     async findForAsset(asset) {
         return asset?.creative_id ? this.findById(asset.creative_id) : null;
     }
+
+    /**
+     * The Creative a stored file belongs to, and the ids of every file that
+     * plays with it, in play order: the Creative's, or just the file's own.
+     */
+    async withFilesFor(asset) {
+        const creative = await this.findForAsset(asset);
+        return { creative, mediaIds: creative?.media_ids?.length ? creative.media_ids : [asset.id] };
+    }
 }
 
 export const creativeRepository = new CreativeRepository();

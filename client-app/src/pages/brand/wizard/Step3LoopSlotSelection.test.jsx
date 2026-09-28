@@ -538,4 +538,19 @@ describe('Brand wizard slot grid for a multi-file Creative', () => {
             creativeFiles: 3, selectedSlots: [], creativeAssetId: null, creativeUrl: '',
         });
     });
+    it("lists picks that no longer make whole runs, as after repeating different runs onto every day", async () => {
+        // [10, 11] on Jan 7 and [11, 12] on Jan 8, repeated onto both days, give Slots 10–12 on each.
+        const merged = ["2030-01-07", "2030-01-08"].flatMap(date => [9, 10, 11].map(position => picked(8, position, 15.75, { date })));
+        render(<Wizard initial={{ creativeFiles: 2, repeatDaily: true, dateRange: { start: "2030-01-07", end: "2030-01-08" }, selectedSlots: merged }} />);
+
+        const listed = await screen.findByRole("region", { name: "Days with unavailable Slots" });
+        expect(within(listed).getAllByRole("listitem")[0].textContent)
+            .toContain("Slot 10 at 8:00 AM, Downtown Café, is not in a whole run of 2 consecutive Slots.");
+        expect(screen.getByTestId("step-3-next-btn").disabled).toBe(true);
+
+        // Dropping one Slot drops its run; the pair left is whole again.
+        fireEvent.click(within(listed).getAllByRole("button", { name: /^Drop Slot 12/ })[0]);
+        expect(Wizard.latest.selectedSlots.filter(pick => pick.date === "2030-01-07").map(pick => pick.position)
+            .sort((left, right) => left - right)).toEqual([9, 10]);
+    });
 });
