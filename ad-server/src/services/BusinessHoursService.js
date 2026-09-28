@@ -98,8 +98,15 @@ class BusinessHoursServiceClass {
         return SpecialHoursRepository.getAllStoreSpecialHours(storeId);
     }
 
-    /** Throws when a day of a weekly schedule is open without a valid time range. */
+    /**
+     * Throws when a day of a weekly schedule is listed twice, or is open without
+     * a valid time range. A repeated day would be saved as its last entry.
+     */
     validateWeeklyHours(hoursArray) {
+        const days = hoursArray.map(h => parseInt(h.day_of_week));
+        if (new Set(days).size !== days.length) {
+            throw new Error('Each day of the week may be listed only once');
+        }
         hoursArray.forEach(h => this.validateHours(h));
     }
 

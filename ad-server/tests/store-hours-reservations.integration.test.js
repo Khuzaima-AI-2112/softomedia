@@ -141,6 +141,29 @@ describeWithAuthEmulator('Store-hours changes that would drop Reservations', () 
             expect(response.status).toBe(200);
         });
 
+        test('Reservations in hours already past today do not block a change to today', async () => {
+            // 2030-01-07 15:00 in Toronto; its 09:00 Reservation has played.
+            jest.setSystemTime(new Date('2030-01-07T20:00:00.000Z'));
+            ({ headers: admin } = await signInAs('admin', { fakeClock: true }));
+            await reserve(9, 1);
+
+            const response = await saveWeeklyHours(mondayHours('10:00', '22:00'));
+
+            expect(response.status).toBe(200);
+        });
+
+        test('a day listed twice is refused as invalid, so the check cannot miss the saved one', async () => {
+            await reserve(21, 0);
+
+            const response = await saveWeeklyHours([
+                ...mondayHours('08:00', '22:00'),
+                ...mondayHours('08:00', '20:00'),
+            ]);
+
+            expect(response.status).toBe(400);
+            expect(await mondayCloseTime()).toBe('22:00');
+        });
+
         test('invalid hours are still refused as invalid', async () => {
             await reserve(21, 0);
 
