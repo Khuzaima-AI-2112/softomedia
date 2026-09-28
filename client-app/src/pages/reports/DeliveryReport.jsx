@@ -3,10 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import apiService from '../../services/ApiService';
 import { PERMISSIONS } from '../../constants/permissions';
-import { DAYPART_LABELS, DAYPART_NAMES, formatHour } from '../../constants/dayparts';
-
-const OUTSIDE_DAYPARTS = 'outside_dayparts';
-const COLUMNS = [...DAYPART_NAMES, OUTSIDE_DAYPARTS];
+import { DAYPART_LABELS, formatHour } from '../../constants/dayparts';
 
 const cellClass = 'px-4 py-3 text-right tabular-nums';
 
@@ -31,9 +28,10 @@ export default function DeliveryReport() {
 
     if (user && !canView) return <Navigate to="/dashboard" replace />;
 
-    const heading = name => {
-        if (name === OUTSIDE_DAYPARTS) return 'Other hours';
+    // The server's columns are the Dayparts, then the hours no Daypart covers.
+    const columnHeading = name => {
         const range = report.dayparts[name];
+        if (!range) return 'Other hours';
         return (
             <>
                 {DAYPART_LABELS[name]}{' '}
@@ -67,8 +65,8 @@ export default function DeliveryReport() {
                         <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                             <tr>
                                 <th className="px-4 py-3 text-left font-semibold">Campaign</th>
-                                {COLUMNS.map(name => (
-                                    <th key={name} className="px-4 py-3 text-right font-semibold">{heading(name)}</th>
+                                {report.columns.map(name => (
+                                    <th key={name} className="px-4 py-3 text-right font-semibold">{columnHeading(name)}</th>
                                 ))}
                                 <th className="px-4 py-3 text-right font-semibold">Total</th>
                             </tr>
@@ -78,11 +76,11 @@ export default function DeliveryReport() {
                                 <tr key={row.campaign_id} data-testid={`delivery-row-${row.campaign_id}`}>
                                     <td className="px-4 py-3 text-slate-900 dark:text-white">
                                         {row.campaign_name}
-                                        {row.is_promotion && (
+                                        {row.is_retailer_promotion && (
                                             <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">Promotion</span>
                                         )}
                                     </td>
-                                    {COLUMNS.map(name => <td key={name} className={cellClass}>{row.dayparts[name]}</td>)}
+                                    {report.columns.map(name => <td key={name} className={cellClass}>{row.dayparts[name]}</td>)}
                                     <td className={`${cellClass} font-semibold`}>{row.total}</td>
                                 </tr>
                             ))}
@@ -90,7 +88,7 @@ export default function DeliveryReport() {
                         <tfoot className="border-t border-slate-200 dark:border-slate-700 font-semibold">
                             <tr data-testid="delivery-row-total">
                                 <td className="px-4 py-3">Total</td>
-                                {COLUMNS.map(name => <td key={name} className={cellClass}>{report.totals[name]}</td>)}
+                                {report.columns.map(name => <td key={name} className={cellClass}>{report.totals[name]}</td>)}
                                 <td className={cellClass}>{report.totals.total}</td>
                             </tr>
                         </tfoot>

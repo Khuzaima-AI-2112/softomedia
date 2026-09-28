@@ -21,11 +21,11 @@ const REPORT = {
     columns: ['breakfast', 'lunch', 'dinner', 'outside_dayparts'],
     rows: [
         {
-            campaign_id: 'muffin', campaign_name: 'Breakfast muffin', is_promotion: true,
+            campaign_id: 'muffin', campaign_name: 'Breakfast muffin', is_retailer_promotion: true,
             dayparts: { breakfast: 3, lunch: 0, dinner: 0, outside_dayparts: 0 }, total: 3,
         },
         {
-            campaign_id: 'cola', campaign_name: 'Cola summer', is_promotion: false,
+            campaign_id: 'cola', campaign_name: 'Cola summer', is_retailer_promotion: false,
             dayparts: { breakfast: 2, lunch: 1, dinner: 4, outside_dayparts: 1 }, total: 8,
         },
     ],

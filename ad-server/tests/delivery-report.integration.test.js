@@ -13,6 +13,7 @@ const {
     impressionRepository,
     loopRepository,
     playbackObservationRepository,
+    StoreRepository,
 } = await import('../src/repositories/index.js');
 const { describeWithAuthEmulator, signInAs } = await import('./fixtures/emulator-sign-in.js');
 const app = createTestApp(apiRouter, '/api');
@@ -25,6 +26,8 @@ const EMPTY = { breakfast: 0, lunch: 0, dinner: 0, outside_dayparts: 0 };
 // Retailer One's Store plays Brand One's Campaign and its own promotion;
 // Retailer Two's Store plays Brand One's and Brand Two's Campaigns.
 async function seed() {
+    await StoreRepository.create('store-one', { name: 'Retailer One Downtown', retailer_id: 'retailer-one' });
+    await StoreRepository.create('store-two', { name: 'Retailer Two Uptown', retailer_id: 'retailer-two' });
     await campaignRepository.create('brand-one-cola', { name: 'Cola summer', brand_id: 'brand-one', budget: 900 });
     await campaignRepository.create('brand-two-chips', { name: 'Chips launch', advertiser_id: 'brand-two' });
     await campaignRepository.create('retailer-one-muffin', {

@@ -135,7 +135,7 @@
 
 | Method | Path | Request body | Auth guard | Source file | Notes |
 |---|---|---|---|---|---|
-| GET | `/api/delivery-report` | — | `authenticate` + `delivery_report.view_network` or `delivery_report.view_own` | `deliveryReport.js` | Proof of Play per Campaign or Retailer promotion and per Daypart (#41): `{ dayparts, columns, rows: [{ campaign_id, campaign_name, is_promotion, dayparts: { breakfast, lunch, dinner, outside_dayparts }, total }], totals }`. A Proof of Play counts in the Daypart of its Hourly Loop's hour; hours no Daypart covers count as `outside_dayparts`. Fallback Content is never counted. Admin and Super Administrator see the network, a Brand its own Campaigns, a Retailer Administrator its own Stores; `403` for a Technical Operator or an account with no organization. |
+| GET | `/api/delivery-report` | — | `authenticate` + `delivery_report.view_network` or `delivery_report.view_own` | `deliveryReport.js` | Proof of Play per Campaign or Retailer promotion and per Daypart (#41): `{ dayparts, columns, rows: [{ campaign_id, campaign_name, is_retailer_promotion, dayparts: { breakfast, lunch, dinner, outside_dayparts }, total }], totals }`. A Proof of Play counts in the Daypart of its Hourly Loop's hour; hours no Daypart covers count as `outside_dayparts`. Fallback Content is never counted. Admin and Super Administrator see the network, a Brand its own Campaigns, a Retailer Administrator its own Stores, taken from each Hourly Loop's Store record; `403` for a Technical Operator or an account with no organization. |
 
 ---
 

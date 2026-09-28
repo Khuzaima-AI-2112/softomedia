@@ -8,6 +8,10 @@ const loops = [
     { id: 'north-16', retailer_id: 'freshmart', store_id: 'north', date: '2030-01-16', hour: 16 },
     { id: 'south-18', retailer_id: 'beanery', store_id: 'south', date: '2030-01-16', hour: 18 },
 ];
+const stores = [
+    { id: 'north', retailer_id: 'freshmart' },
+    { id: 'south', retailer_id: 'beanery' },
+];
 const campaigns = [
     { id: 'cola', name: 'Cola summer', brand_id: 'fizz' },
     { id: 'chips', name: 'Chips launch', advertiser_id: 'crunch' },
@@ -33,7 +37,7 @@ const proofs = [
 ];
 
 const report = (scope, extra = {}) => buildDeliveryReport({
-    proofs, loops, campaigns, dayparts: DEFAULT_DAYPARTS, scope, ...extra,
+    proofs, loops, stores, campaigns, dayparts: DEFAULT_DAYPARTS, scope, ...extra,
 });
 const counts = row => ({ campaign_id: row.campaign_id, ...row.dayparts, total: row.total });
 
@@ -52,11 +56,11 @@ describe('Daypart delivery report', () => {
     test('names each Campaign and tells a Retailer promotion from paid advertising', () => {
         const { rows } = report({ kind: 'network' });
 
-        expect(rows.map(({ campaign_id, campaign_name, is_promotion }) => ({ campaign_id, campaign_name, is_promotion })))
+        expect(rows.map(({ campaign_id, campaign_name, is_retailer_promotion }) => ({ campaign_id, campaign_name, is_retailer_promotion })))
             .toEqual([
-                { campaign_id: 'muffin', campaign_name: 'Breakfast muffin', is_promotion: true },
-                { campaign_id: 'chips', campaign_name: 'Chips launch', is_promotion: false },
-                { campaign_id: 'cola', campaign_name: 'Cola summer', is_promotion: false },
+                { campaign_id: 'muffin', campaign_name: 'Breakfast muffin', is_retailer_promotion: true },
+                { campaign_id: 'chips', campaign_name: 'Chips launch', is_retailer_promotion: false },
+                { campaign_id: 'cola', campaign_name: 'Cola summer', is_retailer_promotion: false },
             ]);
     });
 
@@ -95,6 +99,15 @@ describe('Daypart delivery report', () => {
             { campaign_id: 'cola', breakfast: 2, lunch: 1, dinner: 0, outside_dayparts: 1, total: 4 },
         ]);
         expect(report({ kind: 'retailer', retailerId: 'beanery' }).totals.total).toBe(2);
+    });
+
+    test('takes a Store\'s Retailer from the Store, not from the Hourly Loop', () => {
+        // A Loop wrongly stamped with FreshMart still plays in the Beanery's Store.
+        const misStamped = { id: 'south-09', retailer_id: 'freshmart', store_id: 'south', date: '2030-01-16', hour: 9 };
+        const extra = { loops: [...loops, misStamped], proofs: [...proofs, proof('chips', 'south-09')] };
+
+        expect(report({ kind: 'retailer', retailerId: 'freshmart' }, extra).totals.total).toBe(5);
+        expect(report({ kind: 'retailer', retailerId: 'beanery' }, extra).totals.total).toBe(3);
     });
 
     test('shows nothing to a scope it does not recognise', () => {

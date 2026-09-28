@@ -8,14 +8,17 @@ import {
     daypartRepository,
     impressionRepository,
     loopRepository,
+    StoreRepository,
 } from '../repositories/index.js';
 import { PERMISSIONS, normalizeRole, userHasPermission } from '../middleware/requireRole.js';
-import { retailerIdFor } from '../middleware/storeManagement.js';
 import { ROLES, brandIdFor } from '../constants/roles.js';
 import { buildDeliveryReport } from '../services/DeliveryReport.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
+
+// As campaigns.js reads it: the Retailer a Retailer Administrator acts for.
+const retailerIdFor = user => user?.organization_id || user?.linked_entity_id || null;
 
 /** Whose delivery this user may see, or null. */
 function reportScopeFor(user) {
@@ -29,21 +32,22 @@ function reportScopeFor(user) {
 
 /**
  * GET /api/delivery-report
- * { dayparts, columns, rows: [{ campaign_id, campaign_name, is_promotion, dayparts, total }], totals }
+ * { dayparts, columns, rows: [{ campaign_id, campaign_name, is_retailer_promotion, dayparts, total }], totals }
  */
 router.get('/', async (req, res) => {
     const scope = reportScopeFor(req.user);
     if (!scope) return res.status(403).json({ error: 'Access denied' });
 
     try {
-        const [proofs, loops, campaigns, dayparts] = await Promise.all([
+        const [proofs, loops, stores, campaigns, dayparts] = await Promise.all([
             impressionRepository.findAll({ where: [['playback_kind', '==', 'campaign_delivery']] }),
             loopRepository.findAll(),
+            StoreRepository.findAll(),
             campaignRepository.findAll(),
             daypartRepository.get(),
         ]);
         return res.json({
-            ...buildDeliveryReport({ proofs, loops, campaigns, dayparts, scope }),
+            ...buildDeliveryReport({ proofs, loops, stores, campaigns, dayparts, scope }),
             generated_at: new Date().toISOString(),
         });
     } catch (error) {
