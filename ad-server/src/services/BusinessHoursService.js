@@ -36,13 +36,8 @@ class BusinessHoursServiceClass {
         }
 
         // 2. Fallback to default weekly hours
-        // Use a more robust way to get local day of week from YYYY-MM-DD
-        const [year, month, day] = dateString.split('-').map(Number);
-        const date = new Date(year, month - 1, day);
-        const dayOfWeek = date.getDay(); // 0-6 (Sun-Sat)
-
         const defaults = await BusinessHoursRepository.getDefaultHours(storeId);
-        const dayDefault = defaults.find(d => parseInt(d.day_of_week) === dayOfWeek);
+        const dayDefault = this.weeklyHoursOn(defaults, dateString);
 
         if (!dayDefault) {
             return {
@@ -63,6 +58,17 @@ class BusinessHoursServiceClass {
     }
 
     /**
+     * The entry of a weekly schedule that applies to a date, if it has one.
+     * @param {Array} weeklyHours
+     * @param {string} dateString - YYYY-MM-DD
+     */
+    weeklyHoursOn(weeklyHours, dateString) {
+        const [year, month, day] = dateString.split('-').map(Number);
+        const dayOfWeek = new Date(year, month - 1, day).getDay(); // 0-6 (Sun-Sat)
+        return weeklyHours.find(d => parseInt(d.day_of_week) === dayOfWeek);
+    }
+
+    /**
      * Get weekly schedule
      */
     async getWeeklyHours(storeId) {
@@ -73,7 +79,7 @@ class BusinessHoursServiceClass {
      * Update weekly schedule
      */
     async updateWeeklyHours(storeId, weeklyHours) {
-        this._validateHoursBatch(weeklyHours);
+        this.validateWeeklyHours(weeklyHours);
         return BusinessHoursRepository.updateDefaultHours(storeId, weeklyHours);
     }
 
@@ -81,9 +87,7 @@ class BusinessHoursServiceClass {
      * Update special hours
      */
     async updateSpecialHours(storeId, date, hoursData) {
-        if (!hoursData.is_closed) {
-            this._validateTimeRange(hoursData.open_time, hoursData.close_time);
-        }
+        this.validateHours(hoursData);
         return SpecialHoursRepository.updateSpecialHours(storeId, date, hoursData);
     }
 
@@ -94,12 +98,16 @@ class BusinessHoursServiceClass {
         return SpecialHoursRepository.getAllStoreSpecialHours(storeId);
     }
 
-    _validateHoursBatch(hoursArray) {
-        hoursArray.forEach(h => {
-            if (!h.is_closed) {
-                this._validateTimeRange(h.open_time, h.close_time);
-            }
-        });
+    /** Throws when a day of a weekly schedule is open without a valid time range. */
+    validateWeeklyHours(hoursArray) {
+        hoursArray.forEach(h => this.validateHours(h));
+    }
+
+    /** Throws when the hours are open without a valid time range. */
+    validateHours(hoursData) {
+        if (!hoursData.is_closed) {
+            this._validateTimeRange(hoursData.open_time, hoursData.close_time);
+        }
     }
 
     _validateTimeRange(open, close) {

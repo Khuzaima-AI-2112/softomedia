@@ -1,7 +1,12 @@
 import express from 'express';
 import StoreRepository from '../repositories/StoreRepository.js';
 import PricingRepository from '../repositories/PricingRepository.js';
+import { notificationRepository } from '../repositories/NotificationRepository.js';
 import { BusinessHoursService } from '../services/BusinessHoursService.js';
+import {
+    reservationsDroppedBySpecialHours,
+    reservationsDroppedByWeeklyHours,
+} from '../services/StoreHoursChange.js';
 import { authenticate } from '../middleware/auth.js';
 import { PERMISSIONS, userHasPermission } from '../middleware/requireRole.js';
 import {
@@ -175,11 +180,37 @@ router.get('/:id/weekly-hours', async (req, res) => {
     }
 });
 
+const slotLabel = ({ date, hour, position }) => `${date} ${String(hour).padStart(2, '0')}:00, Slot ${position + 1}`;
+
+/**
+ * Refuses an opening-hours change that would drop Reservations, listing them,
+ * and notifies the user who tried it so the refusal is not lost with the page.
+ */
+async function refuseDroppingReservations(req, res, store, reservations) {
+    const error = `This change would remove hours holding ${reservations.length} Reservation`
+        + `${reservations.length === 1 ? '' : 's'} at ${store.name}. `
+        + 'Resolve them before changing the hours.';
+    try {
+        await notificationRepository.notify(req.user.id || req.user.uid, {
+            title: `Opening hours change blocked at ${store.name}`,
+            message: `${error} Affected: ${reservations.map(slotLabel).join('; ')}.`,
+            type: 'warning',
+        });
+    } catch (notifyError) {
+        console.error('Failed to notify of a blocked hours change:', notifyError);
+    }
+    return res.status(409).json({ error, code: 'HOURS_HOLD_RESERVATIONS', reservations });
+}
+
 router.put('/:id/weekly-hours', async (req, res) => {
     try {
         const store = await findManagedStore(req, res, req.params.id);
         if (!store) return;
-        return res.json(await BusinessHoursService.updateWeeklyHours(store.id, req.body.weekly_hours));
+        const weeklyHours = req.body.weekly_hours;
+        BusinessHoursService.validateWeeklyHours(weeklyHours);
+        const dropped = await reservationsDroppedByWeeklyHours(store, weeklyHours);
+        if (dropped.length > 0) return refuseDroppingReservations(req, res, store, dropped);
+        return res.json(await BusinessHoursService.updateWeeklyHours(store.id, weeklyHours));
     } catch (error) {
         return res.status(400).json({ error: error.message });
     }
@@ -191,6 +222,9 @@ router.put('/:id/special-hours', async (req, res) => {
         if (!store) return;
         const { date, ...hoursData } = req.body;
         if (!date) return res.status(400).json({ error: 'Date is required' });
+        BusinessHoursService.validateHours(hoursData);
+        const dropped = await reservationsDroppedBySpecialHours(store, date, hoursData);
+        if (dropped.length > 0) return refuseDroppingReservations(req, res, store, dropped);
         return res.json(await BusinessHoursService.updateSpecialHours(store.id, date, hoursData));
     } catch (error) {
         return res.status(400).json({ error: error.message });

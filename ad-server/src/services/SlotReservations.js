@@ -20,7 +20,7 @@ export const isCalendarDate = value => {
 };
 
 /** The Store-local date and time now, as YYYY-MM-DD and HH:mm. */
-function storeLocalNow(now, timeZone) {
+export function storeLocalNow(now, timeZone) {
     const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
         timeZone,
         hourCycle: 'h23',

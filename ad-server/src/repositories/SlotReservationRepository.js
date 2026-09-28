@@ -32,6 +32,15 @@ export class SlotReservationRepository extends BaseRepository {
     }
 
     /**
+     * A Store's held Reservations for this date and later. The date is compared
+     * here, not queried: equality filters alone need no composite index.
+     */
+    async findHeldForStoreFrom(storeId, fromDate) {
+        const held = await this.findAll({ where: [['store_id', '==', storeId], ['status', '==', 'held']] });
+        return held.filter(reservation => reservation.date >= fromDate);
+    }
+
+    /**
      * Creates a Campaign and a Reservation for each of its Slots, all or none.
      * Throws SlotTakenError naming the Slots someone else already holds.
      * @param {object} campaignRepository - Where the Campaign is written

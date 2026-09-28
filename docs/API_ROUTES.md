@@ -110,6 +110,15 @@
 
 ---
 
+## Store hours (`ad-server/src/api/stores.js`)
+
+| Method | Path | Request body | Auth guard | Source file | Notes |
+|---|---|---|---|---|---|
+| PUT | `/api/stores/:id/weekly-hours` | `{ weekly_hours: [{ day_of_week, open_time, close_time, is_closed }] }` | `authenticate` + Store management (Admin, Super Administrator, or the Store's Retailer Administrator) | `stores.js` | Saves only the days sent. `400 { error }` for an open day without a valid time range. `409 { error, code: 'HOURS_HOLD_RESERVATIONS', reservations: [{ store_id, date, hour, position, campaign_id }] }` when the change would drop a held Reservation from today on (#42): its hour closes, or the day opens at another time and its position is no longer Paid. Dates with Special Hours keep them and are not affected. A refusal also sends the caller an in-app `warning` notification. |
+| PUT | `/api/stores/:id/special-hours` | `{ date, open_time, close_time, is_closed, reason? }` | as above | `stores.js` | Saves one date's Special Hours. Same `400` and `409` as weekly hours, for that date's Reservations. |
+
+---
+
 ## Pricing (`ad-server/src/api/pricing.js`)
 
 > S14 GUARDRAIL-7 debt cleared. S15-1 hardening applied.

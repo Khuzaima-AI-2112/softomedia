@@ -19,3 +19,4 @@ export * from './SlotReservationRepository.js';
 export * from './ScheduleOverrideRepository.js';
 export * from './CreativeRepository.js';
 export * from './DaypartRepository.js';
+export * from './NotificationRepository.js';
