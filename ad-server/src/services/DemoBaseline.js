@@ -1,8 +1,20 @@
 import { CREATIVE_STATUS } from '../constants/creatives.js';
+import { DEFAULT_PRICING } from '../repositories/PricingRepository.js';
+import { LOOP_STATUS } from '../repositories/LoopRepository.js';
+import { slotReservationRepository } from '../repositories/SlotReservationRepository.js';
+import { slotQuote } from './CampaignPricingService.js';
+import { DEFAULT_DAYPARTS } from './Dayparts.js';
+import { loopGenerationService } from './LoopGenerationService.js';
+import { allocatedCategory, firstPositionOfHour, SLOTS_PER_LOOP } from './SlotInventory.js';
+import { storeLocalNow } from './SlotReservations.js';
 
-export const DEMO_RESET_SCOPE = 'phase-1-demo';
-export const DEMO_RESET_SCOPE_FIELD = 'demo_reset_scope';
 export const DEMO_STORAGE_PREFIX = 'phase-1-demo/';
+
+/**
+ * Every collection the app keeps business records in. The demo project holds
+ * nothing else, so demo reset empties all of them, whoever wrote the records.
+ * User profiles are kept, with the demo's Firebase accounts.
+ */
 export const DEMO_BUSINESS_COLLECTIONS = Object.freeze([
     'ads',
     'advertisers',
@@ -23,8 +35,10 @@ export const DEMO_BUSINESS_COLLECTIONS = Object.freeze([
     'platform_audits',
     'proof_of_play',
     'retailers',
+    'schedule_overrides',
     'scheduling_audits',
     'screens',
+    'slot_reservations',
     'store_default_hours',
     'store_special_hours',
     'stores',
@@ -50,7 +64,6 @@ function record(collection, id, data, resetAtIso) {
         data: {
             id,
             ...data,
-            [DEMO_RESET_SCOPE_FIELD]: DEMO_RESET_SCOPE,
             created_at: resetAtIso,
             updated_at: resetAtIso,
         },
@@ -81,12 +94,76 @@ function mediaFixture({ id, category, ownerType, ownerId, creativeId, bucketName
                 contentType: 'image/png',
                 cacheControl: 'private, max-age=300',
                 metadata: {
-                    demoResetScope: DEMO_RESET_SCOPE,
                     mediaCategory: category,
                 },
             },
         },
     };
+}
+
+function calendarDateAfter(date, days) {
+    const next = new Date(`${date}T00:00:00Z`);
+    next.setUTCDate(next.getUTCDate() + days);
+    return next.toISOString().slice(0, 10);
+}
+
+/** The Paid positions of an hour at a Store whose broadcast day starts at `openingHour`. */
+function paidPositions(hour, openingHour) {
+    return Array.from({ length: SLOTS_PER_LOOP }, (_, position) => position)
+        .filter(position => allocatedCategory(firstPositionOfHour(hour, openingHour) + position) === 'paid');
+}
+
+/** A Brand Campaign's held Reservations, each priced as the Brand would have booked it. */
+function reservationRecords({ campaign, store, slots, resetAtIso }) {
+    return slots.map(({ date, hour, position }) => {
+        const slot = { store_id: store.id, date, hour, position };
+        const { price } = slotQuote({
+            config: DEFAULT_PRICING,
+            retailerId: store.retailer_id,
+            storeTier: store.cpm_traffic_tier,
+            date,
+            hour,
+        });
+        return record('slot_reservations', slotReservationRepository.idFor(slot), {
+            ...slot,
+            brand_id: campaign.advertiser_id,
+            campaign_id: campaign.id,
+            status: 'held',
+            price,
+        }, resetAtIso);
+    });
+}
+
+/**
+ * A Store's schedule for one date, already approved by its Retailer: the
+ * loops that loop generation would make for these Reservations and content.
+ */
+function approvedSchedule({ store, date, hours, reserved, content, fallback, resetAtIso }) {
+    const loops = hours.map(hour => record('loops', `${date}_${hour}_${store.id}`, {
+        date,
+        hour,
+        retailer_id: store.retailer_id,
+        store_id: store.id,
+        status: LOOP_STATUS.APPROVED,
+        version: 1,
+        generated_at: resetAtIso,
+        approved_at: resetAtIso,
+        approved_by: null,
+        slots: loopGenerationService.buildSlots(content, {
+            sequenceStart: firstPositionOfHour(hour, hours[0]),
+            fallback,
+            reserved: reserved.get(hour) || new Map(),
+        }),
+    }, resetAtIso));
+    const dailySchedule = record('daily_schedules', `${store.id}_${date}`, {
+        store_id: store.id,
+        retailer_id: store.retailer_id,
+        date,
+        is_closed: false,
+        operating_hours: hours,
+        loop_ids: loops.map(loop => loop.id),
+    }, resetAtIso);
+    return [...loops, dailySchedule];
 }
 
 export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
@@ -104,6 +181,114 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
         mediaFixture({ id: 'demo-media-internal', category: 'internal', ownerType: 'platform', ownerId: null, bucketName, resetAtIso }),
         mediaFixture({ id: 'demo-media-fallback', category: 'fallback', ownerType: 'platform', ownerId: null, bucketName, resetAtIso }),
     ];
+    const [paidMedia, , internalMedia, fallbackMedia] = mediaFixtures.map(fixture => fixture.document.data);
+
+    const northStore = record('stores', 'demo-store-mtl-north', {
+        name: 'FreshMart North Synthetic Store',
+        retailer_id: 'demo-retailer-freshmart',
+        city: 'Montréal',
+        country: 'CA',
+        address: '100 Demo Way',
+        time_zone: 'America/Toronto',
+        location_ids: ['demo-location-mtl-entrance', 'demo-location-mtl-checkout'],
+        status: 'active',
+    }, resetAtIso);
+    const phoenixStore = record('stores', 'demo-store-phoenix', {
+        name: 'HarborCart Desert Synthetic Store',
+        retailer_id: 'demo-retailer-secondary',
+        city: 'Phoenix',
+        country: 'US',
+        address: '200 Example Avenue',
+        time_zone: 'America/Phoenix',
+        location_ids: ['demo-location-phoenix-entrance'],
+        status: 'active',
+    }, resetAtIso);
+    // Open around the clock, so its schedule for today plays whenever the demo runs.
+    const allDayStore = record('stores', 'demo-store-phoenix-allday', {
+        name: 'HarborCart All-Day Synthetic Store',
+        retailer_id: 'demo-retailer-secondary',
+        city: 'Phoenix',
+        country: 'US',
+        address: '300 Example Avenue',
+        time_zone: 'America/Phoenix',
+        location_ids: ['demo-location-phoenix-allday-entrance'],
+        status: 'active',
+    }, resetAtIso);
+
+    // "Today" is the all-day Store's own date, which is the date its Screen plays.
+    const today = storeLocalNow(resetAt, allDayStore.data.time_zone).date;
+    const allDayHours = Array.from({ length: 24 }, (_, hour) => hour);
+
+    const approvedCampaign = record('campaigns', 'demo-secondary-campaign-1', {
+        name: 'Northstar Pantry Synthetic Campaign',
+        advertiser_id: 'demo-advertiser-secondary',
+        retailer_id: 'demo-retailer-secondary',
+        media_id: paidMedia.id,
+        inventory_selection: [phoenixStore, allDayStore].map(store => ({
+            retailer_id: store.data.retailer_id,
+            store_id: store.id,
+        })),
+        status: 'approved',
+        visibility: 'private',
+        start_date: today,
+        end_date: calendarDateAfter(today, 13),
+        budget: 2400,
+    }, resetAtIso);
+    const pendingCampaign = record('campaigns', 'demo-secondary-campaign-2', {
+        name: 'Northstar Home Synthetic Campaign',
+        advertiser_id: 'demo-advertiser-secondary',
+        retailer_id: 'demo-retailer-secondary',
+        media_id: paidMedia.id,
+        inventory_selection: [{ retailer_id: phoenixStore.data.retailer_id, store_id: phoenixStore.id }],
+        status: 'pending_approval',
+        visibility: 'private',
+        start_date: isoDateDaysAfter(resetAt, 7),
+        end_date: isoDateDaysAfter(resetAt, 21),
+        budget: 1800,
+    }, resetAtIso);
+
+    // The approved Campaign holds the first Paid Slot of every hour at the
+    // all-day Store, today and tomorrow; the pending one two Slots at lunch.
+    const approvedReservations = reservationRecords({
+        campaign: approvedCampaign.data,
+        store: allDayStore.data,
+        slots: [today, calendarDateAfter(today, 1)].flatMap(date => allDayHours.map(hour => ({
+            date, hour, position: paidPositions(hour, 0)[0],
+        }))),
+        resetAtIso,
+    });
+    const pendingReservations = reservationRecords({
+        campaign: pendingCampaign.data,
+        store: phoenixStore.data,
+        slots: paidPositions(12, 8).slice(0, 2).map(position => ({
+            date: pendingCampaign.data.start_date, hour: 12, position,
+        })),
+        resetAtIso,
+    });
+
+    const todaysReservedCreative = new Map(approvedReservations
+        .filter(({ data }) => data.date === today)
+        .map(({ data }) => [data.hour, new Map([[data.position, {
+            type: 'paid',
+            campaign_id: approvedCampaign.id,
+            asset_id: paidMedia.id,
+            asset_name: paidMedia.title,
+        }]])]));
+    const todaysSchedule = approvedSchedule({
+        store: allDayStore.data,
+        date: today,
+        hours: allDayHours,
+        reserved: todaysReservedCreative,
+        content: [{
+            type: 'internal',
+            asset_id: internalMedia.id,
+            asset_name: internalMedia.title,
+            campaign_id: null,
+            content_kind: 'media',
+        }],
+        fallback: fallbackMedia,
+        resetAtIso,
+    });
 
     const documents = [
         record('advertisers', 'demo-advertiser-bonvie', {
@@ -132,36 +317,21 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
             contract_start: isoDateDaysAfter(resetAt, -30),
             status: 'active',
         }, resetAtIso),
-        record('stores', 'demo-store-mtl-north', {
-            name: 'FreshMart North Synthetic Store',
-            retailer_id: 'demo-retailer-freshmart',
-            city: 'Montréal',
-            country: 'CA',
-            address: '100 Demo Way',
-            time_zone: 'America/Toronto',
-            location_ids: ['demo-location-mtl-entrance', 'demo-location-mtl-checkout'],
-            status: 'active',
-        }, resetAtIso),
-        record('stores', 'demo-store-phoenix', {
-            name: 'HarborCart Desert Synthetic Store',
-            retailer_id: 'demo-retailer-secondary',
-            city: 'Phoenix',
-            country: 'US',
-            address: '200 Example Avenue',
-            time_zone: 'America/Phoenix',
-            location_ids: ['demo-location-phoenix-entrance'],
-            status: 'active',
-        }, resetAtIso),
+        northStore,
+        phoenixStore,
+        allDayStore,
         // Standard hours every day, as a Store created through the API receives;
         // without them a Store is closed and no loops are generated for it.
-        ...['demo-store-mtl-north', 'demo-store-phoenix'].flatMap(storeId =>
-            Array.from({ length: 7 }, (_, dayOfWeek) => record('store_default_hours', `def_${storeId}_${dayOfWeek}`, {
-                store_id: storeId,
-                day_of_week: dayOfWeek,
-                open_time: '08:00',
-                close_time: '22:00',
-                is_closed: false,
-            }, resetAtIso))),
+        // A close of 00:00 is midnight at the end of the day.
+        ...[[northStore, '08:00', '22:00'], [phoenixStore, '08:00', '22:00'], [allDayStore, '00:00', '00:00']]
+            .flatMap(([store, openTime, closeTime]) => Array.from({ length: 7 }, (_, dayOfWeek) =>
+                record('store_default_hours', `def_${store.id}_${dayOfWeek}`, {
+                    store_id: store.id,
+                    day_of_week: dayOfWeek,
+                    open_time: openTime,
+                    close_time: closeTime,
+                    is_closed: false,
+                }, resetAtIso))),
         record('locations', 'demo-location-mtl-entrance', {
             name: 'Entrance Placement',
             retailer_id: 'demo-retailer-freshmart',
@@ -179,6 +349,12 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
             retailer_id: 'demo-retailer-secondary',
             store_id: 'demo-store-phoenix',
             screen_ids: ['demo-screen-secondary-1'],
+        }, resetAtIso),
+        record('locations', 'demo-location-phoenix-allday-entrance', {
+            name: 'Entrance Placement',
+            retailer_id: 'demo-retailer-secondary',
+            store_id: allDayStore.id,
+            screen_ids: ['demo-screen-secondary-2'],
         }, resetAtIso),
         record('screens', 'demo-screen-north-1', {
             name: 'North Entrance Synthetic Screen',
@@ -210,6 +386,16 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
             status: 'OFFLINE',
             last_seen: null,
         }, resetAtIso),
+        record('screens', 'demo-screen-secondary-2', {
+            name: 'All-Day Entrance Synthetic Screen',
+            retailer_id: 'demo-retailer-secondary',
+            store_id: allDayStore.id,
+            location_id: 'demo-location-phoenix-allday-entrance',
+            resolution: '1920x1080',
+            orientation: 'landscape',
+            status: 'OFFLINE',
+            last_seen: null,
+        }, resetAtIso),
         ...mediaFixtures.map(fixture => fixture.document),
         record('creatives', 'demo-creative-paid', {
             brand_id: 'demo-advertiser-secondary',
@@ -219,28 +405,11 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
             decided_at: resetAtIso,
             reason: null,
         }, resetAtIso),
-        record('campaigns', 'demo-secondary-campaign-1', {
-            name: 'Northstar Pantry Synthetic Campaign',
-            advertiser_id: 'demo-advertiser-secondary',
-            retailer_id: 'demo-retailer-secondary',
-            media_id: 'demo-media-paid',
-            status: 'approved',
-            visibility: 'private',
-            start_date: isoDateDaysAfter(resetAt, 1),
-            end_date: isoDateDaysAfter(resetAt, 14),
-            budget: 2400,
-        }, resetAtIso),
-        record('campaigns', 'demo-secondary-campaign-2', {
-            name: 'Northstar Home Synthetic Campaign',
-            advertiser_id: 'demo-advertiser-secondary',
-            retailer_id: 'demo-retailer-secondary',
-            media_id: 'demo-media-paid',
-            status: 'pending_approval',
-            visibility: 'private',
-            start_date: isoDateDaysAfter(resetAt, 7),
-            end_date: isoDateDaysAfter(resetAt, 21),
-            budget: 1800,
-        }, resetAtIso),
+        approvedCampaign,
+        pendingCampaign,
+        ...approvedReservations,
+        ...pendingReservations,
+        record('platform_config', 'dayparts', { ...DEFAULT_DAYPARTS }, resetAtIso),
         record('loops', 'demo-loop-mtl-next-day-08', {
             date: isoDateDaysAfter(resetAt, 1),
             hour: 8,
@@ -258,6 +427,7 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
                 status: 'approved',
             })),
         }, resetAtIso),
+        ...todaysSchedule,
     ];
 
     return {

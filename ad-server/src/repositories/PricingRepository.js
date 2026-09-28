@@ -4,7 +4,7 @@
 import { BaseRepository } from './BaseRepository.js';
 
 // Default pricing config
-const DEFAULT_PRICING = {
+export const DEFAULT_PRICING = {
     schemaVersion: 1,
     baseCPM: 15.00,
     currency: 'USD',

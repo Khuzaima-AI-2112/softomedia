@@ -1,5 +1,4 @@
 import { BaseRepository } from './BaseRepository.js';
-import { DEMO_RESET_SCOPE, DEMO_RESET_SCOPE_FIELD } from '../services/DemoBaseline.js';
 
 export class PlatformAuditRepository extends BaseRepository {
     constructor() {
@@ -10,7 +9,6 @@ export class PlatformAuditRepository extends BaseRepository {
         return {
             id: `platform_audit_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
             ...entry,
-            [DEMO_RESET_SCOPE_FIELD]: DEMO_RESET_SCOPE,
         };
     }
 

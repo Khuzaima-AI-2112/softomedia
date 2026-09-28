@@ -1,12 +1,10 @@
 import {
     DEMO_BUSINESS_COLLECTIONS,
-    DEMO_RESET_SCOPE,
-    DEMO_RESET_SCOPE_FIELD,
     DEMO_STORAGE_PREFIX,
     buildDemoBaseline,
 } from './DemoBaseline.js';
 
-const MAX_ATOMIC_FIRESTORE_WRITES = 500;
+const MAX_BATCH_WRITES = 500;
 
 export function assertDedicatedDemoProject({ activeProjectId, expectedProjectId }) {
     if (!expectedProjectId || activeProjectId !== expectedProjectId) {
@@ -39,29 +37,6 @@ export async function resetDemoBaseline({
     }
 
     const baseline = buildDemoBaseline({ resetAt, bucketName });
-    const baselineIds = new Map();
-    for (const document of baseline.documents) {
-        if (!baselineIds.has(document.collection)) baselineIds.set(document.collection, new Set());
-        baselineIds.get(document.collection).add(document.id);
-    }
-
-    const scopedSnapshots = await Promise.all(DEMO_BUSINESS_COLLECTIONS.map(collection =>
-        firestore.collection(collection)
-            .where(DEMO_RESET_SCOPE_FIELD, '==', DEMO_RESET_SCOPE)
-            .get()
-    ));
-    const staleDocumentReferences = scopedSnapshots.flatMap((snapshot, index) => {
-        const collection = DEMO_BUSINESS_COLLECTIONS[index];
-        return snapshot.docs
-            .filter(document => !baselineIds.get(collection)?.has(document.id))
-            .map(document => document.ref);
-    });
-
-    const writeCount = staleDocumentReferences.length + baseline.documents.length;
-    if (writeCount > MAX_ATOMIC_FIRESTORE_WRITES) {
-        throw new Error(`Demo reset requires ${writeCount} Firestore writes; refusing to exceed the atomic limit`);
-    }
-
     const bucket = storage.bucket(bucketName);
     const [scopedObjects] = await bucket.getFiles({ prefix: DEMO_STORAGE_PREFIX });
     const baselineObjectNames = new Set(baseline.storageObjects.map(object => object.name));
@@ -77,12 +52,19 @@ export async function resetDemoBaseline({
         .filter(object => !baselineObjectNames.has(object.name))
         .map(object => object.delete()));
 
-    const batch = firestore.batch();
-    for (const reference of staleDocumentReferences) batch.delete(reference);
-    for (const document of baseline.documents) {
-        batch.set(firestore.collection(document.collection).doc(document.id), document.data);
+    // The project guard above makes every business record synthetic, so each
+    // collection is emptied whoever wrote to it (#18). A walkthrough can leave
+    // more records than one atomic batch holds, so a reset that fails midway
+    // leaves a partial baseline; running it again completes it.
+    await Promise.all(DEMO_BUSINESS_COLLECTIONS.map(collection =>
+        firestore.recursiveDelete(firestore.collection(collection))));
+    for (let start = 0; start < baseline.documents.length; start += MAX_BATCH_WRITES) {
+        const batch = firestore.batch();
+        for (const document of baseline.documents.slice(start, start + MAX_BATCH_WRITES)) {
+            batch.set(firestore.collection(document.collection).doc(document.id), document.data);
+        }
+        await batch.commit();
     }
-    await batch.commit();
 
     return {
         projectId: activeProjectId,

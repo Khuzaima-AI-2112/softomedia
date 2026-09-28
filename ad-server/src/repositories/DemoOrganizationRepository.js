@@ -1,5 +1,4 @@
 import { BaseRepository } from './BaseRepository.js';
-import { DEMO_RESET_SCOPE, DEMO_RESET_SCOPE_FIELD } from '../services/DemoBaseline.js';
 
 export class DemoOrganizationRepository extends BaseRepository {
     constructor() {
@@ -11,7 +10,6 @@ export class DemoOrganizationRepository extends BaseRepository {
         return super.create(id, {
             ...data,
             demo: true,
-            [DEMO_RESET_SCOPE_FIELD]: DEMO_RESET_SCOPE,
         });
     }
 }

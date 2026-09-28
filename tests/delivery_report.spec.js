@@ -3,8 +3,6 @@ import { test, expect, hasEmulators, signIn, signOut } from './fixtures/demo-ses
 test.skip(!hasEmulators, 'requires Firebase Auth, Firestore, and Storage emulators');
 
 const DATE = '2030-01-16';
-// Demo reset removes what carries its scope, so every seeded record goes with it.
-const scoped = fields => ({ ...fields, demo_reset_scope: 'phase-1-demo' });
 
 // FreshMart North plays Bonvie at breakfast and dinner; the Phoenix Store plays
 // Bonvie and the secondary Brand's Campaign at lunch.
@@ -28,25 +26,25 @@ async function seedDelivery() {
     const { impressionRepository } = await import('../ad-server/src/repositories/ImpressionRepository.js');
     const firestore = getFirestore();
     const batch = firestore.batch();
-    batch.set(firestore.collection('campaigns').doc('report-bonvie'), scoped({
+    batch.set(firestore.collection('campaigns').doc('report-bonvie'), {
         id: 'report-bonvie', name: 'Bonvie Morning Coffee', advertiser_id: 'demo-advertiser-bonvie', status: 'approved',
-    }));
+    });
     for (const [id, retailerId, storeId, hour] of LOOPS) {
-        batch.set(firestore.collection('loops').doc(id), scoped({
+        batch.set(firestore.collection('loops').doc(id), {
             id, retailer_id: retailerId, store_id: storeId, date: DATE, hour, status: 'approved', slots: [],
-        }));
+        });
     }
     PROOFS.forEach(([campaignId, loopId], index) => {
         const eventId = `report-pop-${index}`;
-        batch.set(firestore.collection('impressions').doc(eventId), scoped(impressionRepository.buildProofOfPlay({
+        batch.set(firestore.collection('impressions').doc(eventId), impressionRepository.buildProofOfPlay({
             event_id: eventId, campaign_id: campaignId, loop_id: loopId, slot_position: index,
             presentation_started_at: `${DATE}T12:00:00.000Z`, intended_duration_seconds: 5,
-        })));
+        }));
     });
     // Fallback Content playback is reported separately and never counts as delivery.
-    batch.set(firestore.collection('playback_observations').doc('report-fallback'), scoped({
+    batch.set(firestore.collection('playback_observations').doc('report-fallback'), {
         presentation_type: 'fallback', loop_id: 'report-north-08', slot_position: 11,
-    }));
+    });
     await batch.commit();
 }
 

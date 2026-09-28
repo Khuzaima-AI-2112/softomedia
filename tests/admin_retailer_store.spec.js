@@ -37,7 +37,6 @@ test('Admin adds a Store to a newly created Retailer and it persists after a rel
         await page.getByTestId('retailers-list').getByText(retailerName).click();
         await expect(page.getByTestId('stores-list').getByText(storeName)).toBeVisible();
     } finally {
-        await demo.removeRetailersNamed(retailerName);
         await demo.reset();
     }
 });

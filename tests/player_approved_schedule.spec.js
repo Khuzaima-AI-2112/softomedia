@@ -227,9 +227,6 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
         await expect(brand.getByTestId(`proof-events-${campaignId}`)).toContainText(proof.event_id);
     } finally {
         await Promise.all(personaPages.map(persona => persona.context().close()));
-        // Not demo-scoped, so the reset would leave it for the Screen form of later journeys.
-        await retailerRepository.delete(retailerId).catch(() => null);
-        await creativeRepository.delete(creativeId).catch(() => null);
         await demo.reset();
     }
 });
