@@ -6,17 +6,6 @@ export class ScreenRepository extends BaseRepository {
     }
 
     /**
-     * Find active screens for a location
-     * @param {string} locationId 
-     * @returns {Promise<Array>}
-     */
-    async findByLocation(locationId) {
-        return this.findAll({
-            where: [['location_id', '==', locationId], ['status', '==', 'ONLINE']]
-        });
-    }
-
-    /**
      * Update last seen timestamp
      * @param {string} id 
      * @param {string} status 

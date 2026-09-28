@@ -9,13 +9,13 @@ export default {
     collectCoverageFrom: ['index.js', 'src/**/*.js'],
     coverageDirectory: 'coverage',
     coverageReporters: ['text', 'lcov', 'clover'],
-    // Ratchet: just under the measured baseline (#29); raised to 90% lines by #47.
+    // Lines held at 90% (#47); the rest ratchet just under what #47 measured.
     coverageThreshold: {
         global: {
-            branches: 62,
-            functions: 81,
-            lines: 71,
-            statements: 69
+            branches: 81,
+            functions: 94,
+            lines: 90,
+            statements: 90
         }
     },
     testMatch: ['**/tests/**/*.test.js'],

@@ -18,15 +18,6 @@ class StoreRepositoryClass extends BaseRepository {
     }
 
     /**
-     * Get stores with screen counts
-     */
-    async getAllWithScreenCounts() {
-        const stores = await this.findAll();
-        // Screen counts would be computed from screens collection
-        return stores;
-    }
-
-    /**
      * Create a new store with screens
      */
     async createWithScreens(storeData, screenCount = 0) {

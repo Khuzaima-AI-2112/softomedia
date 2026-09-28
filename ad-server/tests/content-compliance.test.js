@@ -171,4 +171,58 @@ describeWithAuthEmulator('Stricter media rules (#35)', () => {
         expect(response.status).toBe(400);
         expect(response.body.error).toBe('Media must be 16:9; this file is 1024×768');
     });
+
+    // Files that pass the signature check but whose header can't be read.
+    const box = (type, ...parts) => {
+        const body = Buffer.concat(parts);
+        const header = Buffer.alloc(8);
+        header.writeUInt32BE(8 + body.length);
+        header.write(type, 4, 'latin1');
+        return Buffer.concat([header, body]);
+    };
+    const ftyp = box('ftyp', Buffer.from('isom0000'));
+    const handler = kind => box('hdlr', Buffer.alloc(8), Buffer.from(kind, 'latin1'), Buffer.alloc(12));
+    const mediaHeader = (timescale, duration) => {
+        const body = Buffer.alloc(20);
+        body.writeUInt32BE(timescale, 12);
+        body.writeUInt32BE(duration, 16);
+        return box('mdhd', body);
+    };
+    const largeBox = () => {
+        const header = Buffer.alloc(16);
+        header.writeUInt32BE(1);
+        header.write('free', 4, 'latin1');
+        header.writeBigUInt64BE(24n, 8);
+        return Buffer.concat([header, Buffer.alloc(8)]);
+    };
+    const toEndBox = () => Buffer.concat([Buffer.from([0, 0, 0, 0]), Buffer.from('mdat', 'latin1'), Buffer.alloc(4)]);
+    const video = (...children) => Buffer.concat([ftyp, box('moov', ...children)]);
+
+    it.each([
+        ['has no movie box', Buffer.concat([ftyp, box('mdat', Buffer.alloc(8))])],
+        ['has only 64-bit and open-ended boxes', Buffer.concat([ftyp, largeBox(), toEndBox()])],
+        ['has a box shorter than its own header', Buffer.concat([ftyp, Buffer.from([0, 0, 0, 4]), Buffer.from('free')])],
+        ['has only a sound track', video(box('trak', box('mdia', handler('soun'))))],
+        ['has a track with no media', video(box('trak', box('udta')))],
+        ['has a video track with no duration', video(box('trak', box('tkhd', Buffer.alloc(84)), box('mdia', handler('vide'))))],
+        ['has a video track of zero length', video(box('trak', box('tkhd', Buffer.alloc(84)), box('mdia', handler('vide'), mediaHeader(600, 0))))],
+        ['has a cut-short track header', video(box('trak', box('mdia', handler('vide'), mediaHeader(600, 3000)), box('tkhd', Buffer.alloc(4))))],
+    ])('rejects a video that %s', async (_label, bytes) => {
+        const response = await uploadAsBrand(bytes, { filename: 'creative.mp4', contentType: 'video/mp4' });
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toBe('The video could not be read. Upload a playable .mp4 or .mov file');
+    });
+
+    it.each([
+        ['a PNG with no image header', Buffer.concat([mediaFile('frame-16x9.png').subarray(0, 8), Buffer.alloc(24)]), 'creative.png'],
+        ['a JPEG that breaks off after fill and restart markers', Buffer.from([0xff, 0xd8, 0xff, 0xff, 0xd0, 0x12, 0x34, 0x56, 0x78]), 'creative.jpg'],
+        ['a JPEG that ends before any frame', Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x02, 0x00, 0x00]), 'creative.jpeg'],
+    ])('rejects %s', async (_label, bytes, filename) => {
+        const contentType = filename.endsWith('.png') ? 'image/png' : 'image/jpeg';
+        const response = await uploadAsBrand(bytes, { filename, contentType });
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toBe('The image could not be read. Upload a valid .png, .jpg or .jpeg file');
+    });
 });

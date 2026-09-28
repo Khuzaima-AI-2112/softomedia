@@ -11,7 +11,6 @@ import { schedulingAuditRepository } from './SchedulingAuditRepository.js';
 export const BUSINESS_HOURS = {
     START: 0,   // support all hours
     END: 24,
-    get TOTAL_LOOPS() { return this.END - this.START; }
 };
 
 // Valid loop statuses — canonical stored values are lowercase.
@@ -21,18 +20,13 @@ export const LOOP_STATUS = Object.freeze({
     get REPLACEMENT_REQUESTED() { return 'replacement_requested'; },
     get APPROVED() { return 'approved'; },
     get REJECTED() { return 'rejected'; },
-    get LIVE() { return 'live'; },
 });
 
 // Slot statuses — canonical stored values are lowercase.
 // Uppercase property names are preserved as the import API for existing callers.
 export const SLOT_STATUS = Object.freeze({
-    get PENDING() { return 'pending'; },
-    get APPROVED() { return 'approved'; },
     get REJECTED() { return 'rejected'; },
     get REPLACED() { return 'replaced'; },
-    get BOOKED() { return 'booked'; },
-    get AVAILABLE() { return 'available'; },
 });
 
 export class LoopRepository extends BaseRepository {
@@ -93,28 +87,6 @@ export class LoopRepository extends BaseRepository {
             ]
         });
         return all;
-    }
-
-    /**
-     * Find approved loops for a screen on a specific date, sorted by version desc
-     * so the latest approved version is always first.
-     * @param {string} screenId
-     * @param {string} date - Format: YYYY-MM-DD
-     * @returns {Promise<Array>}
-     */
-    async findApprovedByScreen(screenId, date) {
-        const all = await this.findAll({
-            where: [
-                ['status', '==', LOOP_STATUS.APPROVED]
-            ]
-        });
-
-        return all
-            .filter(loop =>
-                loop.date === date &&
-                (loop.screen_id === screenId || loop.screen_id === 'ALL')
-            )
-            .sort((a, b) => (b.version ?? 1) - (a.version ?? 1));
     }
 
     /**
