@@ -27,6 +27,16 @@ export function allocatedCategory(dayPosition) {
 }
 
 /**
+ * Whether these effective hours give the day a Paid Slot at this hour and
+ * position. Moving the opening time moves every later Slot's category too.
+ */
+export function isPaidSlot(effectiveHours, hour, position) {
+    const { start, end, is_closed: isClosed } = BusinessHoursService.getOperatingHourRange(effectiveHours);
+    if (isClosed || hour < start || hour >= end) return false;
+    return allocatedCategory(firstPositionOfHour(hour, start) + position) === 'paid';
+}
+
+/**
  * Every Slot of every operating hour of a Store on a date. A Paid Slot's
  * status says whether a Brand may book it; Retailer and Internal Slots are
  * never bookable and have no status.

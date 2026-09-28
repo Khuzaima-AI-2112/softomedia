@@ -25,18 +25,10 @@
  */
 
 import express from 'express';
-import { BaseRepository } from '../repositories/BaseRepository.js';
+import { notificationRepository as notificationRepo } from '../repositories/NotificationRepository.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
-
-// Thin repo — no custom methods needed beyond BaseRepository
-class NotificationRepository extends BaseRepository {
-    constructor() {
-        super('notifications');
-    }
-}
-const notificationRepo = new NotificationRepository();
 
 /**
  * Resolve the caller's user ID from the request.

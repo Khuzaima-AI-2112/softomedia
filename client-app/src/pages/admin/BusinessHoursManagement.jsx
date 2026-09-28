@@ -94,6 +94,17 @@ function BusinessHoursManagement() {
         setWeeklyHours(newHours);
     };
 
+    // A refusal that lists Reservations stays until the next message: the
+    // Admin needs the list to resolve them.
+    const dismissMessageSoon = () => setTimeout(
+        () => setMessage(current => (current?.reservations ? current : null)),
+        3000,
+    );
+
+    const failureMessage = (error, prefix) => (error.response?.reservations
+        ? { type: 'error', text: error.message, reservations: error.response.reservations }
+        : { type: 'error', text: `${prefix}: ${error.message}` });
+
     const saveWeeklyHours = async () => {
         if (!selectedStore) return;
         try {
@@ -102,10 +113,10 @@ function BusinessHoursManagement() {
             await apiService.updateWeeklyHours(selectedStore.id, weeklyHours);
             setMessage({ type: 'success', text: 'Weekly schedule saved successfully!' });
         } catch (error) {
-            setMessage({ type: 'error', text: `Failed to save: ${error.message}` });
+            setMessage(failureMessage(error, 'Failed to save'));
         } finally {
             setSaving(false);
-            setTimeout(() => setMessage(null), 3000);
+            dismissMessageSoon();
         }
     };
 
@@ -149,10 +160,12 @@ function BusinessHoursManagement() {
             setShowSpecialModal(false);
             setMessage({ type: 'success', text: `Special hours for ${selectedDate} updated!` });
         } catch (error) {
-            setMessage({ type: 'error', text: `Failed to update special hours: ${error.message}` });
+            // The page behind the form shows the Reservations to resolve.
+            if (error.response?.reservations) setShowSpecialModal(false);
+            setMessage(failureMessage(error, 'Failed to update special hours'));
         } finally {
             setSaving(false);
-            setTimeout(() => setMessage(null), 3000);
+            dismissMessageSoon();
         }
     };
 
@@ -273,7 +286,18 @@ function BusinessHoursManagement() {
                                     <span className="material-symbols-outlined text-lg">
                                         {message.type === 'success' ? 'check_circle' : message.type === 'error' ? 'error' : 'info'}
                                     </span>
-                                    {message.text}
+                                    <div>
+                                        {message.text}
+                                        {message.reservations && (
+                                            <ul className="mt-2 list-disc pl-5">
+                                                {message.reservations.map(({ date, hour, position, campaign_id: campaignId }) => (
+                                                    <li key={`${date}_${hour}_${position}`}>
+                                                        {`${date} ${String(hour).padStart(2, '0')}:00, Slot ${position + 1} (Campaign ${campaignId})`}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </div>
                                 </div>
                             )}
 
