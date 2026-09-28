@@ -1,6 +1,5 @@
 import { BaseRepository } from './BaseRepository.js';
 import { DEFAULT_DAYPARTS, DAYPART_NAMES } from '../services/Dayparts.js';
-import { DEMO_RESET_SCOPE, DEMO_RESET_SCOPE_FIELD } from '../services/DemoBaseline.js';
 
 const DOCUMENT_ID = 'dayparts';
 
@@ -22,10 +21,10 @@ export class DaypartRepository extends BaseRepository {
 
     /**
      * Saves validated Dayparts with their audit record, both or neither.
-     * Demo reset removes them, restoring the defaults.
+     * Demo reset restores the defaults.
      */
     async saveWithAudit(dayparts, auditRepository, auditEntry) {
-        const data = { ...hoursOf(dayparts), [DEMO_RESET_SCOPE_FIELD]: DEMO_RESET_SCOPE };
+        const data = hoursOf(dayparts);
 
         if (this.db && auditRepository.db === this.db) {
             const audit = auditRepository.buildRecord(auditEntry);

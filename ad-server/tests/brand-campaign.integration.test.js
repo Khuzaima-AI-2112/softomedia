@@ -118,11 +118,12 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
             .set('Authorization', `Bearer ${brandToken}`);
 
         expect(response.status).toBe(200);
-        expect(response.body.items).toHaveLength(3);
+        expect(response.body.items).toHaveLength(4);
         expect(response.body.items.map(item => item.screen.id)).not.toContain('test-private-screen');
         expect(response.body.items.map(item => item.retailer.name)).toEqual([
             'FreshMart Synthetic Retailer',
             'FreshMart Synthetic Retailer',
+            'HarborCart Synthetic Retailer',
             'HarborCart Synthetic Retailer',
         ]);
         const entrance = response.body.items.find(item => item.location.id === 'demo-location-mtl-entrance');

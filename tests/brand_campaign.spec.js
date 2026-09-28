@@ -14,10 +14,8 @@ const dayFromToday = offset => {
 
 test('Brand books Slots on the grid through a conflict and the Booking Cutoff, and retains only its Campaign after account switches', async ({ page, demo }) => {
     const title = `BonVie browser campaign ${Date.now()}`;
-    const today = dayFromToday(0);
     const bookable = dayFromToday(3);
     await demo.reset();
-    await demo.releaseSlots('demo-store-phoenix', [today, bookable]);
     const accounts = await demo.provisionPersonas();
     const brand = accounts.find(account => account.email === 'brand@demo.softomedia.test');
     const secondaryBrand = accounts.find(account => account.email === 'brand-secondary@demo.softomedia.test');
@@ -26,7 +24,8 @@ test('Brand books Slots on the grid through a conflict and the Booking Cutoff, a
         await signIn(page, brand.email, BRAND_DASHBOARD);
         await page.getByTestId('new-campaign-btn').click();
 
-        await expect(page.getByText('HarborCart Synthetic Retailer')).toBeVisible();
+        // HarborCart has two Stores, each named with its Retailer.
+        await expect(page.getByText('HarborCart Synthetic Retailer').first()).toBeVisible();
         // A Brand books whole Stores, never individual Screens.
         const desertStore = page.getByTestId('store-harborcart-desert-synthetic-store');
         await expect(desertStore).toContainText('1 Screen');
@@ -125,7 +124,6 @@ test('Brand books Slots on the grid through a conflict and the Booking Cutoff, a
         await expect(page.getByText('demo-screen-secondary-1')).toBeVisible();
         await expect(page.getByRole('img', { name: `${title} creative` })).toBeVisible();
     } finally {
-        await demo.releaseSlots('demo-store-phoenix', [today, bookable]);
         await demo.reset();
     }
 });

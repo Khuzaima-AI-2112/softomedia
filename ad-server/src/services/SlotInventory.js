@@ -26,6 +26,12 @@ export function allocatedCategory(dayPosition) {
     return ALLOCATION_SEQUENCE[dayPosition % ALLOCATION_SEQUENCE.length];
 }
 
+/** The Paid positions of an hour at a Store whose broadcast day starts at `openingHour`. */
+export function paidPositions(hour, openingHour) {
+    return Array.from({ length: SLOTS_PER_LOOP }, (_, position) => position)
+        .filter(position => allocatedCategory(firstPositionOfHour(hour, openingHour) + position) === 'paid');
+}
+
 /**
  * Whether these effective hours give the day a Paid Slot at this hour and
  * position. Moving the opening time moves every later Slot's category too.
@@ -33,7 +39,7 @@ export function allocatedCategory(dayPosition) {
 export function isPaidSlot(effectiveHours, hour, position) {
     const { start, end, is_closed: isClosed } = BusinessHoursService.getOperatingHourRange(effectiveHours);
     if (isClosed || hour < start || hour >= end) return false;
-    return allocatedCategory(firstPositionOfHour(hour, start) + position) === 'paid';
+    return paidPositions(hour, start).includes(position);
 }
 
 /**

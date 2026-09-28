@@ -32,13 +32,14 @@ export const test = base.extend({
         const { getStorageClient } = await import('../../ad-server/src/utils/storage.js');
 
         await use({
-            reset: () => resetDemoBaseline({
+            // Journeys date their data from a fixed day; one that plays today's seeded schedule passes today.
+            reset: ({ resetAt = new Date('2030-01-15T10:30:00.000Z') } = {}) => resetDemoBaseline({
                 firestore: getFirestore(),
                 storage: getStorageClient(),
                 activeProjectId: 'softomedia-demo',
                 expectedProjectId: 'softomedia-demo',
                 bucketName: process.env.DEMO_ASSETS_BUCKET || 'softomedia-demo.firebasestorage.app',
-                resetAt: new Date('2030-01-15T10:30:00.000Z'),
+                resetAt,
             }),
             provisionPersonas: () => provisionDemoPersonas({ password: PASSWORD, expectedProjectId: 'softomedia-demo' }),
             // Stands in for another Brand reserving a Slot first, between a pick and its submission.
@@ -48,29 +49,6 @@ export const test = base.extend({
                     store_id: storeId, date, hour, position, brand_id: brandId,
                     campaign_id: `held-by-${brandId}`, status: 'held', price: 0,
                 }),
-            // Demo reset does not yet clear Reservations (#46), so journeys remove their own.
-            releaseSlots: async (storeId, dates) => {
-                const reservations = await getFirestore().collection('slot_reservations')
-                    .where('store_id', '==', storeId).get();
-                await Promise.all(reservations.docs
-                    .filter(document => dates.includes(document.data().date))
-                    .map(document => document.ref.delete()));
-            },
-            // Demo reset does not yet clear app-created Retailers (#46), so journeys remove
-            // their own, with the Stores and Store hours created under them.
-            removeRetailersNamed: async (name) => {
-                const firestore = getFirestore();
-                const retailers = await firestore.collection('retailers').where('name', '==', name).get();
-                for (const retailer of retailers.docs) {
-                    const stores = await firestore.collection('stores').where('retailer_id', '==', retailer.id).get();
-                    for (const store of stores.docs) {
-                        const hours = await firestore.collection('store_default_hours').where('store_id', '==', store.id).get();
-                        await Promise.all(hours.docs.map(document => document.ref.delete()));
-                        await store.ref.delete();
-                    }
-                    await retailer.ref.delete();
-                }
-            },
         });
 
         await closeFirestore();
