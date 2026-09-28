@@ -157,11 +157,11 @@ describe('guarded demo reset', () => {
         expect((await outsideDemoPrefix.download())[0].toString()).toBe('preserve');
     });
 
+    // The Screen asks for its schedule at the moment of the reset, so no hour or midnight passes in between.
     test('a Screen plays today\'s seeded schedule, as loop generation would have made it', async () => {
-        const now = new Date();
-        await reset({ resetAt: now });
+        await reset();
 
-        const playback = await playbackService.getForScreen('demo-screen-secondary-2', now);
+        const playback = await playbackService.getForScreen('demo-screen-secondary-2', RESET_AT);
         expect(playback).toEqual(expect.objectContaining({
             schedule_status: 'approved',
             playback_mode: 'approved_schedule',

@@ -5,7 +5,7 @@ import { slotReservationRepository } from '../repositories/SlotReservationReposi
 import { slotQuote } from './CampaignPricingService.js';
 import { DEFAULT_DAYPARTS } from './Dayparts.js';
 import { loopGenerationService } from './LoopGenerationService.js';
-import { allocatedCategory, firstPositionOfHour, SLOTS_PER_LOOP } from './SlotInventory.js';
+import { firstPositionOfHour, paidPositions } from './SlotInventory.js';
 import { storeLocalNow } from './SlotReservations.js';
 
 export const DEMO_STORAGE_PREFIX = 'phase-1-demo/';
@@ -51,10 +51,11 @@ const SYNTHETIC_PNG = Buffer.from(
     'base64'
 );
 
-function isoDateDaysAfter(resetAt, days) {
-    const date = new Date(resetAt.getTime());
-    date.setUTCDate(date.getUTCDate() + days);
-    return date.toISOString().slice(0, 10);
+/** The calendar date `days` after a YYYY-MM-DD date. */
+function calendarDateAfter(date, days) {
+    const next = new Date(`${date}T00:00:00Z`);
+    next.setUTCDate(next.getUTCDate() + days);
+    return next.toISOString().slice(0, 10);
 }
 
 function record(collection, id, data, resetAtIso) {
@@ -101,19 +102,7 @@ function mediaFixture({ id, category, ownerType, ownerId, creativeId, bucketName
     };
 }
 
-function calendarDateAfter(date, days) {
-    const next = new Date(`${date}T00:00:00Z`);
-    next.setUTCDate(next.getUTCDate() + days);
-    return next.toISOString().slice(0, 10);
-}
-
-/** The Paid positions of an hour at a Store whose broadcast day starts at `openingHour`. */
-function paidPositions(hour, openingHour) {
-    return Array.from({ length: SLOTS_PER_LOOP }, (_, position) => position)
-        .filter(position => allocatedCategory(firstPositionOfHour(hour, openingHour) + position) === 'paid');
-}
-
-/** A Brand Campaign's held Reservations, each priced as the Brand would have booked it. */
+/** A Brand Campaign's held Slot Reservations, each priced as the Brand would have booked it. */
 function reservationRecords({ campaign, store, slots, resetAtIso }) {
     return slots.map(({ date, hour, position }) => {
         const slot = { store_id: store.id, date, hour, position };
@@ -135,10 +124,10 @@ function reservationRecords({ campaign, store, slots, resetAtIso }) {
 }
 
 /**
- * A Store's schedule for one date, already approved by its Retailer: the
- * loops that loop generation would make for these Reservations and content.
+ * A Store's Daily Schedule, already approved by its Retailer: the Hourly Loops
+ * that loop generation would make for these Slot Reservations and content.
  */
-function approvedSchedule({ store, date, hours, reserved, content, fallback, resetAtIso }) {
+function approvedDailySchedule({ store, date, hours, reserved, content, fallback, resetAtIso }) {
     const loops = hours.map(hour => record('loops', `${date}_${hour}_${store.id}`, {
         date,
         hour,
@@ -175,6 +164,7 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
     }
 
     const resetAtIso = resetAt.toISOString();
+    const resetDate = resetAtIso.slice(0, 10);
     const mediaFixtures = [
         mediaFixture({ id: 'demo-media-paid', category: 'paid', ownerType: 'brand', ownerId: 'demo-advertiser-secondary', creativeId: 'demo-creative-paid', bucketName, resetAtIso }),
         mediaFixture({ id: 'demo-media-retailer', category: 'retailer', ownerType: 'retailer', ownerId: 'demo-retailer-freshmart', bucketName, resetAtIso }),
@@ -242,8 +232,8 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
         inventory_selection: [{ retailer_id: phoenixStore.data.retailer_id, store_id: phoenixStore.id }],
         status: 'pending_approval',
         visibility: 'private',
-        start_date: isoDateDaysAfter(resetAt, 7),
-        end_date: isoDateDaysAfter(resetAt, 21),
+        start_date: calendarDateAfter(resetDate, 7),
+        end_date: calendarDateAfter(resetDate, 21),
         budget: 1800,
     }, resetAtIso);
 
@@ -274,7 +264,7 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
             asset_id: paidMedia.id,
             asset_name: paidMedia.title,
         }]])]));
-    const todaysSchedule = approvedSchedule({
+    const todaysSchedule = approvedDailySchedule({
         store: allDayStore.data,
         date: today,
         hours: allDayHours,
@@ -308,13 +298,13 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
         record('retailers', 'demo-retailer-freshmart', {
             name: 'FreshMart Synthetic Retailer',
             contact_email: 'retaileradmin@demo.softomedia.test',
-            contract_start: isoDateDaysAfter(resetAt, -30),
+            contract_start: calendarDateAfter(resetDate, -30),
             status: 'active',
         }, resetAtIso),
         record('retailers', 'demo-retailer-secondary', {
             name: 'HarborCart Synthetic Retailer',
             contact_email: 'retaileradmin-secondary@demo.softomedia.test',
-            contract_start: isoDateDaysAfter(resetAt, -30),
+            contract_start: calendarDateAfter(resetDate, -30),
             status: 'active',
         }, resetAtIso),
         northStore,
@@ -323,15 +313,18 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
         // Standard hours every day, as a Store created through the API receives;
         // without them a Store is closed and no loops are generated for it.
         // A close of 00:00 is midnight at the end of the day.
-        ...[[northStore, '08:00', '22:00'], [phoenixStore, '08:00', '22:00'], [allDayStore, '00:00', '00:00']]
-            .flatMap(([store, openTime, closeTime]) => Array.from({ length: 7 }, (_, dayOfWeek) =>
-                record('store_default_hours', `def_${store.id}_${dayOfWeek}`, {
-                    store_id: store.id,
-                    day_of_week: dayOfWeek,
-                    open_time: openTime,
-                    close_time: closeTime,
-                    is_closed: false,
-                }, resetAtIso))),
+        ...[
+            { store: northStore, openTime: '08:00', closeTime: '22:00' },
+            { store: phoenixStore, openTime: '08:00', closeTime: '22:00' },
+            { store: allDayStore, openTime: '00:00', closeTime: '00:00' },
+        ].flatMap(({ store, openTime, closeTime }) => Array.from({ length: 7 }, (_, dayOfWeek) =>
+            record('store_default_hours', `def_${store.id}_${dayOfWeek}`, {
+                store_id: store.id,
+                day_of_week: dayOfWeek,
+                open_time: openTime,
+                close_time: closeTime,
+                is_closed: false,
+            }, resetAtIso))),
         record('locations', 'demo-location-mtl-entrance', {
             name: 'Entrance Placement',
             retailer_id: 'demo-retailer-freshmart',
@@ -411,7 +404,7 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
         ...pendingReservations,
         record('platform_config', 'dayparts', { ...DEFAULT_DAYPARTS }, resetAtIso),
         record('loops', 'demo-loop-mtl-next-day-08', {
-            date: isoDateDaysAfter(resetAt, 1),
+            date: calendarDateAfter(resetDate, 1),
             hour: 8,
             retailer_id: 'demo-retailer-freshmart',
             location_id: 'demo-location-mtl-entrance',
