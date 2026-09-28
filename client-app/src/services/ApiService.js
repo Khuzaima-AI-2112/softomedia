@@ -431,6 +431,15 @@ class ApiService {
     }
 
     // ============================================
+    // DELIVERY REPORT
+    // ============================================
+
+    /** Proof of Play per Campaign and Daypart, scoped by the server to the signed-in role. */
+    async getDeliveryReport() {
+        return apiClient.get('/api/delivery-report');
+    }
+
+    // ============================================
     // GENERIC REQUEST (used by Invoices.jsx)
     // ============================================
 

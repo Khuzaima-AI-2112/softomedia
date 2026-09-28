@@ -12,4 +12,6 @@ export const PERMISSIONS = Object.freeze({
     INVOICE_VIEW_OWN: 'invoices.view_own',
     SUPPORT_TICKET_CREATE_OWN: 'support_ticket.create_own',
     SUPPORT_TICKET_MANAGE_NETWORK: 'support_ticket.manage_network',
+    DELIVERY_REPORT_VIEW_NETWORK: 'delivery_report.view_network',
+    DELIVERY_REPORT_VIEW_OWN: 'delivery_report.view_own',
 });

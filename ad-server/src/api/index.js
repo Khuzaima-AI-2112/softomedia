@@ -24,6 +24,7 @@ import analyticsRouter from './analytics.js';
 import platformRouter from './platform.js';
 import inventoryRouter from './inventory.js';
 import deviceRouter from './device.js';
+import deliveryReportRouter from './deliveryReport.js';
 import { authenticate } from '../middleware/auth.js';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
 
@@ -74,6 +75,7 @@ router.use('/assets', authenticate, assetsRouter);
 router.use('/creatives', authenticate, creativesRouter);
 router.use('/loops', authenticate, loopsRouter);
 router.use('/monitoring', authenticate, monitoringRouter);
+router.use('/delivery-report', authenticate, deliveryReportRouter);
 router.use('/locations', authenticate, locationsRouter);
 router.use('/notifications', authenticate, notificationsRouter);
 router.use('/schedules', authenticate, schedulesRouter);

@@ -1,6 +1,9 @@
 import { ROLES } from '../constants/roles';
 
 // ── Role-aware sidebar nav items ───────────────────────────────────────────────
+// Every role but the Technical Operator reads the delivery report, scoped by the server (#41).
+const DELIVERY_REPORT = { to: '/dashboard/delivery-report', icon: 'query_stats', label: 'Delivery by Daypart', testId: 'nav-delivery-report' };
+
 // superAdminOnly pages need platform.governance or organizations.manage, which the
 // Admin role does not hold; listing them for Admin led to 403s and silent redirects.
 const NETWORK_NAV = [
@@ -12,6 +15,7 @@ const NETWORK_NAV = [
     { to: '/dashboard/admin/screens', icon: 'tv', label: 'Screens' },
     { to: '/dashboard/admin/loops', icon: 'subscriptions', label: 'Loops' },
     { to: '/dashboard/admin/loop-analytics', icon: 'analytics', label: 'Loop Analytics', testId: 'nav-reports' },
+    DELIVERY_REPORT,
     { to: '/dashboard/admin/users', icon: 'group', label: 'Users', superAdminOnly: true },
     { to: '/dashboard/admin/organizations', icon: 'domain', label: 'Organizations', superAdminOnly: true },
     { to: '/dashboard/admin/hours', icon: 'schedule', label: 'Business Hours' },
@@ -35,6 +39,7 @@ const BRAND_NAV = [
     { to: '/dashboard/brand/campaign/new', icon: 'add_circle', label: 'New Campaign' },
     { to: '/dashboard/advertiser/campaigns', icon: 'sell', label: 'My Campaigns', testId: 'nav-campaigns' },
     { to: '/dashboard/advertiser', icon: 'insights', label: 'Performance', end: true, testId: 'nav-reports' },
+    DELIVERY_REPORT,
     { to: '/dashboard/advertiser/invoices', icon: 'receipt_long', label: 'Invoices' },
 ];
 
@@ -47,6 +52,7 @@ const RETAILER_NAV = [
     { to: '/dashboard/retailer/hours', icon: 'schedule', label: 'Store Hours', testId: 'nav-store-hours' },
     { to: '/dashboard/retailer/loops', icon: 'subscriptions', label: 'Loops' },
     { to: '/dashboard/retailer/campaign-approvals', icon: 'approval', label: 'Campaign Approvals', testId: 'nav-approvals' },
+    DELIVERY_REPORT,
     // fix(mvp-nav): MVP §3.2 — communicate feedback or issues to Softomedia
     { to: '/dashboard/tickets', icon: 'confirmation_number', label: 'Support Tickets', testId: 'nav-tickets' },
 ];

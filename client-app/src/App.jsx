@@ -42,6 +42,7 @@
  *   pages/advertiser/AdvertiserCampaigns.jsx   ✅  (served at /dashboard/advertiser/campaigns) Sprint 14
  *   pages/advertiser/Invoices.jsx              ✅  (served at /dashboard/advertiser/invoices)   Sprint 15
  *   pages/tech/TechOpsDashboard.jsx      ✅  (served at /dashboard/techoperator)
+ *   pages/reports/DeliveryReport.jsx     ✅  (served at /dashboard/delivery-report) #41
  *   pages/tickets/TicketDashboard.jsx    ✅  (served at /dashboard/tickets)
  *   pages/tickets/TicketDetail.jsx       ✅  (served at /dashboard/tickets/:id)
  *
@@ -111,6 +112,9 @@ const TicketDetail    = lazy(() => import('./pages/tickets/TicketDetail'));
 
 // ── Tech Operator pages ────────────────────────────────────────────────────────────────────────
 const TechOpsDashboard = lazy(() => import('./pages/tech/TechOpsDashboard'));
+
+// ── Reports ──────────────────────────────────────────────────────────────────────────────
+const DeliveryReport = lazy(() => import('./pages/reports/DeliveryReport'));
 
 function App() {
     return (
@@ -185,6 +189,9 @@ function App() {
                             <Route path="techoperator"        element={<TechOpsDashboard />} />
                             <Route path="techoperator/health" element={<Health />} />
                             <Route path="techoperator/screens" element={<ScreenManagement />} />
+
+                            {/* Reports — Brand, Retailer Administrator, Admin and Super Administrator (#41) */}
+                            <Route path="delivery-report" element={<DeliveryReport />} />
 
                             {/* Catch-all for unknown /dashboard/* paths */}
                             <Route path="*" element={<NotFound />} />
