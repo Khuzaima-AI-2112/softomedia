@@ -13,7 +13,11 @@ import {
 } from '../repositories/index.js';
 import { resolveAgreedCpm } from '../services/CampaignPricingService.js';
 import { prepareReservations } from '../services/SlotReservations.js';
-import { RELEASE_REASONS, releaseCampaignReservations } from '../services/ReservationRelease.js';
+import {
+    RELEASE_REASONS,
+    releaseCampaignReservations,
+    releaseLapsedReservations,
+} from '../services/ReservationRelease.js';
 import { promotionScheduleError } from '../services/Dayparts.js';
 import { authenticate } from '../middleware/auth.js';
 import {
@@ -419,8 +423,11 @@ router.patch('/:id/status', authenticate, requireCampaignApproval, async (req, r
             });
         }
 
+        // Slots whose approval deadline passed while pending are released first,
+        // so approving late never keeps them (ADR 0005).
+        if (currentStatus === 'pending_approval') await releaseLapsedReservations(id);
         const updated = await campaignRepository.update(id, { status: requestedStatus });
-        // A rejected Campaign's Slots go back to other Brands at once (ADR 0005).
+        // A rejected Campaign's Slots go back to other Brands at once.
         if (requestedStatus === 'rejected') await releaseCampaignReservations(updated, RELEASE_REASONS.REJECTED);
         res.json(updated);
     } catch (error) {
@@ -518,6 +525,9 @@ router.get('/:id/proofs-of-play', authenticate, async (req, res) => {
  */
 router.delete('/:id', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_DELETE, ROLES.SUPERADMIN), async (req, res) => {
     try {
+        const campaign = await campaignRepository.findById(req.params.id);
+        // A deleted Campaign's Slots go back to other Brands, and its Brand is told.
+        if (campaign) await releaseCampaignReservations(campaign, RELEASE_REASONS.DELETED);
         await campaignRepository.delete(req.params.id);
         res.status(204).send();
     } catch (error) {

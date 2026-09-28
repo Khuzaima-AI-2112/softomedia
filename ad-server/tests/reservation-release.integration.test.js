@@ -30,8 +30,9 @@ const MONDAY = 1;
 const BOOKED = new Date('2030-01-01T12:00:00.000Z');
 const BEFORE_DEADLINE = new Date('2030-01-06T22:59:59.000Z'); // 17:59:59 on D-1 in Toronto
 const AT_DEADLINE = new Date('2030-01-06T23:00:00.000Z'); // 18:00 on D-1 in Toronto
+const DURING_NINE = new Date('2030-01-07T14:30:00.000Z'); // 09:30 on D in Toronto: hour 8 has played
 const POSITION = 3;
-const OTHER_POSITION = 4;
+const OTHER_POSITION = 4; // Paid in both hour 8 and hour 9
 
 const SELECTION = [{
     retailer_id: 'retailer-one',
@@ -82,24 +83,26 @@ async function signInAllAt(now) {
         brandTwo: await signIn('brand', 'brand-two'),
         retailer: await signIn('retaileradmin', 'retailer-one'),
         admin: await signIn('admin'),
+        superadmin: await signIn('superadmin'),
     };
 }
 
-const book = (user, brandId, position = POSITION) => request(app).post('/api/campaigns').set(user.headers).send({
-    name: `${brandId} breakfast`,
-    media_id: `${brandId}-file`,
-    start_date: DATE,
-    end_date: DATE,
-    budget: 100,
-    inventory_selection: SELECTION,
-    slots: [{ store_id: 'store-one', date: DATE, hour: 8, position }],
-});
+const book = (user, brandId, position = POSITION, hours = [8]) => request(app).post('/api/campaigns')
+    .set(user.headers).send({
+        name: `${brandId} breakfast`,
+        media_id: `${brandId}-file`,
+        start_date: DATE,
+        end_date: DATE,
+        budget: 100,
+        inventory_selection: SELECTION,
+        slots: hours.map(hour => ({ store_id: 'store-one', date: DATE, hour, position })),
+    });
 
-/** The status of a Slot in hour 8 as this user sees it. */
-async function slotStatus(user, position = POSITION) {
+/** The status of a Slot as this user sees it. */
+async function slotStatus(user, position = POSITION, hour = 8) {
     const response = await request(app).get(`/api/inventory/stores/store-one/slots?date=${DATE}`).set(user.headers);
     expect(response.status).toBe(200);
-    return response.body.hours.find(hour => hour.hour === 8).slots[position].status;
+    return response.body.hours.find(candidate => candidate.hour === hour).slots[position].status;
 }
 
 const notifications = async user => (await request(app).get('/api/notifications').set(user.headers)).body;
@@ -235,5 +238,51 @@ describeWithAuthEmulator('Releasing Slot Reservations', () => {
 
         expect(slots[POSITION]).toMatchObject({ is_fallback: true, campaign_id: null });
         expect(await notifications(as.brand)).toHaveLength(1);
+    });
+
+    test('approving after the deadline releases the Slots even when nothing read them in between', async () => {
+        let as = await signInAllAt(BOOKED);
+        const unapproved = await book(as.brand, 'brand-one');
+
+        as = await signInAllAt(AT_DEADLINE);
+        expect((await setStatus(as.retailer, unapproved.body.id, 'approved')).status).toBe(200);
+
+        const slots = await generateHourEight(as.admin);
+        expect(slots[POSITION]).toMatchObject({ is_fallback: true, campaign_id: null });
+        const [notice] = await notifications(as.brand);
+        expect(notice.message).toContain('approval deadline');
+        // Booking for the date closed before the deadline, so no one else can take the Slot.
+        expect(notice.message).not.toContain('Other Brands');
+    });
+
+    test('cancelling a live Campaign releases only the Slots still to play', async () => {
+        let as = await signInAllAt(BOOKED);
+        const booked = await book(as.brand, 'brand-one', OTHER_POSITION, [8, 9]);
+        expect(booked.status).toBe(201);
+        expect((await setStatus(as.retailer, booked.body.id, 'approved')).status).toBe(200);
+        expect((await setStatus(as.retailer, booked.body.id, 'live')).status).toBe(200);
+
+        as = await signInAllAt(DURING_NINE);
+        expect((await cancel(as.brand, booked.body.id)).status).toBe(200);
+
+        // Hour 8 has played and stays on record; the hour still playing is released.
+        expect(await slotStatus(as.brandTwo, OTHER_POSITION, 8)).toBe('taken');
+        expect(await slotStatus(as.brandTwo, OTHER_POSITION, 9)).toBe('free');
+        const [notice] = await notifications(as.brand);
+        expect(notice.message).toContain('09:00');
+        expect(notice.message).not.toContain('08:00');
+    });
+
+    test('deleting a Campaign releases its Slots and tells the Brand', async () => {
+        const as = await signInAllAt(BOOKED);
+        const booked = await book(as.brand, 'brand-one');
+
+        expect((await request(app).delete(`/api/campaigns/${booked.body.id}`).set(as.superadmin.headers)).status)
+            .toBe(204);
+
+        expect(await slotStatus(as.brandTwo)).toBe('free');
+        expect(await notifications(as.brand)).toEqual([expect.objectContaining({
+            message: expect.stringContaining('the Campaign was deleted'),
+        })]);
     });
 });

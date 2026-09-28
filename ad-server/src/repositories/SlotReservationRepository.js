@@ -101,9 +101,13 @@ export class SlotReservationRepository extends BaseRepository {
      */
     async release(reservations, reason) {
         const releasedAt = new Date().toISOString();
-        const stillHeld = (record, reservation) => isHeld(record) && record.campaign_id === reservation.campaign_id;
-        const releasedRecord = record => ({
-            ...record, status: 'released', release_reason: reason, released_at: releasedAt, updated_at: releasedAt,
+        // The released form of each current record still held for the Reservation's Campaign, by index.
+        const releasable = currentRecords => reservations.flatMap((reservation, index) => {
+            const record = currentRecords[index];
+            if (!isHeld(record) || record.campaign_id !== reservation.campaign_id) return [];
+            return [{ index, record: {
+                ...record, status: 'released', release_reason: reason, released_at: releasedAt, updated_at: releasedAt,
+            } }];
         });
 
         let released = [];
@@ -111,19 +115,14 @@ export class SlotReservationRepository extends BaseRepository {
             released = await this.db.runTransaction(async transaction => {
                 const refs = reservations.map(reservation => this.collection.doc(reservation.id));
                 const current = await transaction.getAll(...refs);
-                const writes = reservations
-                    .map((reservation, index) => ({ ref: refs[index], record: current[index].data(), reservation }))
-                    .filter(({ record, reservation }) => stillHeld(record, reservation))
-                    .map(({ ref, record }) => ({ ref, record: releasedRecord(record) }));
-                writes.forEach(({ ref, record }) => transaction.set(ref, record));
+                const writes = releasable(current.map(snapshot => snapshot.data()));
+                writes.forEach(({ index, record }) => transaction.set(refs[index], record));
                 return writes.map(({ record }) => record);
             });
         } else if (!this.db) {
             // Memory mode: read and written without yielding, like reserveForCampaign.
-            released = reservations
-                .map(reservation => ({ record: readMockRecord(this.collectionName, reservation.id), reservation }))
-                .filter(({ record, reservation }) => stillHeld(record, reservation))
-                .map(({ record }) => releasedRecord(record));
+            released = releasable(reservations.map(reservation => readMockRecord(this.collectionName, reservation.id)))
+                .map(({ record }) => record);
         }
         commitMockStorage(released.map(record => ({ collectionName: this.collectionName, id: record.id, data: record })));
         return released;

@@ -351,7 +351,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
         }
     });
 
-    test('a cancelled Campaign’s Slot is released in Firestore and another Brand can reserve it', async () => {
+    test('a cancelled Campaign’s Slot is freed in Firestore and another Brand can reserve it', async () => {
         const creativeFor = async brandId => {
             const id = `release-creative-${brandId}-${Date.now()}`;
             createdMediaIds.push(id);
@@ -361,8 +361,13 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
             return id;
         };
         const [slot] = await freePaidSlots(brandToken, 'demo-store-phoenix', '2030-01-21');
-        const reservationRef = firestore.collection('slot_reservations')
-            .doc(`demo-store-phoenix_2030-01-21_${slot.hour}_${slot.position}`);
+        const statusFor = async token => {
+            const availability = await request(app)
+                .get('/api/inventory/stores/demo-store-phoenix/slots?date=2030-01-21')
+                .set('Authorization', `Bearer ${token}`);
+            expect(availability.status).toBe(200);
+            return availability.body.hours.find(({ hour }) => hour === slot.hour).slots[slot.position].status;
+        };
         const submit = async (token, brandId) => request(app).post('/api/campaigns')
             .set('Authorization', `Bearer ${token}`)
             .send({
@@ -389,16 +394,17 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
             const cancelled = await request(app).post(`/api/campaigns/${first.body.id}/cancel`)
                 .set('Authorization', `Bearer ${brandToken}`);
             expect(cancelled.status).toBe(200);
-            expect((await reservationRef.get()).data()).toMatchObject({
-                campaign_id: first.body.id, status: 'released', release_reason: 'campaign_cancelled',
-            });
+            expect(await statusFor(secondaryBrandToken)).toBe('free');
+            const notices = await request(app).get('/api/notifications').set('Authorization', `Bearer ${brandToken}`);
+            expect(notices.body).toEqual(expect.arrayContaining([expect.objectContaining({
+                title: 'Slot Reservation released', message: expect.stringContaining('the Campaign was cancelled'),
+            })]));
 
             const second = await submit(secondaryBrandToken, 'demo-advertiser-secondary');
             expect(second.status).toBe(201);
             campaignIds.push(second.body.id);
-            expect((await reservationRef.get()).data()).toMatchObject({
-                campaign_id: second.body.id, brand_id: 'demo-advertiser-secondary', status: 'held',
-            });
+            expect(await statusFor(secondaryBrandToken)).toBe('yours');
+            expect(await statusFor(brandToken)).toBe('taken');
         } finally {
             const released = await firestore.collection('notifications')
                 .where('title', '==', 'Slot Reservation released').get();
