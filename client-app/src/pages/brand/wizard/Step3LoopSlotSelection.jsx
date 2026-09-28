@@ -6,6 +6,12 @@ import { campaignDates, sameSlot } from './slots';
 
 const CATEGORY_LABELS = { paid: 'Paid', retailer: 'Retailer', internal: 'Internal' };
 
+const CREATIVE_LENGTHS = [
+    { count: 1, label: '5 seconds · 1 file' },
+    { count: 2, label: '10 seconds · 2 files' },
+    { count: 3, label: '15 seconds · 3 files' },
+];
+
 const formatHour = (hour) => {
     const suffix = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
@@ -159,6 +165,8 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
     const stores = data.selectedStores || [];
     const selectedSlots = data.selectedSlots || [];
     const repeatDaily = data.repeatDaily ?? true;
+    // One Slot per five-second file of the Creative, in consecutive Paid Slots.
+    const files = data.creativeFiles || 1;
     const dates = campaignDates(data.dateRange);
     if (dates.length === 0) dates.push(toISODate(new Date()));
     const [storeId, setStoreId] = useState(stores[0]);
@@ -176,7 +184,7 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
         // configuration, and after a reload nothing else has loaded it (#27).
         for (const store of storesKey.split(',')) {
             for (const date of datesKey.split(',')) {
-                apiService.getSlotAvailability(store, date)
+                apiService.getSlotAvailability(store, date, files)
                     .then(response => {
                         if (current) setDays(loaded => ({ ...loaded, [dayKey(store, date)]: { availability: response } }));
                     })
@@ -187,7 +195,7 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
             }
         }
         return () => { current = false; };
-    }, [storesKey, datesKey]);
+    }, [storesKey, datesKey, files]);
 
     // Picks made on an earlier Campaign range are repeated onto the dates added since.
     useEffect(() => {
@@ -212,15 +220,52 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
     // The dates are kept with the picks, so dates added to the Campaign later can be told apart.
     const setPicks = (picks, update = {}) => updateData({ selectedSlots: picks, slotDates: dates, ...update });
 
-    // With the option on, a Slot is picked or unpicked on every Campaign date at once.
-    const toggle = (hour, position) => {
-        const slot = { store_id: storeId, date: selectedDate, hour, position };
-        const alreadyPicked = selectedSlots.some(candidate => sameSlot(candidate, slot));
+    const isPicked = slot => selectedSlots.some(candidate => sameSlot(candidate, slot));
+
+    /**
+     * The picks played as one run with this one: its hour's picks, in position
+     * order, taken `files` at a time, as the server reads them.
+     */
+    const runOf = pick => {
+        const positions = selectedSlots
+            .filter(candidate => candidate.store_id === pick.store_id && candidate.date === pick.date
+                && candidate.hour === pick.hour)
+            .map(candidate => candidate.position)
+            .sort((left, right) => left - right);
+        const index = positions.indexOf(pick.position);
+        if (index === -1) return [pick];
+        const first = index - (index % files);
+        return positions.slice(first, first + files).map(position => ({ ...pick, position }));
+    };
+
+    /**
+     * The positions of the first free run through this Slot with no Slot already
+     * picked, or null if there is none: only these can hold the Creative.
+     */
+    const freeRunThrough = ({ hour, runs = [] }, position) => {
+        const start = runs.find(candidate => candidate <= position && position < candidate + files
+            && Array.from({ length: files }, (_, offset) => candidate + offset)
+                .every(member => !isPicked({ store_id: storeId, date: selectedDate, hour, position: member })));
+        return start === undefined ? null : Array.from({ length: files }, (_, offset) => start + offset);
+    };
+
+    // With the option on, a run is picked or unpicked on every Campaign date at once.
+    const toggle = (hourRuns, position) => {
+        const slot = { store_id: storeId, date: selectedDate, hour: hourRuns.hour, position };
+        const alreadyPicked = isPicked(slot);
+        const run = alreadyPicked ? runOf(slot) : (freeRunThrough(hourRuns, position) || [])
+            .map(member => ({ ...slot, position: member }));
         const affected = repeatDaily
-            ? dates.map(date => ({ ...slot, date }))
-            : [slot];
+            ? run.flatMap(pick => dates.map(date => ({ ...pick, date })))
+            : run;
         const others = selectedSlots.filter(candidate => !affected.some(other => sameSlot(candidate, other)));
         setPicks(alreadyPicked ? others : [...others, ...affected.map(pick => ({ ...pick, price: priceOf(pick) }))]);
+    };
+
+    // A different length needs different runs, and a Creative of that many files.
+    const setFiles = count => {
+        if (count === files) return;
+        setPicks([], { creativeFiles: count, creativeAssetId: null, creativeUrl: '' });
     };
 
     // Turning the option on repeats every Slot already picked, on any date, onto every date.
@@ -232,7 +277,11 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
         return setPicks(repeated, { repeatDaily: true });
     };
 
-    const drop = picks => setPicks(selectedSlots.filter(candidate => !picks.some(pick => sameSlot(candidate, pick))));
+    // A dropped pick takes the rest of its run with it, since part of a run can't play.
+    const drop = picks => {
+        const dropped = picks.flatMap(runOf);
+        setPicks(selectedSlots.filter(candidate => !dropped.some(pick => sameSlot(candidate, pick))));
+    };
 
     // Every pick is checked on its own day, so no day of a repeated Slot is skipped silently.
     // A pick left outside the Campaign by an earlier step is listed too, so it can be dropped.
@@ -295,7 +344,7 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
                 <BookingCutoff open={availability.booking_open} cutoff={availability.booking_cutoff} />
                 <table className="w-full border-separate border-spacing-1" aria-label="Slots by hour">
                     <tbody>
-                        {availability.hours.map(({ hour, price, tier, slots }) => (
+                        {availability.hours.map(({ hour, price, tier, slots, runs }) => (
                             <tr key={hour} aria-label={formatHour(hour)} data-testid={`hour-row-${hour}`}>
                                 <th scope="row" className="pr-3 text-left text-sm font-semibold whitespace-nowrap">
                                     <div className="flex items-center gap-2">
@@ -311,11 +360,12 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
                                         key={slot.position}
                                         slot={slot}
                                         hour={hour}
-                                        isPicked={selectedSlots.some(candidate => sameSlot(candidate, {
+                                        isPicked={isPicked({
                                             store_id: storeId, date: selectedDate, hour, position: slot.position,
-                                        }))}
-                                        canPick={availability.booking_open}
-                                        onToggle={() => toggle(hour, slot.position)}
+                                        })}
+                                        canPick={availability.booking_open
+                                            && freeRunThrough({ hour, runs }, slot.position) !== null}
+                                        onToggle={() => toggle({ hour, runs }, slot.position)}
                                     />
                                 ))}
                             </tr>
@@ -397,6 +447,24 @@ function Step3LoopSlotSelection({ data, updateData, onNext, onPrev }) {
                 />
                 Same Slots every day of the Campaign
             </label>
+
+            <fieldset className="flex flex-wrap items-center gap-4 text-sm">
+                <legend className="mb-2 font-medium">
+                    Advertisement length: a 10- or 15-second advertisement plays as two or three five-second files in consecutive Paid Slots.
+                </legend>
+                {CREATIVE_LENGTHS.map(({ count, label }) => (
+                    <label key={count} className="flex items-center gap-2">
+                        <input
+                            type="radio"
+                            name="creative-files"
+                            checked={files === count}
+                            onChange={() => setFiles(count)}
+                            className="size-4 accent-primary"
+                        />
+                        {label}
+                    </label>
+                ))}
+            </fieldset>
 
             <div className="flex gap-2 overflow-x-auto pb-2">
                 {campaignDays.map(day => (

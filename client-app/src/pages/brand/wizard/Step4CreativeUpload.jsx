@@ -3,7 +3,7 @@
  * Part of the advertiser campaign booking wizard
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import GlassCard from '../../../components/GlassCard';
 import ProtectedImage from '../../../components/ProtectedImage';
 import apiService from '../../../services/ApiService';
@@ -20,7 +20,26 @@ const DEMO_CREATIVES = [
     { id: 6, url: 'https://picsum.photos/seed/ad6/1920/1080', label: 'New Arrival' }
 ];
 
+/** One file of the Creative, checked for playability as soon as it's chosen. */
+function CreativeFileInput({ label, showError, onChange }) {
+    const { file, checkingFile, chooseFile } = useChosenMediaFile(showError);
+    useEffect(() => onChange({ file, checking: checkingFile }), [file, checkingFile]); // eslint-disable-line react-hooks/exhaustive-deps
+    return (
+        <label className="text-sm font-medium">
+            {label}
+            <input type="file" accept={ACCEPTED_MEDIA} onChange={event => chooseFile(event.target.files?.[0] || null)}
+                className="mt-1 block w-full rounded-xl border border-dashed border-slate-300 p-3 dark:border-slate-600" />
+        </label>
+    );
+}
+
+const fileLabel = (index, count) => (count === 1
+    ? 'Creative file'
+    : `File ${index + 1} of ${count} (${index === 0 ? 'first' : 'next'} 5 seconds)`);
+
 function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
+    // A 10- or 15-second advertisement is two or three five-second files, in play order.
+    const fileCount = data.creativeFiles || 1;
     const [selectedCreative, setSelectedCreative] = useState(data.creativeUrl || '');
     const [customUrl, setCustomUrl] = useState('');
     const [error, setError] = useState('');
@@ -29,7 +48,10 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
     const [uploading, setUploading] = useState(false);
     const [uploadSuccess, setUploadSuccess] = useState('');
     const [approvalStatus, setApprovalStatus] = useState(null);
-    const { file: creativeFile, checkingFile, chooseFile } = useChosenMediaFile(setError);
+    const [chosen, setChosen] = useState(() => Array.from({ length: fileCount }, () => ({ file: null, checking: false })));
+    const chooseAt = index => choice => setChosen(previous => previous.map((entry, at) => (at === index ? choice : entry)));
+    const creativeFiles = chosen.map(({ file }) => file);
+    const checkingFile = chosen.some(({ checking }) => checking);
 
     const handleSelectDemo = (url) => {
         setSelectedCreative(url);
@@ -50,13 +72,15 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
         setError('');
         setUploadSuccess('');
         setApprovalStatus(null);
-        if (!creativeTitle.trim() || !creativeFile) {
-            setError('Enter a creative title and choose a file');
+        if (!creativeTitle.trim() || creativeFiles.some(file => !file)) {
+            setError(fileCount === 1
+                ? 'Enter a creative title and choose a file'
+                : `Enter a creative title and choose all ${fileCount} files`);
             return;
         }
 
         const payload = new FormData();
-        payload.append('file', creativeFile);
+        for (const file of creativeFiles) payload.append('file', file);
         payload.append('title', creativeTitle.trim());
         payload.append('category', 'paid');
 
@@ -136,11 +160,14 @@ function Step4CreativeUpload({ data, updateData, onNext, onPrev }) {
                         <input value={creativeTitle} onChange={event => setCreativeTitle(event.target.value)}
                             className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-800" />
                     </label>
-                    <label className="text-sm font-medium">
-                        Creative file
-                        <input type="file" accept={ACCEPTED_MEDIA} onChange={event => chooseFile(event.target.files?.[0] || null)}
-                            className="mt-1 block w-full rounded-xl border border-dashed border-slate-300 p-3 dark:border-slate-600" />
-                    </label>
+                    {chosen.map((_, index) => (
+                        <CreativeFileInput
+                            key={index}
+                            label={fileLabel(index, fileCount)}
+                            showError={setError}
+                            onChange={chooseAt(index)}
+                        />
+                    ))}
                 </div>
                 <button type="button" onClick={handleFileUpload} disabled={uploading || checkingFile}
                     className="mt-4 rounded-xl bg-primary px-5 py-3 font-semibold text-white disabled:opacity-60">

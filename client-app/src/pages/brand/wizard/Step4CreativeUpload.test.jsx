@@ -77,4 +77,33 @@ describe('Brand creative upload', () => {
         });
         expect(onNext).toHaveBeenCalled();
     });
+
+    it('for a 10-second advertisement asks for two files and uploads them in order as one Creative', async () => {
+        uploadAsset.mockResolvedValue({
+            id: 'ast_first',
+            content_path: '/api/assets/ast_first/content',
+            creative: { id: 'crv_pair', approval_status: 'pending', media_ids: ['ast_first', 'ast_second'] },
+        });
+        const updateData = vi.fn();
+        render(<Step4CreativeUpload data={{ creativeFiles: 2 }} updateData={updateData} onNext={vi.fn()} onPrev={vi.fn()} />);
+        const png = name => new File(['pixels'], name, { type: 'image/png' });
+
+        fireEvent.change(screen.getByLabelText('Creative title'), { target: { value: 'Breakfast story' } });
+        fireEvent.change(screen.getByLabelText('File 1 of 2 (first 5 seconds)'), { target: { files: [png('opening.png')] } });
+        fireEvent.click(screen.getByRole('button', { name: 'Upload creative' }));
+        expect(await screen.findByText('Enter a creative title and choose all 2 files')).toBeTruthy();
+        expect(uploadAsset).not.toHaveBeenCalled();
+
+        fireEvent.change(screen.getByLabelText('File 2 of 2 (next 5 seconds)'), { target: { files: [png('closing.png')] } });
+        fireEvent.click(screen.getByRole('button', { name: 'Upload creative' }));
+
+        await waitFor(() => expect(uploadAsset).toHaveBeenCalled());
+        expect(uploadAsset.mock.calls[0][0].getAll('file').map(file => file.name)).toEqual(['opening.png', 'closing.png']);
+        expect(await screen.findByText('Creative uploaded successfully.')).toBeTruthy();
+
+        fireEvent.click(screen.getByTestId('wizard-next-step'));
+        expect(updateData).toHaveBeenCalledWith({
+            creativeUrl: '/api/assets/ast_first/content', creativeAssetId: 'ast_first',
+        });
+    });
 });

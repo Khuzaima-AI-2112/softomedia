@@ -10,6 +10,7 @@ import { sendMediaContent } from './mediaContent.js';
 import { assetContentPath } from '../constants/mediaPaths.js';
 import { decodeUploadFilename } from '../utils/uploadFilename.js';
 import { readMediaHeader } from '../utils/mediaHeaders.js';
+import { MAXIMUM_CREATIVE_FILES } from '../constants/creatives.js';
 
 const router = express.Router();
 const CATEGORIES = new Set(['paid', 'retailer', 'internal', 'fallback']);
@@ -36,18 +37,25 @@ const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0
 
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: MAXIMUM_FILE_MB * 1024 * 1024, fieldSize: 2 * 1024 * 1024, files: 1 },
+    limits: {
+        fileSize: MAXIMUM_FILE_MB * 1024 * 1024,
+        fieldSize: 2 * 1024 * 1024,
+        files: MAXIMUM_CREATIVE_FILES,
+    },
 });
 
-function receiveFile(req, res, next) {
-    upload.single('file')(req, res, error => {
+/** Receives up to three `file` fields, in the order sent: a Creative's files in play order. */
+function receiveFiles(req, res, next) {
+    upload.array('file', MAXIMUM_CREATIVE_FILES)(req, res, error => {
         if (!error) {
-            if (req.file) req.file.originalname = decodeUploadFilename(req.file.originalname);
+            for (const file of req.files || []) file.originalname = decodeUploadFilename(file.originalname);
             return next();
         }
         const message = error.code === 'LIMIT_FILE_SIZE'
             ? `File must be ${MAXIMUM_FILE_MB} MB or smaller`
-            : error.message;
+            : error.code === 'LIMIT_FILE_COUNT' || error.code === 'LIMIT_UNEXPECTED_FILE'
+                ? `A Creative holds at most ${MAXIMUM_CREATIVE_FILES} files`
+                : error.message;
         return res.status(400).json({ error: message });
     });
 }
@@ -124,17 +132,29 @@ function measureMedia(file, extension) {
     return { duration: isVideo ? header.duration : SLOT_SECONDS, width: header.width, height: header.height };
 }
 
-function validateMetadata(req, file) {
-    const title = req.body.title?.trim();
-    const category = req.body.category?.trim().toLowerCase();
-    if (!file) return { error: 'No file uploaded' };
+/** Whether a file is an accepted type that really is what its name and type claim. */
+function isAcceptedFile(file) {
     const extension = path.extname(file.originalname).toLowerCase();
     const expectedMimeType = ACCEPTED_FILES.get(extension);
-    if (!expectedMimeType || expectedMimeType !== file.mimetype || !hasExpectedSignature(file, extension)) {
-        return { error: 'Invalid file type. Allowed: .png, .jpg, .jpeg, .mp4, .mov' };
+    return Boolean(expectedMimeType) && expectedMimeType === file.mimetype && hasExpectedSignature(file, extension);
+}
+
+/**
+ * Checks each file, then the upload's metadata. Each file's measurements come
+ * back in `files`, in order. A problem with one of several files names it.
+ */
+function validateMetadata(req, files) {
+    const title = req.body.title?.trim();
+    const category = req.body.category?.trim().toLowerCase();
+    if (files.length === 0) return { error: 'No file uploaded' };
+    const whichFile = index => (files.length > 1 ? `File ${index + 1}: ` : '');
+    const rejected = files.findIndex(file => !isAcceptedFile(file));
+    if (rejected !== -1) {
+        return { error: `${whichFile(rejected)}Invalid file type. Allowed: .png, .jpg, .jpeg, .mp4, .mov` };
     }
     if (!title) return { error: 'Media title is required' };
     if (!CATEGORIES.has(category)) return { error: 'Media category must be paid, retailer, internal, or fallback' };
+    if (files.length > 1 && category !== 'paid') return { error: 'Only a Brand’s Creative may hold several files' };
 
     const uploadMetadata = resolveUploadMetadata(req, category);
     if (!uploadMetadata) return { status: 403, error: 'This role cannot upload media in the selected category' };
@@ -158,10 +178,11 @@ function validateMetadata(req, file) {
         return { error: `${category} media cannot have an organization owner` };
     }
 
-    const measured = measureMedia(file, extension);
-    if (measured.error) return measured;
+    const measured = files.map(file => measureMedia(file, path.extname(file.originalname).toLowerCase()));
+    const unmeasured = measured.findIndex(measurement => measurement.error);
+    if (unmeasured !== -1) return { error: `${whichFile(unmeasured)}${measured[unmeasured].error}` };
 
-    return { title, category, ...measured, ...uploadMetadata };
+    return { title, category, files: measured, ...uploadMetadata };
 }
 
 router.get('/', async (req, res) => {
@@ -191,11 +212,15 @@ router.get('/', async (req, res) => {
 
 /**
  * Stored media is addressed by its API content path; its Storage location stays
- * internal. A paid file carries the approval status of the Creative it belongs to.
+ * internal. A paid file carries the Creative it belongs to: its approval status
+ * and all its files in play order.
  */
 function presentAsset(asset, creative = null) {
     const presented = creative
-        ? { ...asset, creative: { id: creative.id, approval_status: creative.approval_status } }
+        ? {
+            ...asset,
+            creative: { id: creative.id, approval_status: creative.approval_status, media_ids: creative.media_ids },
+        }
         : asset;
     if (!presented?.storage_path) return presented;
     const addressed = { ...presented, content_path: assetContentPath(asset.id) };
@@ -203,11 +228,12 @@ function presentAsset(asset, creative = null) {
     return addressed;
 }
 
-/** A Retailer reviews the creative of any Campaign booked at its Stores. */
+/** A Retailer reviews every file of the Creative of any Campaign booked at its Stores. */
 async function isUnderReviewBy(asset, retailerId) {
     if (!retailerId) return false;
     const campaigns = await campaignRepository.findAll();
-    return campaigns.some(campaign => (campaign.media_id === asset.id || campaign.asset_id === asset.id)
+    return campaigns.some(campaign => (campaign.media_id === asset.id || campaign.asset_id === asset.id
+        || (asset.creative_id && campaign.creative_id === asset.creative_id))
         && campaignRepository.targetsRetailer(campaign, retailerId));
 }
 
@@ -237,32 +263,41 @@ router.get('/:id/content', async (req, res) => {
     return sendMediaContent(res, asset);
 });
 
-router.post('/upload', receiveFile, async (req, res) => {
-    const metadata = validateMetadata(req, req.file);
+/**
+ * POST /api/assets/upload
+ * One file, or for a Brand's Creative up to three sent in play order. Every
+ * file is stored as its own media record; a paid upload's files form one new
+ * Creative, approved as one. Answers with the first file.
+ */
+router.post('/upload', receiveFiles, async (req, res) => {
+    const files = req.files || [];
+    const metadata = validateMetadata(req, files);
     if (metadata.error) return res.status(metadata.status || 400).json({ error: metadata.error });
     if (!mediaRepository.isDurable()) {
         return res.status(503).json({ error: 'Persistent media metadata is unavailable; no success was recorded' });
     }
 
-    const id = `ast_${randomUUID()}`;
-    const extension = path.extname(req.file.originalname).toLowerCase();
-    const destination = `phase-1-demo/uploads/${id}${extension}`;
-    let storedObject = null;
+    const ids = files.map(() => `ast_${randomUUID()}`);
+    const storedObjects = [];
+    const createdIds = [];
     let creative = null;
 
     try {
-        storedObject = await uploadMediaObject({
-            destination,
-            buffer: req.file.buffer,
-            contentType: req.file.mimetype,
-            metadata: { mediaCategory: metadata.category, assetId: id },
-        });
+        for (const [index, file] of files.entries()) {
+            const extension = path.extname(file.originalname).toLowerCase();
+            storedObjects.push(await uploadMediaObject({
+                destination: `phase-1-demo/uploads/${ids[index]}${extension}`,
+                buffer: file.buffer,
+                contentType: file.mimetype,
+                metadata: { mediaCategory: metadata.category, assetId: ids[index] },
+            }));
+        }
 
         // Every paid upload is a new Creative, even of a file uploaded before.
         if (metadata.category === 'paid') {
             creative = await creativeRepository.create(creativeRepository.newId(), {
                 brand_id: metadata.ownerId,
-                media_ids: [id],
+                media_ids: ids,
                 approval_status: CREATIVE_STATUS.PENDING,
                 decided_by: null,
                 decided_at: null,
@@ -275,28 +310,34 @@ router.post('/upload', receiveFile, async (req, res) => {
                 approval_status: metadata.approvalStatus,
                 eligible_for_playback: metadata.approvalStatus === 'approved',
             };
-        const asset = await mediaRepository.create(id, {
-            id,
-            title: metadata.title,
-            filename: req.file.originalname,
-            category: metadata.category,
-            content_kind: metadata.category === 'fallback' ? 'neutral_fallback' : 'campaign',
-            owner_type: metadata.ownerType,
-            owner_id: metadata.ownerId,
-            ...approval,
-            duration: metadata.duration,
-            width: metadata.width ?? null,
-            height: metadata.height ?? null,
-            mime_type: req.file.mimetype,
-            file_type: req.file.mimetype,
-            size_bytes: req.file.size,
-            storage_path: storedObject.storage_path,
-            status: 'ready',
-        });
-        return res.status(201).json(presentAsset(asset, creative));
+        const assets = [];
+        for (const [index, file] of files.entries()) {
+            const measured = metadata.files[index];
+            assets.push(await mediaRepository.create(ids[index], {
+                id: ids[index],
+                title: files.length > 1 ? `${metadata.title} (${index + 1} of ${files.length})` : metadata.title,
+                filename: file.originalname,
+                category: metadata.category,
+                content_kind: metadata.category === 'fallback' ? 'neutral_fallback' : 'campaign',
+                owner_type: metadata.ownerType,
+                owner_id: metadata.ownerId,
+                ...approval,
+                duration: measured.duration,
+                width: measured.width ?? null,
+                height: measured.height ?? null,
+                mime_type: file.mimetype,
+                file_type: file.mimetype,
+                size_bytes: file.size,
+                storage_path: storedObjects[index].storage_path,
+                status: 'ready',
+            }));
+            createdIds.push(ids[index]);
+        }
+        return res.status(201).json(presentAsset(assets[0], creative));
     } catch (error) {
+        await Promise.all(createdIds.map(id => mediaRepository.delete(id)));
         if (creative) await creativeRepository.delete(creative.id);
-        if (storedObject?.storage_path) {
+        for (const storedObject of storedObjects) {
             try {
                 await deleteMediaObject(storedObject.object_ref);
             } catch (cleanupError) {

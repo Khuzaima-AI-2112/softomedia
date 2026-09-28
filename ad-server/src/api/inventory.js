@@ -8,6 +8,7 @@ import {
 import PricingRepository from '../repositories/PricingRepository.js';
 import { authenticate } from '../middleware/auth.js';
 import { brandIdFor, normalizeRole } from '../constants/roles.js';
+import { MAXIMUM_CREATIVE_FILES } from '../constants/creatives.js';
 import { isCalendarDate, slotAvailability } from '../services/SlotReservations.js';
 
 const router = express.Router();
@@ -32,15 +33,21 @@ router.get('/', async (req, res) => {
 });
 
 /**
- * GET /api/inventory/stores/:storeId/slots?date=YYYY-MM-DD
+ * GET /api/inventory/stores/:storeId/slots?date=YYYY-MM-DD[&files=1|2|3]
  * Each Slot of each operating hour with only its category and status (free,
  * taken or yours), so a Brand never learns which organization holds a Slot,
- * plus each hour's price and the date's Booking Cutoff.
+ * plus each hour's price and the date's Booking Cutoff. Each hour's `runs`
+ * lists where enough free consecutive Paid Slots begin for a Creative of
+ * `files` files (default 1).
  */
 router.get('/stores/:storeId/slots', async (req, res) => {
-    const { date } = req.query;
+    const { date, files = '1' } = req.query;
     if (!isCalendarDate(date)) {
         return res.status(400).json({ error: 'date must be a calendar date in YYYY-MM-DD form' });
+    }
+    const runLength = Number(files);
+    if (!/^\d+$/.test(files) || runLength < 1 || runLength > MAXIMUM_CREATIVE_FILES) {
+        return res.status(400).json({ error: 'files must be 1, 2 or 3' });
     }
 
     try {
@@ -49,7 +56,7 @@ router.get('/stores/:storeId/slots', async (req, res) => {
             return res.status(404).json({ error: 'Store not found' });
         }
         const store = await StoreRepository.findById(req.params.storeId);
-        return res.json(await slotAvailability(store, date, brandIdFor(req.user)));
+        return res.json(await slotAvailability(store, date, brandIdFor(req.user), runLength));
     } catch (error) {
         console.error('Failed to load Slot availability:', error);
         return res.status(500).json({ error: 'Slot availability could not be loaded' });

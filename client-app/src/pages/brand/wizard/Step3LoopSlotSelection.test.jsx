@@ -17,20 +17,24 @@ const FIRST_HOUR = ['paid', 'paid', 'retailer', 'paid', 'paid', 'internal',
 const PRICES = { 8: { price: 15.75, tier: 'low' }, 9: { price: 15.75, tier: 'low' }, 10: { price: 22.5, tier: 'medium' },
     12: { price: 33.75, tier: 'high' } };
 
-const availability = (hours = [8, 9], { statuses = {}, bookingOpen = true } = {}) => ({
+// As the server answers: each hour lists where `runLength` free Paid Slots in a row begin.
+const availability = (hours = [8, 9], { statuses = {}, bookingOpen = true, runLength = 1 } = {}) => ({
     is_closed: false,
     booking_open: bookingOpen,
     booking_cutoff: { date: '2030-01-05', time: '18:00', time_zone: 'America/Toronto' },
     currency: 'USD',
-    hours: hours.map(hour => ({
-        hour,
-        ...PRICES[hour],
-        slots: FIRST_HOUR.map((category, position) => ({
+    run_length: runLength,
+    hours: hours.map(hour => {
+        const slots = FIRST_HOUR.map((category, position) => ({
             position,
             category,
             status: category === 'paid' ? statuses[`${hour}_${position}`] || 'free' : null,
-        })),
-    })),
+        }));
+        const free = position => slots[position]?.status === 'free';
+        const runs = slots.map(({ position }) => position)
+            .filter(start => Array.from({ length: runLength }, (_, offset) => start + offset).every(free));
+        return { hour, ...PRICES[hour], slots, runs };
+    }),
 });
 
 const wizardData = {
@@ -65,7 +69,7 @@ describe('Brand wizard slot grid', () => {
         renderStep();
 
         const eightAm = await screen.findByRole('row', { name: /8:00 AM/ });
-        expect(getSlotAvailability).toHaveBeenCalledWith('store_1', '2030-01-07');
+        expect(getSlotAvailability).toHaveBeenCalledWith('store_1', '2030-01-07', 1);
         expect(within(eightAm).getAllByRole('cell')).toHaveLength(12);
         expect(screen.getByRole('row', { name: /9:00 AM/ })).toBeTruthy();
     });
@@ -396,7 +400,7 @@ describe('Same Slots every day of the Campaign', () => {
             'Mon, Jan 7: Slot 1 at 8:00 AM, Airport Café, is outside the Campaign’s Stores or dates.',
             'Sat, Jan 12: Slot 1 at 8:00 AM, Downtown Café, is outside the Campaign’s Stores or dates.',
         ]);
-        expect(getSlotAvailability).not.toHaveBeenCalledWith('store_3', expect.anything());
+        expect(getSlotAvailability.mock.calls.map(([storeId]) => storeId)).not.toContain('store_3');
 
         fireEvent.click(within(listed).getByRole('button', { name: 'Drop all' }));
         expect(conflicts()).toBeNull();
@@ -459,5 +463,79 @@ describe('Same Slots every day of the Campaign', () => {
         expect(summary()).toContain('$51.50');
         fireEvent.click(screen.getByTestId('step-3-next-btn'));
         expect(submitted.map(pick => pick.price)).toEqual([15.75, 15.75, 20]);
+    });
+});
+
+describe('Brand wizard slot grid for a multi-file Creative', () => {
+    // 8:00 AM: P P R P P I P P R P P P, so two-Slot runs start at Slots 1, 4, 7, 10 and 11.
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getSlotAvailability.mockImplementation(async (storeId, date, files = 1) =>
+            availability([8], { runLength: files }));
+    });
+
+    /** The wizard's own state, so each choice is seen by the next render. */
+    function Wizard({ initial }) {
+        const [data, setData] = useState({ ...wizardData, repeatDaily: false, ...initial });
+        Wizard.latest = data;
+        return (
+            <Step3LoopSlotSelection
+                data={data}
+                updateData={update => setData(previous => ({ ...previous, ...update }))}
+                onNext={vi.fn()}
+                onPrev={vi.fn()}
+            />
+        );
+    }
+    const positionsPicked = () => Wizard.latest.selectedSlots.map(pick => pick.position).sort((a, b) => a - b);
+
+    it('asks how long the advertisement is, and loads runs long enough for it', async () => {
+        render(<Wizard initial={{}} />);
+        await screen.findByRole('row', { name: /8:00 AM/ });
+        expect(screen.getByRole('radio', { name: '5 seconds · 1 file' }).checked).toBe(true);
+
+        fireEvent.click(screen.getByRole('radio', { name: '10 seconds · 2 files' }));
+
+        await vi.waitFor(() => expect(getSlotAvailability).toHaveBeenCalledWith('store_1', '2030-01-07', 2));
+        expect(Wizard.latest.creativeFiles).toBe(2);
+    });
+
+    it('picks a whole run of consecutive Paid Slots at once, and unpicks it whole', async () => {
+        render(<Wizard initial={{ creativeFiles: 2 }} />);
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Slot 5 at 8:00 AM' }));
+        expect(positionsPicked()).toEqual([3, 4]);
+        expect(screen.getByRole('cell', { name: 'Slot 4 at 8:00 AM: Paid, picked' })).toBeTruthy();
+
+        // Slots 10–12 hold one run of two; once 10 and 11 are picked, 12 has no partner left.
+        fireEvent.click(screen.getByRole('button', { name: 'Slot 10 at 8:00 AM' }));
+        expect(positionsPicked()).toEqual([3, 4, 9, 10]);
+        expect(within(screen.getByRole('cell', { name: 'Slot 12 at 8:00 AM: Paid, free' })).queryByRole('button'))
+            .toBeNull();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Slot 11 at 8:00 AM' }));
+        expect(positionsPicked()).toEqual([3, 4]);
+    });
+
+    it('offers no free Paid Slot that is outside every run of the right length', async () => {
+        render(<Wizard initial={{ creativeFiles: 3 }} />);
+
+        const eightAm = await screen.findByRole('row', { name: /8:00 AM/ });
+        expect(within(eightAm).getAllByRole('button').map(button => button.getAttribute('aria-label')))
+            .toEqual(['Slot 10 at 8:00 AM', 'Slot 11 at 8:00 AM', 'Slot 12 at 8:00 AM']);
+        expect(within(screen.getByRole('cell', { name: 'Slot 1 at 8:00 AM: Paid, free' })).queryByRole('button'))
+            .toBeNull();
+    });
+
+    it('drops picks and any uploaded Creative when the length changes', async () => {
+        render(<Wizard initial={{ creativeAssetId: 'ast_old', creativeUrl: '/api/assets/ast_old/content' }} />);
+        fireEvent.click(await screen.findByRole('button', { name: 'Slot 1 at 8:00 AM' }));
+        expect(positionsPicked()).toEqual([0]);
+
+        fireEvent.click(screen.getByRole('radio', { name: '15 seconds · 3 files' }));
+
+        expect(Wizard.latest).toMatchObject({
+            creativeFiles: 3, selectedSlots: [], creativeAssetId: null, creativeUrl: '',
+        });
     });
 });

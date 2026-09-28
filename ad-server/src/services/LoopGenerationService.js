@@ -9,6 +9,7 @@ import { loopRepository, LOOP_STATUS } from '../repositories/LoopRepository.js';
 import { campaignRepository } from '../repositories/CampaignRepository.js';
 import { dailyScheduleRepository } from '../repositories/DailyScheduleRepository.js';
 import { mediaRepository } from '../repositories/MediaRepository.js';
+import { creativeRepository } from '../repositories/CreativeRepository.js';
 import StoreRepository from '../repositories/StoreRepository.js';
 import { daypartRepository } from '../repositories/DaypartRepository.js';
 import { BusinessHoursService } from './BusinessHoursService.js';
@@ -18,7 +19,6 @@ import logger from '../utils/logger.js';
 import {
     isApprovedFallbackAsset,
     isApprovedPlaybackAsset,
-    isPlayableStoredAsset,
 } from './PlaybackEligibility.js';
 import { allocatedCategory, firstPositionOfHour, SLOTS_PER_LOOP } from './SlotInventory.js';
 
@@ -253,27 +253,48 @@ export class LoopGenerationService {
      * A Store's held Reservations for a date whose Creative is approved, by hour then
      * position. Any other Reservation's Slot gets Fallback Content. The Campaign's
      * own approval is checked when the Slot plays, so one approved after
-     * generation still plays.
+     * generation still plays. A Creative's files play in order: its Reservations
+     * in an hour come in runs of consecutive Slots, one Slot per file.
      * @returns {Promise<Map<number, Map<number, object>>>}
      */
     async getReservedCreatives(storeId, targetDate) {
         const store = await StoreRepository.findById(storeId);
         const reservations = store ? await heldReservations(store, targetDate) : [];
-        const byHour = new Map();
-        await Promise.all(reservations.map(async reservation => {
-            const campaign = await campaignRepository.findById(reservation.campaign_id);
-            const asset = campaign && await mediaRepository.findById(campaign.media_id || campaign.asset_id);
-            if (!(await isPlayableStoredAsset(asset))) return;
+        const byCampaignHour = new Map();
+        for (const reservation of reservations) {
+            const key = `${reservation.campaign_id}_${reservation.hour}`;
+            byCampaignHour.set(key, [...(byCampaignHour.get(key) || []), reservation]);
+        }
 
-            if (!byHour.has(reservation.hour)) byHour.set(reservation.hour, new Map());
-            byHour.get(reservation.hour).set(reservation.position, {
-                type: 'paid',
-                campaign_id: campaign.id,
-                asset_id: asset.id,
-                asset_name: asset.title || asset.filename || null,
+        const byHour = new Map();
+        await Promise.all([...byCampaignHour.values()].map(async held => {
+            const campaign = await campaignRepository.findById(held[0].campaign_id);
+            const parts = campaign ? await this.getCreativeFiles(campaign) : [];
+            if (parts.length === 0) return;
+
+            const { hour } = held[0];
+            if (!byHour.has(hour)) byHour.set(hour, new Map());
+            held.sort((a, b) => a.position - b.position).forEach((reservation, index) => {
+                const asset = parts[index % parts.length];
+                byHour.get(hour).set(reservation.position, {
+                    type: 'paid',
+                    campaign_id: campaign.id,
+                    asset_id: asset.id,
+                    asset_name: asset.title || asset.filename || null,
+                });
             });
         }));
         return byHour;
+    }
+
+    /** The files of a Campaign's Creative in play order, or none unless every one may play. */
+    async getCreativeFiles(campaign) {
+        const first = await mediaRepository.findById(campaign.media_id || campaign.asset_id);
+        const creative = await creativeRepository.findForAsset(first);
+        const parts = creative?.media_ids?.length
+            ? await Promise.all(creative.media_ids.map(id => mediaRepository.findById(id)))
+            : [first];
+        return parts.every(part => isApprovedPlaybackAsset(part, creative)) ? parts : [];
     }
 
     namesRetailer(campaign, retailerId) {

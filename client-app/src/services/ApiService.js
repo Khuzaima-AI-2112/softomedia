@@ -302,8 +302,9 @@ class ApiService {
         return apiClient.get('/api/inventory');
     }
 
-    async getSlotAvailability(storeId, date) {
-        const query = new URLSearchParams({ date }).toString();
+    /** A Store's Slots on a date, with where runs long enough for a Creative of `files` files begin. */
+    async getSlotAvailability(storeId, date, files = 1) {
+        const query = new URLSearchParams({ date, files: String(files) }).toString();
         return apiClient.get(`/api/inventory/stores/${encodeURIComponent(storeId)}/slots?${query}`);
     }
 
