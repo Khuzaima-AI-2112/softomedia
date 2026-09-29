@@ -56,7 +56,7 @@ function LocationManager() {
             setShowStoreForm(false);
             setMessage({ type: 'success', text: `${store.name} was created with 08:00–22:00 hours every day.` });
         } catch (error) {
-            setMessage({ type: 'error', text: error?.response?.data?.error || 'Unable to create the store.' });
+            setMessage({ type: 'error', text: error?.response?.error || 'Unable to create the store.' });
         }
     };
 
@@ -69,7 +69,7 @@ function LocationManager() {
             setShowLocationForm(false);
             setMessage({ type: 'success', text: `${location.name} was added to the selected store.` });
         } catch (error) {
-            setMessage({ type: 'error', text: error?.response?.data?.error || 'Unable to create the location.' });
+            setMessage({ type: 'error', text: error?.response?.error || 'Unable to create the location.' });
         }
     };
 

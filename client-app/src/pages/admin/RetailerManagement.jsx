@@ -202,7 +202,7 @@ function RetailerManagement() {
             closeModal();
         } catch (error) {
             console.error('Failed to save retailer:', error);
-            setModalError(error?.data?.message || error.message || 'Failed to save retailer');
+            setModalError(error?.message || 'Failed to save retailer');
         } finally {
             setRetailerSubmitting(false);
         }
@@ -219,7 +219,7 @@ function RetailerManagement() {
             addToast(`Retailer "${retailer.name}" deleted.`, 'success');
         } catch (error) {
             console.error('Failed to delete retailer:', error);
-            setPageError(error?.data?.message || error.message || 'Failed to delete retailer');
+            setPageError(error?.message || 'Failed to delete retailer');
         }
     };
 
@@ -236,7 +236,7 @@ function RetailerManagement() {
             addToast(`Retailer "${retailer.name}" is now ${newStatus}.`, 'success');
         } catch (error) {
             console.error('Failed to toggle retailer status:', error);
-            setPageError(error?.data?.message || error.message || 'Failed to toggle retailer status');
+            setPageError(error?.message || 'Failed to toggle retailer status');
         } finally {
             setTogglingIds(prev => { const n = new Set(prev); n.delete(retailer.id); return n; });
         }
@@ -339,7 +339,7 @@ function RetailerManagement() {
             closeStoreModal();
         } catch (error) {
             console.error('Failed to save store:', error);
-            setStoreModalError(error?.data?.message || error.message || 'Failed to save store');
+            setStoreModalError(error?.message || 'Failed to save store');
         } finally {
             setStoreSubmitting(false);
         }
@@ -356,7 +356,7 @@ function RetailerManagement() {
             addToast(`Store "${store.name}" deleted.`, 'success');
         } catch (error) {
             console.error('Failed to delete store:', error);
-            addToast(error?.data?.message || error.message || `Failed to delete store "${store.name}".`, 'error');
+            addToast(error?.message || `Failed to delete store "${store.name}".`, 'error');
         } finally {
             setDeletingStoreIds(prev => { const n = new Set(prev); n.delete(store.id); return n; });
         }
@@ -484,7 +484,8 @@ function RetailerManagement() {
             header: 'Contract Start',
             render: (retailer) => (
                 <span className="text-sm text-slate-600 dark:text-slate-400">
-                    {new Date(retailer.contract_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {/* A date-only value parses as UTC midnight; format it in UTC so it keeps its day. */}
+                    {new Date(retailer.contract_start).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' })}
                 </span>
             )
         },
