@@ -250,6 +250,36 @@ describeWithEmulators('Hourly Loop review', () => {
             expect(rejected.body.slots[3]).toEqual(expect.objectContaining({ status: 'rejected', rejection_reason: 'Blurry' }));
         });
 
+        test('a Slot position outside the Hourly Loop is refused and changes nothing', async () => {
+            const id = await createLoop('bad-position', { hour: 19 });
+            const approved = await createLoop('bad-position-approved', { hour: 20, status: 'approved' });
+            const before = (await firestore.collection('loops').doc(id).get()).data();
+            const approvedBefore = (await firestore.collection('loops').doc(approved).get()).data();
+
+            for (const position of ['-1', '12', 'abc', '1.5', '3abc']) {
+                const rejected = await request(app).patch(`/api/loops/${id}/slots/${position}/reject`)
+                    .set(as.retailer).send({ reason: 'Blurry' });
+                expect(rejected.status).toBe(400);
+                expect(rejected.body).toEqual({ error: `Invalid slot position: ${position}` });
+
+                const replaced = await request(app).patch(`/api/loops/${id}/slots/${position}/replace`)
+                    .set(as.admin).send({ assetId: 'new-asset' });
+                expect(replaced.status).toBe(400);
+                expect(replaced.body).toEqual({ error: `Invalid slot position: ${position}` });
+
+                const versioned = await request(app).patch(`/api/loops/${approved}/slots/${position}/replace`)
+                    .set(as.admin).send({ assetId: 'new-asset' });
+                expect(versioned.status).toBe(400);
+            }
+
+            expect((await firestore.collection('loops').doc(id).get()).data()).toEqual(before);
+            expect((await firestore.collection('loops').doc(approved).get()).data()).toEqual(approvedBefore);
+            expect((await firestore.collection('loops').doc(`${approved}_v2`).get()).exists).toBe(false);
+            const audits = await firestore.collection('scheduling_audits')
+                .where('entity_id', 'in', [id, approved, `${approved}_v2`]).get();
+            expect(audits.empty).toBe(true);
+        });
+
         test('an Hourly Loop whose broadcast has started can no longer be reviewed', async () => {
             const id = await createLoop('started', { date: PAST });
 
