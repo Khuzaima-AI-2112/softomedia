@@ -1,6 +1,7 @@
 import express from 'express';
 import { userRepository } from '../repositories/index.js';
 import logger from '../utils/logger.js';
+import { isValidEmail } from '../utils/email.js';
 import { requirePlatformGovernance } from '../middleware/requireRole.js';
 import { CANONICAL_ROLES } from '../constants/roles.js';
 
@@ -53,11 +54,8 @@ router.post('/', async (req, res) => {
 
         if (!email || typeof email !== 'string') {
             errors.push('Email is required');
-        } else {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(email)) {
-                errors.push('Email must be a valid email address');
-            }
+        } else if (!isValidEmail(email)) {
+            errors.push('Email must be a valid email address');
         }
 
         const allowedRoles = CANONICAL_ROLES;
@@ -109,11 +107,8 @@ router.put('/:id', async (req, res) => {
         if (email !== undefined) {
             if (typeof email !== 'string') {
                 errors.push('Email must be a string');
-            } else {
-                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                if (!emailRegex.test(email)) {
-                    errors.push('Email must be a valid email address');
-                }
+            } else if (!isValidEmail(email)) {
+                errors.push('Email must be a valid email address');
             }
         }
 
@@ -164,10 +159,7 @@ router.patch('/:id', async (req, res) => {
         const allowedStatuses = ['active', 'inactive'];
 
         if (name     !== undefined && (typeof name !== 'string' || name.trim().length < 1)) errors.push('Name must be a non-empty string');
-        if (email    !== undefined) {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(email)) errors.push('Email must be a valid email address');
-        }
+        if (email    !== undefined && !isValidEmail(email))    errors.push('Email must be a valid email address');
         if (role     !== undefined && !allowedRoles.includes(role))    errors.push(`Role must be one of: ${allowedRoles.join(', ')}`);
         if (status   !== undefined && !allowedStatuses.includes(status)) errors.push(`Status must be one of: ${allowedStatuses.join(', ')}`);
 
