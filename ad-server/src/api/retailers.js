@@ -1,6 +1,7 @@
 import express from 'express';
 import { retailerRepository } from '../repositories/RetailerRepository.js';
 import logger from '../utils/logger.js';
+import { isValidEmail } from '../utils/email.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireOrganizationManagement } from '../middleware/requireRole.js';
 
@@ -71,11 +72,8 @@ router.post('/', authenticate, requireOrganizationManagement, async (req, res) =
 
         if (!contact_email || typeof contact_email !== 'string') {
             errors.push('Contact email is required');
-        } else {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(contact_email)) {
-                errors.push('Contact email must be a valid email address');
-            }
+        } else if (!isValidEmail(contact_email)) {
+            errors.push('Contact email must be a valid email address');
         }
 
         if (!contract_start || typeof contract_start !== 'string') {

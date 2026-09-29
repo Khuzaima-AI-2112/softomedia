@@ -1,6 +1,7 @@
 import express from 'express';
 import { advertiserRepository } from '../repositories/AdvertiserRepository.js';
 import logger from '../utils/logger.js';
+import { isValidEmail } from '../utils/email.js';
 import { authenticate } from '../middleware/auth.js';
 import {
     PERMISSIONS,
@@ -83,7 +84,7 @@ router.post('/', authenticate, requireOrganizationManagement, async (req, res) =
         if (!industry || typeof industry !== 'string' || industry.trim().length === 0) {
             errors.push('industry is required');
         }
-        if (!contactemail || typeof contactemail !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactemail)) {
+        if (!isValidEmail(contactemail)) {
             errors.push('contactemail must be a valid email address');
         }
         if (budget === undefined || budget === null || isNaN(Number(budget)) || Number(budget) < 0) {

@@ -144,6 +144,28 @@ describeWithEmulators('User, Retailer and Brand administration', () => {
             expect(invalid.body.error.split(' | ')).toHaveLength(4);
         });
 
+        test('an email with spaces around it is saved trimmed, and one with a space inside is refused', async () => {
+            const response = await createUser({ name: 'Padded', email: `  Padded.${suffix}@Example.com `, role: 'brand' });
+            expect(response.status).toBe(201);
+            created.users.push(response.body.id);
+            expect(response.body.email).toBe(`padded.${suffix}@example.com`);
+            const url = `/api/users/${response.body.id}`;
+
+            const put = await request(app).put(url).set(as.superadmin).send({ email: ` Padded.Put.${suffix}@Example.com ` });
+            expect(put.status).toBe(200);
+            expect(put.body.email).toBe(`padded.put.${suffix}@example.com`);
+
+            const patch = await request(app).patch(url).set(as.superadmin).send({ email: ` Padded.Patch.${suffix}@Example.com ` });
+            expect(patch.status).toBe(200);
+            expect(patch.body.email).toBe(`padded.patch.${suffix}@example.com`);
+
+            const inner = `pad ded.${suffix}@example.com`;
+            expect((await createUser({ name: 'Inner', email: inner, role: 'brand' })).status).toBe(400);
+            expect((await request(app).put(url).set(as.superadmin).send({ email: inner })).status).toBe(400);
+            expect((await request(app).patch(url).set(as.superadmin).send({ email: inner })).status).toBe(400);
+            expect((await request(app).patch(url).set(as.superadmin).send({ email: ['listed@example.com'] })).status).toBe(400);
+        });
+
         test('updating or deleting a user who does not exist answers 404', async () => {
             const missing = `missing-user-${suffix}`;
             expect((await request(app).put(`/api/users/${missing}`).set(as.superadmin).send({ name: 'X' })).status).toBe(404);
@@ -224,6 +246,19 @@ describeWithEmulators('User, Retailer and Brand administration', () => {
             expect(invalid.status).toBe(400);
             expect(invalid.body.error).toContain('Contact email must be a valid email address');
             expect(invalid.body.error).toContain('Contract start date must be a valid date string');
+        });
+
+        test('a contact email with spaces around it is saved trimmed, and one with a space inside is refused', async () => {
+            const id = `ret-padded-${suffix}`;
+            const response = await createRetailer({ ...valid(id), contact_email: '  Ops@Northwind.test ' });
+
+            expect(response.status).toBe(201);
+            created.retailers.push(id);
+            expect(response.body.contact_email).toBe('Ops@Northwind.test');
+
+            const inner = await createRetailer({ ...valid(`ret-inner-${suffix}`), contact_email: 'ops @northwind.test' });
+            expect(inner.status).toBe(400);
+            expect(inner.body.error).toBe('Contact email must be a valid email address');
         });
 
         test('creating a Retailer with an ID already in use answers 409', async () => {
@@ -352,6 +387,19 @@ describeWithEmulators('User, Retailer and Brand administration', () => {
                 'contactemail must be a valid email address',
                 'budget must be a non-negative number',
             ]);
+        });
+
+        test('a contact email with spaces around it is saved trimmed, and one with a space inside is refused', async () => {
+            const id = `adv-padded-${suffix}`;
+            const response = await createAdvertiser({ ...valid(id), contactemail: '  Buyer@Acme.test ' });
+
+            expect(response.status).toBe(201);
+            created.advertisers.push(id);
+            expect(response.body.contactemail).toBe('buyer@acme.test');
+
+            const inner = await createAdvertiser({ ...valid(`adv-inner-${suffix}`), contactemail: 'buy er@acme.test' });
+            expect(inner.status).toBe(400);
+            expect(inner.body.error).toBe('contactemail must be a valid email address');
         });
 
         test('creating a Brand with an ID already in use answers 409', async () => {
