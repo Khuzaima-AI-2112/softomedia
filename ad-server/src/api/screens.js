@@ -100,10 +100,7 @@ router.get('/', authenticate, async (req, res) => {
 
         if (userHasPermission(req.user, PERMISSIONS.SCREEN_MANAGEMENT)) {
             // Technical Operator, Admin, Super Administrator — see everything
-            const storeId = req.query.store_id || req.query.storeId || req.query.storeid;
-            const screens = storeId
-                ? await screenRepository.findByLocation(storeId)
-                : await screenRepository.findAll();
+            const screens = await screenRepository.findAll();
             return res.json(screens.map(withoutDeviceCredential));
         }
 
