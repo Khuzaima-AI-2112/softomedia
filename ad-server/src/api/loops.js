@@ -27,6 +27,7 @@ import { loopRepository, LOOP_STATUS } from '../repositories/LoopRepository.js';
 import { loopGenerationService } from '../services/LoopGenerationService.js';
 import { BusinessHoursService } from '../services/BusinessHoursService.js';
 import { approvalWindowService, ApprovalWindowError } from '../services/ApprovalWindowService.js';
+import { SLOTS_PER_LOOP } from '../services/SlotInventory.js';
 import StoreRepository from '../repositories/StoreRepository.js';
 import { authenticate } from '../middleware/auth.js';
 import { PERMISSIONS, requireCampaignApproval, requirePermission } from '../middleware/requireRole.js';
@@ -58,6 +59,13 @@ async function findAuthorizedLoop(req, res, allowedRoles) {
         return null;
     }
     return loop;
+}
+
+/** The Slot position in the URL as a whole number inside the Hourly Loop, or null. */
+function slotPositionFrom(param) {
+    if (!/^\d+$/.test(param)) return null;
+    const position = Number(param);
+    return position < SLOTS_PER_LOOP ? position : null;
 }
 
 function sendApprovalError(res, error, fallback) {
@@ -378,9 +386,12 @@ router.patch('/:id/approve', authenticate, requireCampaignApproval, async (req, 
 router.patch('/:id/slots/:position/reject', authenticate, requireCampaignApproval, async (req, res) => {
     try {
         const { id } = req.params;
-        const position = parseInt(req.params.position, 10);
+        const position = slotPositionFrom(req.params.position);
         const reason = req.body.reason?.trim();
 
+        if (position === null) {
+            return res.status(400).json({ error: `Invalid slot position: ${req.params.position}` });
+        }
         if (!reason) {
             return res.status(400).json({ error: 'Rejection reason is required' });
         }
@@ -411,10 +422,13 @@ router.patch('/:id/slots/:position/reject', authenticate, requireCampaignApprova
 router.patch('/:id/slots/:position/replace', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
-        const position = parseInt(req.params.position, 10);
+        const position = slotPositionFrom(req.params.position);
         const { assetId } = req.body;
         const userId = req.user?.uid || null;
 
+        if (position === null) {
+            return res.status(400).json({ error: `Invalid slot position: ${req.params.position}` });
+        }
         if (!assetId) {
             return res.status(400).json({ error: 'Replacement assetId is required' });
         }
