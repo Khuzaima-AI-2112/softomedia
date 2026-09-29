@@ -734,7 +734,7 @@ function RetailerManagement() {
                                 const storeOnline = storeScreens.filter(s => s.status === 'online').length;
                                 const isDeleting = deletingStoreIds.has(store.id);
                                 return (
-                                    <div key={store.id} className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30">
+                                    <div key={store.id} role="group" aria-label={store.name} className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30">
                                         <div className="flex items-start justify-between mb-2">
                                             <div className="flex-1 min-w-0 mr-2">
                                                 <p className="font-semibold text-sm truncate">{store.name}</p>

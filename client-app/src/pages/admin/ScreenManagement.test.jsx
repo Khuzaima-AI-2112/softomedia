@@ -30,6 +30,7 @@ describe('Technical Operator Screen Management', () => {
         }]);
         api.createScreen.mockResolvedValue({ id: 'screen-entrance-1' });
     });
+    afterEach(() => vi.restoreAllMocks());
 
     it('registers a Screen at the selected Store and Location', async () => {
         render(<ScreenManagement />);
@@ -190,7 +191,6 @@ describe('Technical Operator Screen Management', () => {
             vi.spyOn(console, 'error').mockImplementation(() => {});
             api.getScreens.mockResolvedValue([RECORD]);
         });
-        afterEach(() => vi.restoreAllMocks());
 
         it('removes the row once the Screen is deleted', async () => {
             api.deleteScreen.mockResolvedValue({});
@@ -220,7 +220,6 @@ describe('Technical Operator Screen Management', () => {
             vi.spyOn(window, 'confirm').mockReturnValue(true);
             api.getScreens.mockResolvedValue([RECORD]);
         });
-        afterEach(() => vi.restoreAllMocks());
 
         it('shows the new key once with a Player link, until dismissed', async () => {
             api.rotateScreenDeviceKey.mockResolvedValue({ screen_id: 'lobby-1', device_key: 'key-123' });
@@ -269,7 +268,6 @@ describe('Technical Operator Screen Management', () => {
         };
 
         beforeEach(() => vi.spyOn(console, 'error').mockImplementation(() => {}));
-        afterEach(() => vi.restoreAllMocks());
 
         it('only offers the chosen Retailer\'s Stores and the chosen Store\'s Locations', async () => {
             api.getStores.mockResolvedValue([
@@ -320,17 +318,17 @@ describe('Technical Operator Screen Management', () => {
         });
 
         it('shows the server\'s reason when registration is refused', async () => {
-            api.createScreen.mockRejectedValue(new APIError('screen_id already registered', 409, {
-                error: 'screen_id already registered',
+            api.createScreen.mockRejectedValue(new APIError('Location must belong to the selected Store', 400, {
+                error: 'Location must belong to the selected Store',
             }));
             await openForm();
 
             fillAndSubmit();
 
-            expect((await screen.findByRole('alert')).textContent).toBe('screen_id already registered');
+            expect((await screen.findByRole('alert')).textContent).toBe('Location must belong to the selected Store');
         });
 
-        it('tells the operator how long to wait while the database is unavailable', async () => {
+        it('tells the Technical Operator how long to wait while the database is unavailable', async () => {
             api.createScreen.mockRejectedValue(new APIError(
                 'Database temporarily unavailable. Please try again shortly.', 503, {
                     error: 'Database temporarily unavailable. Please try again shortly.',
@@ -377,7 +375,6 @@ describe('Technical Operator Screen Management', () => {
             render(<ScreenManagement />);
 
             expect((await screen.findByRole('alert')).textContent).toBe('Failed to load screens. Please refresh.');
-            vi.restoreAllMocks();
         });
     });
 });

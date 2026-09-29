@@ -176,7 +176,7 @@ describe('RetailerManagement', () => {
         };
         const type = (label, value) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
 
-        it('explains each invalid field and re-checks as the Admin types', async () => {
+        it('explains each invalid field and re-checks as the Super Administrator types', async () => {
             await openAdd();
             type('Contract Start Date', '');
 
@@ -220,8 +220,8 @@ describe('RetailerManagement', () => {
         });
 
         it('keeps the form open with the server\'s reason when saving fails', async () => {
-            api.createRetailer.mockRejectedValue(new APIError('A retailer with this name already exists', 409, {
-                error: 'A retailer with this name already exists',
+            api.createRetailer.mockRejectedValue(new APIError('Retailer already exists', 409, {
+                error: 'Retailer already exists',
             }));
             await openAdd();
             type('Company Name', 'Fresh Foods');
@@ -229,7 +229,7 @@ describe('RetailerManagement', () => {
 
             fireEvent.click(screen.getByRole('button', { name: 'Create Retailer' }));
 
-            expect(await screen.findByText('A retailer with this name already exists')).toBeTruthy();
+            expect(await screen.findByText('Retailer already exists')).toBeTruthy();
             expect(screen.getByRole('heading', { name: 'Add New Retailer' })).toBeTruthy();
         });
 
@@ -312,7 +312,7 @@ describe('RetailerManagement', () => {
             expect(within(rowOf(FRESH.name)).getAllByRole('cell')[4].textContent).toBe('Active');
         });
 
-        it('asks before deleting and does nothing when the Admin declines', async () => {
+        it('asks before deleting and does nothing when the Super Administrator declines', async () => {
             confirmSpy.mockReturnValue(false);
             await renderPage();
 
@@ -336,12 +336,12 @@ describe('RetailerManagement', () => {
         });
 
         it('keeps the Retailer and shows the server\'s reason when deletion fails', async () => {
-            api.deleteRetailer.mockRejectedValue(new APIError('Retailer has stores', 409, { error: 'Retailer has stores' }));
+            api.deleteRetailer.mockRejectedValue(new APIError('Failed to delete retailer', 500, { error: 'Failed to delete retailer' }));
             await renderPage();
 
             fireEvent.click(screen.getByRole('button', { name: `Delete retailer ${FRESH.name}` }));
 
-            expect(await screen.findByText('Retailer has stores')).toBeTruthy();
+            expect(await screen.findByText('Failed to delete retailer')).toBeTruthy();
             expect(retailerNames()).toContain(FRESH.name);
         });
     });
@@ -369,7 +369,7 @@ describe('RetailerManagement', () => {
             expect(confirmSpy).not.toHaveBeenCalled();
         });
 
-        it('does nothing when the Admin declines', async () => {
+        it('does nothing when the Super Administrator declines', async () => {
             confirmSpy.mockReturnValue(false);
             await renderPage();
 
@@ -399,7 +399,7 @@ describe('RetailerManagement', () => {
             const list = await openStores(FRESH);
 
             expect(screen.getByText('2 locations')).toBeTruthy();
-            const downtown = within(list).getByText('Downtown').closest('.p-4');
+            const downtown = within(list).getByRole('group', { name: 'Downtown' });
             expect(within(downtown).getByText('1 Main Street')).toBeTruthy();
             expect(within(downtown).getByText('high traffic')).toBeTruthy();
             expect(downtown.textContent).toContain('1/2 screens');
@@ -414,7 +414,7 @@ describe('RetailerManagement', () => {
             expect(screen.getByText('1 location')).toBeTruthy();
         });
 
-        it('invites the Admin to add the first Store when there are none', async () => {
+        it('invites the Super Administrator to add the first Store when there are none', async () => {
             const list = await openStores(EMPTY);
 
             expect(within(list).getByText('No stores yet')).toBeTruthy();
@@ -441,7 +441,7 @@ describe('RetailerManagement', () => {
             };
             const type = (label, value) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
 
-            it('explains each invalid field and re-checks as the Admin types', async () => {
+            it('explains each invalid field and re-checks as the Super Administrator types', async () => {
                 await openAddStore();
                 type('Time Zone', ' ');
 
@@ -557,7 +557,7 @@ describe('RetailerManagement', () => {
         });
 
         describe('deleting a Store', () => {
-            it('asks first and does nothing when the Admin declines', async () => {
+            it('asks first and does nothing when the Super Administrator declines', async () => {
                 confirmSpy.mockReturnValue(false);
                 await openStores(FRESH);
 
@@ -594,14 +594,14 @@ describe('RetailerManagement', () => {
             });
 
             it('keeps the Store and shows the server\'s reason when deletion fails', async () => {
-                api.deleteStore.mockRejectedValue(new APIError('Store has active Reservations', 409, {
-                    error: 'Store has active Reservations',
+                api.deleteStore.mockRejectedValue(new APIError('Failed to delete store', 500, {
+                    error: 'Failed to delete store',
                 }));
                 await openStores(FRESH);
 
                 fireEvent.click(screen.getByRole('button', { name: 'Delete store Downtown' }));
 
-                await toast('Store has active Reservations');
+                await toast('Failed to delete store');
                 await waitFor(() => expect(screen.getByRole('button', { name: 'Delete store Downtown' }).disabled).toBe(false));
             });
         });
