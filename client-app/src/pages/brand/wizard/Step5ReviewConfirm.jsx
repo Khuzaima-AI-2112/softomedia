@@ -1,16 +1,11 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import GlassCard from '../../../components/GlassCard';
 import LoopVisualisationBar from '../../../components/LoopVisualisationBar';
 import ProtectedImage from '../../../components/ProtectedImage';
-import { PriceSummary } from '../../../components/PriceDisplay';
-import TrafficTierBadge from '../../../components/TrafficTierBadge';
-import apiService from '../../../services/ApiService';
 import pricingService from '../../../services/PricingService';
 
 // Bug #27 fix: accept `submitting` prop from wizard so button reflects in-flight state
 function Step5ReviewConfirm({ data, onConfirm, submitting, onPrev }) {
-    const navigate = useNavigate();
     const [termsAgreed, setTermsAgreed] = useState(true);
 
     const summary = useMemo(() => {
@@ -146,7 +141,6 @@ function Step5ReviewConfirm({ data, onConfirm, submitting, onPrev }) {
                             <p className="text-sm font-medium text-slate-500">Slot Distribution</p>
                             <div className="flex flex-wrap gap-2">
                                 {summary.byDateHour.slice(0, 10).map((item, idx) => {
-                                    const tier = pricingService.getTrafficTier(item.hour);
                                     return (
                                         <div
                                             key={idx}

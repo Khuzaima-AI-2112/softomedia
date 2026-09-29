@@ -25,7 +25,6 @@ function formatTierExample(baseCPM, multiplier) {
 export default function PricingConfig() {
     const { user } = useAuth();
 
-    const [config, setConfig] = useState(null);
     const [form, setForm] = useState(null);
     const [stores, setStores] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -37,7 +36,6 @@ export default function PricingConfig() {
         if (user && user.role !== 'superadmin') return;
         Promise.all([apiService.getPricingConfig(), apiService.getStores()])
             .then(([data, storeList]) => {
-                setConfig(data);
                 setStores(Array.isArray(storeList) ? storeList : []);
                 setForm({
                     baseCPM: data.baseCPM ?? 0,
@@ -108,8 +106,7 @@ export default function PricingConfig() {
         setError(null);
         setSuccess(false);
         try {
-            const updated = await apiService.updatePricingConfig(form);
-            setConfig(updated);
+            await apiService.updatePricingConfig(form);
             setSuccess(true);
         } catch (err) {
             setError(err?.response?.data?.error ?? err.message);

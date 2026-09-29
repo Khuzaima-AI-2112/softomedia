@@ -26,7 +26,6 @@ function AdminOverview() {
 
     const [retailers, setRetailers] = useState([]);
     const [advertisers, setAdvertisers] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [showRetailerModal, setShowRetailerModal] = useState(false);
     const [newRetailerName, setNewRetailerName] = useState('');
     const [newRetailerEmail, setNewRetailerEmail] = useState('');
@@ -37,8 +36,6 @@ function AdminOverview() {
 
     const loadData = async () => {
         try {
-            setLoading(true);
-
             const [allRetailers, allAdvertisers, allScreens, allLoops, allUsers] = await Promise.all([
                 apiService.getRetailers().catch(() => []),
                 apiService.getAdvertisers().catch(() => []),
@@ -68,8 +65,6 @@ function AdminOverview() {
             });
         } catch (error) {
             console.error('Failed to load admin overview data:', error);
-        } finally {
-            setLoading(false);
         }
     };
 
