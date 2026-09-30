@@ -39,15 +39,10 @@ class APIClient {
         this.baseURL = baseURL;
         this.config = { ...DEFAULT_CONFIG, ...config };
         this.requestInterceptors = [];
-        this.responseInterceptors = [];
     }
 
     addRequestInterceptor(interceptor) {
         this.requestInterceptors.push(interceptor);
-    }
-
-    addResponseInterceptor(interceptor) {
-        this.responseInterceptors.push(interceptor);
     }
 
     async applyRequestInterceptors(url, options) {
@@ -56,14 +51,6 @@ class APIClient {
             modifiedOptions = await interceptor(url, modifiedOptions);
         }
         return modifiedOptions;
-    }
-
-    async applyResponseInterceptors(response) {
-        let modifiedResponse = response;
-        for (const interceptor of this.responseInterceptors) {
-            modifiedResponse = await interceptor(modifiedResponse);
-        }
-        return modifiedResponse;
     }
 
     async request(endpoint, options = {}, attempt = 1) {
@@ -89,11 +76,9 @@ class APIClient {
 
             clearTimeout(timeoutId);
 
-            const modifiedResponse = await this.applyResponseInterceptors(response);
-
-            if (!modifiedResponse.ok) {
+            if (!response.ok) {
                 const shouldRetry =
-                    this.config.retryOn.includes(modifiedResponse.status) &&
+                    this.config.retryOn.includes(response.status) &&
                     attempt < this.config.retries;
 
                 if (shouldRetry) {
@@ -101,16 +86,16 @@ class APIClient {
                     return this.request(endpoint, options, attempt + 1);
                 }
 
-                const errorData = await modifiedResponse.json().catch(() => ({}));
+                const errorData = await response.json().catch(() => ({}));
                 throw new APIError(
-                    errorData.error || `HTTP ${modifiedResponse.status}`,
-                    modifiedResponse.status,
+                    errorData.error || `HTTP ${response.status}`,
+                    response.status,
                     errorData
                 );
             }
 
-            if (options.responseType === 'blob') return modifiedResponse.blob();
-            const data = await modifiedResponse.json();
+            if (options.responseType === 'blob') return response.blob();
+            const data = await response.json();
             return data;
 
         } catch (error) {

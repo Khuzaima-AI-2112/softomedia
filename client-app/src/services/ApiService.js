@@ -9,20 +9,12 @@ class ApiService {
         return apiClient.get('/api/users');
     }
 
-    async getUser(id) {
-        return apiClient.get(`/api/users/${id}`);
-    }
-
     async createUser(data) {
         return apiClient.post('/api/users', data);
     }
 
     async updateUser(id, data) {
         return apiClient.put(`/api/users/${id}`, data);
-    }
-
-    async deleteUser(id) {
-        return apiClient.delete(`/api/users/${id}`);
     }
 
     // ============================================
@@ -39,10 +31,6 @@ class ApiService {
 
     async updateDemoOrganization(id, data) {
         return apiClient.patch(`/api/platform/organizations/${id}`, data);
-    }
-
-    async getPlatformAuditRecords() {
-        return apiClient.get('/api/platform/audit');
     }
 
     // ============================================
@@ -92,10 +80,6 @@ class ApiService {
         return apiClient.get('/api/advertisers');
     }
 
-    async getAdvertiser(id) {
-        return apiClient.get(`/api/advertisers/${id}`);
-    }
-
     async createAdvertiser(data) {
         return apiClient.post('/api/advertisers', data);
     }
@@ -126,25 +110,12 @@ class ApiService {
         return apiClient.get(`/api/stores${query ? '?' + query : ''}`);
     }
 
-    async getStore(id) {
-        return apiClient.get(`/api/stores/${id}`);
-    }
-
     async createStore(data) {
         return apiClient.post('/api/stores', data);
     }
 
     async updateStore(id, data) {
         return apiClient.put(`/api/stores/${id}`, data);
-    }
-
-    /**
-     * Partial update for a store — e.g. status toggle.
-     * @param {number|string} id
-     * @param {object} data - Partial store fields.
-     */
-    async patchStore(id, data) {
-        return apiClient.patch(`/api/stores/${id}`, data);
     }
 
     async deleteStore(id) {
@@ -164,10 +135,6 @@ class ApiService {
         return apiClient.post('/api/locations', data);
     }
 
-    async deleteLocation(id) {
-        return apiClient.delete(`/api/locations/${id}`);
-    }
-
     // ============================================
     // SCREENS
     // ============================================
@@ -177,20 +144,8 @@ class ApiService {
         return apiClient.get(`/api/screens${query ? '?' + query : ''}`);
     }
 
-    async getScreen(id) {
-        return apiClient.get(`/api/screens/${id}`);
-    }
-
     async createScreen(data) {
         return apiClient.post('/api/screens', data);
-    }
-
-    async updateScreen(id, data) {
-        return apiClient.put(`/api/screens/${id}`, data);
-    }
-
-    async patchScreen(id, data) {
-        return apiClient.patch(`/api/screens/${id}`, data);
     }
 
     /**
@@ -267,14 +222,6 @@ class ApiService {
         return apiClient.post('/api/loops', data);
     }
 
-    async updateLoop(id, data) {
-        return apiClient.put(`/api/loops/${id}`, data);
-    }
-
-    async deleteLoop(id) {
-        return apiClient.delete(`/api/loops/${id}`);
-    }
-
     /**
      * Generate loops for all business hours for a given date.
      * Called by the Generate Loops button in LoopManagement.jsx.
@@ -288,10 +235,6 @@ class ApiService {
 
     async replaceLoopSlot(loopId, position, assetId) {
         return apiClient.patch(`/api/loops/${loopId}/slots/${position}/replace`, { assetId });
-    }
-
-    async approveLoop(loopId) {
-        return apiClient.patch(`/api/loops/${loopId}/approve`);
     }
 
     // ============================================
@@ -313,20 +256,12 @@ class ApiService {
         return apiClient.get(`/api/campaigns${query ? '?' + query : ''}`);
     }
 
-    async getCampaign(id) {
-        return apiClient.get(`/api/campaigns/${id}`);
-    }
-
     async getCampaignProofsOfPlay(id) {
         return apiClient.get(`/api/campaigns/${id}/proofs-of-play`);
     }
 
     async createCampaign(data) {
         return apiClient.post('/api/campaigns', data);
-    }
-
-    async updateCampaign(id, data) {
-        return apiClient.put(`/api/campaigns/${id}`, data);
     }
 
     async deleteCampaign(id) {

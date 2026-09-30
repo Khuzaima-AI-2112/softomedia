@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import apiService from '../services/ApiService';
 
 /**
@@ -100,9 +100,6 @@ export default function CampaignWizardModal({ onSuccess, onClose }) {
             setSub(false);
         }
     };
-
-    // Derive selected retailer name for list display (persisted via retailer_id)
-    const selectedRetailerName = retailers.find(r => r.id === form.retailer_id)?.name ?? null;
 
     return (
         /* Backdrop */

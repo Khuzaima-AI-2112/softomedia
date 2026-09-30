@@ -97,11 +97,4 @@ describe('PricingService — per-Store foot-traffic tiers', () => {
         // A 1.5x factor must never be shown as the standard tier.
         expect(pricing.storeTrafficTier.label).toBe('High traffic');
     });
-
-    it('carries the Store tier into a campaign total', () => {
-        const total = pricingService.calculateCampaignTotal([
-            { screenId: 'screen-store-high', date: '2030-01-16', hour: 12, slotCount: 2 },
-        ]);
-        expect(total.totalCost).toBe(30); // 15 per slot x 2
-    });
 });

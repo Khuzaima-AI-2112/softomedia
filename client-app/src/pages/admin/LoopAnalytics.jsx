@@ -18,12 +18,6 @@ const formatHour = (hour) => {
     return `${displayHour}:00 ${period}`;
 };
 
-const getBusinessHours = () => {
-    const hours = [];
-    for (let h = BUSINESS_HOURS.START; h < BUSINESS_HOURS.END; h++) hours.push(h);
-    return hours;
-};
-
 // Return an array of ISO date strings for the last N days (today first)
 const getLastNDates = (n) => {
     const dates = [];
@@ -78,8 +72,6 @@ function LoopAnalytics() {
     const [loading, setLoading] = useState(true);
     const [apiUnavailable, setApiUnavailable] = useState(false);
     const [selectedHour, setSelectedHour] = useState(null);
-
-    const businessHours = getBusinessHours();
 
     // ── Fetch single-day hourly data ──────────────────────────────────────────
     const fetchDay = useCallback(async (date) => {

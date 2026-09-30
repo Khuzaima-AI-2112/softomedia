@@ -8,9 +8,9 @@ import { playerUrlFor } from '../../services/deviceAPI';
 // Allowed screen statuses (matches backend enum).
 const SCREEN_STATUS = Object.freeze({ ACTIVE: 'active', INACTIVE: 'inactive' });
 
-// Error codes returned by the backend for campaign-aware rejections.
+// Error code the backend returns when Campaigns block deactivating a Screen.
+// An APIError carries the response body on `response`.
 const ERR_STATUS_ACTIVE_CAMPAIGNS = 'SCREEN_STATUS_CHANGE_REJECTED_ACTIVE_CAMPAIGNS';
-const ERR_DELETE_ACTIVE_CAMPAIGNS = 'SCREEN_DELETE_REJECTED_ACTIVE_CAMPAIGNS';
 
 // Seeded Screens carry a name and no screen_id; Screens registered on this
 // page carry a screen_id and no name.
@@ -100,8 +100,7 @@ function ScreenManagement() {
                 prev.map(s => s.id === screen.id ? { ...s, status: screen.status } : s)
             );
 
-            const errorCode = error?.data?.error ?? error?.code ?? '';
-            if (errorCode === ERR_STATUS_ACTIVE_CAMPAIGNS) {
+            if (error?.response?.error === ERR_STATUS_ACTIVE_CAMPAIGNS) {
                 addToast(
                     `Cannot set "${screenLabel(screen)}" to inactive — it is part of active or upcoming campaigns. ` +
                     'Adjust those campaigns first.',
@@ -110,10 +109,7 @@ function ScreenManagement() {
                 );
             } else {
                 console.error('Screen status toggle failed:', error);
-                addToast(
-                    error?.data?.message || error?.message || 'Failed to update screen status.',
-                    'error'
-                );
+                addToast(error?.message || 'Failed to update screen status.', 'error');
             }
         } finally {
             setTogglingIds(prev => {
@@ -131,8 +127,7 @@ function ScreenManagement() {
      *  1. Confirmation dialog.
      *  2. Call DELETE /api/screens/:id.
      *  3a. Success  → remove row, show success toast.
-     *  3b. Campaign conflict (409) → row stays, show admin-friendly error toast.
-     *  3c. Other error → row stays, show generic error toast.
+     *  3b. Error    → row stays, show the server's reason.
      */
     const handleDelete = useCallback(async (screen) => {
         if (!confirm(`Delete screen "${screenLabel(screen)}"? This action cannot be undone.`)) return;
@@ -142,21 +137,8 @@ function ScreenManagement() {
             setScreens(prev => prev.filter(s => s.id !== screen.id));
             addToast(`Screen "${screenLabel(screen)}" deleted.`, 'success');
         } catch (error) {
-            const errorCode = error?.data?.error ?? error?.code ?? '';
-
-            if (errorCode === ERR_DELETE_ACTIVE_CAMPAIGNS) {
-                addToast(
-                    `"${screenLabel(screen)}" can't be deleted — it's used by an active or upcoming campaign. End or reassign those campaigns first.`,
-                    'error',
-                    8000
-                );
-            } else {
-                console.error('Failed to delete screen:', error);
-                addToast(
-                    error?.data?.message || error?.message || 'Failed to delete screen.',
-                    'error'
-                );
-            }
+            console.error('Failed to delete screen:', error);
+            addToast(error?.message || 'Failed to delete screen.', 'error');
         }
     }, [addToast]);
 
@@ -182,14 +164,13 @@ function ScreenManagement() {
             console.error('Failed to create screen:', error);
 
             // 503: circuit breaker is OPEN — show a friendly retry message
-            const status = error?.status ?? error?.response?.status;
-            if (status === 503) {
-                const retryAfter = error?.data?.retryAfterSeconds ?? error?.response?.headers?.get?.('Retry-After') ?? 30;
+            if (error?.status === 503) {
+                const retryAfter = error.response?.retryAfterSeconds ?? 30;
                 setPageError(
                     `The database is temporarily unavailable. Please try again in ${retryAfter} seconds.`
                 );
             } else {
-                setPageError(error?.data?.message || error?.message || 'Failed to register screen.');
+                setPageError(error?.message || 'Failed to register screen.');
             }
         }
     }, [newScreen, loadData, addToast]);

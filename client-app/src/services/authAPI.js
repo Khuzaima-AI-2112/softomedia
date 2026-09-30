@@ -41,12 +41,4 @@ export const authAPI = {
         }
         return profileRequest;
     },
-
-    /**
-     * Check if user is authenticated
-     * @returns {boolean}
-     */
-    isAuthenticated() {
-        return !!auth.currentUser;
-    },
 };

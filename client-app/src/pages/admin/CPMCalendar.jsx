@@ -20,15 +20,6 @@ const LayoutTag = ({ name, position = 'top-left' }) => {
     );
 };
 
-// Generate array of business hours (8 AM to 10 PM)
-const getBusinessHours = () => {
-    const hours = [];
-    for (let h = 8; h < 22; h++) {
-        hours.push(h);
-    }
-    return hours;
-};
-
 // Format hour to display string
 const formatHour = (hour) => {
     const suffix = hour >= 12 ? 'PM' : 'AM';
@@ -48,9 +39,7 @@ function CPMCalendar() {
     const [selectedStore, setSelectedStore] = useState(null);
     const [retailers, setRetailers] = useState([]);
     const [stores, setStores] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
-    const [editingTier, setEditingTier] = useState(null);
     const [storeHours, setStoreHours] = useState(null);
 
     // Filter stores based on selected retailer
@@ -98,7 +87,6 @@ function CPMCalendar() {
     }, [selectedStore, selectedDate]);
 
     const loadData = async () => {
-        setLoading(true);
         setLoadError(null);
         try {
             const [config, retailersData, storesData] = await Promise.all([
@@ -115,8 +103,6 @@ function CPMCalendar() {
             setLoadError(error.status === 403
                 ? 'Pricing is managed by the Super Administrator. Your account cannot view it.'
                 : 'Pricing configuration could not be loaded. Try again later.');
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -125,7 +111,7 @@ function CPMCalendar() {
 
 
             // Call backend API to update
-            const result = await apiService.updatePricingConfig({ baseCPM: editedBaseCPM });
+            await apiService.updatePricingConfig({ baseCPM: editedBaseCPM });
 
             // CRITICAL: Force refresh of pricing service with new data from database
 
@@ -195,26 +181,6 @@ function CPMCalendar() {
             setPricingConfig(updated);
         } catch (error) {
             console.error('Failed to set date override:', error);
-        }
-    };
-
-    const handleSaveTrafficTier = async (tierKey, updates) => {
-        try {
-
-            const newTiers = { ...pricingConfig.trafficTiers, [tierKey]: { ...pricingConfig.trafficTiers[tierKey], ...updates } };
-            await apiService.updatePricingConfig({ trafficTiers: newTiers });
-
-            // LAYER 2: Secure Reactive Pulse
-
-            await pricingService.init(true);
-            const updatedConfig = pricingService.getConfig();
-            setPricingConfig(updatedConfig);
-
-            setEditingTier(null);
-            alert('Traffic tier updated successfully');
-        } catch (error) {
-            console.error('Failed to update traffic tier:', error);
-            alert('Failed to update traffic tier');
         }
     };
 

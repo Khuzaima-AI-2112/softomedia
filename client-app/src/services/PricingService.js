@@ -179,55 +179,6 @@ class PricingService {
     }
 
     /**
-     * Calculate slot price based on base CPM and active multipliers
-     */
-    calculateSlotPrice(hour, date, retailerId = null) {
-        if (!this.config) return null;
-
-        // 1. Determine Base CPM (Check for Retailer Override first)
-        let baseCPM = this.config.baseCPM;
-        if (retailerId && this.config.retailerOverrides?.[retailerId]?.baseCPM) {
-            baseCPM = this.config.retailerOverrides[retailerId].baseCPM;
-
-        }
-
-        // 2. Get Traffic Tier Multiplier
-        let tierMultiplier = 1.0;
-        const tier = this.getTrafficTier(hour, date); // Use getTrafficTier to get the full tier object
-        if (tier) {
-            tierMultiplier = tier.multiplier;
-        }
-
-        // 3. Get Date Override Multiplier
-        let dateMultiplier = 1.0;
-        const dateKey = this._formatDateKey(date); // Assuming _formatDateKey exists or will be added
-        const dateOverride = this.config.dateOverrides?.[dateKey];
-        if (dateOverride) {
-            dateMultiplier = dateOverride.multiplier;
-        }
-
-        // 4. Calculate Final Price
-        // Store-level foot traffic is not known here; getSlotPrice applies it
-        // per Screen, where the Store is known.
-        const finalPrice = baseCPM * tierMultiplier * dateMultiplier;
-
-        return finalPrice;
-    }
-
-    /**
-     * Helper to format date string for consistent key access
-     * @param {string} date - ISO date string (YYYY-MM-DD)
-     * @returns {string} Formatted date key
-     */
-    _formatDateKey(date) {
-        // Ensure date is in YYYY-MM-DD format
-        if (date instanceof Date) {
-            return date.toISOString().split('T')[0];
-        }
-        return date; // Assume it's already in the correct string format
-    }
-
-    /**
      * Get date-specific multiplier for special events/holidays
      * @param {string} date - ISO date string (YYYY-MM-DD)
      * @returns {number} Multiplier (1.0 = no change)
@@ -278,24 +229,6 @@ class PricingService {
     }
 
     /**
-     * Calculate the price for a full loop (12 slots)
-     * @param {string} screenId 
-     * @param {string} date 
-     * @param {number} hour 
-     * @returns {object} { totalPrice, perSlotPrice, slots: 12, ... }
-     */
-    getLoopPrice(screenId, date, hour) {
-        const slotPricing = this.getSlotPrice(screenId, date, hour);
-
-        return {
-            ...slotPricing,
-            totalPrice: Math.round(slotPricing.price * 12 * 100) / 100,
-            perSlotPrice: slotPricing.price,
-            slots: 12
-        };
-    }
-
-    /**
      * Get estimated impressions for a slot based on traffic tier
      * @param {string} screenId 
      * @param {number} hour 
@@ -330,50 +263,6 @@ class PricingService {
         else if (screen?.type === 'entrance') baseImpressions *= 1.2;
 
         return Math.round(baseImpressions);
-    }
-
-    /**
-     * Calculate total campaign cost for a set of slot selections
-     * @param {Array} selections - Array of { screenId, date, hour, slotCount }
-     * @returns {object} { totalCost, totalSlots, totalImpressions, breakdown }
-     */
-    calculateCampaignTotal(selections) {
-        let totalCost = 0;
-        let totalSlots = 0;
-        let totalImpressions = 0;
-        const breakdown = [];
-
-        for (const selection of selections) {
-            const { screenId, date, hour, slotCount } = selection;
-            const slotPricing = this.getSlotPrice(screenId, date, hour);
-            const impressionsPerSlot = this.getEstimatedImpressions(screenId, hour);
-
-            const selectionCost = slotPricing.price * slotCount;
-            const selectionImpressions = impressionsPerSlot * slotCount;
-
-            totalCost += selectionCost;
-            totalSlots += slotCount;
-            totalImpressions += selectionImpressions;
-
-            breakdown.push({
-                screenId,
-                date,
-                hour,
-                slotCount,
-                pricePerSlot: slotPricing.price,
-                totalPrice: Math.round(selectionCost * 100) / 100,
-                impressions: selectionImpressions,
-                trafficTier: slotPricing.trafficTier
-            });
-        }
-
-        return {
-            totalCost: Math.round(totalCost * 100) / 100,
-            totalSlots,
-            totalImpressions,
-            breakdown,
-            averageCPM: totalSlots > 0 ? Math.round((totalCost / totalSlots) * 100) / 100 : 0
-        };
     }
 
     /**
@@ -418,29 +307,6 @@ class PricingService {
             businessHours,
             hourlyBreakdown: hours,
             totalScreens: screens.length
-        };
-    }
-
-    /**
-     * Get slot availability summary (Sync version using provided loop data)
-     * @param {object} loop 
-     * @returns {object} { available, booked, total, slots }
-     */
-    getSlotAvailabilityFromLoop(loop) {
-        if (!loop) {
-            return {
-                available: 12,
-                booked: 0,
-                total: 12,
-                slots: Array(12).fill({ status: 'available' })
-            };
-        }
-
-        return {
-            available: loop.slots.filter(s => s.status === 'available').length,
-            booked: loop.slots.filter(s => s.status !== 'available').length,
-            total: 12,
-            slots: loop.slots
         };
     }
 
