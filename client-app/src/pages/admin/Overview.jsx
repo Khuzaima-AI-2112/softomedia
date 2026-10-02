@@ -6,7 +6,6 @@ import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import apiService from '../../services/ApiService';
 import pricingService from '../../services/PricingService';
-import { loopListFrom } from '../../services/loopList';
 
 function AdminOverview() {
     const navigate = useNavigate();
@@ -20,7 +19,6 @@ function AdminOverview() {
         advertisers: 0,
         activeScreens: 0,
         totalScreens: 0,
-        pendingLoops: 0,
         totalUsers: 0
     });
 
@@ -36,11 +34,10 @@ function AdminOverview() {
 
     const loadData = async () => {
         try {
-            const [allRetailers, allAdvertisers, allScreens, allLoops, allUsers] = await Promise.all([
+            const [allRetailers, allAdvertisers, allScreens, allUsers] = await Promise.all([
                 apiService.getRetailers().catch(() => []),
                 apiService.getAdvertisers().catch(() => []),
                 apiService.getScreens().catch(() => []),
-                apiService.getLoops().catch(() => []),
                 // Phase 3: only fetch users if the current actor is superadmin;
                 // non-superadmin admins get an empty list rather than a 403 toast
                 isSuperAdmin ? apiService.getUsers().catch(() => []) : Promise.resolve([])
@@ -49,7 +46,6 @@ function AdminOverview() {
             const safeRetailers = Array.isArray(allRetailers) ? allRetailers : [];
             const safeAdvertisers = Array.isArray(allAdvertisers) ? allAdvertisers : [];
             const safeScreens = Array.isArray(allScreens) ? allScreens : [];
-            const safeLoops = loopListFrom(allLoops);
             const safeUsers = Array.isArray(allUsers) ? allUsers : [];
 
             setRetailers(safeRetailers.slice(0, 4));
@@ -60,7 +56,6 @@ function AdminOverview() {
                 advertisers: safeAdvertisers.length,
                 activeScreens: safeScreens.filter(s => s.status === 'online').length,
                 totalScreens: safeScreens.length,
-                pendingLoops: safeLoops.filter(l => l.status === 'PENDING_APPROVAL').length,
                 totalUsers: safeUsers.length
             });
         } catch (error) {
@@ -171,26 +166,6 @@ function AdminOverview() {
                     <p className="text-3xl font-bold text-blue-500">{stats.totalUsers}</p>
                 </GlassCard>
             </div>
-
-            {stats.pendingLoops > 0 && (
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                    <span data-testid="pending-approval-badge" className="material-symbols-outlined text-amber-500">pending_actions</span>
-                    <div className="flex-1">
-                        <p className="font-medium text-amber-800 dark:text-amber-200">
-                            {stats.pendingLoops} loops awaiting retailer approval
-                        </p>
-                        <p className="text-sm text-amber-600 dark:text-amber-400">
-                            Retailers need to approve tomorrow&apos;s schedule
-                        </p>
-                    </div>
-                    <Link
-                        to="/dashboard/admin/loops"
-                        className="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600"
-                    >
-                        View Loops
-                    </Link>
-                </div>
-            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <GlassCard>

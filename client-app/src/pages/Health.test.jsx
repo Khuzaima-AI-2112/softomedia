@@ -29,7 +29,7 @@ describe('Technical Operator Health', () => {
                 id: 'screen-entrance-1',
                 connectivity: 'online',
                 last_seen: '2026-09-12T02:59:30.000Z',
-                schedule: { state: 'unavailable', approved: false },
+                schedule: { state: 'unavailable' },
             }],
         });
     });
@@ -42,6 +42,6 @@ describe('Technical Operator Health', () => {
         expect(screen.getByTestId('health-chip-storage').dataset.status).toBe('healthy');
         expect(screen.getByText('screen-entrance-1')).toBeTruthy();
         expect(screen.getByText('Online')).toBeTruthy();
-        expect(screen.getByText('No approved schedule')).toBeTruthy();
+        expect(screen.getByText('No schedule')).toBeTruthy();
     });
 });

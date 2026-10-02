@@ -16,7 +16,7 @@ import { notificationRepository } from '../repositories/NotificationRepository.j
 import { slotReservationRepository } from '../repositories/SlotReservationRepository.js';
 import StoreRepository from '../repositories/StoreRepository.js';
 import { userRepository } from '../repositories/UserRepository.js';
-import { approvalWindowService, storeLocalInstant } from './ApprovalWindowService.js';
+import { approvalDeadline, storeLocalInstant } from './StoreLocalTime.js';
 import { isCreativeApprovedFor } from './CreativeApproval.js';
 import logger from '../utils/logger.js';
 
@@ -93,7 +93,7 @@ function releaseReason(store, campaign, creative, reservation, now) {
     if (!campaign || !hasNotPlayed(store, reservation, now)) return null;
     if (campaign.status === CAMPAIGN_STATUS.CANCELLED) return RELEASE_REASONS.CANCELLED;
     if (creative !== undefined && !isCreativeApprovedFor(creative, store.retailer_id) && store.time_zone
-        && now >= approvalWindowService.normalDeadlineInstant(store, reservation.date)) {
+        && now >= approvalDeadline(store, reservation.date)) {
         return RELEASE_REASONS.APPROVAL_DEADLINE;
     }
     return null;

@@ -206,14 +206,6 @@ class ApiService {
         return apiClient.get(`/api/loops?date=${date}${query}`);
     }
 
-    async getScheduleReview(storeId, date) {
-        return apiClient.get(`/api/loops/review/${storeId}/${date}`);
-    }
-
-    async reopenApprovalWindow(storeId, date, data) {
-        return apiClient.post(`/api/loops/review/${storeId}/${date}/reopen`, data);
-    }
-
     async getLoop(id) {
         return apiClient.get(`/api/loops/${id}`);
     }

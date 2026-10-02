@@ -258,50 +258,24 @@ describeWithEmulators('Network setup', () => {
 
             beforeAll(async () => {
                 ({ body: location } = await createLocation('Counter'));
-                await createLoop(`net-loop-pending-${suffix}`, { date: FUTURE });
-                await createLoop(`net-loop-approved-${suffix}`, { date: FUTURE, hour: 11, status: 'approved' });
+                await createLoop(`net-loop-future-${suffix}`, { date: FUTURE });
+                await createLoop(`net-loop-later-${suffix}`, { date: '2036-01-01', hour: 11 });
             });
 
-            test('are listed for the Location, by date and status', async () => {
+            test('are listed for the Location, by date', async () => {
                 const all = await request(app).get(`/api/locations/${location.id}/loops`).set(as.retailer);
                 expect(all.status).toBe(200);
                 expect(all.body).toHaveLength(2);
 
-                const pending = await request(app)
-                    .get(`/api/locations/${location.id}/loops?date=${FUTURE}&status=pending_approval`).set(as.retailer);
-                expect(pending.body.map(loop => loop.id)).toEqual([`net-loop-pending-${suffix}`]);
+                const onDate = await request(app)
+                    .get(`/api/locations/${location.id}/loops?date=${FUTURE}`).set(as.retailer);
+                expect(onDate.body.map(loop => loop.id)).toEqual([`net-loop-future-${suffix}`]);
                 expect((await request(app).get(`/api/locations/missing-${suffix}/loops`).set(as.retailer)).status).toBe(403);
-            });
-
-            test('are approved together only by the Retailer Administrator', async () => {
-                const url = `/api/locations/${location.id}/loops/approve-all`;
-                expect((await request(app).post(url).set(as.admin).send({ date: FUTURE })).status).toBe(403);
-
-                const approved = await request(app).post(url).set(as.retailer).send({ date: FUTURE });
-                expect(approved.status).toBe(200);
-                expect(approved.body).toEqual({ approved: 1 });
-                const saved = await firestore.collection('loops').doc(`net-loop-pending-${suffix}`).get();
-                expect(saved.data().status).toBe('approved');
-
-                const again = await request(app).post(url).set(as.retailer).send({ date: FUTURE });
-                expect(again.body).toEqual({ approved: 0, message: 'No pending loops found for this location' });
-            });
-
-            test('cannot be approved once their broadcast has started', async () => {
-                await createLoop(`net-loop-past-${suffix}`, { date: '2020-01-06' });
-
-                const response = await request(app).post(`/api/locations/${location.id}/loops/approve-all`)
-                    .set(as.retailer).send({ date: '2020-01-06' });
-
-                expect(response.status).toBe(409);
-                expect(response.body).toEqual({ error: 'Approval window is closed' });
             });
 
             test('a storage failure answers 500', async () => {
                 failStorage(repositories.loopRepository, 'findAll');
                 expect((await request(app).get(`/api/locations/${location.id}/loops`).set(as.retailer)).status).toBe(500);
-                expect((await request(app).post(`/api/locations/${location.id}/loops/approve-all`)
-                    .set(as.retailer).send({})).status).toBe(500);
             });
         });
 

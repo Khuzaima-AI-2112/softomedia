@@ -115,9 +115,9 @@ describeWithEmulator('Proof of Play HTTP API with Firestore persistence', () => 
             store_id: ids.store,
             status: 'ONLINE',
         });
+        // A generated loop: nobody approves an Hourly Loop (ADR 0007).
         await firestore.collection('loops').doc(ids.loop).set({
             id: ids.loop,
-            status: 'approved',
             retailer_id: ids.retailer,
             store_id: ids.store,
             date: broadcastDate,
@@ -323,14 +323,15 @@ describeWithEmulator('Proof of Play HTTP API with Firestore persistence', () => 
         expect(report.status).toBe(200);
         expect(report.body).toEqual(expect.objectContaining({
             allocated_capacity: {
-                scope: 'all_approved_hourly_loops',
-                approved_hourly_loop_count: expect.any(Number),
-                approved_slot_count: expect.any(Number),
+                scope: 'all_hourly_loops',
+                hourly_loop_count: expect.any(Number),
+                slot_count: expect.any(Number),
             },
             campaign_delivery: expect.any(Number),
             fallback_playback: 1,
             holding_slide_playback: 1,
             recent_campaign_delivery: [expect.objectContaining({ event_id: ids.event })],
         }));
+        expect(report.body.allocated_capacity.hourly_loop_count).toBeGreaterThanOrEqual(1);
     });
 });

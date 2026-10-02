@@ -100,7 +100,7 @@ const Health = () => {
                             <tr className="border-b border-slate-200 dark:border-slate-700">
                                 <th className="p-3">Screen</th>
                                 <th className="p-3">Connectivity</th>
-                                <th className="p-3">Approved schedule</th>
+                                <th className="p-3">Schedule</th>
                                 <th className="p-3">Last heartbeat</th>
                             </tr>
                         </thead>
@@ -112,7 +112,7 @@ const Health = () => {
                                         {screen.connectivity === 'online' ? 'Online' : 'Offline'}
                                     </td>
                                     <td className="p-3">
-                                        {screen.schedule?.approved ? 'Available' : 'No approved schedule'}
+                                        {screen.schedule?.state === 'available' ? 'Available' : 'No schedule'}
                                     </td>
                                     <td className="p-3 text-sm text-slate-500">
                                         {screen.last_seen ? new Date(screen.last_seen).toLocaleString() : 'Never'}

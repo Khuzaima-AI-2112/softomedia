@@ -33,7 +33,6 @@ const DATE = '2030-01-07';
 const MONDAY = 1;
 const BOOKED = new Date('2030-01-01T12:00:00.000Z');
 const GENERATED = new Date('2030-01-05T14:00:00.000Z');
-const APPROVED = new Date('2030-01-06T15:00:00.000Z');
 const PLAYING = new Date('2030-01-07T13:00:30.000Z'); // 08:00:30 in Toronto
 
 const SELECTION = [{
@@ -226,10 +225,7 @@ describeWithAuthEmulator('Multi-file Creatives in consecutive Paid Slots', () =>
             assetId, campaignId, fallback,
         }))).toEqual(parts.map(assetId => ({ assetId, campaignId: booked.body.id, fallback: false })));
 
-        jest.setSystemTime(APPROVED);
-        const approver = (await signInAs('retaileradmin', { organizationId: 'retailer-one', fakeClock: true })).headers;
-        expect((await request(app).patch(`/api/loops/${eightAm.id}/approve`).set(approver)).status).toBe(200);
-
+        // Nobody approves the hour: the Screen plays the generated loop (ADR 0007).
         jest.setSystemTime(PLAYING);
         const device = `Device store-one-screen:${deviceKey}`;
         const playback = await request(app).get('/api/device/playback').set('Authorization', device);

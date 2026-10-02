@@ -40,7 +40,7 @@ async function seed() {
         ['two-18', 'retailer-two', 'store-two', 18],
     ]) {
         await loopRepository.create(id, {
-            retailer_id: retailerId, store_id: storeId, date: DATE, hour, status: 'approved',
+            retailer_id: retailerId, store_id: storeId, date: DATE, hour,
         });
     }
     const proofs = [

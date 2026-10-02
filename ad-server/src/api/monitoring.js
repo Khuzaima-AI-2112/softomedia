@@ -6,7 +6,6 @@ import {
     playbackObservationRepository,
     screenRepository,
 } from '../repositories/index.js';
-import { LOOP_STATUS } from '../repositories/LoopRepository.js';
 import { requireNetworkProofOfPlayView, requireScreenDiagnostics } from '../middleware/requireRole.js';
 import logger from '../utils/logger.js';
 
@@ -30,22 +29,18 @@ router.post('/impression', (req, res) => {
 router.get('/status', requireScreenDiagnostics, async (_req, res) => {
     try {
         await heartbeatService.checkScreenHealth();
-        const [screens, approvedLoops] = await Promise.all([
-            screenRepository.findAll(),
-            loopRepository.findAll({
-                where: [['status', '==', LOOP_STATUS.APPROVED]],
-            }),
-        ]);
+        // Nobody approves an Hourly Loop, so a Screen has a schedule once today's loops are generated.
         const targetDate = new Date().toISOString().slice(0, 10);
+        const [screens, todaysLoops] = await Promise.all([
+            screenRepository.findAll(),
+            loopRepository.findAll({ where: [['date', '==', targetDate]] }),
+        ]);
         const screenStatuses = screens.map(screen => {
-            const scheduleAvailable = approvedLoops.some(loop => (
-                loop.date === targetDate
-                && (
-                    loop.location_id === screen.location_id
-                    || loop.screen_id === screen.id
-                    || loop.screen_id === 'ALL'
-                    || loop.screen_ids?.includes(screen.id)
-                )
+            const scheduleAvailable = todaysLoops.some(loop => (
+                loop.location_id === screen.location_id
+                || loop.screen_id === screen.id
+                || loop.screen_id === 'ALL'
+                || loop.screen_ids?.includes(screen.id)
             ));
             return {
                 id: screen.id,
@@ -58,7 +53,6 @@ router.get('/status', requireScreenDiagnostics, async (_req, res) => {
                 last_seen: screen.last_seen || null,
                 schedule: {
                     state: scheduleAvailable ? 'available' : 'unavailable',
-                    approved: scheduleAvailable,
                 },
             };
         });
@@ -80,7 +74,8 @@ router.get('/status', requireScreenDiagnostics, async (_req, res) => {
 router.get('/delivery-report', requireNetworkProofOfPlayView, async (req, res) => {
     try {
         const [loops, proofs, observations] = await Promise.all([
-            loopRepository.findAll({ where: [['status', '==', 'approved']] }),
+            // Every generated loop plays; nobody approves an Hourly Loop (ADR 0007).
+            loopRepository.findAll(),
             impressionRepository.findAll(),
             playbackObservationRepository.findAll(),
         ]);
@@ -89,9 +84,9 @@ router.get('/delivery-report', requireNetworkProofOfPlayView, async (req, res) =
 
         return res.json({
             allocated_capacity: {
-                scope: 'all_approved_hourly_loops',
-                approved_hourly_loop_count: loops.length,
-                approved_slot_count: slots.length,
+                scope: 'all_hourly_loops',
+                hourly_loop_count: loops.length,
+                slot_count: slots.length,
             },
             campaign_delivery: campaignDelivery.length,
             fallback_playback: observations.filter(item => item.presentation_type === 'fallback').length,

@@ -68,7 +68,6 @@ jest.unstable_mockModule('../src/repositories/StoreRepository.js', () => ({
 
 jest.unstable_mockModule('../src/repositories/LoopRepository.js', () => ({
     loopRepository: { findAll: jest.fn(async () => []) },
-    LOOP_STATUS: { APPROVED: 'approved' },
 }));
 
 const { HeartbeatService } = await import('../src/services/HeartbeatService.js');
@@ -153,19 +152,18 @@ describeWithAuthEmulator('Screen heartbeat connectivity', () => {
         expect(withoutSchedule.body.screens[0]).toMatchObject({
             id: 'screen-status',
             connectivity: 'online',
-            schedule: { state: 'unavailable', approved: false },
+            schedule: { state: 'unavailable' },
         });
 
         loopRepository.findAll.mockResolvedValueOnce([{
-            id: 'approved-loop',
-            status: 'approved',
+            id: 'generated-loop',
             date: '2026-09-12',
             location_id: 'location-entrance',
         }]);
         const withSchedule = await request(app).get('/api/monitoring/status').set(operator);
         expect(withSchedule.body.screens[0]).toMatchObject({
             connectivity: 'online',
-            schedule: { state: 'available', approved: true },
+            schedule: { state: 'available' },
         });
     });
 

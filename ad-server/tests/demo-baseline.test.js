@@ -127,11 +127,11 @@ describe('deterministic SM_MVP1 demo baseline', () => {
         }
     });
 
-    test('approves today\'s schedule for the all-day Store, playing the reserved Creative in its Slots', () => {
+    test('generates today\'s schedule for the all-day Store, playing the reserved Creative in its Slots', () => {
         const loops = dataOf(baseline, 'loops').filter(loop => loop.store_id === ALL_DAY_STORE);
         expect(loops.map(loop => [loop.id, loop.date, loop.hour, loop.status])).toEqual(
             Array.from({ length: 24 }, (_, hour) =>
-                [`2030-01-15_${hour}_${ALL_DAY_STORE}`, '2030-01-15', hour, 'approved']));
+                [`2030-01-15_${hour}_${ALL_DAY_STORE}`, '2030-01-15', hour, undefined]));
 
         for (const loop of loops) {
             expect(loop.retailer_id).toBe('demo-retailer-secondary');

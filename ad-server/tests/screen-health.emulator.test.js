@@ -76,20 +76,19 @@ describeWithEmulator('Technical Operator Screen health with Firebase emulators',
         expect(status.body.screens).toContainEqual(expect.objectContaining({
             id: ids.screen,
             connectivity: 'online',
-            schedule: { state: 'unavailable', approved: false },
+            schedule: { state: 'unavailable' },
         }));
 
         await firestore.collection('loops').doc('issue-5-loop').set({
             id: 'issue-5-loop',
             date: new Date().toISOString().slice(0, 10),
             location_id: ids.location,
-            status: 'approved',
         });
         const scheduledStatus = await request(app).get('/api/monitoring/status').set(await technicalOperator());
         expect(scheduledStatus.body.screens).toContainEqual(expect.objectContaining({
             id: ids.screen,
             connectivity: 'online',
-            schedule: { state: 'available', approved: true },
+            schedule: { state: 'available' },
         }));
 
     });

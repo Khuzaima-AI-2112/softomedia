@@ -31,7 +31,7 @@ async function seedDelivery() {
     });
     for (const [id, retailerId, storeId, hour] of LOOPS) {
         batch.set(firestore.collection('loops').doc(id), {
-            id, retailer_id: retailerId, store_id: storeId, date: DATE, hour, status: 'approved', slots: [],
+            id, retailer_id: retailerId, store_id: storeId, date: DATE, hour, slots: [],
         });
     }
     PROOFS.forEach(([campaignId, loopId], index) => {

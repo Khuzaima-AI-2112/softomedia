@@ -46,13 +46,25 @@ describe('LoopRepository', () => {
                 hour: 14,
                 retailer_id: 'ret_001',
                 location_id: 'loc_downtown',
-                status: 'pending_approval',
                 slots
             });
 
             expect(loop.id).toBe('2026-01-03_14');
             expect(loop.slots).toHaveLength(12);
-            expect(loop.status).toBe('pending_approval'); // repo stores as-written; LOOP_STATUS enum is lowercase
+        });
+
+        // Nobody approves an Hourly Loop (ADR 0007), so a loop carries no approval state.
+        test('records no approval state', async () => {
+            const loop = await repo.create('2026-01-03_14', {
+                date: '2026-01-03',
+                hour: 14,
+                retailer_id: 'ret_001',
+                slots: []
+            });
+
+            expect(loop).not.toHaveProperty('status');
+            expect(loop).not.toHaveProperty('approved_at');
+            expect(loop).not.toHaveProperty('approved_by');
         });
 
         test('should reject loops with invalid hours', async () => {
@@ -78,7 +90,6 @@ describe('LoopRepository', () => {
                 date: '2026-01-03',
                 hour: 14,
                 retailer_id: 'ret_001',
-                status: 'APPROVED',
                 slots: []
             });
 
@@ -88,87 +99,25 @@ describe('LoopRepository', () => {
         });
     });
 
-    describe('findPendingByRetailer', () => {
-        test('should return only pending loops for retailer', async () => {
-            await repo.create('2026-01-03_14', {
-                date: '2026-01-03',
-                hour: 14,
-                retailer_id: 'ret_001',
-                status: 'pending_approval',
-                slots: []
-            });
-
-            await repo.create('2026-01-03_15', {
-                date: '2026-01-03',
-                hour: 15,
-                retailer_id: 'ret_001',
-                status: 'APPROVED',
-                slots: []
-            });
-
-            const pending = await repo.findPendingByRetailer('ret_001');
-            expect(pending.map(loop => loop.id)).toEqual(['2026-01-03_14']);
-        });
-    });
-
-    describe('approveLoop', () => {
-        test('should change status to APPROVED', async () => {
-            await repo.create('2026-01-03_14', {
-                date: '2026-01-03',
-                hour: 14,
-                retailer_id: 'ret_001',
-                status: 'pending_approval',
-                slots: []
-            });
-
-            const updated = await repo.approveLoop('2026-01-03_14', 'user_123');
-            expect(updated.status).toBe('approved');
-            expect(updated.approved_by).toBe('user_123');
-            expect(updated.approved_at).toBeDefined();
-        });
-    });
-
-    describe('rejectSlot', () => {
-        test('should mark specific slot as rejected', async () => {
-            const slots = Array.from({ length: 12 }, (_, i) => ({
-                position: i,
-                asset_id: `asset_${i}`,
-                duration: 5,
-                status: 'PENDING'
-            }));
-
-            await repo.create('2026-01-03_14', {
-                date: '2026-01-03',
-                hour: 14,
-                retailer_id: 'ret_001',
-                status: 'pending_approval',
-                slots
-            });
-
-            const updated = await repo.rejectSlot('2026-01-03_14', 3, 'Competitor ad');
-            expect(updated.slots[3].status).toMatch(/rejected/i); // SLOT_STATUS.REJECTED === 'rejected'
-            expect(updated.slots[3].rejection_reason).toBe('Competitor ad');
-        });
-    });
-
     describe('replaceSlot', () => {
-        test('should replace rejected slot with new asset', async () => {
+        test('should replace a slot with a new asset in the loop that plays', async () => {
             const slots = Array.from({ length: 12 }, (_, i) => ({
                 position: i,
                 asset_id: `asset_${i}`,
-                duration: 5,
-                status: i === 3 ? 'REJECTED' : 'PENDING'
+                duration: 5
             }));
 
+            // A loop approved before #70 is corrected in place too, not cloned into a draft.
             await repo.create('2026-01-03_14', {
                 date: '2026-01-03',
                 hour: 14,
                 retailer_id: 'ret_001',
-                status: 'pending_approval',
+                status: 'approved',
                 slots
             });
 
             const updated = await repo.replaceSlot('2026-01-03_14', 3, 'new_asset_xyz');
+            expect(updated.id).toBe('2026-01-03_14');
             expect(updated.slots[3].asset_id).toBe('new_asset_xyz');
             expect(updated.slots[3].status).toMatch(/replaced/i); // SLOT_STATUS.REPLACED === 'replaced'
         });

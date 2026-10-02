@@ -13,19 +13,9 @@ export const BUSINESS_HOURS = {
     END: 24,
 };
 
-// Valid loop statuses — canonical stored values are lowercase.
-// Uppercase property names are preserved as the import API for existing callers.
-export const LOOP_STATUS = Object.freeze({
-    get PENDING_APPROVAL() { return 'pending_approval'; },
-    get REPLACEMENT_REQUESTED() { return 'replacement_requested'; },
-    get APPROVED() { return 'approved'; },
-    get REJECTED() { return 'rejected'; },
-});
-
-// Slot statuses — canonical stored values are lowercase.
-// Uppercase property names are preserved as the import API for existing callers.
+// Nobody approves an Hourly Loop (ADR 0007), so a loop has no approval status.
+// A Slot an Admin corrected is marked replaced.
 export const SLOT_STATUS = Object.freeze({
-    get REJECTED() { return 'rejected'; },
     get REPLACED() { return 'replaced'; },
 });
 
@@ -51,13 +41,10 @@ export class LoopRepository extends BaseRepository {
 
         const loopData = {
             ...data,
-            status: data.status || LOOP_STATUS.PENDING_APPROVAL,
             slots: data.slots || [],
             version: data.version || 1,
             screen_ids: data.screen_ids || (data.screen_id ? [data.screen_id] : []),
             generated_at: new Date().toISOString(),
-            approved_at: null,
-            approved_by: null
         };
 
         return super.create(id, loopData);
@@ -75,103 +62,7 @@ export class LoopRepository extends BaseRepository {
     }
 
     /**
-     * Find all pending loops for a retailer
-     * @param {string} retailerId
-     * @returns {Promise<Array>}
-     */
-    async findPendingByRetailer(retailerId) {
-        const all = await this.findAll({
-            where: [
-                ['retailer_id', '==', retailerId],
-                ['status', '==', LOOP_STATUS.PENDING_APPROVAL]
-            ]
-        });
-        return all;
-    }
-
-    /**
-     * Approve an entire loop.
-     * Guards: loop must exist, must be PENDING_APPROVAL, all slots must have an asset.
-     * @param {string} loopId
-     * @param {string} userId
-     * @returns {Promise<object>}
-     */
-    async approveLoop(loopId, userId) {
-        const loop = await this.findById(loopId);
-        if (!loop) throw new Error(`Loop ${loopId} not found`);
-
-        if (loop.status !== LOOP_STATUS.PENDING_APPROVAL) {
-            throw new Error(`Loop ${loopId} cannot be approved from status: ${loop.status}`);
-        }
-
-        const emptySlots = (loop.slots || []).filter(s => !s?.asset_id);
-        if (emptySlots.length > 0) {
-            throw new Error(`Loop ${loopId} has ${emptySlots.length} empty slot(s) and cannot be approved`);
-        }
-
-        const result = await this.update(loopId, {
-            status: LOOP_STATUS.APPROVED,
-            approved_at: new Date().toISOString(),
-            approved_by: userId
-        });
-
-        await schedulingAuditRepository.logAction('loop_approved', {
-            entity_id: loopId,
-            user_id: userId,
-            version: loop.version ?? 1,
-            screen_count: loop.screen_ids?.length ?? 1,
-            timestamp: new Date().toISOString()
-        });
-
-        return result;
-    }
-
-    /**
-     * Reject a specific slot in a loop
-     * @param {string} loopId
-     * @param {number} position - Slot position (0-11)
-     * @param {string} reason - Rejection reason
-     * @returns {Promise<object>}
-     */
-    async rejectSlot(loopId, position, reason, userId = null) {
-        const loop = await this.findById(loopId);
-        if (!loop) throw new Error(`Loop ${loopId} not found`);
-
-        const slots = [...loop.slots];
-        if (position < 0 || position >= slots.length) {
-            throw new Error(`Invalid slot position: ${position}`);
-        }
-
-        slots[position] = {
-            ...slots[position],
-            status: SLOT_STATUS.REJECTED,
-            rejection_reason: reason,
-            rejected_at: new Date().toISOString(),
-            rejected_by: userId,
-        };
-
-        const result = await this.update(loopId, {
-            slots,
-            status: LOOP_STATUS.REPLACEMENT_REQUESTED,
-            approved_at: null,
-            approved_by: null,
-        });
-
-        await schedulingAuditRepository.logAction('slot_rejected', {
-            entity_id: loopId,
-            slot_index: position,
-            reason: reason,
-            user_id: userId,
-            timestamp: new Date().toISOString()
-        });
-
-        return result;
-    }
-
-    /**
-     * Replace a slot with a new asset.
-     * If the loop is APPROVED, clones the loop into a new PENDING_APPROVAL draft
-     * (version n+1) rather than mutating the approved document.
+     * Replace a slot with a new asset, in the loop that plays.
      * @param {string} loopId
      * @param {number} position - Slot position (0-11)
      * @param {string} newAssetId - Replacement asset ID
@@ -187,43 +78,6 @@ export class LoopRepository extends BaseRepository {
             throw new Error(`Invalid slot position: ${position}`);
         }
 
-        // If loop is APPROVED, clone it into a new draft version instead of mutating
-        if (loop.status === LOOP_STATUS.APPROVED) {
-            const newVersion = (loop.version ?? 1) + 1;
-            const newId = `${loopId}_v${newVersion}`;
-            const clonedSlots = [...loop.slots];
-            clonedSlots[position] = {
-                ...clonedSlots[position],
-                asset_id: newAssetId,
-                status: SLOT_STATUS.REPLACED,
-                replaced_at: new Date().toISOString()
-            };
-
-            const cloned = await this.create(newId, {
-                ...loop,
-                id: newId,
-                status: LOOP_STATUS.PENDING_APPROVAL,
-                version: newVersion,
-                parentLoopId: loopId,
-                slots: clonedSlots,
-                approved_at: null,
-                approved_by: null
-            });
-
-            await schedulingAuditRepository.logAction('slot_replaced', {
-                entity_id: newId,
-                parent_loop_id: loopId,
-                slot_index: position,
-                asset_id: newAssetId,
-                user_id: userId,
-                version: newVersion,
-                timestamp: new Date().toISOString()
-            });
-
-            return cloned;
-        }
-
-        // Non-APPROVED loops: mutate in place
         slots[position] = {
             ...slots[position],
             asset_id: newAssetId,
@@ -231,16 +85,7 @@ export class LoopRepository extends BaseRepository {
             replaced_at: new Date().toISOString()
         };
 
-        const returningToReview = loop.status === LOOP_STATUS.REPLACEMENT_REQUESTED
-            || loop.status === LOOP_STATUS.REJECTED;
-        const result = await this.update(loopId, {
-            slots,
-            ...(returningToReview ? {
-                status: LOOP_STATUS.PENDING_APPROVAL,
-                approved_at: null,
-                approved_by: null,
-            } : {}),
-        });
+        const result = await this.update(loopId, { slots });
 
         await schedulingAuditRepository.logAction('slot_replaced', {
             entity_id: loopId,
@@ -252,7 +97,6 @@ export class LoopRepository extends BaseRepository {
 
         return result;
     }
-
 
     /**
      * Get all loops for a specific date

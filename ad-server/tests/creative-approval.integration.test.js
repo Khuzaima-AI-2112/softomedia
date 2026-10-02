@@ -177,8 +177,7 @@ describeWithAuthEmulator('Approving a Creative once, by the Super Administrator 
         expect((await reservedSlot(as.admin, 'harbor-pier', MONDAY)).slot)
             .toMatchObject({ is_fallback: false, asset_id: 'latte-file', campaign_id: harborBooking.body.id });
 
-        // Northwind's Screen plays it once its hour is approved; nobody approves the Campaign.
-        expect((await request(app).patch(`/api/loops/${downtown.loop.id}/approve`).set(as.northwind)).status).toBe(200);
+        // Northwind's Screen plays it; nobody approves the Campaign or the hour.
         await signInAllAt(PLAYING);
         const playback = await request(app).get('/api/device/playback').set('Authorization', device('north-downtown'));
         expect(playback.status).toBe(200);

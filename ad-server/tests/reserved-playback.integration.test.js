@@ -33,7 +33,6 @@ const DATE = '2030-01-07';
 const MONDAY = 1;
 const BOOKED = new Date('2030-01-01T12:00:00.000Z');
 const GENERATED = new Date('2030-01-05T14:00:00.000Z'); // 09:00 on D-2, while bookings are still open
-const APPROVED = new Date('2030-01-06T15:00:00.000Z'); // before the 18:00 D-1 approval deadline
 const PLAYING = new Date('2030-01-07T13:00:30.000Z'); // 08:00:30 in Toronto
 
 const RESERVED = 3; // Brand One's approved Creative
@@ -196,12 +195,7 @@ describeWithAuthEmulator('Reserved Slots on the Screen', () => {
         const nineAm = generated.body.loops.find(loop => loop.hour === 9);
         expect(nineAm.slots.filter(slot => slot.campaign_id)).toEqual([]);
 
-        // The Retailer approves the hour.
-        as = await signInAllAt(APPROVED);
-        const loopApproval = await request(app).patch(`/api/loops/${eightAm.id}/approve`).set(as.retailer);
-        expect(loopApproval.status).toBe(200);
-
-        // The Screen plays.
+        // Nobody approves the hour: the Screen plays the generated loop (ADR 0007).
         as = await signInAllAt(PLAYING);
         const playback = await request(app).get('/api/device/playback').set('Authorization', device());
         expect(playback.status).toBe(200);

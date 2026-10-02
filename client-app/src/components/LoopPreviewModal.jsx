@@ -1,22 +1,11 @@
 /**
  * Loop Preview Modal
- * Displays a single hour's loop for retailer validation
- * Allows approve/reject of individual ads
+ * Shows a single hour's loop to the Retailer Administrator. Nobody approves an
+ * Hourly Loop (ADR 0007); the Retailer Administrator previews it (#21).
  */
 
 import { useState } from 'react';
-import StatusBadge from './StatusBadge';
 import LoopPlaybackPreview from './LoopPlaybackPreview';
-import apiClient from '../services/api';
-
-// Rejection reasons dropdown options
-const REJECTION_REASONS = [
-    { value: 'inappropriate', label: 'Inappropriate Content' },
-    { value: 'competitor', label: 'Competitor Brand' },
-    { value: 'low_quality', label: 'Low Quality' },
-    { value: 'off_brand', label: 'Off-Brand / Not Aligned' },
-    { value: 'other', label: 'Other' }
-];
 
 // Format hour
 const formatHour = (hour) => {
@@ -25,55 +14,9 @@ const formatHour = (hour) => {
     return `${displayHour}:00 ${period}`;
 };
 
-function LoopPreviewModal({ loop, onClose, onRefresh, approvalOpen = true }) {
-    const [slots, setSlots] = useState(loop.slots || []);
-    const [rejectingSlot, setRejectingSlot] = useState(null);
-    const [rejectionReason, setRejectionReason] = useState('');
-    const [saving, setSaving] = useState(false);
-    const [actionError, setActionError] = useState('');
+function LoopPreviewModal({ loop, onClose }) {
+    const slots = loop.slots || [];
     const [showPlayback, setShowPlayback] = useState(false);
-
-    const handleRejectSlot = async (position) => {
-        if (!rejectionReason) {
-            alert('Please select a rejection reason');
-            return;
-        }
-
-        setSaving(true);
-        setActionError('');
-        try {
-            const updated = await apiClient.patch(`/api/loops/${loop.id}/slots/${position}/reject`, {
-                reason: rejectionReason,
-            });
-            setSlots(updated.slots);
-            setRejectingSlot(null);
-            setRejectionReason('');
-            onRefresh?.();
-        } catch (error) {
-            console.error('Failed to reject slot:', error);
-            setActionError(error.message || 'Failed to request replacement');
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const handleApproveLoop = async () => {
-        setSaving(true);
-        setActionError('');
-        try {
-            await apiClient.patch(`/api/loops/${loop.id}/approve`);
-            onRefresh?.();
-            onClose();
-        } catch (error) {
-            console.error('Failed to approve loop:', error);
-            setActionError(error.message || 'Failed to approve loop');
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const rejectedCount = slots.filter(s => s.status?.toLowerCase() === 'rejected').length;
-    const canApprove = approvalOpen && rejectedCount === 0;
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -94,10 +37,6 @@ function LoopPreviewModal({ loop, onClose, onRefresh, approvalOpen = true }) {
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <StatusBadge status={
-                            loop.status?.toLowerCase() === 'approved' ? 'Active' :
-                                loop.status?.toLowerCase() === 'pending_approval' ? 'Warning' : 'Offline'
-                        } />
                         <button
                             onClick={() => setShowPlayback(true)}
                             data-testid="btn-preview-playback"
@@ -108,6 +47,7 @@ function LoopPreviewModal({ loop, onClose, onRefresh, approvalOpen = true }) {
                         </button>
                         <button
                             onClick={onClose}
+                            aria-label="Close"
                             data-testid="btn-modal-close" className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
                         >
                             <span className="material-symbols-outlined">close</span>
@@ -121,11 +61,9 @@ function LoopPreviewModal({ loop, onClose, onRefresh, approvalOpen = true }) {
                         {slots.map((slot, position) => (
                             <div
                                 key={position}
-                                className={`relative p-4 rounded-xl border-2 ${slot.status?.toLowerCase() === 'rejected'
-                                        ? 'border-red-400 bg-red-50 dark:bg-red-900/20'
-                                        : slot.status?.toLowerCase() === 'replaced'
-                                            ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20'
-                                            : 'border-slate-200 dark:border-slate-700'
+                                className={`relative p-4 rounded-xl border-2 ${slot.status?.toLowerCase() === 'replaced'
+                                        ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20'
+                                        : 'border-slate-200 dark:border-slate-700'
                                     }`}
                                 data-testid={`preview-slot-${position}`}
                             >
@@ -135,7 +73,7 @@ function LoopPreviewModal({ loop, onClose, onRefresh, approvalOpen = true }) {
                                 </div>
 
                                 {/* Slot Content */}
-                                <div className="h-16 flex flex-col items-center justify-center mb-3">
+                                <div className="h-16 flex flex-col items-center justify-center">
                                     <span className="text-3xl mb-1">
                                         {slot.asset_thumbnail || '📦'}
                                     </span>
@@ -143,121 +81,15 @@ function LoopPreviewModal({ loop, onClose, onRefresh, approvalOpen = true }) {
                                         {slot.asset_name || slot.asset_id || 'Empty'}
                                     </span>
                                 </div>
-
-                                {/* Status & Actions */}
-                                {slot.status?.toLowerCase() === 'rejected' ? (
-                                    <div className="text-center">
-                                        <span className="text-xs text-red-500 font-bold block mb-2">
-                                            REJECTED: {slot.rejection_reason}
-                                        </span>
-                                        <span className="text-xs text-slate-500">Replacement requested from Admin</span>
-                                    </div>
-                                ) : slot.status?.toLowerCase() === 'replaced' ? (
-                                    <div className="text-center">
-                                        <span className="text-xs text-emerald-600 font-bold">✓ REPLACED</span>
-                                    </div>
-                                ) : (
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => setRejectingSlot(position)}
-                                            disabled={!approvalOpen}
-                                            className="flex-1 text-xs px-2 py-1.5 bg-red-100 text-red-600 rounded-lg font-medium hover:bg-red-200 transition-colors"
-                                            data-testid={`reject-btn-${position}`}
-                                        >
-                                            Reject
-                                        </button>
-                                    </div>
-                                )}
                             </div>
                         ))}
                     </div>
                 </div>
 
-                {/* Footer */}
-                <div className="p-6 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
-                    <div className="text-sm text-slate-500">
-                        {rejectedCount > 0 ? (
-                            <span className="text-red-500 font-bold">
-                                ⚠️ {rejectedCount} ad{rejectedCount > 1 ? 's' : ''} need replacement before approval
-                            </span>
-                        ) : (
-                            <span className="text-emerald-500 font-bold">
-                                ✓ All ads are ready for broadcast
-                            </span>
-                        )}
-                    </div>
-                    <div className="flex gap-3">
-                        <button
-                            onClick={onClose}
-                            className="px-4 py-2 text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleApproveLoop}
-                            disabled={!canApprove || saving}
-                            className="px-6 py-2 bg-emerald-500 text-white font-bold rounded-lg shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                            data-testid="approve-loop-btn"
-                        >
-                            <span className="material-symbols-outlined text-[20px]">check_circle</span>
-                            {saving ? 'Approving...' : 'Approve Loop'}
-                        </button>
-                    </div>
-                </div>
-
-                {actionError && (
-                    <div role="alert" className="px-6 py-3 bg-red-50 text-red-700" data-testid="approval-action-error">
-                        {actionError}
-                    </div>
-                )}
-
                 {/* Loop Playback Preview — plays the loop's currently assigned Slot assets in real broadcast order */}
                 {showPlayback && (
                     <LoopPlaybackPreview slots={slots} onClose={() => setShowPlayback(false)} />
                 )}
-
-                {/* Rejection Reason Modal */}
-                {rejectingSlot !== null && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
-                        <div className="bg-white dark:bg-surface-dark rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
-                            <h4 className="font-bold text-lg mb-4">Reject Slot {rejectingSlot + 1}</h4>
-                            <p className="text-sm text-slate-500 mb-4">
-                                Please select a reason for rejecting this ad:
-                            </p>
-                            <select
-                                value={rejectionReason}
-                                onChange={(e) => setRejectionReason(e.target.value)}
-                                className="w-full p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 mb-4"
-                                data-testid="rejection-reason-select"
-                            >
-                                <option value="">Select reason...</option>
-                                {REJECTION_REASONS.map(r => (
-                                    <option key={r.value} value={r.value}>{r.label}</option>
-                                ))}
-                            </select>
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => {
-                                        setRejectingSlot(null);
-                                        setRejectionReason('');
-                                    }}
-                                    className="flex-1 px-4 py-2 text-slate-600 font-medium border border-slate-200 rounded-lg"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={() => handleRejectSlot(rejectingSlot)}
-                                    disabled={!rejectionReason || saving}
-                                    className="flex-1 px-4 py-2 bg-red-500 text-white font-bold rounded-lg disabled:opacity-50"
-                                    data-testid="confirm-reject-btn"
-                                >
-                                    {saving ? 'Rejecting...' : 'Confirm Reject'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
             </div>
         </div>
     );
