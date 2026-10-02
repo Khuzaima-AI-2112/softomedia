@@ -2,12 +2,19 @@ import { useEffect, useState } from 'react';
 import GlassCard from '../../components/GlassCard';
 import apiService from '../../services/ApiService';
 
-// A Creative plays only once approved; the Brand sees where each one stands.
+// A Creative plays in a Store once the Super Administrator and the Store's
+// Retailer have both approved it (ADR 0007); the Brand sees where each stands.
 const APPROVAL = {
-    pending: { label: 'Pending approval', className: 'bg-amber-100 text-amber-800' },
-    approved: { label: 'Approved', className: 'bg-emerald-100 text-emerald-800' },
-    rejected: { label: 'Rejected', className: 'bg-rose-100 text-rose-800' },
+    pending: { label: 'Awaiting Super Admin approval', className: 'bg-amber-100 text-amber-800' },
+    approved: { label: 'Approved by Super Admin', className: 'bg-emerald-100 text-emerald-800' },
+    rejected: { label: 'Rejected by Super Admin', className: 'bg-rose-100 text-rose-800' },
     revoked: { label: 'Revoked', className: 'bg-slate-200 text-slate-700' },
+};
+
+const RETAILER_DECISION = {
+    pending: { label: 'Awaiting approval', className: 'text-amber-700' },
+    approved: { label: 'Approved', className: 'text-emerald-700' },
+    rejected: { label: 'Rejected', className: 'text-rose-700' },
 };
 
 function BrandCreatives() {
@@ -48,6 +55,22 @@ function BrandCreatives() {
                                 </span>
                                 {creative.reason && (
                                     <p className="w-full text-sm text-slate-500">{creative.reason}</p>
+                                )}
+                                {creative.retailer_approvals?.length > 0 && (
+                                    <ul className="w-full space-y-1 text-sm">
+                                        {creative.retailer_approvals.map(approval => {
+                                            const decision = RETAILER_DECISION[approval.status]
+                                                ?? { label: approval.status, className: 'text-slate-600' };
+                                            return (
+                                                <li key={approval.retailer_id}
+                                                    data-testid={`creative-retailer-${creative.id}-${approval.retailer_id}`}
+                                                    className={decision.className}>
+                                                    {approval.retailer_name || approval.retailer_id}: {decision.label}
+                                                    {approval.reason && ` — ${approval.reason}`}
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
                                 )}
                             </li>
                         );

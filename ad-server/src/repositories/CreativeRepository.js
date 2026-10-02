@@ -1,13 +1,23 @@
 import { randomUUID } from 'node:crypto';
 import { BaseRepository, commitMockStorage, readMockRecord } from './BaseRepository.js';
 
-export { CREATIVE_STATUS } from '../constants/creatives.js';
+import { CREATIVE_STATUS } from '../constants/creatives.js';
+
+export { CREATIVE_STATUS };
 
 /** The Creative's status changed before this decision could be made. */
 export class CreativeStatusConflictError extends Error {
     constructor(currentStatus) {
         super(`The Creative is ${currentStatus}`);
         this.name = 'CreativeStatusConflictError';
+    }
+}
+
+/** A Retailer's decision on a Creative can't be recorded now. */
+export class RetailerDecisionConflictError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = 'RetailerDecisionConflictError';
     }
 }
 
@@ -29,33 +39,62 @@ export class CreativeRepository extends BaseRepository {
     }
 
     /**
-     * Records a decision on a Creative that is still in the `from` status, checked
-     * and written together so two decisions at once can't both succeed.
+     * Records the Super Administrator's decision on a Creative that is still in
+     * the `from` status, checked and written together so two decisions at once
+     * can't both succeed.
      * @returns {Promise<object|null>} The decided Creative, or null if there is none
      * @throws {CreativeStatusConflictError} When the Creative is no longer `from`
      */
-    async decide(id, from, decision) {
-        const decide = current => {
-            if (!current) return null;
+    decide(id, from, decision) {
+        return this.#change(id, current => {
             if (current.approval_status !== from) throw new CreativeStatusConflictError(current.approval_status);
-            return { ...current, ...decision, updated_at: new Date().toISOString() };
-        };
+            return decision;
+        });
+    }
 
-        let decided;
+    /**
+     * Records one Retailer's decision on a Creative, for its own Stores. The
+     * Super Administrator approves first, and a Retailer decides only once.
+     * @returns {Promise<object|null>} The decided Creative, or null if there is none
+     * @throws {RetailerDecisionConflictError} When the Retailer may not decide now
+     */
+    decideForRetailer(id, retailerId, decision) {
+        return this.#change(id, current => {
+            if (current.approval_status !== CREATIVE_STATUS.APPROVED) {
+                throw new RetailerDecisionConflictError('The Super Administrator approves a Creative first');
+            }
+            if (current.retailer_approvals?.[retailerId]) {
+                throw new RetailerDecisionConflictError('Your decision on this Creative is already recorded');
+            }
+            return { retailer_approvals: { ...current.retailer_approvals, [retailerId]: decision } };
+        });
+    }
+
+    /**
+     * Reads a Creative and writes the fields `change` returns for it, in one
+     * transaction. `change` may throw to refuse.
+     * @returns {Promise<object|null>} The changed Creative, or null if there is none
+     */
+    async #change(id, change) {
+        const apply = current => (current
+            ? { ...current, ...change(current), updated_at: new Date().toISOString() }
+            : null);
+
+        let changed;
         if (this.collection) {
             const ref = this.collection.doc(id);
-            decided = await this.db.runTransaction(async transaction => {
+            changed = await this.db.runTransaction(async transaction => {
                 const snapshot = await transaction.get(ref);
-                const next = decide(snapshot.exists ? { id: snapshot.id, ...snapshot.data() } : null);
+                const next = apply(snapshot.exists ? { id: snapshot.id, ...snapshot.data() } : null);
                 if (next) transaction.set(ref, next);
                 return next;
             });
         } else {
             // Memory mode: the check and the write run without yielding in between.
-            decided = decide(readMockRecord(this.collectionName, id));
+            changed = apply(readMockRecord(this.collectionName, id));
         }
-        if (decided) commitMockStorage([{ collectionName: this.collectionName, id, data: decided }]);
-        return decided;
+        if (changed) commitMockStorage([{ collectionName: this.collectionName, id, data: changed }]);
+        return changed;
     }
 
     /** The Creative a stored file belongs to, or null. */

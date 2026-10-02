@@ -392,11 +392,18 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
         ...mediaFixtures.map(fixture => fixture.document),
         record('creatives', 'demo-creative-paid', {
             brand_id: 'demo-advertiser-secondary',
+            title: 'Synthetic Demo Paid Media',
             media_ids: ['demo-media-paid'],
             approval_status: CREATIVE_STATUS.APPROVED,
             decided_by: null,
             decided_at: resetAtIso,
             reason: null,
+            // Approved by the Super Administrator and by the Retailer it is booked with (ADR 0007).
+            retailer_approvals: {
+                [phoenixStore.data.retailer_id]: {
+                    status: CREATIVE_STATUS.APPROVED, decided_by: null, decided_at: resetAtIso, reason: null,
+                },
+            },
         }, resetAtIso),
         approvedCampaign,
         pendingCampaign,

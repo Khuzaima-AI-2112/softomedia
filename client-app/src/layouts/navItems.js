@@ -4,6 +4,9 @@ import { ROLES } from '../constants/roles';
 // Every role but the Technical Operator reads the delivery report, scoped by the server (#41).
 const DELIVERY_REPORT = { to: '/dashboard/delivery-report', icon: 'query_stats', label: 'Delivery by Daypart', testId: 'nav-delivery-report' };
 
+// The Super Administrator approves a Creative for the network, then each Retailer for its Stores (ADR 0007).
+const CREATIVE_APPROVALS = { to: '/dashboard/creative-approvals', icon: 'fact_check', label: 'Creative Approvals', testId: 'nav-creative-approvals' };
+
 // superAdminOnly pages need platform.governance or organizations.manage, which the
 // Admin role does not hold; listing them for Admin led to 403s and silent redirects.
 const NETWORK_NAV = [
@@ -29,6 +32,7 @@ const ADMIN_NAV = NETWORK_NAV.filter(item => !item.superAdminOnly);
 // Super Administrators manage every Support Ticket; Admin has no ticket access in Phase 1.
 const SUPERADMIN_NAV = [
     ...NETWORK_NAV,
+    CREATIVE_APPROVALS,
     { to: '/dashboard/tickets', icon: 'confirmation_number', label: 'Support Tickets', testId: 'nav-tickets' },
 ];
 
@@ -52,6 +56,7 @@ const RETAILER_NAV = [
     { to: '/dashboard/retailer/hours', icon: 'schedule', label: 'Store Hours', testId: 'nav-store-hours' },
     { to: '/dashboard/retailer/loops', icon: 'subscriptions', label: 'Loops' },
     { to: '/dashboard/retailer/campaign-approvals', icon: 'approval', label: 'Campaign Approvals', testId: 'nav-approvals' },
+    CREATIVE_APPROVALS,
     DELIVERY_REPORT,
     // fix(mvp-nav): MVP §3.2 — communicate feedback or issues to Softomedia
     { to: '/dashboard/tickets', icon: 'confirmation_number', label: 'Support Tickets', testId: 'nav-tickets' },

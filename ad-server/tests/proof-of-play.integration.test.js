@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, jest, test } from '@jest/globals';
+import { retailerApprovals } from './fixtures/creative-approval.js';
 
 process.env.NODE_ENV = 'test';
 process.env.GOOGLE_CLOUD_PROJECT = process.env.GOOGLE_CLOUD_PROJECT || 'softomedia-demo';
@@ -82,6 +83,7 @@ describeWithEmulator('Proof of Play HTTP API with Firestore persistence', () => 
             brand_id: ids.brand,
             media_ids: [ids.asset],
             approval_status: 'approved',
+            retailer_approvals: retailerApprovals(ids.retailer),
         });
         await firestore.collection('media').doc(ids.fallbackAsset).set({
             id: ids.fallbackAsset,

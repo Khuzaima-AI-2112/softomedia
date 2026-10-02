@@ -106,7 +106,7 @@ test('Brand books Slots on the grid through a conflict and the Booking Cutoff, a
         await expect(page.getByRole('img', { name: `${title} creative` })).toBeVisible();
         // The Brand sees its Creative waiting for approval.
         await expect(page.locator('[data-testid^="creative-row-"]').filter({ hasText: `${title} creative` })
-            .locator('[data-testid^="creative-status-"]')).toHaveText('Pending approval');
+            .locator('[data-testid^="creative-status-"]')).toHaveText('Awaiting Super Admin approval');
 
         await page.reload();
         await expect(page.getByText(title, { exact: true })).toBeVisible();

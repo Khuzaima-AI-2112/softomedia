@@ -32,3 +32,8 @@ export function normalizeRole(raw) {
 export function brandIdFor(user) {
     return user?.linked_entity_id || user?.organization_id || null;
 }
+
+/** The Retailer a signed-in Retailer Administrator acts for. */
+export function retailerIdFor(user) {
+    return user?.organization_id || user?.linked_entity_id || null;
+}

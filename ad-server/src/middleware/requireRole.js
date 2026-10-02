@@ -26,8 +26,10 @@ export const PERMISSIONS = Object.freeze({
     CAMPAIGN_DELETE: 'campaigns.delete',
     CAMPAIGN_APPROVAL: 'campaigns.approve',
     CAMPAIGN_VIEW_NETWORK: 'campaigns.view_network',
-    // Approve, reject and revoke a Creative. Granted to no role until Chris names the approver (#37).
+    // A Creative is approved by the Super Administrator for the whole network, then by
+    // each Retailer whose Stores it is booked in, for those Stores (ADR 0007).
     CREATIVE_APPROVAL: 'creatives.approve',
+    CREATIVE_APPROVAL_OWN: 'creatives.approve_own',
     LOOP_INJECT: 'loops.inject',
     LOOP_GENERATE: 'loops.generate',
     SCHEDULE_OVERRIDE: 'schedules.override',
@@ -45,8 +47,9 @@ export const PERMISSIONS = Object.freeze({
 
 // The accepted Phase 1 permission matrix (docs/phase-1-demo-acceptance.md).
 // Every grant is explicit; no role inherits another role's authority.
-// Approval belongs to the Retailer Administrator alone; no administrative
-// override approves on a Retailer's behalf.
+// A Retailer Administrator approves what plays on its own Stores' Screens; no
+// administrative override approves on a Retailer's behalf. A Creative also needs
+// the Super Administrator's approval, given first (ADR 0007).
 const ROLE_PERMISSIONS = Object.freeze({
     [ROLES.SUPERADMIN]: Object.freeze([
         PERMISSIONS.PLATFORM_GOVERNANCE,
@@ -60,6 +63,7 @@ const ROLE_PERMISSIONS = Object.freeze({
         PERMISSIONS.CAMPAIGN_CREATE,
         PERMISSIONS.CAMPAIGN_DELETE,
         PERMISSIONS.CAMPAIGN_VIEW_NETWORK,
+        PERMISSIONS.CREATIVE_APPROVAL,
         PERMISSIONS.LOOP_INJECT,
         PERMISSIONS.LOOP_GENERATE,
         PERMISSIONS.SCHEDULE_OVERRIDE,
@@ -92,6 +96,7 @@ const ROLE_PERMISSIONS = Object.freeze({
         PERMISSIONS.SUPPORT_TICKET_VIEW_OWN,
         PERMISSIONS.SCREEN_VIEW_OWN,
         PERMISSIONS.CAMPAIGN_APPROVAL,
+        PERMISSIONS.CREATIVE_APPROVAL_OWN,
         PERMISSIONS.SCHEDULE_OVERRIDE,
         PERMISSIONS.IMPRESSION_VIEW_OWN,
         PERMISSIONS.AUDIT_VIEW_OWN,

@@ -1,5 +1,5 @@
 import { BaseRepository } from './BaseRepository.js';
-import { ROLES, brandIdFor, normalizeRole } from '../constants/roles.js';
+import { ROLES, brandIdFor, normalizeRole, retailerIdFor } from '../constants/roles.js';
 
 export class UserRepository extends BaseRepository {
     constructor() {
@@ -43,6 +43,21 @@ export class UserRepository extends BaseRepository {
         const users = new Map([...linked, ...members].map(user => [user.id, user]));
         return [...users.values()]
             .filter(user => normalizeRole(user.role) === ROLES.BRAND && brandIdFor(user) === brandId);
+    }
+
+    /**
+     * The Administrators who act for a Retailer.
+     * @param {string} retailerId
+     * @returns {Promise<Array>}
+     */
+    async findRetailerUsers(retailerId) {
+        const [members, linked] = await Promise.all([
+            this.findAll({ where: [['organization_id', '==', retailerId]] }),
+            this.findAll({ where: [['linked_entity_id', '==', retailerId]] }),
+        ]);
+        const users = new Map([...members, ...linked].map(user => [user.id, user]));
+        return [...users.values()]
+            .filter(user => normalizeRole(user.role) === ROLES.RETAILERADMIN && retailerIdFor(user) === retailerId);
     }
 
     /**

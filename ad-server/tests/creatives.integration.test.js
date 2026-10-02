@@ -29,6 +29,7 @@ describeWithEmulators('Creatives with Firebase emulators', () => {
     const tokens = {};
     const createdMediaIds = [];
     const createdCreativeIds = [];
+    const createdCampaignIds = [];
 
     const as = (persona, pending) => pending.set('Authorization', `Bearer ${tokens[persona]}`);
 
@@ -57,6 +58,7 @@ describeWithEmulators('Creatives with Firebase emulators', () => {
             brand: 'brand@demo.softomedia.test',
             secondaryBrand: 'brand-secondary@demo.softomedia.test',
             retaileradmin: 'retaileradmin@demo.softomedia.test',
+            secondaryRetailer: 'retaileradmin-secondary@demo.softomedia.test',
             techoperator: 'techoperator@demo.softomedia.test',
         };
         await Promise.all(Object.entries(personas).map(async ([persona, email]) => {
@@ -68,6 +70,7 @@ describeWithEmulators('Creatives with Firebase emulators', () => {
     afterAll(async () => {
         await Promise.all(createdMediaIds.map(id => firestore.collection('media').doc(id).delete()));
         await Promise.all(createdCreativeIds.map(id => firestore.collection('creatives').doc(id).delete()));
+        await Promise.all(createdCampaignIds.map(id => firestore.collection('campaigns').doc(id).delete()));
         await firestore?.terminate();
     });
 
@@ -124,17 +127,134 @@ describeWithEmulators('Creatives with Firebase emulators', () => {
         expect(mine).toEqual(expect.arrayContaining([first.creative.id, second.creative.id]));
     });
 
-    test.each(['approve', 'reject', 'revoke'])('no role may %s a Creative yet', async action => {
-        const asset = await brandUpload(`Nobody can ${action} this`);
+    const decide = (persona, creativeId, action, body = {}) =>
+        as(persona, request(app).post(`/api/creatives/${creativeId}/${action}`)).send(body);
 
-        for (const persona of ['superadmin', 'admin', 'brand', 'retaileradmin', 'techoperator']) {
-            const response = await as(persona, request(app).post(`/api/creatives/${asset.creative.id}/${action}`))
-                .send({ reason: 'Not on brand' });
+    test.each(['approve', 'reject', 'revoke'])('Admin, Brand and Technical Operator may not %s a Creative', async action => {
+        const asset = await brandUpload(`Nobody else can ${action} this`);
+
+        for (const persona of ['admin', 'brand', 'secondaryBrand', 'techoperator']) {
+            const response = await decide(persona, asset.creative.id, action, { reason: 'Not on brand' });
             expect({ persona, status: response.status }).toEqual({ persona, status: 403 });
         }
 
         const [creative] = (await listCreatives('brand')).filter(({ id }) => id === asset.creative.id);
         expect(creative.approval_status).toBe('pending');
+    });
+
+    test('the Super Administrator approves a pending Creative, or rejects it with a reason the Brand sees', async () => {
+        const approved = await brandUpload('Super Admin approves');
+        const approval = await decide('superadmin', approved.creative.id, 'approve');
+        expect(approval.status).toBe(200);
+        expect(approval.body).toMatchObject({ approval_status: 'approved', reason: null });
+
+        const rejected = await brandUpload('Super Admin rejects');
+        expect((await decide('superadmin', rejected.creative.id, 'reject')).status).toBe(400);
+        const rejection = await decide('superadmin', rejected.creative.id, 'reject', { reason: 'Logo is cropped' });
+        expect(rejection.status).toBe(200);
+
+        const mine = await listCreatives('brand');
+        expect(mine.find(({ id }) => id === approved.creative.id)).toMatchObject({ approval_status: 'approved' });
+        expect(mine.find(({ id }) => id === rejected.creative.id))
+            .toMatchObject({ approval_status: 'rejected', reason: 'Logo is cropped' });
+    });
+
+    const FRESHMART = 'demo-retailer-freshmart';
+    const HARBORCART = 'demo-retailer-secondary';
+
+    /** A Campaign of the Brand's that books its Creative in these Retailers' Stores. */
+    async function bookIn(creativeId, retailerIds) {
+        const id = `cmp_creative_${createdCampaignIds.length}_${Date.now()}`;
+        createdCampaignIds.push(id);
+        await firestore.collection('campaigns').doc(id).set({
+            name: 'Approval booking', type: 'paid', status: 'pending_approval',
+            brand_id: 'demo-advertiser-bonvie', advertiser_id: 'demo-advertiser-bonvie', creative_id: creativeId,
+            inventory_selection: retailerIds.map(retailerId => ({ retailer_id: retailerId })),
+        });
+    }
+
+    const notificationsFor = async persona => {
+        const response = await as(persona, request(app).get('/api/notifications'));
+        expect(response.status).toBe(200);
+        return response.body;
+    };
+
+    test('the approvers are told in the app when a Creative waits for them', async () => {
+        const title = `Pumpkin muffin ${Date.now()}`;
+        const asset = await brandUpload(title);
+        const awaiting = expect.objectContaining({
+            title: 'Creative awaiting approval',
+            message: `“${title}” from BonVie Synthetic Brand is waiting for your approval.`,
+            read: false,
+        });
+
+        // The Super Administrator, as soon as it is uploaded.
+        expect(await notificationsFor('superadmin')).toEqual(expect.arrayContaining([awaiting]));
+
+        // Each Retailer it is booked with, once the Super Administrator has approved it.
+        await bookIn(asset.creative.id, [FRESHMART]);
+        expect(await notificationsFor('retaileradmin')).not.toEqual(expect.arrayContaining([awaiting]));
+        expect((await decide('superadmin', asset.creative.id, 'approve')).status).toBe(200);
+        expect(await notificationsFor('retaileradmin')).toEqual(expect.arrayContaining([awaiting]));
+        expect(await notificationsFor('secondaryRetailer')).not.toEqual(expect.arrayContaining([awaiting]));
+
+        // The Retailer finds it waiting on its decision, with every file to preview.
+        const waiting = (await listCreatives('retaileradmin')).find(({ id }) => id === asset.creative.id);
+        expect(waiting).toMatchObject({
+            title,
+            awaits_your_decision: true,
+            files: [{ id: asset.id, mime_type: 'image/png', content_path: `/api/assets/${asset.id}/content` }],
+            retailer_approvals: [expect.objectContaining({ retailer_id: FRESHMART, status: 'pending' })],
+        });
+        const preview = await as('retaileradmin', request(app).get(`/api/assets/${asset.id}/content`));
+        expect(preview.status).toBe(200);
+        // Another Retailer never sees it.
+        expect((await listCreatives('secondaryRetailer')).map(({ id }) => id)).not.toContain(asset.creative.id);
+    });
+
+    test('each Retailer whose Stores book the Creative approves it for them, after the Super Administrator', async () => {
+        const asset = await brandUpload('Two Retailers');
+        const creativeId = asset.creative.id;
+        await bookIn(creativeId, [FRESHMART]);
+        await bookIn(creativeId, [HARBORCART]);
+
+        // The Super Administrator decides first.
+        const early = await decide('retaileradmin', creativeId, 'approve');
+        expect(early.status).toBe(409);
+        expect(early.body.error).toBe('The Super Administrator approves a Creative first');
+        expect((await decide('superadmin', creativeId, 'approve')).status).toBe(200);
+
+        const freshmart = await decide('retaileradmin', creativeId, 'approve');
+        expect(freshmart.status).toBe(200);
+        expect(freshmart.body.retailer_approvals).toEqual([
+            expect.objectContaining({ retailer_id: FRESHMART, status: 'approved', reason: null }),
+        ]);
+        // Once per Retailer.
+        expect((await decide('retaileradmin', creativeId, 'approve')).status).toBe(409);
+
+        expect((await decide('secondaryRetailer', creativeId, 'reject')).status).toBe(400);
+        const harborcart = await decide('secondaryRetailer', creativeId, 'reject', { reason: 'Not for our shoppers' });
+        expect(harborcart.status).toBe(200);
+
+        // A Retailer with no booking of the Creative can't see it to decide.
+        const { headers } = await signInAs('retaileradmin', { organizationId: 'retailer-without-bookings' });
+        const unbooked = await request(app).post(`/api/creatives/${creativeId}/approve`).set(headers);
+        expect(unbooked.status).toBe(404);
+        // Revoking stays with the Super Administrator.
+        expect((await decide('retaileradmin', creativeId, 'revoke', { reason: 'x' })).status).toBe(403);
+
+        // The Brand sees each Retailer's decision, and the reason for a rejection.
+        const mine = (await listCreatives('brand')).find(({ id }) => id === creativeId);
+        expect(mine.approval_status).toBe('approved');
+        expect(mine.retailer_approvals).toEqual([
+            expect.objectContaining({
+                retailer_id: FRESHMART, retailer_name: 'FreshMart Synthetic Retailer', status: 'approved', reason: null,
+            }),
+            expect.objectContaining({
+                retailer_id: HARBORCART, retailer_name: 'HarborCart Synthetic Retailer',
+                status: 'rejected', reason: 'Not for our shoppers',
+            }),
+        ]);
     });
 
     test('whoever holds the Creative-approval grant approves, rejects with a reason, and revokes', async () => {

@@ -11,6 +11,7 @@ import { assetContentPath } from '../constants/mediaPaths.js';
 import { decodeUploadFilename } from '../utils/uploadFilename.js';
 import { readMediaHeader } from '../utils/mediaHeaders.js';
 import { MAXIMUM_CREATIVE_FILES } from '../constants/creatives.js';
+import { notifyNetworkApprovers } from '../services/CreativeApproval.js';
 
 const router = express.Router();
 const CATEGORIES = new Set(['paid', 'retailer', 'internal', 'fallback']);
@@ -296,6 +297,7 @@ router.post('/upload', receiveFiles, async (req, res) => {
         // Every paid upload is a new Creative, even of a file uploaded before.
         if (metadata.category === 'paid') {
             creative = await creativeRepository.create(creativeRepository.newId(), {
+                title: metadata.title,
                 brand_id: metadata.ownerId,
                 media_ids: ids,
                 approval_status: CREATIVE_STATUS.PENDING,
@@ -333,6 +335,7 @@ router.post('/upload', receiveFiles, async (req, res) => {
             }));
             createdIds.push(ids[index]);
         }
+        if (creative) await notifyNetworkApprovers(creative);
         return res.status(201).json(presentAsset(assets[0], creative));
     } catch (error) {
         await Promise.all(createdIds.map(id => mediaRepository.delete(id)));

@@ -25,6 +25,15 @@ describe('role navigation', () => {
         for (const page of paths(ROLES.ADMIN)) expect(superAdminPaths).toContain(page);
     });
 
+    it('offers Creative Approvals to the Super Administrator and the Retailer Administrator only (ADR 0007)', () => {
+        for (const role of [ROLES.SUPERADMIN, ROLES.RETAILERADMIN]) {
+            expect(paths(role)).toContain('/dashboard/creative-approvals');
+        }
+        for (const role of [ROLES.ADMIN, ROLES.BRAND, ROLES.TECHOPERATOR]) {
+            expect(paths(role)).not.toContain('/dashboard/creative-approvals');
+        }
+    });
+
     it('offers the delivery report to every role that holds a report grant, and not to a Technical Operator', () => {
         for (const role of [ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.BRAND, ROLES.RETAILERADMIN]) {
             expect(paths(role)).toContain('/dashboard/delivery-report');
