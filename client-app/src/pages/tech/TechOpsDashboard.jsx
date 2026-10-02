@@ -7,9 +7,9 @@ function TechOpsDashboard() {
     const [stats, setStats] = useState({ total: 0, online: 0, offline: 0, screens: [] });
     const [deliveryReport, setDeliveryReport] = useState({
         allocated_capacity: {
-            scope: 'all_approved_hourly_loops',
-            approved_hourly_loop_count: 0,
-            approved_slot_count: 0,
+            scope: 'all_hourly_loops',
+            hourly_loop_count: 0,
+            slot_count: 0,
         },
         campaign_delivery: 0,
         fallback_playback: 0,
@@ -318,7 +318,7 @@ function TechOpsDashboard() {
             <GlassCard>
                 <h3 className="font-bold mb-4">Playback Reporting</h3>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" data-testid="delivery-report">
-                    <div><p className="text-xs text-slate-500">Approved Slots (all approved Hourly Loops)</p><p data-testid="allocated-capacity" className="text-2xl font-bold">{deliveryReport.allocated_capacity.approved_slot_count}</p></div>
+                    <div><p className="text-xs text-slate-500">Slots (all Hourly Loops)</p><p data-testid="allocated-capacity" className="text-2xl font-bold">{deliveryReport.allocated_capacity.slot_count}</p></div>
                     <div><p className="text-xs text-slate-500">Campaign delivery</p><p data-testid="campaign-delivery" className="text-2xl font-bold text-emerald-500">{deliveryReport.campaign_delivery}</p></div>
                     <div><p className="text-xs text-slate-500">Fallback playback</p><p data-testid="fallback-playback" className="text-2xl font-bold text-amber-500">{deliveryReport.fallback_playback}</p></div>
                     <div><p className="text-xs text-slate-500">Holding Slide playback</p><p data-testid="holding-slide-playback" className="text-2xl font-bold text-slate-500">{deliveryReport.holding_slide_playback}</p></div>

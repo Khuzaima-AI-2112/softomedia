@@ -556,7 +556,6 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
         });
         await firestore.collection('loops').doc(proofLoopId).set({
             id: proofLoopId,
-            status: 'approved',
             retailer_id: 'demo-retailer-secondary',
             store_id: 'demo-store-phoenix',
             date: broadcast.date,

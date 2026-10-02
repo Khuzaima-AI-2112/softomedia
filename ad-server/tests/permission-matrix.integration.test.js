@@ -124,8 +124,8 @@ describeWithEmulators('Phase 1 permission matrix with Firebase emulators', () =>
         ]));
     });
 
-    test.each(['superadmin', 'admin', 'techoperator', 'brand'])(
-        '%s cannot approve or reject a loop on a Retailer\'s behalf',
+    test.each(['superadmin', 'admin', 'brand', 'retaileradmin', 'techoperator'])(
+        '%s cannot approve or reject an Hourly Loop: nobody approves one',
         async persona => {
             const attempts = [
                 as(persona, request(app).patch('/api/loops/matrix-loop/approve')).send({}),
@@ -133,7 +133,7 @@ describeWithEmulators('Phase 1 permission matrix with Firebase emulators', () =>
                 as(persona, request(app).patch('/api/loops/matrix-loop/slots/0/reject')).send({ reason: 'matrix' }),
             ];
             const statuses = (await Promise.all(attempts)).map(response => response.status);
-            expect(statuses).toEqual([403, 403, 403]);
+            expect(statuses).toEqual([404, 404, 404]);
         },
     );
 
@@ -160,9 +160,9 @@ describeWithEmulators('Phase 1 permission matrix with Firebase emulators', () =>
 
     test('a Retailer reads only audit entries for its own loops, Stores and Screens', async () => {
         const entries = {
-            'matrix-audit-own-loop': { action: 'loop_approved', entity_id: 'demo-loop-mtl-next-day-08' },
-            'matrix-audit-own-store': { action: 'approval_window_reopened', store_id: 'demo-store-mtl-north' },
-            'matrix-audit-foreign-store': { action: 'approval_window_reopened', store_id: 'demo-store-phoenix' },
+            'matrix-audit-own-loop': { action: 'slot_replaced', entity_id: 'demo-loop-mtl-next-day-08' },
+            'matrix-audit-own-store': { action: 'store_hours_changed', store_id: 'demo-store-mtl-north' },
+            'matrix-audit-foreign-store': { action: 'store_hours_changed', store_id: 'demo-store-phoenix' },
             'matrix-audit-foreign-screen': { action: 'screen_restart', screen_id: 'demo-screen-secondary-1' },
             'matrix-audit-unscoped': { action: 'screen_restart' },
         };

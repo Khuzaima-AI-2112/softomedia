@@ -8,25 +8,16 @@ function resolveTimezone(location) {
     return location?.time_zone || location?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
-// Task 3.1 + 3.6: build the D-1 date string and cutoff state
-function getTomorrowInfo(tz) {
-    const now = new Date();
-    const tomorrow = new Date(now);
+// Task 3.1: build the D-1 date string
+function getTomorrowLabel(tz) {
+    const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const dateLabel = tomorrow.toLocaleDateString('en-AU', {
+    return tomorrow.toLocaleDateString('en-AU', {
         weekday: 'long',
         day: 'numeric',
         month: 'short',
         timeZone: tz,
     });
-
-    // D-1 cutoff: 18:00 store local time (confirmed business rule)
-    const cutoffHour = 18;
-    const nowInTz = new Date(now.toLocaleString('en-US', { timeZone: tz }));
-    const isPastCutoff = nowInTz.getHours() >= cutoffHour;
-
-    return { dateLabel, isPastCutoff, cutoffHour };
 }
 
 // Task 3.1: dynamic next-hour window label
@@ -42,6 +33,7 @@ function getNextHourWindow(tz) {
     return `${fmt(nextHour)} – ${fmt(endHour)}`;
 }
 
+// Nobody approves the schedule: Screens play the generated loops (ADR 0007).
 function ScheduleManager() {
     const [selectedLocation, setSelectedLocation] = useState(null);
     const [locations, setLocations] = useState([]);
@@ -49,15 +41,6 @@ function ScheduleManager() {
     const [isLoading, setIsLoading] = useState(true);
     // Task 3.3: full-day is default view
     const [viewMode, setViewMode] = useState('fullday');
-    // Task 3.5: rejection modal state
-    const [rejectingSlot, setRejectingSlot] = useState(null); // { loopId, hour }
-    const [rejectComment, setRejectComment] = useState('');
-    const [rejectWarn, setRejectWarn] = useState(false);
-    const [rejectLoading, setRejectLoading] = useState(false);
-    // Task 3.4: bulk approve state
-    const [showBulkConfirm, setShowBulkConfirm] = useState(false);
-    const [bulkLoading, setBulkLoading] = useState(false);
-    const [bulkResult, setBulkResult] = useState(null); // null | 'success' | 'error'
     // Full-day slots state (hours 0–23 summary)
     const [daySlots, setDaySlots] = useState([]);
 
@@ -92,8 +75,8 @@ function ScheduleManager() {
             const date = new Date().toISOString().split('T')[0];
             const hour = new Date().getHours();
 
-            const response = await apiClient.get(`/api/loops?location_id=${loc.id}&date=${date}&hour=${hour}&status=approved`);
-            // Find loop for this hour or take the first approved loop
+            const response = await apiClient.get(`/api/loops?location_id=${loc.id}&date=${date}&hour=${hour}`);
+            // Find loop for this hour or take the first loop
             const loop = (response.loops || []).find(l => l.hour === hour) || (response.loops || [])[0];
             setHourlyLoop((loop?.slots || []).map(s => ({
                 ...s,
@@ -115,7 +98,7 @@ function ScheduleManager() {
                 const hasBonVie = loop && loop.slots && loop.slots.some(s => s.campaign_id === 'demo-campaign-001');
                 return {
                     hour: h,
-                    status: loop ? loop.status : 'pending',
+                    generated: Boolean(loop),
                     loopId: loop ? loop.id : `${locId}_h${h}`,
                     slotCount: 12,
                     campaignName: hasBonVie ? 'BonVie Summer Demo' : null
@@ -127,7 +110,7 @@ function ScheduleManager() {
             setDaySlots(
                 Array.from({ length: 24 }, (_, h) => ({
                     hour: h,
-                    status: 'pending',
+                    generated: false,
                     loopId: `${locId}_h${h}`,
                     slotCount: 12,
                 }))
@@ -136,48 +119,8 @@ function ScheduleManager() {
     };
 
     const tz = useMemo(() => resolveTimezone(selectedLocation), [selectedLocation]);
-    const { dateLabel, isPastCutoff, cutoffHour } = useMemo(() => getTomorrowInfo(tz), [tz]);
+    const dateLabel = useMemo(() => getTomorrowLabel(tz), [tz]);
     const nextHourWindow = useMemo(() => getNextHourWindow(tz), [tz]);
-    const unreviewedCount = daySlots.filter(s => s.status === 'pending').length;
-
-    // Task 3.4: bulk approve handler — POST /api/locations/:id/loops/approve-all
-    const handleBulkApprove = async () => {
-        if (!selectedLocation) return;
-        setBulkLoading(true);
-        setBulkResult(null);
-        try {
-            await apiClient.post(`/api/locations/${selectedLocation.id}/loops/approve-all`, { date: dateLabel });
-            setDaySlots(prev => prev.map(s => ({ ...s, status: 'approved' })));
-            setBulkResult('success');
-        } catch {
-            setBulkResult('error');
-        } finally {
-            setBulkLoading(false);
-            setShowBulkConfirm(false);
-        }
-    };
-
-    // Task 3.5: per-slot rejection handler — POST /api/loops/:loopId/reject
-    const handleRejectSubmit = async () => {
-        if (!rejectComment.trim()) {
-            setRejectWarn(true);
-            return;
-        }
-        setRejectLoading(true);
-        try {
-            await apiClient.post(`/api/loops/${rejectingSlot.loopId}/reject`, { reason: rejectComment });
-            setDaySlots(prev =>
-                prev.map(s => s.loopId === rejectingSlot.loopId ? { ...s, status: 'rejected' } : s)
-            );
-        } catch {
-            // silent — slot status unchanged, user can retry
-        } finally {
-            setRejectLoading(false);
-            setRejectingSlot(null);
-            setRejectComment('');
-            setRejectWarn(false);
-        }
-    };
 
     const formatHour = (h) => {
         const suffix = h >= 12 ? 'PM' : 'AM';
@@ -195,17 +138,6 @@ function ScheduleManager() {
     return (
         <div data-testid="schedule-manager" className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
-            {/* Task 3.6: D-1 cutoff warning banner */}
-            {isPastCutoff && (
-                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400">
-                    <span className="material-symbols-outlined text-[20px]">warning</span>
-                    <span className="text-sm font-semibold">
-                        Approval window closed — D-1 cutoff was {cutoffHour}:00 {tz}.
-                        Contact admin to reopen.
-                    </span>
-                </div>
-            )}
-
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start gap-6">
                 <div>
@@ -215,10 +147,6 @@ function ScheduleManager() {
                         D-1 Preview for <strong>{selectedLocation?.name || 'your location'}</strong>
                         {' '}— {dateLabel}
                         {' '}· <span className="font-mono text-xs">{tz}</span>
-                    </p>
-                    {/* Task 3.6: approval deadline label */}
-                    <p className="text-xs text-slate-400 mt-1">
-                        Approval deadline: {dateLabel.split(',')[0]} {cutoffHour}:00 {tz}
                     </p>
                 </div>
                 <div className="flex gap-2">
@@ -232,119 +160,8 @@ function ScheduleManager() {
                         </span>
                         {viewMode === 'fullday' ? 'View Hour Detail' : 'Back to Full Day'}
                     </button>
-                    {/* Task 3.4: Bulk Approve All — triggers confirmation dialog */}
-                    <button
-                        data-testid="btn-approve-schedule"
-                        onClick={() => setShowBulkConfirm(true)}
-                        disabled={isPastCutoff || unreviewedCount === 0}
-                        className="px-4 py-2 bg-emerald-500 text-white font-bold rounded-lg shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                        <span className="material-symbols-outlined text-[18px]">done_all</span>
-                        Bulk Approve All
-                    </button>
                 </div>
             </div>
-
-            {/* Task 3.4: bulk approve confirmation dialog */}
-            {showBulkConfirm && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 space-y-4">
-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white">Confirm Bulk Approval</h3>
-                        <p className="text-slate-600 dark:text-slate-400 text-sm">
-                            Approve all <strong>{unreviewedCount}</strong> unreviewed slots for{' '}
-                            <strong>{selectedLocation?.name}</strong> on{' '}
-                            <strong>{dateLabel}</strong>? This action cannot be undone.
-                        </p>
-                        <div className="flex gap-3 justify-end pt-2">
-                            <button
-                                onClick={() => setShowBulkConfirm(false)}
-                                className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleBulkApprove}
-                                disabled={bulkLoading}
-                                className="px-4 py-2 bg-emerald-500 text-white text-sm font-bold rounded-lg hover:bg-emerald-600 transition-all disabled:opacity-60"
-                            >
-                                {bulkLoading ? 'Approving…' : 'Yes, Approve All'}
-                            </button>
-                        </div>
-                        {bulkResult === 'error' && (
-                            <p className="text-sm text-rose-500">Approval failed — please try again or contact admin.</p>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Task 3.5: per-slot rejection modal */}
-            {rejectingSlot && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                    <div data-testid="modal-rejection-reason" className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 space-y-4">
-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                            Reject slot — {formatHour(rejectingSlot.hour)}
-                        </h3>
-                        <div>
-                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300 block mb-1">
-                                Rejection note <span className="text-slate-400 font-normal">(optional but recommended)</span>
-                            </label>
-                            <textarea
-                                data-testid="input-rejection-reason"
-                                maxLength={280}
-                                rows={3}
-                                value={rejectComment}
-                                onChange={e => { setRejectComment(e.target.value); setRejectWarn(false); }}
-                                placeholder="Reason for rejection…"
-                                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm resize-none outline-none focus:ring-2 focus:ring-primary/20"
-                            />
-                            <div className="flex justify-between mt-1">
-                                <span className="text-xs text-slate-400">{rejectComment.length}/280</span>
-                            </div>
-                            {rejectWarn && (
-                                <p className="text-xs text-amber-500 mt-1">
-                                    ⚠ Rejection without a note may delay resolution.
-                                    Add a note or confirm below to proceed anyway.
-                                </p>
-                            )}
-                        </div>
-                        <div className="flex gap-3 justify-end pt-2">
-                            <button
-                                onClick={() => { setRejectingSlot(null); setRejectComment(''); setRejectWarn(false); }}
-                                className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
-                            >
-                                Cancel
-                            </button>
-                            {rejectWarn && (
-                                <button
-                                    onClick={handleRejectSubmit}
-                                    className="px-4 py-2 bg-amber-500 text-white text-sm font-bold rounded-lg hover:bg-amber-600 transition-all"
-                                >
-                                    Reject anyway
-                                </button>
-                            )}
-                            <button
-                                data-testid="btn-confirm-rejection"
-                                onClick={handleRejectSubmit}
-                                disabled={rejectLoading}
-                                className="px-4 py-2 bg-rose-500 text-white text-sm font-bold rounded-lg hover:bg-rose-600 transition-all disabled:opacity-60"
-                            >
-                                {rejectLoading ? 'Submitting…' : 'Submit Rejection'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Task 3.4: bulk approve success toast */}
-            {bulkResult === 'success' && (
-                <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400">
-                    <span className="material-symbols-outlined text-[18px]">check_circle</span>
-                    <span className="text-sm font-semibold">All slots approved for {selectedLocation?.name} on {dateLabel}.</span>
-                    <button onClick={() => setBulkResult(null)} className="ml-auto text-emerald-500 hover:text-emerald-700">
-                        <span className="material-symbols-outlined text-[18px]">close</span>
-                    </button>
-                </div>
-            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                 {/* Location Sidebar */}
@@ -357,7 +174,6 @@ function ScheduleManager() {
                                 setSelectedLocation(loc);
                                 fetchLoop(loc.id, locations);
                                 fetchDaySlots(loc.id);
-                                setBulkResult(null);
                             }}
                             className={`p-4 rounded-xl cursor-pointer transition-all border-2 ${selectedLocation?.id === loc.id ? 'bg-primary/5 border-primary shadow-lg shadow-primary/5' : 'bg-white dark:bg-surface-dark border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'}`}
                         >
@@ -378,7 +194,7 @@ function ScheduleManager() {
                                     <h2 className="text-xl font-bold">Hourly Loop: {nextHourWindow}</h2>
                                     {/* Task 3.1 + 3.2: dynamic date + timezone */}
                                     <p className="text-sm text-slate-500">
-                                        Validation window for {dateLabel} · {tz}
+                                        Broadcast date {dateLabel} · {tz}
                                     </p>
                                 </div>
                                 <div className="px-3 py-1 rounded-full bg-amber-500/10 text-amber-500 text-xs font-bold ring-1 ring-inset ring-amber-500/20 flex items-center gap-1">
@@ -402,32 +218,17 @@ function ScheduleManager() {
                                         key={slot.hour}
                                         data-testid="schedule-slot"
                                         className={`p-3 rounded-xl border ${
-                                            slot.status === 'approved'
+                                            slot.generated
                                                 ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10'
-                                                : slot.status === 'rejected'
-                                                    ? 'border-rose-200 dark:border-rose-800 bg-rose-50/50 dark:bg-rose-900/10'
-                                                    : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30'
+                                                : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30'
                                         }`}
                                     >
                                         <p className="text-xs font-bold text-slate-500 mb-1">{formatHour(slot.hour)}</p>
-                                        <p data-testid={`status-badge-${slot.loopId}`} className={`text-sm font-semibold capitalize ${
-                                            slot.status === 'approved' ? 'text-emerald-600 dark:text-emerald-400'
-                                            : slot.status === 'rejected' ? 'text-rose-600 dark:text-rose-400'
-                                            : 'text-amber-600 dark:text-amber-400'
-                                        }`}>{slot.status}</p>
+                                        <p data-testid={`loop-generated-${slot.hour}`} className={`text-sm font-semibold ${
+                                            slot.generated ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'
+                                        }`}>{slot.generated ? 'Generated' : 'Not generated'}</p>
                                         {slot.campaignName && (
                                             <p className="text-xs font-semibold text-primary mt-1">{slot.campaignName}</p>
-                                        )}
-                                        {/* Task 3.5: per-slot reject button */}
-                                        {slot.status === 'pending' && !isPastCutoff && (
-                                            <button
-                                                data-testid={`btn-reject-schedule-${slot.loopId}`}
-                                                onClick={() => setRejectingSlot({ loopId: slot.loopId, hour: slot.hour })}
-                                                className="mt-2 text-xs text-rose-500 hover:text-rose-700 flex items-center gap-1"
-                                            >
-                                                <span className="material-symbols-outlined text-[14px]">block</span>
-                                                Reject
-                                            </button>
                                         )}
                                     </div>
                                 ))}

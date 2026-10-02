@@ -1,6 +1,5 @@
 import { CREATIVE_STATUS } from '../constants/creatives.js';
 import { DEFAULT_PRICING } from '../repositories/PricingRepository.js';
-import { LOOP_STATUS } from '../repositories/LoopRepository.js';
 import { slotReservationRepository } from '../repositories/SlotReservationRepository.js';
 import { slotQuote } from './CampaignPricingService.js';
 import { DEFAULT_DAYPARTS } from './Dayparts.js';
@@ -124,20 +123,17 @@ function reservationRecords({ campaign, store, slots, resetAtIso }) {
 }
 
 /**
- * A Store's Daily Schedule, already approved by its Retailer: the Hourly Loops
- * that loop generation would make for these Slot Reservations and content.
+ * A Store's Daily Schedule: the Hourly Loops that loop generation would make
+ * for these Slot Reservations and content. Nobody approves them (ADR 0007).
  */
-function approvedDailySchedule({ store, date, hours, reserved, content, fallback, resetAtIso }) {
+function generatedDailySchedule({ store, date, hours, reserved, content, fallback, resetAtIso }) {
     const loops = hours.map(hour => record('loops', `${date}_${hour}_${store.id}`, {
         date,
         hour,
         retailer_id: store.retailer_id,
         store_id: store.id,
-        status: LOOP_STATUS.APPROVED,
         version: 1,
         generated_at: resetAtIso,
-        approved_at: resetAtIso,
-        approved_by: null,
         slots: loopGenerationService.buildSlots(content, {
             sequenceStart: firstPositionOfHour(hour, hours[0]),
             fallback,
@@ -265,7 +261,7 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
             asset_id: paidMedia.id,
             asset_name: paidMedia.title,
         }]])]));
-    const todaysSchedule = approvedDailySchedule({
+    const todaysSchedule = generatedDailySchedule({
         store: allDayStore.data,
         date: today,
         hours: allDayHours,
@@ -418,14 +414,12 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
             location_id: 'demo-location-mtl-entrance',
             screen_id: 'demo-screen-north-1',
             screen_ids: ['demo-screen-north-1'],
-            status: 'pending_approval',
             version: 1,
             generated_at: resetAtIso,
             slots: Array.from({ length: 12 }, (_, position) => ({
                 position,
                 asset_id: mediaFixtures[position % mediaFixtures.length].document.id,
                 asset_name: mediaFixtures[position % mediaFixtures.length].document.data.title,
-                status: 'approved',
             })),
         }, resetAtIso),
         ...todaysSchedule,

@@ -36,7 +36,7 @@ function sendPresentationError(res, error, { logMessage, publicMessage }) {
     logger.error(logMessage, { error: error.message });
     return res.status(503).json({ error: publicMessage });
 }
-// GET /api/device/playback — approved Hourly Loop or Holding Slide for this Screen now
+// GET /api/device/playback — the generated Hourly Loop or Holding Slide for this Screen now
 router.get('/playback', async (req, res) => {
     try {
         return res.json(await playbackService.getForScreen(req.device.screen_id));

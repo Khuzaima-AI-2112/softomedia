@@ -7,7 +7,8 @@ const API = 'http://localhost:8080';
 // The demo reset uploads these private images; the Player reads them through its device media route.
 const demoStoragePath = category => `gs://${process.env.DEMO_ASSETS_BUCKET}/phase-1-demo/media/${category}.png`;
 
-test('Player authenticates as its Screen and reports approved Campaign, fallback, and Holding Slide state truthfully', async ({ page, browser, demo }) => {
+// Nobody approves an Hourly Loop: the Screen plays the generated one (ADR 0007).
+test('Player authenticates as its Screen and plays a generated loop nobody approved, with fallback and Holding Slide reported truthfully', async ({ page, browser, demo }) => {
     const suffix = `${Date.now()}`;
     const retailerId = `player-retailer-${suffix}`;
     const storeId = `player-store-${suffix}`;
@@ -19,7 +20,7 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
     const campaignId = `browser-campaign-${suffix}`;
     const brandId = 'demo-advertiser-bonvie';
     const fallbackId = `browser-fallback-${suffix}`;
-    // Schedule the current and next UTC hour so a run that crosses the hour boundary stays approved.
+    // Schedule the current and next UTC hour so a run that crosses the hour boundary keeps a loop.
     const now = new Date();
     const hours = [now, new Date(now.getTime() + 60 * 60 * 1000)].map((moment, index) => ({
         loopId: index === 0 ? loopId : `${loopId}-next`,
@@ -33,7 +34,7 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
     const { retailerRepository } = await import('../ad-server/src/repositories/RetailerRepository.js');
     const { default: StoreRepository } = await import('../ad-server/src/repositories/StoreRepository.js');
     const { locationRepository } = await import('../ad-server/src/repositories/LocationRepository.js');
-    const { loopRepository, LOOP_STATUS } = await import('../ad-server/src/repositories/LoopRepository.js');
+    const { loopRepository } = await import('../ad-server/src/repositories/LoopRepository.js');
     const { dailyScheduleRepository } = await import('../ad-server/src/repositories/DailyScheduleRepository.js');
     const { mediaRepository } = await import('../ad-server/src/repositories/MediaRepository.js');
     const { creativeRepository } = await import('../ad-server/src/repositories/CreativeRepository.js');
@@ -95,18 +96,21 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
                 hour: scheduled.hour,
                 retailer_id: retailerId,
                 store_id: storeId,
-                status: LOOP_STATUS.APPROVED,
                 slots: campaignSlots,
             });
         }
-        for (const scheduleDate of new Set(hours.map(scheduled => scheduled.date))) {
-            const sameDay = hours.filter(scheduled => scheduled.date === scheduleDate);
-            await dailyScheduleRepository.save(storeId, scheduleDate, {
-                retailer_id: retailerId,
-                operating_hours: sameDay.map(scheduled => scheduled.hour),
-                loop_ids: sameDay.map(scheduled => scheduled.loopId),
-            });
-        }
+        // The nightly job's Daily Schedule; with no loops in it, the Screen shows the Holding Slide.
+        const scheduleLoops = async ({ withLoops }) => {
+            for (const scheduleDate of new Set(hours.map(scheduled => scheduled.date))) {
+                const sameDay = hours.filter(scheduled => scheduled.date === scheduleDate);
+                await dailyScheduleRepository.save(storeId, scheduleDate, {
+                    retailer_id: retailerId,
+                    operating_hours: sameDay.map(scheduled => scheduled.hour),
+                    loop_ids: withLoops ? sameDay.map(scheduled => scheduled.loopId) : [],
+                });
+            }
+        };
+        await scheduleLoops({ withLoops: true });
         const updateLoops = patch => Promise.all(loopIds.map(id => loopRepository.update(id, patch)));
 
         // Technical Operator signs in, registers the Screen and receives its one-time device key.
@@ -179,14 +183,15 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
         await expect(page.getByTestId('fallback-presentation')).toContainText('Reserved retailer position');
         await expect(page.getByTestId('campaign-presentation')).toHaveCount(0);
 
-        await updateLoops({ status: LOOP_STATUS.REJECTED });
+        await scheduleLoops({ withLoops: false });
         await expect(page.getByTestId('holding-slide')).toContainText('No approved schedule', { timeout: 15000 });
         await expect(page.getByTestId('player-container')).toHaveAttribute('data-connectivity-status', 'ONLINE');
         await expect(page.getByTestId('campaign-presentation')).toHaveCount(0);
         await expect.poll(async () => (await playbackObservationRepository.findAll())
             .filter(item => item.screen_id === screenId && item.presentation_type === 'holding_slide').length).toBeGreaterThan(0);
 
-        await updateLoops({ status: LOOP_STATUS.APPROVED, slots: campaignSlots });
+        await scheduleLoops({ withLoops: true });
+        await updateLoops({ slots: campaignSlots });
         await campaignRepository.update(campaignId, { end_date: '2000-01-01' });
         await page.reload();
         await expect(page.getByTestId('fallback-presentation')).toBeVisible();

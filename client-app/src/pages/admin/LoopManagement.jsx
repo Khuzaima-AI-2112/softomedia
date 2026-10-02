@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import GlassCard from '../../components/GlassCard';
-import StatusBadge from '../../components/StatusBadge';
 import apiService from '../../services/ApiService';
 import { ToastContainer, useToasts } from '../../components/Toast';
 
@@ -17,16 +16,6 @@ const formatHour = (hour) => {
     const period = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
     return `${displayHour}:00 ${period}`;
-};
-
-const getStatusColor = (status) => {
-    switch (status) {
-        case 'APPROVED': return 'bg-emerald-500';
-        case 'PENDING_APPROVAL': return 'bg-amber-500';
-        case 'REJECTED': return 'bg-red-500';
-        case 'LIVE': return 'bg-blue-500';
-        default: return 'bg-slate-400';
-    }
 };
 
 function LoopManagement() {
@@ -138,9 +127,9 @@ function LoopManagement() {
 
     const getLoopForHour = (hour) => loops.find(l => l.hour === hour) || null;
 
-    // Task 7.6: Warn if any upcoming hours today have no approved loop.
+    // Task 7.6: Warn if any upcoming hours have no loop; nobody approves one (ADR 0007).
     // "Upcoming" = current hour and later (for today), or all hours (for future dates).
-    const getUnapprovedUpcomingHours = () => {
+    const getUpcomingHoursWithoutLoop = () => {
         const now = new Date();
         const todayStr = now.toISOString().split('T')[0];
         const isToday = targetDate === todayStr;
@@ -149,13 +138,11 @@ function LoopManagement() {
         return businessHours.filter(hour => {
             // For today: only warn about current + future hours
             if (isToday && hour < currentHour) return false;
-            const loop = getLoopForHour(hour);
-            // Warn if no loop exists OR loop is not APPROVED
-            return !loop || loop.status !== 'APPROVED';
+            return !getLoopForHour(hour);
         });
     };
 
-    const unapprovedHours = !loading ? getUnapprovedUpcomingHours() : [];
+    const hoursWithoutLoop = !loading ? getUpcomingHoursWithoutLoop() : [];
     const slots = loops.flatMap(loop => loop.slots || []);
     const allocationCounts = slots.reduce((counts, slot) => {
         const category = slot.allocated_category;
@@ -222,48 +209,34 @@ function LoopManagement() {
                 </div>
             </div>
 
-            {/* Task 7.6: Unapproved upcoming hours warning banner */}
-            {unapprovedHours.length > 0 && (
+            {/* Task 7.6: upcoming hours without a loop warning banner */}
+            {hoursWithoutLoop.length > 0 && (
                 <div
-                    data-testid="unapproved-hours-banner"
+                    data-testid="hours-without-loop-banner"
                     className="flex items-start gap-3 px-4 py-3 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 text-amber-800 dark:text-amber-300"
                 >
                     <span className="material-symbols-outlined text-[20px] mt-0.5 shrink-0">warning</span>
                     <div>
                         <p className="font-semibold text-sm">
-                            {unapprovedHours.length} upcoming hour{unapprovedHours.length !== 1 ? 's' : ''} without an approved loop
+                            {hoursWithoutLoop.length} upcoming hour{hoursWithoutLoop.length !== 1 ? 's' : ''} without a loop
                         </p>
                         <p className="text-xs mt-0.5 text-amber-700 dark:text-amber-400">
                             Screens may play fallback content during:{' '}
-                            {unapprovedHours.map(h => formatHour(h)).join(', ')}
+                            {hoursWithoutLoop.map(h => formatHour(h)).join(', ')}
                         </p>
                     </div>
                 </div>
             )}
 
             {/* Quick Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <GlassCard className="border-l-4 border-l-primary">
                     <p className="text-sm font-medium text-slate-500 mb-1">Total Hours</p>
                     <p className="text-3xl font-bold text-slate-900 dark:text-white">{businessHours.length}</p>
                 </GlassCard>
                 <GlassCard className="border-l-4 border-l-emerald-500">
-                    <p className="text-sm font-medium text-slate-500 mb-1">Approved</p>
-                    <p className="text-3xl font-bold text-emerald-500">
-                        {loops.filter(l => l.status === 'APPROVED').length}
-                    </p>
-                </GlassCard>
-                <GlassCard className="border-l-4 border-l-amber-500">
-                    <p className="text-sm font-medium text-slate-500 mb-1">Pending</p>
-                    <p className="text-3xl font-bold text-amber-500">
-                        {loops.filter(l => l.status === 'PENDING_APPROVAL').length}
-                    </p>
-                </GlassCard>
-                <GlassCard className="border-l-4 border-l-red-500">
-                    <p className="text-sm font-medium text-slate-500 mb-1">Rejected</p>
-                    <p className="text-3xl font-bold text-red-500">
-                        {loops.filter(l => l.status === 'REJECTED').length}
-                    </p>
+                    <p className="text-sm font-medium text-slate-500 mb-1">Loops Generated</p>
+                    <p className="text-3xl font-bold text-emerald-500">{loops.length}</p>
                 </GlassCard>
             </div>
 
@@ -300,10 +273,7 @@ function LoopManagement() {
                     </h3>
                     <div className="flex items-center gap-4 text-xs">
                         <span className="flex items-center gap-1">
-                            <span className="w-3 h-3 rounded-full bg-emerald-500"></span> Approved
-                        </span>
-                        <span className="flex items-center gap-1">
-                            <span className="w-3 h-3 rounded-full bg-amber-500"></span> Pending
+                            <span className="w-3 h-3 rounded-full bg-primary"></span> Filled
                         </span>
                         <span className="flex items-center gap-1">
                             <span className="w-3 h-3 rounded-full bg-slate-400"></span> Empty
@@ -334,13 +304,6 @@ function LoopManagement() {
                                         <span className="text-sm font-bold text-slate-900 dark:text-white">
                                             {formatHour(hour)}
                                         </span>
-                                        {/* Task 7.6: status dot + StatusBadge inline */}
-                                        {loop && (
-                                            <div className="flex items-center gap-1.5">
-                                                <span className={`w-2.5 h-2.5 rounded-full ${getStatusColor(loop.status)}`}></span>
-                                                <StatusBadge status={loop.status} size="xs" />
-                                            </div>
-                                        )}
                                     </div>
 
                                     {loop ? (
@@ -353,9 +316,7 @@ function LoopManagement() {
                                                     <div
                                                         key={i}
                                                         className={`h-1.5 flex-1 rounded-full ${loop.slots?.[i]?.asset_id
-                                                                ? loop.slots[i].status === 'REJECTED'
-                                                                    ? 'bg-red-400'
-                                                                    : 'bg-primary'
+                                                                ? 'bg-primary'
                                                                 : 'bg-slate-200 dark:bg-slate-700'
                                                             }`}
                                                     />

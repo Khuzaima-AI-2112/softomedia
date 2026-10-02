@@ -5,7 +5,6 @@ import StatusBadge from '../../components/StatusBadge';
 import SupportTicketModal from '../../components/SupportTicketModal';
 import LocationManager from '../../components/LocationManager';
 import apiService from '../../services/ApiService';
-import { loopListFrom } from '../../services/loopList';
 
 /**
  * RetailerDashboard
@@ -14,10 +13,7 @@ import { loopListFrom } from '../../services/loopList';
  *   Before: '/dashboard/retailer/schedule/calendar'  → 404 (no such route in App.jsx)
  *   After:  '/dashboard/retailer/schedule'           → ScheduleCalendar (App.jsx line confirmed)
  *
- *   Before: '/dashboard/retailer/history'            → 404 (no such route in App.jsx)
- *   After:  '/dashboard/retailer/schedule-history'   → ScheduleHistory (App.jsx line confirmed)
- *
- *   Pending-alert "Review Now" link also corrected from /schedule/calendar → /schedule.
+ * Nobody approves an Hourly Loop (ADR 0007), so there is no pending-approval count.
  */
 function RetailerDashboard() {
     const [isSyncActive, setIsSyncActive] = useState(true);
@@ -27,8 +23,7 @@ function RetailerDashboard() {
     const [stats, setStats] = useState({
         stores: 0,
         screens: 0,
-        onlineScreens: 0,
-        pendingLoops: 0
+        onlineScreens: 0
     });
 
     useEffect(() => {
@@ -38,18 +33,15 @@ function RetailerDashboard() {
     const loadStats = async () => {
         setLoading(true);
         try {
-            const [stores, screens, loopsResponse] = await Promise.all([
+            const [stores, screens] = await Promise.all([
                 apiService.getStores(),
-                apiService.getScreens(),
-                apiService.getLoops()
+                apiService.getScreens()
             ]);
-            const loops = loopListFrom(loopsResponse);
 
             setStats({
                 stores: stores.length,
                 screens: screens.length,
-                onlineScreens: screens.filter(s => s.status === 'online' || s.status === 'ACTIVE').length,
-                pendingLoops: loops.filter(l => l.validation_status === 'pending' || l.status === 'PENDING').length
+                onlineScreens: screens.filter(s => s.status === 'online' || s.status === 'ACTIVE').length
             });
         } catch (error) {
             console.error('Failed to load retailer stats:', error);
@@ -63,7 +55,6 @@ function RetailerDashboard() {
     // S9-4: paths corrected to match registered routes in App.jsx
     const quickActions = [
         { label: 'Schedule Calendar', icon: 'event', path: '/dashboard/retailer/schedule', color: 'primary' },
-        { label: 'Approval History', icon: 'history', path: '/dashboard/retailer/schedule-history', color: 'amber' },
     ];
 
     return (
@@ -138,34 +129,7 @@ function RetailerDashboard() {
                         {loading ? '...' : '168'}
                     </p>
                 </GlassCard>
-                <GlassCard className="!p-4">
-                    <p className="text-sm text-slate-500 mb-1">Pending Approvals</p>
-                    <p className={`text-2xl font-bold ${stats.pendingLoops > 0 ? 'text-amber-500' : 'text-slate-400'}`}>
-                        {loading ? '...' : stats.pendingLoops}
-                    </p>
-                </GlassCard>
             </div>
-
-            {/* Pending Alert */}
-            {!loading && stats.pendingLoops > 0 && (
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                    <span className="material-symbols-outlined text-amber-500">pending_actions</span>
-                    <div className="flex-1">
-                        <p className="font-medium text-amber-800 dark:text-amber-200">
-                            {stats.pendingLoops} loops awaiting your approval
-                        </p>
-                        <p className="text-sm text-amber-600 dark:text-amber-400">
-                            Review tomorrow&apos;s broadcast schedule before midnight
-                        </p>
-                    </div>
-                    <Link
-                        to="/dashboard/retailer/schedule"
-                        className="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600"
-                    >
-                        Review Now
-                    </Link>
-                </div>
-            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <GlassCard className="flex flex-col justify-between">

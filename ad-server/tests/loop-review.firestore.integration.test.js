@@ -10,14 +10,11 @@ const describeWithEmulators = hasEmulators ? describe : describe.skip;
 
 jest.setTimeout(30_000);
 
-// A broadcast date far enough ahead that its Approval Window is open, and one
-// whose broadcast has long started.
 const FUTURE = '2035-04-10';
-const PAST = '2020-01-06';
 
 /**
- * Reading, injecting, generating and reviewing Hourly Loops, through the whole
- * server and saved in Firestore.
+ * Reading, injecting, generating and correcting Hourly Loops, through the whole
+ * server and saved in Firestore. Nobody approves an Hourly Loop (ADR 0007).
  */
 describeWithEmulators('Hourly Loop review', () => {
     const suffix = Date.now();
@@ -63,7 +60,6 @@ describeWithEmulators('Hourly Loop review', () => {
             superadmin: (await signInAs('superadmin')).headers,
             admin: (await signInAs('admin')).headers,
             retailer: (await signInAs('retaileradmin', { organizationId: retailerId })).headers,
-            otherRetailer: (await signInAs('retaileradmin', { organizationId: otherRetailerId })).headers,
             brand: (await signInAs('brand', { organizationId: `loop-brand-${suffix}` })).headers,
         };
     });
@@ -98,10 +94,10 @@ describeWithEmulators('Hourly Loop review', () => {
             expect(response.body.business_hours).toEqual(expect.objectContaining({ is_closed: expect.any(Boolean) }));
         });
 
-        test('Hourly Loops are filtered by Retailer, Store, Location, Screen and status', async () => {
+        test('Hourly Loops are filtered by Retailer, Store, Location and Screen', async () => {
             const response = await request(app).get('/api/loops').query({
                 retailer_id: retailerId, store_id: storeId, location_id: 'another-location',
-                screen_id: 'another-screen', status: 'pending_approval',
+                screen_id: 'another-screen',
             }).set(as.admin);
 
             expect(response.status).toBe(200);
@@ -110,7 +106,7 @@ describeWithEmulators('Hourly Loop review', () => {
         });
 
         test('a Retailer Administrator reads only their own Retailer\'s Hourly Loops', async () => {
-            const own = await request(app).get('/api/loops').query({ status: 'pending_approval' }).set(as.retailer);
+            const own = await request(app).get('/api/loops').set(as.retailer);
             expect(own.status).toBe(200);
             expect(own.body.loops.length).toBeGreaterThan(0);
             expect(own.body.loops.every(loop => loop.retailer_id === retailerId)).toBe(true);
@@ -129,22 +125,12 @@ describeWithEmulators('Hourly Loop review', () => {
             expect((await request(app).get(`/api/loops/missing-${suffix}`).set(as.admin)).status).toBe(404);
         });
 
-        test('a Retailer Administrator lists their own pending Hourly Loops only', async () => {
-            const own = await request(app).get(`/api/loops/pending/${retailerId}`).set(as.retailer);
-            expect(own.status).toBe(200);
-            expect(own.body.count).toBe(own.body.loops.length);
-            expect(own.body.loops.every(loop => loop.status === 'pending_approval' && loop.retailer_id === retailerId)).toBe(true);
-
-            expect((await request(app).get(`/api/loops/pending/${otherRetailerId}`).set(as.retailer)).status).toBe(403);
-        });
-
         test('a storage failure answers 500', async () => {
             failStorage(loopRepository, 'findAll');
             expect((await request(app).get('/api/loops').set(as.admin)).status).toBe(500);
-            expect((await request(app).get(`/api/loops/pending/${retailerId}`).set(as.retailer)).status).toBe(500);
-            const review = await request(app).get(`/api/loops/review/${storeId}/${FUTURE}`).set(as.retailer);
-            expect(review.status).toBe(500);
-            expect(review.body).toEqual({ error: 'Approval operation failed' });
+            const preview = await request(app).get(`/api/loops/review/${storeId}/${FUTURE}`).set(as.retailer);
+            expect(preview.status).toBe(500);
+            expect(preview.body).toEqual({ error: 'Failed to fetch schedule' });
             failStorage(loopRepository, 'findById');
             expect((await request(app).get(`/api/loops/${listed}`).set(as.admin)).status).toBe(500);
         });
@@ -158,7 +144,8 @@ describeWithEmulators('Hourly Loop review', () => {
 
             const injected = await request(app).post('/api/loops').set(as.superadmin).send(body);
             expect(injected.status).toBe(201);
-            expect(injected.body).toEqual(expect.objectContaining({ id, status: 'pending_approval', version: 1 }));
+            expect(injected.body).toEqual(expect.objectContaining({ id, version: 1 }));
+            expect(injected.body).not.toHaveProperty('status');
 
             expect((await request(app).post('/api/loops').set(as.superadmin).send(body)).status).toBe(409);
             expect((await request(app).post('/api/loops').set(as.admin).send(body)).status).toBe(403);
@@ -201,131 +188,44 @@ describeWithEmulators('Hourly Loop review', () => {
         });
     });
 
-    describe('reviewing Hourly Loops', () => {
-        test('reopening an Approval Window is for the Admin or Super Administrator, with a reason', async () => {
-            const url = `/api/loops/review/${storeId}/${PAST}/reopen`;
-            expect((await request(app).post(url).set(as.retailer).send({ reason: 'Late' })).status).toBe(403);
-            expect((await request(app).post(`/api/loops/review/missing-${suffix}/${PAST}/reopen`).set(as.admin)
-                .send({ reason: 'Late' })).status).toBe(403);
-
-            const noReason = await request(app).post(url).set(as.admin).send({ expires_at: '2020-01-06T12:00' });
-            expect(noReason.status).toBe(400);
-            expect(noReason.body).toEqual({ error: 'Reason is required' });
-        });
-
-        test('a rejected Hourly Loop records who rejected it and why', async () => {
-            const id = await createLoop('rejected', { hour: 13 });
-
-            expect((await request(app).post(`/api/loops/${id}/reject`).set(as.retailer).send({ reason: ' ' })).status).toBe(400);
-            expect((await request(app).post(`/api/loops/${id}/reject`).set(as.otherRetailer).send({ reason: 'No' })).status).toBe(403);
-
-            const rejected = await request(app).post(`/api/loops/${id}/reject`).set(as.retailer).send({ reason: ' Off-brand ' });
-            expect(rejected.status).toBe(200);
-            expect(rejected.body).toEqual(expect.objectContaining({
-                status: 'rejected', rejection_reason: 'Off-brand', rejected_at: expect.any(String), rejected_by: expect.any(String),
-            }));
-            expect((await firestore.collection('loops').doc(id).get()).data().status).toBe('rejected');
-        });
-
-        test('an approved Hourly Loop cannot be approved again', async () => {
-            const id = await createLoop('approved', { hour: 14 });
-
-            const approved = await request(app).patch(`/api/loops/${id}/approve`).set(as.retailer);
-            expect(approved.status).toBe(200);
-            expect(approved.body).toEqual(expect.objectContaining({ status: 'approved', approved_by: expect.any(String) }));
-
-            const again = await request(app).patch(`/api/loops/${id}/approve`).set(as.retailer);
-            expect(again.status).toBe(400);
-            expect(again.body.error).toContain('cannot be approved from status: approved');
-        });
-
-        test('a rejected Slot asks for a replacement', async () => {
-            const id = await createLoop('slot', { hour: 15 });
-            const url = `/api/loops/${id}/slots/3/reject`;
-
-            expect((await request(app).patch(url).set(as.retailer).send({})).status).toBe(400);
-            const rejected = await request(app).patch(url).set(as.retailer).send({ reason: 'Blurry' });
-            expect(rejected.status).toBe(200);
-            expect(rejected.body.status).toBe('replacement_requested');
-            expect(rejected.body.slots[3]).toEqual(expect.objectContaining({ status: 'rejected', rejection_reason: 'Blurry' }));
-        });
-
+    describe('correcting Hourly Loops', () => {
         test('a Slot position outside the Hourly Loop is refused and changes nothing', async () => {
             const id = await createLoop('bad-position', { hour: 19 });
-            const approved = await createLoop('bad-position-approved', { hour: 20, status: 'approved' });
             const before = (await firestore.collection('loops').doc(id).get()).data();
-            const approvedBefore = (await firestore.collection('loops').doc(approved).get()).data();
 
             for (const position of ['-1', '12', 'abc', '1.5', '3abc']) {
-                const rejected = await request(app).patch(`/api/loops/${id}/slots/${position}/reject`)
-                    .set(as.retailer).send({ reason: 'Blurry' });
-                expect(rejected.status).toBe(400);
-                expect(rejected.body).toEqual({ error: `Invalid slot position: ${position}` });
-
                 const replaced = await request(app).patch(`/api/loops/${id}/slots/${position}/replace`)
                     .set(as.admin).send({ assetId: 'new-asset' });
                 expect(replaced.status).toBe(400);
                 expect(replaced.body).toEqual({ error: `Invalid slot position: ${position}` });
-
-                const versioned = await request(app).patch(`/api/loops/${approved}/slots/${position}/replace`)
-                    .set(as.admin).send({ assetId: 'new-asset' });
-                expect(versioned.status).toBe(400);
             }
 
             expect((await firestore.collection('loops').doc(id).get()).data()).toEqual(before);
-            expect((await firestore.collection('loops').doc(approved).get()).data()).toEqual(approvedBefore);
-            expect((await firestore.collection('loops').doc(`${approved}_v2`).get()).exists).toBe(false);
-            const audits = await firestore.collection('scheduling_audits')
-                .where('entity_id', 'in', [id, approved, `${approved}_v2`]).get();
+            const audits = await firestore.collection('scheduling_audits').where('entity_id', '==', id).get();
             expect(audits.empty).toBe(true);
         });
 
-        test('an Hourly Loop whose broadcast has started can no longer be reviewed', async () => {
-            const id = await createLoop('started', { date: PAST });
-
-            expect((await request(app).patch(`/api/loops/${id}/approve`).set(as.retailer)).status).toBe(409);
-            expect((await request(app).post(`/api/loops/${id}/reject`).set(as.retailer).send({ reason: 'Late' })).status).toBe(409);
-            expect((await request(app).patch(`/api/loops/${id}/slots/0/reject`).set(as.retailer).send({ reason: 'Late' })).status).toBe(409);
-        });
-
-        test('an Hourly Loop without a Store cannot be reviewed', async () => {
-            const id = await createLoop('storeless', { store_id: `missing-store-${suffix}` });
-            const conflict = { error: 'Loop is not assigned to a Store' };
-
-            expect((await request(app).patch(`/api/loops/${id}/approve`).set(as.retailer)).body).toEqual(conflict);
-            expect((await request(app).post(`/api/loops/${id}/reject`).set(as.retailer).send({ reason: 'x' })).body).toEqual(conflict);
-            expect((await request(app).patch(`/api/loops/${id}/slots/0/reject`).set(as.retailer).send({ reason: 'x' })).body).toEqual(conflict);
-        });
-
-        test('an Admin replaces a Slot in place, or in a new version of an approved Hourly Loop', async () => {
-            const pending = await createLoop('replace', { hour: 16 });
+        test('an Admin replaces a Slot in the loop that plays, even one approved before #70', async () => {
+            const generated = await createLoop('replace', { hour: 16 });
             const approved = await createLoop('replace-approved', { hour: 17, status: 'approved' });
-            created.loops.push(`${approved}_v2`);
 
-            expect((await request(app).patch(`/api/loops/${pending}/slots/2/replace`).set(as.admin).send({})).status).toBe(400);
-            expect((await request(app).patch(`/api/loops/${pending}/slots/2/replace`).set(as.retailer)
+            expect((await request(app).patch(`/api/loops/${generated}/slots/2/replace`).set(as.admin).send({})).status).toBe(400);
+            expect((await request(app).patch(`/api/loops/${generated}/slots/2/replace`).set(as.retailer)
                 .send({ assetId: 'new' })).status).toBe(403);
 
-            const inPlace = await request(app).patch(`/api/loops/${pending}/slots/2/replace`).set(as.admin).send({ assetId: 'new-asset' });
-            expect(inPlace.status).toBe(200);
-            expect(inPlace.body.id).toBe(pending);
-            expect(inPlace.body.slots[2]).toEqual(expect.objectContaining({ asset_id: 'new-asset', status: 'replaced' }));
-
-            const versioned = await request(app).patch(`/api/loops/${approved}/slots/2/replace`).set(as.admin).send({ assetId: 'new-asset' });
-            expect(versioned.status).toBe(200);
-            expect(versioned.body).toEqual(expect.objectContaining({
-                id: `${approved}_v2`, parentLoopId: approved, version: 2, status: 'pending_approval',
-            }));
-            expect((await firestore.collection('loops').doc(approved).get()).data().status).toBe('approved');
+            for (const id of [generated, approved]) {
+                const replaced = await request(app).patch(`/api/loops/${id}/slots/2/replace`).set(as.admin).send({ assetId: 'new-asset' });
+                expect(replaced.status).toBe(200);
+                expect(replaced.body.id).toBe(id);
+                expect(replaced.body.slots[2]).toEqual(expect.objectContaining({ asset_id: 'new-asset', status: 'replaced' }));
+            }
+            expect((await firestore.collection('loops').doc(`${approved}_v2`).get()).exists).toBe(false);
         });
 
         test('a storage failure answers 500', async () => {
             const id = await createLoop('fragile', { hour: 18 });
             failStorage(loopRepository, 'update');
 
-            expect((await request(app).post(`/api/loops/${id}/reject`).set(as.retailer).send({ reason: 'x' })).status).toBe(500);
-            expect((await request(app).patch(`/api/loops/${id}/approve`).set(as.retailer)).status).toBe(500);
-            expect((await request(app).patch(`/api/loops/${id}/slots/0/reject`).set(as.retailer).send({ reason: 'x' })).status).toBe(500);
             expect((await request(app).patch(`/api/loops/${id}/slots/0/replace`).set(as.admin).send({ assetId: 'x' })).status).toBe(500);
         });
     });

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { apiClient } = vi.hoisted(() => ({ apiClient: { get: vi.fn(), post: vi.fn(), patch: vi.fn() } }));
 vi.mock('../../services/api', () => ({ default: apiClient }));
@@ -14,7 +14,7 @@ const SAVED = { id: 'sched_1', store_id: 'store-one', day: 'sunday', start: '09:
 function serve(overrides) {
     apiClient.get.mockImplementation(async (endpoint) => {
         if (endpoint === '/api/stores') return [STORE];
-        if (endpoint.startsWith('/api/loops/review/')) return { loops: [], approval_window: null };
+        if (endpoint.startsWith('/api/loops/review/')) return { loops: [] };
         if (endpoint === '/api/schedules?store_id=store-one') return overrides;
         throw new Error(`Unexpected GET ${endpoint}`);
     });
@@ -28,6 +28,33 @@ async function addOverride({ day, start, end, type }) {
     fireEvent.change(screen.getByTestId('select-override-type'), { target: { value: type } });
     fireEvent.click(screen.getByTestId('btn-override-form-submit'));
 }
+
+afterEach(() => vi.restoreAllMocks());
+
+// Nobody approves an Hourly Loop (ADR 0007); the Retailer Administrator previews it (#21).
+describe('ScheduleCalendar schedule preview', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('shows the generated loops with no approval action or deadline', async () => {
+        const loop = { id: 'loop-8', hour: 8, date: '2030-01-16', slots: [{ position: 0, asset_id: 'ast_1' }] };
+        apiClient.get.mockImplementation(async (endpoint) => {
+            if (endpoint === '/api/stores') return [STORE];
+            if (endpoint.startsWith('/api/loops/review/')) return { loops: [loop] };
+            if (endpoint === '/api/schedules?store_id=store-one') return [];
+            throw new Error(`Unexpected GET ${endpoint}`);
+        });
+
+        render(<ScheduleCalendar />);
+
+        await waitFor(() => expect(screen.getByTestId('loops-generated').textContent).toBe('1'));
+        expect(screen.getByTestId('schedule-hour-8').disabled).toBe(false);
+        expect(screen.queryByRole('button', { name: /approve/i })).toBeNull();
+        expect(screen.queryByText(/approval deadline/i)).toBeNull();
+        expect(screen.queryByText(/pending/i)).toBeNull();
+    });
+});
 
 describe('ScheduleCalendar schedule overrides (#16)', () => {
     beforeEach(() => {
@@ -70,7 +97,7 @@ describe('ScheduleCalendar schedule overrides (#16)', () => {
         const other = { id: 'store-two', name: 'Northwind Uptown', time_zone: 'America/Toronto' };
         apiClient.get.mockImplementation(async (endpoint) => {
             if (endpoint === '/api/stores') return [STORE, other];
-            if (endpoint.startsWith('/api/loops/review/')) return { loops: [], approval_window: null };
+            if (endpoint.startsWith('/api/loops/review/')) return { loops: [] };
             if (endpoint.startsWith('/api/schedules?store_id=')) return [];
             throw new Error(`Unexpected GET ${endpoint}`);
         });
@@ -92,7 +119,7 @@ describe('ScheduleCalendar schedule overrides (#16)', () => {
         let finishLoad;
         apiClient.get.mockImplementation((endpoint) => {
             if (endpoint === '/api/stores') return Promise.resolve([STORE]);
-            if (endpoint.startsWith('/api/loops/review/')) return Promise.resolve({ loops: [], approval_window: null });
+            if (endpoint.startsWith('/api/loops/review/')) return Promise.resolve({ loops: [] });
             return new Promise(resolve => { finishLoad = resolve; });
         });
         apiClient.post.mockResolvedValue(SAVED);

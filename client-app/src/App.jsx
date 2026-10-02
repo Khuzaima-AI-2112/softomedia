@@ -31,7 +31,6 @@
  *   pages/brand/BrandCampaignWizard.jsx  ✅
  *   pages/retailer/RetailerDashboard.jsx ✅
  *   pages/retailer/ScheduleCalendar.jsx  ✅
- *   pages/retailer/ScheduleHistory.jsx   ✅  (served at /dashboard/retailer/schedule-history)
  *   pages/retailer/ScheduleManager.jsx   ✅  (served at /dashboard/retailer/schedule-manager)
  *   pages/retailer/Loops.jsx             ✅  (served at /dashboard/retailer/loops)
  *   pages/advertiser/AdvertiserDashboard.jsx   ✅  (served at /dashboard/advertiser)          Sprint 14
@@ -91,7 +90,6 @@ const CampaignWizard = lazy(() => import('./pages/brand/BrandCampaignWizard'));
 // ── Retailer pages ─────────────────────────────────────────────────────────────────────────
 const RetailerOverview  = lazy(() => import('./pages/retailer/RetailerDashboard'));
 const ScheduleCalendar  = lazy(() => import('./pages/retailer/ScheduleCalendar'));
-const ScheduleHistory   = lazy(() => import('./pages/retailer/ScheduleHistory'));
 const ScheduleManager   = lazy(() => import('./pages/retailer/ScheduleManager'));
 const RetailerLoops     = lazy(() => import('./pages/retailer/Loops'));
 
@@ -159,7 +157,6 @@ function App() {
                             {/* Retailer */}
                             <Route path="retailer"                    element={<RetailerOverview />} />
                             <Route path="retailer/schedule"           element={<ScheduleCalendar />} />
-                            <Route path="retailer/schedule-history"   element={<ScheduleHistory />} />
                             <Route path="retailer/schedule-manager"   element={<ScheduleManager />} />
                             <Route path="retailer/hours"              element={<BusinessHoursManagement />} />
                             <Route path="retailer/loops"              element={<RetailerLoops />} />

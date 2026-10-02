@@ -29,8 +29,6 @@ export const PERMISSIONS = Object.freeze({
     // each Retailer whose Stores it is booked in, for those Stores (ADR 0007).
     CREATIVE_APPROVAL: 'creatives.approve',
     CREATIVE_APPROVAL_OWN: 'creatives.approve_own',
-    // The Retailer's daily Hourly Loop approval, until #70 removes it (ADR 0007).
-    LOOP_APPROVAL: 'loops.approve',
     LOOP_INJECT: 'loops.inject',
     LOOP_GENERATE: 'loops.generate',
     SCHEDULE_OVERRIDE: 'schedules.override',
@@ -96,7 +94,6 @@ const ROLE_PERMISSIONS = Object.freeze({
         PERMISSIONS.SUPPORT_TICKET_CREATE_OWN,
         PERMISSIONS.SUPPORT_TICKET_VIEW_OWN,
         PERMISSIONS.SCREEN_VIEW_OWN,
-        PERMISSIONS.LOOP_APPROVAL,
         PERMISSIONS.CREATIVE_APPROVAL_OWN,
         PERMISSIONS.SCHEDULE_OVERRIDE,
         PERMISSIONS.IMPRESSION_VIEW_OWN,
@@ -160,10 +157,6 @@ export const requireNetworkProofOfPlayView = requirePermission(
 export const requireScreenManagement = requirePermission(
     PERMISSIONS.SCREEN_MANAGEMENT,
     ROLES.TECHOPERATOR,
-);
-export const requireLoopApproval = requirePermission(
-    PERMISSIONS.LOOP_APPROVAL,
-    null,
 );
 export const requireCreativeApproval = requirePermission(
     PERMISSIONS.CREATIVE_APPROVAL,

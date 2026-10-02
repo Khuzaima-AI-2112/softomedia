@@ -1,6 +1,7 @@
 /**
  * Schedule Calendar Page
- * Retailer Administrator interface for previewing and approving tomorrow's broadcast schedule
+ * Retailer Administrator interface for previewing tomorrow's broadcast schedule.
+ * Nobody approves it: Screens play the generated loops (ADR 0007).
  * Business Hours: 8am - 10pm (14 loops per day)
  *
  * Sprint 11 — S11-5: data-testid="schedule-calendar-container" added to root div.
@@ -8,7 +9,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import GlassCard from '../../components/GlassCard';
-import StatusBadge from '../../components/StatusBadge';
 import LoopPreviewModal from '../../components/LoopPreviewModal';
 import apiClient from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -50,17 +50,6 @@ const mergeOverrides = (current, incoming) => [
 const formatOverride = ({ day, start, end, type }) =>
     `${day.charAt(0).toUpperCase()}${day.slice(1)} ${start}–${end} · ${OVERRIDE_TYPE_LABELS[type] || type}`;
 
-// Get status styling
-const getStatusStyle = (status) => {
-    switch (status?.toLowerCase()) {
-        case 'approved': return 'bg-emerald-500/10 border-emerald-500 text-emerald-600';
-        case 'pending_approval': return 'bg-amber-500/10 border-amber-500 text-amber-600';
-        case 'replacement_requested':
-        case 'rejected': return 'bg-red-500/10 border-red-500 text-red-600';
-        default: return 'bg-slate-100 border-slate-300 text-slate-500';
-    }
-};
-
 const tomorrowInTimeZone = (timeZone) => {
     const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
         timeZone,
@@ -84,11 +73,9 @@ function ScheduleCalendar() {
     const [loops, setLoops] = useState([]);
     const [stores, setStores] = useState([]);
     const [selectedStore, setSelectedStore] = useState(null);
-    const [approvalWindow, setApprovalWindow] = useState(null);
     const [actionError, setActionError] = useState('');
     const [loading, setLoading] = useState(true);
     const [selectedLoop, setSelectedLoop] = useState(null);
-    const [approving, setApproving] = useState(false);
     
     // Override form state
     const [showOverrideModal, setShowOverrideModal] = useState(false);
@@ -136,7 +123,6 @@ function ScheduleCalendar() {
         try {
             const data = await apiClient.get(`/api/loops/review/${selectedStore.id}/${targetDate}`);
             setLoops(data.loops || []);
-            setApprovalWindow(data.approval_window || null);
         } catch (error) {
             console.error('Failed to fetch schedule:', error);
             setActionError(error.message || 'Failed to fetch schedule');
@@ -164,24 +150,6 @@ function ScheduleCalendar() {
         return loops.find(l => l.hour === hour) || null;
     };
 
-    const handleApproveAll = async () => {
-        setApproving(true);
-        setActionError('');
-        try {
-            // Approve all pending loops
-            const pending = loops.filter(l => l.status?.toLowerCase() === 'pending_approval');
-            for (const loop of pending) {
-                await apiClient.patch(`/api/loops/${loop.id}/approve`);
-            }
-            await fetchLoops();
-        } catch (error) {
-            console.error('Failed to approve loops:', error);
-            setActionError(error.message || 'Failed to approve loops');
-        } finally {
-            setApproving(false);
-        }
-    };
-
     const handleOverrideSubmit = async () => {
         setOverrideError('');
         if (!overrideForm.start || !overrideForm.end) {
@@ -206,27 +174,6 @@ function ScheduleCalendar() {
         }
     };
 
-    const handleModalClose = () => {
-        setSelectedLoop(null);
-        fetchLoops(); // Refresh after potential changes
-    };
-
-    const pendingCount = loops.filter(l => l.status?.toLowerCase() === 'pending_approval').length;
-    const approvedCount = loops.filter(l => l.status?.toLowerCase() === 'approved').length;
-    const rejectedCount = loops.filter(l => ['rejected', 'replacement_requested'].includes(l.status?.toLowerCase())).length;
-    const approvalOpen = approvalWindow?.state === 'open';
-    const deadlineLabel = approvalWindow && selectedStore?.time_zone
-        ? new Date(approvalWindow.effective_deadline).toLocaleString('en-US', {
-            timeZone: selectedStore.time_zone,
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-            timeZoneName: 'short',
-        })
-        : null;
-
     return (
         <div className="space-y-8 animate-in fade-in duration-500" data-testid="schedule-calendar">
             {/* Header */}
@@ -236,7 +183,7 @@ function ScheduleCalendar() {
                         Tomorrow&apos;s Broadcast Schedule
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400">
-                        Review and approve the broadcast schedule for{' '}
+                        Preview the broadcast schedule for{' '}
                         <span className="font-semibold text-primary">
                             {new Date(targetDate).toLocaleDateString('en-US', {
                                 weekday: 'long',
@@ -269,36 +216,15 @@ function ScheduleCalendar() {
                     >
                         Add Override
                     </button>
-                    {pendingCount > 0 && approvalOpen && (
-                        <button
-                            onClick={handleApproveAll}
-                            disabled={approving}
-                            className="px-6 py-3 bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-all flex items-center gap-2 disabled:opacity-50"
-                            data-testid="approve-all-btn"
-                        >
-                            <span className="material-symbols-outlined">check_circle</span>
-                            {approving ? 'Approving...' : `Approve All (${pendingCount})`}
-                        </button>
-                    )}
                 </div>
             </div>
 
             {selectedStore && (
-                <div className="rounded-xl border border-primary/20 bg-primary/5 p-4" data-testid="approval-window-summary">
+                <div className="rounded-xl border border-primary/20 bg-primary/5 p-4" data-testid="store-summary">
                     <p className="font-semibold">{selectedStore.name}</p>
                     <p data-testid="store-time-zone" className="text-sm text-slate-600 dark:text-slate-300">
                         Store time zone: {selectedStore.time_zone}
                     </p>
-                    {deadlineLabel && (
-                        <p data-testid="approval-deadline" className="text-sm text-slate-600 dark:text-slate-300">
-                            Approval deadline: {deadlineLabel}
-                        </p>
-                    )}
-                    {!approvalOpen && approvalWindow && (
-                        <p className="mt-2 text-sm font-semibold text-red-600" data-testid="approval-window-closed">
-                            Approval window closed
-                        </p>
-                    )}
                 </div>
             )}
 
@@ -325,27 +251,17 @@ function ScheduleCalendar() {
                 </div>
             )}
 
-            {/* Status Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Summary */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <GlassCard className="border-l-4 border-l-primary">
                     <p className="text-sm font-medium text-slate-500 mb-1">Total Hours</p>
                     <p className="text-3xl font-bold text-slate-900 dark:text-white">{businessHours.length}</p>
                     <p className="text-xs text-slate-400 mt-1">8AM - 10PM</p>
                 </GlassCard>
-                <GlassCard className="border-l-4 border-l-amber-500">
-                    <p className="text-sm font-medium text-slate-500 mb-1">Pending Review</p>
-                    <p className="text-3xl font-bold text-amber-500">{pendingCount}</p>
-                    <p className="text-xs text-slate-400 mt-1">Requires your approval</p>
-                </GlassCard>
                 <GlassCard className="border-l-4 border-l-emerald-500">
-                    <p className="text-sm font-medium text-slate-500 mb-1">Approved</p>
-                    <p className="text-3xl font-bold text-emerald-500">{approvedCount}</p>
+                    <p className="text-sm font-medium text-slate-500 mb-1">Loops Generated</p>
+                    <p className="text-3xl font-bold text-emerald-500" data-testid="loops-generated">{loops.length}</p>
                     <p className="text-xs text-slate-400 mt-1">Ready to broadcast</p>
-                </GlassCard>
-                <GlassCard className="border-l-4 border-l-red-500">
-                    <p className="text-sm font-medium text-slate-500 mb-1">Needs Attention</p>
-                    <p className="text-3xl font-bold text-red-500">{rejectedCount}</p>
-                    <p className="text-xs text-slate-400 mt-1">Rejected ads need replacement</p>
                 </GlassCard>
             </div>
 
@@ -356,17 +272,6 @@ function ScheduleCalendar() {
                         <span className="material-symbols-outlined text-primary">calendar_today</span>
                         Hourly Schedule Timeline
                     </h3>
-                    <div className="flex items-center gap-4 text-xs">
-                        <span className="flex items-center gap-1">
-                            <span className="w-3 h-3 rounded-full bg-emerald-500"></span> Approved
-                        </span>
-                        <span className="flex items-center gap-1">
-                            <span className="w-3 h-3 rounded-full bg-amber-500"></span> Pending
-                        </span>
-                        <span className="flex items-center gap-1">
-                            <span className="w-3 h-3 rounded-full bg-red-500"></span> Rejected
-                        </span>
-                    </div>
                 </div>
 
                 {loading ? (
@@ -377,7 +282,6 @@ function ScheduleCalendar() {
                     <div className="space-y-2" data-testid="schedule-timeline">
                         {businessHours.map(hour => {
                             const loop = getLoopForHour(hour);
-                            const rejectedSlots = loop?.slots?.filter(s => s.status?.toLowerCase() === 'rejected').length || 0;
 
                             return (
                                 <button
@@ -385,7 +289,7 @@ function ScheduleCalendar() {
                                     onClick={() => handleLoopClick(loop)}
                                     disabled={!loop}
                                     className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all ${loop
-                                        ? `${getStatusStyle(loop.status)} hover:shadow-md cursor-pointer`
+                                        ? 'bg-emerald-500/10 border-emerald-500 text-emerald-600 hover:shadow-md cursor-pointer'
                                         : 'bg-slate-50 dark:bg-slate-800 border-dashed border-slate-200 dark:border-slate-700 opacity-50 cursor-not-allowed'
                                         }`}
                                     data-testid={`schedule-hour-${hour}`}
@@ -405,9 +309,7 @@ function ScheduleCalendar() {
                                                         <div
                                                             key={i}
                                                             className={`h-6 flex-1 rounded ${slot?.asset_id
-                                                                ? slot.status === 'REJECTED'
-                                                                    ? 'bg-red-400'
-                                                                    : 'bg-primary'
+                                                                ? 'bg-primary'
                                                                 : 'bg-slate-300 dark:bg-slate-600'
                                                                 }`}
                                                             title={`Slot ${i + 1}`}
@@ -417,23 +319,6 @@ function ScheduleCalendar() {
                                             </div>
                                         ) : (
                                             <span className="text-sm text-slate-400 italic">No loop generated</span>
-                                        )}
-                                    </div>
-
-                                    {/* Status */}
-                                    <div className="w-32 text-right">
-                                        {loop && (
-                                            <div className="flex items-center justify-end gap-2">
-                                                {rejectedSlots > 0 && (
-                                                    <span className="text-xs text-red-500 font-bold">
-                                                        {rejectedSlots} rejected
-                                                    </span>
-                                                )}
-                                                <StatusBadge status={
-                                                    loop.status?.toLowerCase() === 'approved' ? 'Active' :
-                                                        loop.status?.toLowerCase() === 'pending_approval' ? 'Warning' : 'Offline'
-                                                } />
-                                            </div>
                                         )}
                                     </div>
 
@@ -470,9 +355,7 @@ function ScheduleCalendar() {
             {selectedLoop && (
                 <LoopPreviewModal
                     loop={selectedLoop}
-                    onClose={handleModalClose}
-                    onRefresh={fetchLoops}
-                    approvalOpen={approvalOpen}
+                    onClose={() => setSelectedLoop(null)}
                 />
             )}
 

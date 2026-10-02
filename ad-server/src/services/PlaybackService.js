@@ -1,7 +1,7 @@
 import { dailyScheduleRepository } from '../repositories/DailyScheduleRepository.js';
 import { campaignRepository } from '../repositories/CampaignRepository.js';
 import { locationRepository } from '../repositories/LocationRepository.js';
-import { loopRepository, LOOP_STATUS } from '../repositories/LoopRepository.js';
+import { loopRepository } from '../repositories/LoopRepository.js';
 import { mediaRepository } from '../repositories/MediaRepository.js';
 import { creativeRepository } from '../repositories/CreativeRepository.js';
 import { screenRepository } from '../repositories/ScreenRepository.js';
@@ -66,13 +66,13 @@ export class PlaybackService {
         const loops = schedule?.retailer_id === store.retailer_id
             ? await Promise.all((schedule.loop_ids || []).map(loopId => loopRepository.findById(loopId)))
             : [];
+        // Nobody approves an Hourly Loop; its Paid Slots are checked one by one below (ADR 0007).
         const loop = loops
             .filter(candidate => candidate
                 && candidate.store_id === store.id
                 && candidate.retailer_id === store.retailer_id
                 && candidate.date === current.date
-                && candidate.hour === current.hour
-                && candidate.status === LOOP_STATUS.APPROVED)
+                && candidate.hour === current.hour)
             .sort((a, b) => (b.version ?? 1) - (a.version ?? 1))[0] || null;
 
         if (!loop) {

@@ -51,9 +51,6 @@ export class ProofOfPlayService {
         if (screen.location_id !== body.location_id) {
             throw new ProofOfPlayError('Screen is not assigned to the supplied Location');
         }
-        if (loop.status !== 'approved') {
-            throw new ProofOfPlayError('Hourly Loop is not approved');
-        }
         if (Array.isArray(loop.screen_ids) && loop.screen_ids.length > 0 && !loop.screen_ids.includes(body.screen_id)) {
             throw new ProofOfPlayError('Hourly Loop is not assigned to the supplied Screen');
         }

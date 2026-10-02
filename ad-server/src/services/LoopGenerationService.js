@@ -5,7 +5,7 @@
  * Each loop: 12 ads × 5 seconds = 60 second loop
  */
 
-import { loopRepository, LOOP_STATUS } from '../repositories/LoopRepository.js';
+import { loopRepository } from '../repositories/LoopRepository.js';
 import { campaignRepository } from '../repositories/CampaignRepository.js';
 import { dailyScheduleRepository } from '../repositories/DailyScheduleRepository.js';
 import { mediaRepository } from '../repositories/MediaRepository.js';
@@ -128,7 +128,6 @@ export class LoopGenerationService {
             hour,
             retailer_id: retailerId,
             store_id: storeId,
-            status: LOOP_STATUS.PENDING_APPROVAL,
             slots
         };
         const existing = await loopRepository.findById(loopId);
@@ -182,7 +181,6 @@ export class LoopGenerationService {
                 content_kind: item?.content_kind || (item ? 'campaign' : 'fallback'),
                 is_fallback: !item,
                 duration: SLOT_CONFIG.SLOT_DURATION_SECONDS,
-                status: 'PENDING'
             };
         });
     }

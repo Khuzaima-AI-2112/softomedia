@@ -12,7 +12,7 @@ const { clearMockStorage } = await import('../src/repositories/BaseRepository.js
 const { screenRepository } = await import('../src/repositories/ScreenRepository.js');
 const { locationRepository } = await import('../src/repositories/LocationRepository.js');
 const { default: StoreRepository } = await import('../src/repositories/StoreRepository.js');
-const { loopRepository, LOOP_STATUS } = await import('../src/repositories/LoopRepository.js');
+const { loopRepository } = await import('../src/repositories/LoopRepository.js');
 const { dailyScheduleRepository } = await import('../src/repositories/DailyScheduleRepository.js');
 const { mediaRepository } = await import('../src/repositories/MediaRepository.js');
 const { campaignRepository } = await import('../src/repositories/CampaignRepository.js');
@@ -55,7 +55,6 @@ async function seedLoop({
     hour = 8,
     retailerId = 'retailer-one',
     storeId = 'store-toronto',
-    status = LOOP_STATUS.APPROVED,
 } = {}) {
     for (let position = 0; position < 12; position += 1) {
         await mediaRepository.create(`asset-${position}`, {
@@ -87,7 +86,6 @@ async function seedLoop({
         hour,
         retailer_id: retailerId,
         store_id: storeId,
-        status,
         slots: Array.from({ length: 12 }, (_, position) => ({
             position,
             allocated_category: 'paid',
@@ -120,7 +118,8 @@ describe('GET /api/device/playback', () => {
         jest.useRealTimers();
     });
 
-    test('plays the assigned approved loop for the current Store-local hour', async () => {
+    // Nobody approves an Hourly Loop: the Screen plays the generated one (ADR 0007).
+    test('plays the generated loop for the current Store-local hour', async () => {
         await seedAssignment();
         await seedLoop();
 
@@ -147,9 +146,9 @@ describe('GET /api/device/playback', () => {
         });
     });
 
-    test('reports missing approval independently from Screen connectivity', async () => {
+    test('shows the Holding Slide, independently from Screen connectivity, when no loop was generated for the hour', async () => {
         await seedAssignment();
-        await seedLoop({ status: LOOP_STATUS.PENDING_APPROVAL });
+        await seedLoop({ hour: 9 });
 
         const response = await screenOnePlayback();
 
@@ -507,7 +506,7 @@ describe('GET /api/device/playback', () => {
         expect(response.body).not.toHaveProperty('slots');
     });
 
-    test('uses the Holding Slide when an approved loop has no approved fallback for a reserved position', async () => {
+    test('uses the Holding Slide when a loop has no approved fallback for a reserved position', async () => {
         await seedAssignment();
         const loop = await seedLoop();
         await loopRepository.update(loop.id, {
@@ -533,9 +532,8 @@ describe('GET /api/device/playback', () => {
         });
     });
 
-    test('never substitutes rejected, expired, cross-Store, or cross-organization loops after reload', async () => {
+    test('never substitutes expired, cross-Store, or cross-organization loops after reload', async () => {
         await seedAssignment();
-        const rejected = await seedLoop({ id: 'rejected-current', status: LOOP_STATUS.REJECTED });
         const previousHour = await seedLoop({ id: 'approved-previous-hour', hour: 7 });
         const previousDate = await seedLoop({ id: 'approved-previous-date', date: '2030-07-14' });
         const foreignStore = await seedLoop({ id: 'approved-foreign-store', storeId: 'store-foreign' });
@@ -547,7 +545,6 @@ describe('GET /api/device/playback', () => {
             retailer_id: 'retailer-one',
             operating_hours: [8],
             loop_ids: [
-                rejected.id,
                 previousHour.id,
                 previousDate.id,
                 foreignStore.id,

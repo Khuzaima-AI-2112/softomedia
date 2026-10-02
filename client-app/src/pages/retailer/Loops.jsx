@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import GlassCard from '../../components/GlassCard';
-import StatusBadge from '../../components/StatusBadge';
 import apiService from '../../services/ApiService';
 import { loopListFrom } from '../../services/loopList';
 
@@ -13,23 +12,14 @@ import { loopListFrom } from '../../services/loopList';
  *
  * Shows all loops belonging to the retailer's locations with:
  *   - Loop name, date, hour slot, slot count
- *   - Status badge (approved / pending / draft / locked)
  *   - Link to the admin LoopBuilder for each loop
- *   - Quick-filter by status
  *
- * Sprint 11 — S11-5 fixes:
- *   - data-testid attributes added: loops-list, loop-row-{id}, loop-status-badge-{id}
- *   - Status filter values changed to lowercase to match schema enum
- *     (approved | draft | locked — per #42 guardrail G4)
- *   - Added 'locked' filter tab (was missing)
- *   - Comparison now uses l.status?.toLowerCase() for case-insensitive safety
+ * Nobody approves an Hourly Loop (ADR 0007), so loops have no status to filter by.
  */
 export default function RetailerLoops() {
     const [loops, setLoops]       = useState([]);
     const [loading, setLoading]   = useState(true);
     const [error, setError]       = useState(null);
-    // filter values match schema enum exactly: approved | draft | locked
-    const [filter, setFilter]     = useState('all');
 
     useEffect(() => {
         apiService.getLoops()
@@ -37,10 +27,6 @@ export default function RetailerLoops() {
             .catch(err => setError(err.message))
             .finally(() => setLoading(false));
     }, []);
-
-    const filtered = filter === 'all'
-        ? loops
-        : loops.filter(l => (l.status || '').toLowerCase() === filter);
 
     return (
         <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-500">
@@ -62,24 +48,6 @@ export default function RetailerLoops() {
                 </Link>
             </div>
 
-            {/* Status filter tabs — values match schema enum (lowercase) */}
-            <div className="flex gap-2 flex-wrap">
-                {['all', 'approved', 'pending', 'draft', 'locked'].map(f => (
-                    <button
-                        key={f}
-                        onClick={() => setFilter(f)}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors
-                            ${
-                                filter === f
-                                    ? 'bg-primary text-white'
-                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                            }`}
-                    >
-                        {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
-                    </button>
-                ))}
-            </div>
-
             {loading && (
                 <div className="flex items-center justify-center p-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -90,17 +58,15 @@ export default function RetailerLoops() {
                 <p className="text-red-500 p-4">Failed to load loops: {error}</p>
             )}
 
-            {!loading && !error && filtered.length === 0 && (
+            {!loading && !error && loops.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                     <span className="material-symbols-outlined text-5xl text-slate-300 mb-4">loop</span>
-                    <p className="text-slate-500">
-                        {filter === 'all' ? 'No loops found for your locations.' : `No ${filter} loops.`}
-                    </p>
+                    <p className="text-slate-500">No loops found for your locations.</p>
                 </div>
             )}
 
             <div className="space-y-3" data-testid="loops-list">
-                {filtered.map(loop => (
+                {loops.map(loop => (
                     <GlassCard
                         key={loop.id}
                         className="flex items-center justify-between gap-4 p-4"
@@ -118,10 +84,6 @@ export default function RetailerLoops() {
                                 )}
                             </p>
                         </div>
-
-                        <span data-testid={`loop-status-badge-${loop.id}`}>
-                            <StatusBadge status={loop.status} />
-                        </span>
 
                         <Link
                             to={`/dashboard/admin/loops/${loop.id}`}

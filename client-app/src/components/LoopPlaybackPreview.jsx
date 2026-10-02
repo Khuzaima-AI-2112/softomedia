@@ -6,9 +6,8 @@ const loadWithSignIn = path => apiClient.get(path, { responseType: 'blob' });
 
 /**
  * Plays a Loop's currently assigned Slot assets in real broadcast order and
- * duration — what the Screen will show if the Retailer Administrator
- * approves. Reads `slots` live, so a replaced or rejected Slot's asset is
- * never stale.
+ * duration — what the Screen will show. Reads `slots` live, so a replaced
+ * Slot's asset is never stale.
  */
 function LoopPlaybackPreview({ slots, onClose }) {
     const [index, setIndex] = useState(0);
