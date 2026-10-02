@@ -41,7 +41,7 @@ test('Admin schedules a breakfast promotion that plays only in the Retailer\'s b
         await page.getByTestId('promotion-daypart-breakfast').check();
         await page.getByTestId('promotion-submit-btn').click();
 
-        await expect(page.getByText(`Promotion "${NAME}" scheduled. It plays once the Retailer approves it.`)).toBeVisible();
+        await expect(page.getByText(`Promotion "${NAME}" scheduled.`)).toBeVisible();
         await expect(page.getByRole('row', { name: new RegExp(NAME) })).toContainText('Retailer promotion');
 
         promotion = (await campaignRepository.findAll()).find(campaign => campaign.name === NAME);
@@ -51,11 +51,8 @@ test('Admin schedules a breakfast promotion that plays only in the Retailer\'s b
             store_id: STORE_ID,
             media_id: 'demo-media-retailer',
             schedule: { dates: [tomorrow], dayparts: ['breakfast'], hours: [] },
-            status: 'pending_approval',
+            status: 'scheduled',
         });
-
-        // The Retailer's approval has its own journey (retailer_approval.spec.js).
-        await campaignRepository.update(promotion.id, { status: 'approved' });
 
         await page.goto('/dashboard/admin/loops');
         await page.getByTestId('generate-loops-btn').click();

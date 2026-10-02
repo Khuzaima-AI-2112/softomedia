@@ -24,12 +24,13 @@ export const PERMISSIONS = Object.freeze({
     ADVERTISER_VIEW_NETWORK: 'advertisers.view_network',
     CAMPAIGN_CREATE: 'campaigns.create',
     CAMPAIGN_DELETE: 'campaigns.delete',
-    CAMPAIGN_APPROVAL: 'campaigns.approve',
     CAMPAIGN_VIEW_NETWORK: 'campaigns.view_network',
     // A Creative is approved by the Super Administrator for the whole network, then by
     // each Retailer whose Stores it is booked in, for those Stores (ADR 0007).
     CREATIVE_APPROVAL: 'creatives.approve',
     CREATIVE_APPROVAL_OWN: 'creatives.approve_own',
+    // The Retailer's daily Hourly Loop approval, until #70 removes it (ADR 0007).
+    LOOP_APPROVAL: 'loops.approve',
     LOOP_INJECT: 'loops.inject',
     LOOP_GENERATE: 'loops.generate',
     SCHEDULE_OVERRIDE: 'schedules.override',
@@ -95,7 +96,7 @@ const ROLE_PERMISSIONS = Object.freeze({
         PERMISSIONS.SUPPORT_TICKET_CREATE_OWN,
         PERMISSIONS.SUPPORT_TICKET_VIEW_OWN,
         PERMISSIONS.SCREEN_VIEW_OWN,
-        PERMISSIONS.CAMPAIGN_APPROVAL,
+        PERMISSIONS.LOOP_APPROVAL,
         PERMISSIONS.CREATIVE_APPROVAL_OWN,
         PERMISSIONS.SCHEDULE_OVERRIDE,
         PERMISSIONS.IMPRESSION_VIEW_OWN,
@@ -160,8 +161,8 @@ export const requireScreenManagement = requirePermission(
     PERMISSIONS.SCREEN_MANAGEMENT,
     ROLES.TECHOPERATOR,
 );
-export const requireCampaignApproval = requirePermission(
-    PERMISSIONS.CAMPAIGN_APPROVAL,
+export const requireLoopApproval = requirePermission(
+    PERMISSIONS.LOOP_APPROVAL,
     null,
 );
 export const requireCreativeApproval = requirePermission(

@@ -30,7 +30,7 @@ import { approvalWindowService, ApprovalWindowError } from '../services/Approval
 import { SLOTS_PER_LOOP } from '../services/SlotInventory.js';
 import StoreRepository from '../repositories/StoreRepository.js';
 import { authenticate } from '../middleware/auth.js';
-import { PERMISSIONS, requireCampaignApproval, requirePermission } from '../middleware/requireRole.js';
+import { PERMISSIONS, requireLoopApproval, requirePermission } from '../middleware/requireRole.js';
 import { canManageRetailer, denyStoreAccess, retailerIdFor } from '../middleware/storeManagement.js';
 import { normalizeRole, ROLES } from '../constants/roles.js';
 import logger from '../utils/logger.js';
@@ -188,7 +188,7 @@ router.get('/review/:storeId/:date', async (req, res) => {
  * Ordering: registered before GET /:id to prevent "pending" being matched
  * as a loop ID param.
  */
-router.get('/pending/:retailerId', authenticate, requireCampaignApproval, async (req, res) => {
+router.get('/pending/:retailerId', authenticate, requireLoopApproval, async (req, res) => {
     try {
         if (req.params.retailerId !== retailerIdFor(req.user)) return denyStoreAccess(res);
         const loops = await loopRepository.findPendingByRetailer(req.params.retailerId);
@@ -318,7 +318,7 @@ router.post('/review/:storeId/:date/reopen', async (req, res) => {
  *
  * S13-2 AC-1, AC-3, AC-5
  */
-router.post('/:loopId/reject', authenticate, requireCampaignApproval, async (req, res) => {
+router.post('/:loopId/reject', authenticate, requireLoopApproval, async (req, res) => {
     try {
         const { loopId } = req.params;
         const reason = req.body.reason?.trim();
@@ -353,7 +353,7 @@ router.post('/:loopId/reject', authenticate, requireCampaignApproval, async (req
  * userId is derived exclusively from the authenticated token — no anonymous fallback.
  * Requires authentication.
  */
-router.patch('/:id/approve', authenticate, requireCampaignApproval, async (req, res) => {
+router.patch('/:id/approve', authenticate, requireLoopApproval, async (req, res) => {
     try {
         const loop = await findAuthorizedLoop(req, res, [ROLES.RETAILERADMIN]);
         if (!loop) return;
@@ -383,7 +383,7 @@ router.patch('/:id/approve', authenticate, requireCampaignApproval, async (req, 
  * Body: { reason }
  * Requires authentication.
  */
-router.patch('/:id/slots/:position/reject', authenticate, requireCampaignApproval, async (req, res) => {
+router.patch('/:id/slots/:position/reject', authenticate, requireLoopApproval, async (req, res) => {
     try {
         const { id } = req.params;
         const position = slotPositionFrom(req.params.position);

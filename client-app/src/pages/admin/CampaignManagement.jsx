@@ -11,10 +11,8 @@ import RetailerPromotionForm from './RetailerPromotionForm';
 
 const CAMPAIGN_STATUSES = [
     { value: 'all',              label: 'All' },
-    { value: 'pending_approval', label: 'Pending Approval' },
-    { value: 'approved',         label: 'Approved' },
-    { value: 'rejected',         label: 'Rejected' },
-    { value: 'active',           label: 'Active' },
+    { value: 'scheduled',        label: 'Scheduled' },
+    { value: 'cancelled',        label: 'Cancelled' },
 ];
 
 const EMPTY_FORM = {
@@ -32,8 +30,6 @@ function CampaignManagement() {
     // The Softomedia campaign workspace: Admin and Super Administrator
     const canView    = can(PERMISSIONS.CAMPAIGN_VIEW_NETWORK);
     const canDelete  = can(PERMISSIONS.CAMPAIGN_DELETE);
-    // Only a Retailer Administrator approves; no administrative override
-    const canApprove = can(PERMISSIONS.CAMPAIGN_APPROVAL);
     const canCreate  = can(PERMISSIONS.CAMPAIGN_CREATE);
 
     const [campaigns,        setCampaigns]        = useState([]);
@@ -80,17 +76,6 @@ function CampaignManagement() {
             setDataLoading(false);
         }
     }, []);
-
-    const handleStatusChange = async (campaignId, newStatus) => {
-        try {
-            setPageError('');
-            await apiService.updateCampaignStatus(campaignId, newStatus);
-            setSuccessMsg(`Campaign ${newStatus} successfully.`);
-            loadData();
-        } catch (err) {
-            setPageError(err?.message || 'Failed to update campaign status.');
-        }
-    };
 
     const handleDelete = async (campaignId) => {
         if (!window.confirm('Permanently delete this campaign? This cannot be undone.')) return;
@@ -155,7 +140,6 @@ function CampaignManagement() {
                 budget:        Number(createForm.budget),
                 start_date:    createForm.start_date,
                 end_date:      createForm.end_date,
-                status:        'pending_approval',
             });
             setSuccessMsg(`Campaign "${createForm.name.trim()}" created successfully.`);
             setShowCreateModal(false);
@@ -170,7 +154,7 @@ function CampaignManagement() {
 
     const handlePromotionCreated = (promotion) => {
         setShowPromotionForm(false);
-        setSuccessMsg(`Promotion "${promotion.name}" scheduled. It plays once the Retailer approves it.`);
+        setSuccessMsg(`Promotion "${promotion.name}" scheduled.`);
         loadData();
     };
 
@@ -209,7 +193,7 @@ function CampaignManagement() {
             label: 'Status',
             render: (_value, row) => (
                 <span data-testid="campaign-status">
-                    <StatusBadge status={row.status || 'pending_approval'} />
+                    <StatusBadge status={row.status || 'scheduled'} />
                 </span>
             )
         },
@@ -225,24 +209,6 @@ function CampaignManagement() {
             label: 'Actions',
             render: (_value, row) => (
                 <div className="flex items-center gap-2">
-                    {canApprove && row.status === 'pending_approval' && (
-                        <>
-                            <button
-                                data-testid={`btn-approve-campaign-${row.id}`}
-                                onClick={() => handleStatusChange(row.id, 'approved')}
-                                className="px-2 py-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded transition-colors"
-                            >
-                                Approve
-                            </button>
-                            <button
-                                data-testid={`btn-reject-campaign-${row.id}`}
-                                onClick={() => handleStatusChange(row.id, 'rejected')}
-                                className="px-2 py-1 text-xs bg-amber-600 hover:bg-amber-700 text-white rounded transition-colors"
-                            >
-                                Reject
-                            </button>
-                        </>
-                    )}
                     {canDelete && (
                         <button
                             data-testid={`delete-btn-${row.id}`}
@@ -475,7 +441,7 @@ function CampaignManagement() {
 
                                 {/* Loop inventory note */}
                                 <p className="text-xs text-slate-500">
-                                    Campaign will be created in <span className="text-slate-400 font-medium">pending_approval</span> status.
+                                    Campaign will be created in <span className="text-slate-400 font-medium">scheduled</span> status.
                                     Slot booking is done separately once loop inventory is generated for the campaign dates.
                                 </p>
                             </div>

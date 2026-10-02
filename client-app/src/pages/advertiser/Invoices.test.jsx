@@ -15,7 +15,7 @@ import Invoices from './Invoices';
 // The profile's explicit grants, as GET /api/auth/me returns them.
 const GRANTS = {
     brand: ['campaigns.create', 'invoices.view_own'],
-    retaileradmin: ['campaigns.approve', 'support_ticket.create_own'],
+    retaileradmin: ['creatives.approve_own', 'support_ticket.create_own'],
 };
 
 function renderAs(role, permissions = GRANTS[role] ?? []) {

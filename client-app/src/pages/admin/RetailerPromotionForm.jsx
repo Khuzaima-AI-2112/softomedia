@@ -226,8 +226,7 @@ export default function RetailerPromotionForm({ onClose, onCreated }) {
                     </fieldset>
 
                     <p className="text-xs text-slate-500">
-                        The promotion plays only in this Retailer&apos;s own Slots, trimmed to each Store&apos;s opening hours,
-                        once the Retailer approves it.
+                        The promotion plays only in this Retailer&apos;s own Slots, trimmed to each Store&apos;s opening hours.
                     </p>
 
                     <div className="flex justify-end gap-3 pt-2 border-t border-slate-700">

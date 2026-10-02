@@ -31,7 +31,7 @@ test('the Super Administrator then the Retailer preview and approve a Creative, 
             decided_by: null, decided_at: null, reason: null,
         });
         await campaignRepository.create(`cmp_browser_${suffix}`, {
-            name: 'Browser approval booking', type: 'paid', status: 'pending_approval',
+            name: 'Browser approval booking', type: 'paid', status: 'scheduled',
             brand_id: BRAND_ID, advertiser_id: BRAND_ID, creative_id: creativeId, media_id: assetId,
             inventory_selection: [{ retailer_id: RETAILER_ID, store_id: 'demo-store-mtl-north' }],
         });

@@ -6,6 +6,7 @@ import { mediaRepository } from '../repositories/MediaRepository.js';
 import { creativeRepository } from '../repositories/CreativeRepository.js';
 import { screenRepository } from '../repositories/ScreenRepository.js';
 import StoreRepository from '../repositories/StoreRepository.js';
+import { isCampaignRunning } from '../constants/campaigns.js';
 import { deviceMediaPath } from '../constants/mediaPaths.js';
 import {
     isApprovedFallbackAsset,
@@ -177,7 +178,8 @@ export class PlaybackService {
         locationId,
         screenId,
     }) {
-        if (!campaign || campaign.status !== 'approved') return false;
+        // Nobody approves a Campaign; its Creative's approvals are checked below (ADR 0007).
+        if (!isCampaignRunning(campaign)) return false;
         if (campaign.retailer_id && campaign.retailer_id !== retailerId) return false;
         if (campaign.start_date && date < campaign.start_date) return false;
         if (campaign.end_date && date > campaign.end_date) return false;

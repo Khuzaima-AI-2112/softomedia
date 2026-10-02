@@ -4,7 +4,6 @@ import GlassCard from '../../components/GlassCard';
 import StatusBadge from '../../components/StatusBadge';
 import SupportTicketModal from '../../components/SupportTicketModal';
 import LocationManager from '../../components/LocationManager';
-import CampaignApprovalList from '../../components/CampaignApprovalList';
 import apiService from '../../services/ApiService';
 import { loopListFrom } from '../../services/loopList';
 
@@ -192,8 +191,6 @@ function RetailerDashboard() {
                     <p className="text-sm text-slate-500 dark:text-slate-400">Fixed 5-second per ad transition with D-1 scheduling sync.</p>
                 </GlassCard>
             </div>
-
-            <CampaignApprovalList />
 
             <LocationManager />
 

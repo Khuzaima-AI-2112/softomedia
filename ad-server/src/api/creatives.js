@@ -13,6 +13,7 @@ import { brandIdFor, normalizeRole, retailerIdFor, ROLES } from '../constants/ro
 import { assetContentPath } from '../constants/mediaPaths.js';
 import { PERMISSIONS, requireCreativeApproval, userHasPermission } from '../middleware/requireRole.js';
 import { awaitsRetailer, notifyAfterNetworkApproval, retailerApprovals } from '../services/CreativeApproval.js';
+import { releaseLapsedReservations } from '../services/ReservationRelease.js';
 
 const router = express.Router();
 const NETWORK_ROLES = new Set([ROLES.ADMIN, ROLES.SUPERADMIN]);
@@ -149,6 +150,8 @@ for (const [action, decision] of Object.entries(DECISIONS)) {
         if (reasonRequired && !reason) return res.status(400).json({ error: 'A reason is required' });
 
         try {
+            // Slots whose approval deadline has passed are released first, so a late approval never keeps them.
+            if (to === CREATIVE_STATUS.APPROVED) await releaseLapsedReservations(req.params.id);
             if (!decidesForNetwork(req.user)) {
                 if (action === 'revoke') return res.status(403).json({ error: 'Access denied' });
                 return await decideForRetailer(req, res, decision, reason);

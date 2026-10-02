@@ -29,12 +29,8 @@ export default function AdvertiserDashboard() {
     }, {});
 
     const STATUS_CONFIG = [
-        { key: 'pending_approval', label: 'Pending', colour: 'bg-yellow-100 text-yellow-800  dark:bg-yellow-900/30 dark:text-yellow-300' },
-        { key: 'approved', label: 'Approved', colour: 'bg-blue-100   text-blue-800    dark:bg-blue-900/30   dark:text-blue-300' },
-        { key: 'live', label: 'Live', colour: 'bg-green-100  text-green-800   dark:bg-green-900/30  dark:text-green-300' },
-        { key: 'paused', label: 'Paused', colour: 'bg-slate-100  text-slate-700   dark:bg-slate-800     dark:text-slate-300' },
-        { key: 'completed', label: 'Completed', colour: 'bg-purple-100 text-purple-800  dark:bg-purple-900/30 dark:text-purple-300' },
-        { key: 'rejected', label: 'Rejected', colour: 'bg-red-100    text-red-800     dark:bg-red-900/30    dark:text-red-300' },
+        { key: 'scheduled', label: 'Scheduled', colour: 'bg-blue-100   text-blue-800    dark:bg-blue-900/30   dark:text-blue-300' },
+        { key: 'cancelled', label: 'Cancelled', colour: 'bg-red-100    text-red-800     dark:bg-red-900/30    dark:text-red-300' },
     ];
 
     return (

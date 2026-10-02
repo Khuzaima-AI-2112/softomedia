@@ -209,7 +209,7 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
     const today = storeLocalNow(resetAt, allDayStore.data.time_zone).date;
     const allDayHours = Array.from({ length: 24 }, (_, hour) => hour);
 
-    const approvedCampaign = record('campaigns', 'demo-secondary-campaign-1', {
+    const currentCampaign = record('campaigns', 'demo-secondary-campaign-1', {
         name: 'Northstar Pantry Synthetic Campaign',
         advertiser_id: 'demo-advertiser-secondary',
         retailer_id: 'demo-retailer-secondary',
@@ -218,49 +218,50 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
             retailer_id: store.data.retailer_id,
             store_id: store.id,
         })),
-        status: 'approved',
+        status: 'scheduled',
         visibility: 'private',
         start_date: today,
         end_date: calendarDateAfter(today, 13),
         budget: 2400,
     }, resetAtIso);
-    const pendingCampaign = record('campaigns', 'demo-secondary-campaign-2', {
+    const upcomingCampaign = record('campaigns', 'demo-secondary-campaign-2', {
         name: 'Northstar Home Synthetic Campaign',
         advertiser_id: 'demo-advertiser-secondary',
         retailer_id: 'demo-retailer-secondary',
         media_id: paidMedia.id,
         inventory_selection: [{ retailer_id: phoenixStore.data.retailer_id, store_id: phoenixStore.id }],
-        status: 'pending_approval',
+        status: 'scheduled',
         visibility: 'private',
         start_date: calendarDateAfter(resetDate, 7),
         end_date: calendarDateAfter(resetDate, 21),
         budget: 1800,
     }, resetAtIso);
 
-    // The approved Campaign holds the first Paid Slot of every hour at the
-    // all-day Store, today and tomorrow; the pending one two Slots at lunch.
-    const approvedReservations = reservationRecords({
-        campaign: approvedCampaign.data,
+    // Nobody approves a Campaign; their Creative has both approvals (ADR 0007).
+    // The current Campaign holds the first Paid Slot of every hour at the
+    // all-day Store, today and tomorrow; the upcoming one two Slots at lunch.
+    const currentReservations = reservationRecords({
+        campaign: currentCampaign.data,
         store: allDayStore.data,
         slots: [today, calendarDateAfter(today, 1)].flatMap(date => allDayHours.map(hour => ({
             date, hour, position: paidPositions(hour, 0)[0],
         }))),
         resetAtIso,
     });
-    const pendingReservations = reservationRecords({
-        campaign: pendingCampaign.data,
+    const upcomingReservations = reservationRecords({
+        campaign: upcomingCampaign.data,
         store: phoenixStore.data,
         slots: paidPositions(12, 8).slice(0, 2).map(position => ({
-            date: pendingCampaign.data.start_date, hour: 12, position,
+            date: upcomingCampaign.data.start_date, hour: 12, position,
         })),
         resetAtIso,
     });
 
-    const todaysReservedCreative = new Map(approvedReservations
+    const todaysReservedCreative = new Map(currentReservations
         .filter(({ data }) => data.date === today)
         .map(({ data }) => [data.hour, new Map([[data.position, {
             type: 'paid',
-            campaign_id: approvedCampaign.id,
+            campaign_id: currentCampaign.id,
             asset_id: paidMedia.id,
             asset_name: paidMedia.title,
         }]])]));
@@ -405,10 +406,10 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
                 },
             },
         }, resetAtIso),
-        approvedCampaign,
-        pendingCampaign,
-        ...approvedReservations,
-        ...pendingReservations,
+        currentCampaign,
+        upcomingCampaign,
+        ...currentReservations,
+        ...upcomingReservations,
         record('platform_config', 'dayparts', { ...DEFAULT_DAYPARTS }, resetAtIso),
         record('loops', 'demo-loop-mtl-next-day-08', {
             date: calendarDateAfter(resetDate, 1),

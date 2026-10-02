@@ -215,9 +215,6 @@ describeWithAuthEmulator('Multi-file Creatives in consecutive Paid Slots', () =>
         let brand = await brandAt(BOOKED);
         const booked = await book(brand, parts[0], [slot(8, 11), slot(8, 9), slot(8, 10)]);
         expect(booked.status).toBe(201);
-        const retailer = (await signInAs('retaileradmin', { organizationId: 'retailer-one', fakeClock: true })).headers;
-        expect((await request(app).patch(`/api/campaigns/${booked.body.id}/status`)
-            .set(retailer).send({ status: 'approved' })).status).toBe(200);
 
         jest.setSystemTime(GENERATED);
         const admin = (await signInAs('admin', { fakeClock: true })).headers;
@@ -269,8 +266,6 @@ describeWithAuthEmulator('Multi-file Creatives in consecutive Paid Slots', () =>
         const brand = await brandAt(BOOKED);
         const booked = await book(brand, first, [slot(8, 0), slot(8, 1), slot(8, 3), slot(8, 4)]);
         expect(booked.status).toBe(201);
-        const retailer = (await signInAs('retaileradmin', { organizationId: 'retailer-one', fakeClock: true })).headers;
-        await request(app).patch(`/api/campaigns/${booked.body.id}/status`).set(retailer).send({ status: 'approved' });
         // Only one Slot of the second run is still held.
         await slotReservationRepository.delete(slotReservationRepository.idFor(slot(8, 3)));
 

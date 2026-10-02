@@ -18,9 +18,9 @@ const { PASSWORD, signIn } = await import('./fixtures/emulator-sign-in.js');
 jest.setTimeout(30_000);
 
 /**
- * Campaign approval and visibility are scoped to the signed-in Retailer's
- * Stores (docs/phase-1-demo-acceptance.md: "Retailers approve content only for
- * their own stores"). There is no administrative override.
+ * Nobody approves a Campaign (ADR 0007): a Retailer approves the Creative for
+ * its own Stores instead, so it has no Campaign access. A Campaign's status
+ * changes only when it is cancelled.
  */
 describeWithEmulators('Campaign Retailer scope with Firebase emulators', () => {
     let request;
@@ -36,7 +36,7 @@ describeWithEmulators('Campaign Retailer scope with Firebase emulators', () => {
         await firestore.collection('campaigns').doc(id).set({
             name: `Scope fixture ${id}`,
             advertiser_id: 'demo-advertiser-secondary',
-            status: 'pending_approval',
+            status: 'scheduled',
             budget: 5000,
             start_date: '2030-02-01',
             end_date: '2030-02-14',
@@ -92,40 +92,38 @@ describeWithEmulators('Campaign Retailer scope with Firebase emulators', () => {
         await firestore?.terminate();
     });
 
-    test('a Retailer cannot approve a Campaign booked only at another Retailer\'s Stores', async () => {
-        const foreign = await as('retaileradmin', request(app).patch('/api/campaigns/scope-secondary-stores/status'))
-            .send({ status: 'approved' });
+    test('nobody approves or rejects a Campaign: the status route is gone for every persona', async () => {
+        const attempts = {};
+        for (const persona of ['superadmin', 'admin', 'retaileradmin', 'secondaryRetailer', 'techoperator']) {
+            attempts[persona] = (await as(persona, request(app).patch('/api/campaigns/scope-secondary-stores/status'))
+                .send({ status: 'approved' })).status;
+        }
 
-        expect(foreign.status).toBe(403);
-        expect(await statusOf('scope-secondary-stores')).toBe('pending_approval');
-
-        const owning = await as('secondaryRetailer', request(app).patch('/api/campaigns/scope-secondary-stores/status'))
-            .send({ status: 'approved' });
-
-        expect(owning.status).toBe(200);
-        expect(await statusOf('scope-secondary-stores')).toBe('approved');
+        expect(attempts).toEqual({
+            superadmin: 404, admin: 404, retaileradmin: 404, secondaryRetailer: 404, techoperator: 404,
+        });
+        expect(await statusOf('scope-secondary-stores')).toBe('scheduled');
     });
 
-    test('no one approves a Campaign by editing it', async () => {
-        await seedCampaign('scope-edit-pending', { retailer_id: 'demo-retailer-freshmart' });
+    test('no one changes a Campaign\'s status by editing it', async () => {
+        await seedCampaign('scope-edit-status', { retailer_id: 'demo-retailer-freshmart' });
 
         const attempts = {};
         for (const persona of ['superadmin', 'admin', 'retaileradmin', 'techoperator']) {
-            attempts[persona] = (await as(persona, request(app).put('/api/campaigns/scope-edit-pending'))
-                .send({ name: 'Edited', status: 'approved' })).status;
+            attempts[persona] = (await as(persona, request(app).put('/api/campaigns/scope-edit-status'))
+                .send({ name: 'Edited', status: 'cancelled' })).status;
         }
 
         expect(attempts).toEqual({ superadmin: 400, admin: 400, retaileradmin: 403, techoperator: 403 });
-        expect(await statusOf('scope-edit-pending')).toBe('pending_approval');
+        expect(await statusOf('scope-edit-status')).toBe('scheduled');
 
-        const edit = await as('admin', request(app).put('/api/campaigns/scope-edit-pending')).send({ name: 'Edited' });
+        const edit = await as('admin', request(app).put('/api/campaigns/scope-edit-status')).send({ name: 'Edited' });
         expect(edit.status).toBe(200);
-        expect(edit.body).toMatchObject({ name: 'Edited', status: 'pending_approval' });
+        expect(edit.body).toMatchObject({ name: 'Edited', status: 'scheduled' });
     });
 
-    test('moving an approved Campaign to other Stores returns it to Retailer approval', async () => {
+    test('moving a Campaign to other Stores or swapping its creative leaves it scheduled', async () => {
         await seedCampaign('scope-edit-retarget', {
-            status: 'approved',
             media_id: 'demo-media-paid',
             inventory_selection: [{
                 retailer_id: 'demo-retailer-freshmart',
@@ -135,7 +133,7 @@ describeWithEmulators('Campaign Retailer scope with Firebase emulators', () => {
             }],
         });
 
-        const edit = await as('admin', request(app).put('/api/campaigns/scope-edit-retarget')).send({
+        const moved = await as('admin', request(app).put('/api/campaigns/scope-edit-retarget')).send({
             inventory_selection: [{
                 retailer_id: 'demo-retailer-secondary',
                 store_id: 'demo-store-phoenix',
@@ -143,30 +141,16 @@ describeWithEmulators('Campaign Retailer scope with Firebase emulators', () => {
                 screen_id: 'demo-screen-phoenix-1',
             }],
         });
-
-        expect(edit.status).toBe(200);
-        expect(edit.body).toMatchObject({ status: 'pending_approval' });
-        expect(await statusOf('scope-edit-retarget')).toBe('pending_approval');
-    });
-
-    test('swapping an approved Campaign\'s creative returns it to Retailer approval', async () => {
-        await seedCampaign('scope-edit-creative', {
-            status: 'approved',
-            media_id: 'demo-media-paid',
-            retailer_id: 'demo-retailer-freshmart',
-        });
-
-        const edit = await as('superadmin', request(app).put('/api/campaigns/scope-edit-creative'))
+        const swapped = await as('superadmin', request(app).put('/api/campaigns/scope-edit-retarget'))
             .send({ media_id: 'demo-media-internal' });
 
-        expect(edit.status).toBe(200);
-        expect(edit.body).toMatchObject({ media_id: 'demo-media-internal', status: 'pending_approval' });
-        expect(await statusOf('scope-edit-creative')).toBe('pending_approval');
+        expect([moved.status, swapped.status]).toEqual([200, 200]);
+        expect(swapped.body).toMatchObject({ media_id: 'demo-media-internal', status: 'scheduled' });
+        expect(await statusOf('scope-edit-retarget')).toBe('scheduled');
     });
 
-    test('an Admin edits only a Campaign\'s editable fields, and such edits keep its approval', async () => {
+    test('an Admin edits only a Campaign\'s editable fields', async () => {
         await seedCampaign('scope-edit-allowlist', {
-            status: 'approved',
             media_id: 'demo-media-paid',
             retailer_id: 'demo-retailer-freshmart',
             created_at: '2030-01-10T00:00:00.000Z',
@@ -186,70 +170,44 @@ describeWithEmulators('Campaign Retailer scope with Firebase emulators', () => {
         expect(saved).toMatchObject({
             name: 'Renamed',
             end_date: '2030-02-20',
-            status: 'approved',
+            status: 'scheduled',
             advertiser_id: 'demo-advertiser-secondary',
             created_at: '2030-01-10T00:00:00.000Z',
         });
         expect(saved).not.toHaveProperty('approved_by');
     });
 
-    test('a Campaign an Admin prepares starts pending Retailer approval whatever status is sent', async () => {
+    test('a Campaign an Admin prepares is scheduled whatever status is sent', async () => {
         const created = await as('admin', request(app).post('/api/campaigns')).send({
             id: 'scope-admin-prepared',
             name: 'Admin prepared',
             advertiser_id: 'demo-advertiser-bonvie',
             retailer_id: 'demo-retailer-freshmart',
-            status: 'approved',
+            status: 'cancelled',
         });
         createdCampaignIds.push('scope-admin-prepared');
 
         expect(created.status).toBe(201);
-        expect(await statusOf('scope-admin-prepared')).toBe('pending_approval');
+        expect(await statusOf('scope-admin-prepared')).toBe('scheduled');
     });
 
-    test('a Retailer sees only Campaigns for its Stores, without Brand budgets', async () => {
-        await Promise.all([
-            seedCampaign('scope-freshmart-stores', {
-                inventory_selection: [{
-                    retailer_id: 'demo-retailer-freshmart',
-                    store_id: 'demo-store-mtl-north',
-                    location_id: 'demo-location-mtl-checkout',
-                    screen_id: 'demo-screen-north-1',
-                }],
-            }),
-            seedCampaign('scope-network-wide', {}),
-        ]);
+    test('a Retailer Administrator and a Technical Operator have no Campaign access', async () => {
+        await seedCampaign('scope-freshmart-stores', {
+            inventory_selection: [{
+                retailer_id: 'demo-retailer-freshmart',
+                store_id: 'demo-store-mtl-north',
+                location_id: 'demo-location-mtl-checkout',
+                screen_id: 'demo-screen-north-1',
+            }],
+        });
 
-        const list = await as('retaileradmin', request(app).get('/api/campaigns'));
-        expect(list.status).toBe(200);
-        const ids = list.body.map(({ id }) => id);
-        expect(ids).toEqual(expect.arrayContaining(['scope-freshmart-stores', 'scope-network-wide']));
-        expect(ids).not.toContain('scope-secondary-stores');
-        expect(ids).not.toContain('demo-secondary-campaign-1');
-        expect(list.body.some(campaign => 'budget' in campaign)).toBe(false);
+        const responses = await Promise.all(['retaileradmin', 'techoperator'].flatMap(persona => [
+            as(persona, request(app).get('/api/campaigns')),
+            as(persona, request(app).get('/api/campaigns/scope-freshmart-stores')),
+        ]));
 
-        const widened = await as('retaileradmin', request(app).get('/api/campaigns?advertiserId=demo-advertiser-secondary'));
-        expect(widened.status).toBe(200);
-        expect(widened.body.map(({ id }) => id)).not.toContain('scope-secondary-stores');
-
-        const foreign = await as('retaileradmin', request(app).get('/api/campaigns/scope-secondary-stores'));
-        expect(foreign.status).toBe(404);
-        expect(JSON.stringify(foreign.body)).not.toContain('Scope fixture');
-
-        const own = await as('retaileradmin', request(app).get('/api/campaigns/scope-freshmart-stores'));
-        expect(own.status).toBe(200);
-        expect(own.body.id).toBe('scope-freshmart-stores');
-        expect(own.body).not.toHaveProperty('budget');
-    });
-
-    test('a Technical Operator has no Campaign access', async () => {
-        const [list, detail] = await Promise.all([
-            as('techoperator', request(app).get('/api/campaigns')),
-            as('techoperator', request(app).get('/api/campaigns/scope-network-wide')),
-        ]);
-
-        expect([list.status, detail.status]).toEqual([403, 403]);
-        expect(JSON.stringify([list.body, detail.body])).not.toContain('Scope fixture');
+        expect(responses.map(response => response.status)).toEqual([403, 403, 403, 403]);
+        expect(JSON.stringify(responses.map(response => response.body))).not.toContain('Scope fixture');
     });
 
     test('Campaigns reach loops only through loop generation, not direct slot booking', async () => {

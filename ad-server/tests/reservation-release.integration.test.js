@@ -63,10 +63,14 @@ async function seed() {
         title: 'Neutral fallback', category: 'fallback', content_kind: 'neutral_fallback',
         owner_type: 'platform', owner_id: null,
     }));
+    // Brand one's Creative awaits both approvals; Brand two's has both for retailer-one.
+    const approvals = {
+        'brand-one': { approval_status: 'pending' },
+        'brand-two': { approval_status: 'approved', retailer_approvals: retailerApprovals('retailer-one') },
+    };
     for (const brandId of ['brand-one', 'brand-two']) {
         await creativeRepository.create(`crv-${brandId}`, {
-            brand_id: brandId, media_ids: [`${brandId}-file`], approval_status: 'approved',
-            retailer_approvals: retailerApprovals('retailer-one'),
+            brand_id: brandId, media_ids: [`${brandId}-file`], ...approvals[brandId],
         });
         await mediaRepository.create(`${brandId}-file`, {
             title: `${brandId} latte`, category: 'paid', owner_type: 'brand', owner_id: brandId, status: 'ready',
@@ -109,8 +113,8 @@ async function slotStatus(user, position = POSITION, hour = 8) {
 
 const notifications = async user => (await request(app).get('/api/notifications').set(user.headers)).body;
 
-const setStatus = (user, campaignId, status) => request(app)
-    .patch(`/api/campaigns/${campaignId}/status`).set(user.headers).send({ status });
+/** A Creative Approval or Retailer Approval of Brand one's Creative, by this user. */
+const approveCreative = user => request(app).post('/api/creatives/crv-brand-one/approve').set(user.headers);
 
 const cancel = (user, campaignId) => request(app).post(`/api/campaigns/${campaignId}/cancel`).set(user.headers);
 
@@ -133,38 +137,10 @@ describeWithAuthEmulator('Releasing Slot Reservations', () => {
         jest.restoreAllMocks();
     });
 
-    test('rejecting a Campaign frees its Slots at once and tells the Brand why', async () => {
-        const as = await signInAllAt(BOOKED);
-        const booked = await book(as.brand, 'brand-one');
-        expect(booked.status).toBe(201);
-        expect(await slotStatus(as.brandTwo)).toBe('taken');
-
-        const rejected = await setStatus(as.retailer, booked.body.id, 'rejected');
-        expect(rejected.status).toBe(200);
-
-        expect(await slotStatus(as.brandTwo)).toBe('free');
-        expect(await slotStatus(as.brand)).toBe('free');
-        expect((await book(as.brandTwo, 'brand-two')).status).toBe(201);
-        expect(await notifications(as.brand)).toEqual([expect.objectContaining({
-            title: 'Slot Reservation released',
-            message: expect.stringContaining('rejected'),
-            read: false,
-        })]);
-        expect(await notifications(as.brandTwo)).toEqual([]);
-    });
-
-    test('rejecting an approved Campaign also frees its Slots', async () => {
-        const as = await signInAllAt(BOOKED);
-        const booked = await book(as.brand, 'brand-one');
-        expect((await setStatus(as.retailer, booked.body.id, 'approved')).status).toBe(200);
-        expect((await setStatus(as.retailer, booked.body.id, 'rejected')).status).toBe(200);
-
-        expect(await slotStatus(as.brandTwo)).toBe('free');
-    });
-
     test('a Brand cancelling its Campaign frees its Slots at once and is told why', async () => {
         const as = await signInAllAt(BOOKED);
         const booked = await book(as.brand, 'brand-one');
+        expect(booked.status).toBe(201);
         expect(await slotStatus(as.brandTwo)).toBe('taken');
 
         const cancelled = await cancel(as.brand, booked.body.id);
@@ -176,7 +152,9 @@ describeWithAuthEmulator('Releasing Slot Reservations', () => {
         expect(await notifications(as.brand)).toEqual([expect.objectContaining({
             title: 'Slot Reservation released',
             message: expect.stringContaining('cancelled'),
+            read: false,
         })]);
+        expect(await notifications(as.brandTwo)).toEqual([]);
     });
 
     test('only the owning Brand or an Admin may cancel, and a cancelled Campaign stays cancelled', async () => {
@@ -194,16 +172,25 @@ describeWithAuthEmulator('Releasing Slot Reservations', () => {
         const again = await cancel(as.brand, booked.body.id);
         expect(again.status).toBe(400);
         expect(again.body).toMatchObject({ from: 'cancelled' });
-        expect((await setStatus(as.retailer, booked.body.id, 'approved')).status).toBe(400);
         // Released once, told once.
         expect(await notifications(as.brand)).toHaveLength(1);
     });
 
-    test('an unapproved Campaign’s Slots are released at the approval deadline and not generated', async () => {
+    test('a submitted Campaign holds its Slots with no Campaign approval, and none can be given', async () => {
+        const as = await signInAllAt(BOOKED);
+        const booked = await book(as.brandTwo, 'brand-two');
+
+        expect(booked.body.status).toBe('scheduled');
+        expect(await slotStatus(as.brand)).toBe('taken');
+        const decided = await request(app).patch(`/api/campaigns/${booked.body.id}/status`)
+            .set(as.retailer.headers).send({ status: 'approved' });
+        expect(decided.status).toBe(404);
+    });
+
+    test('a Reservation whose Creative lacks either approval is released at the approval deadline', async () => {
         let as = await signInAllAt(BOOKED);
-        const unapproved = await book(as.brand, 'brand-one', POSITION);
+        await book(as.brand, 'brand-one', POSITION);
         const approved = await book(as.brandTwo, 'brand-two', OTHER_POSITION);
-        expect((await setStatus(as.retailer, approved.body.id, 'approved')).status).toBe(200);
 
         // Still held a second before the deadline.
         as = await signInAllAt(BEFORE_DEADLINE);
@@ -213,22 +200,48 @@ describeWithAuthEmulator('Releasing Slot Reservations', () => {
         as = await signInAllAt(AT_DEADLINE);
         expect(await slotStatus(as.brandTwo, POSITION)).toBe('free');
         expect(await slotStatus(as.brand, POSITION)).toBe('free');
-        // An approved Campaign keeps its Slot.
+        // A Creative with both approvals for the Store's Retailer keeps its Slot.
         expect(await slotStatus(as.brandTwo, OTHER_POSITION)).toBe('yours');
 
         const slots = await generateHourEight(as.admin);
         expect(slots[POSITION]).toMatchObject({ is_fallback: true, campaign_id: null, asset_id: 'fallback-media' });
         expect(slots[OTHER_POSITION]).toMatchObject({ is_fallback: false, campaign_id: approved.body.id });
 
-        // Approving after the deadline does not bring the Slot back.
-        expect((await setStatus(as.retailer, unapproved.body.id, 'approved')).status).toBe(200);
+        // Approving the Creative after the deadline does not bring the Slot back.
+        expect((await approveCreative(as.superadmin)).status).toBe(200);
+        expect((await approveCreative(as.retailer)).status).toBe(200);
         expect(await slotStatus(as.brand, POSITION)).toBe('free');
 
         expect(await notifications(as.brand)).toEqual([expect.objectContaining({
             title: 'Slot Reservation released',
-            message: expect.stringContaining('approval deadline'),
+            message: expect.stringMatching(/Creative was not approved .*by the approval deadline/),
         })]);
         expect(await notifications(as.brandTwo)).toEqual([]);
+    });
+
+    test('the Super Administrator’s approval alone does not keep a Slot past the deadline', async () => {
+        let as = await signInAllAt(BOOKED);
+        await book(as.brand, 'brand-one');
+        expect((await approveCreative(as.superadmin)).status).toBe(200);
+
+        as = await signInAllAt(AT_DEADLINE);
+        expect(await slotStatus(as.brand)).toBe('free');
+        expect(await notifications(as.brand)).toEqual([expect.objectContaining({
+            message: expect.stringContaining('approval deadline'),
+        })]);
+    });
+
+    test('a Creative with both approvals before the deadline keeps its Slot and plays', async () => {
+        let as = await signInAllAt(BOOKED);
+        const booked = await book(as.brand, 'brand-one');
+        expect((await approveCreative(as.superadmin)).status).toBe(200);
+        expect((await approveCreative(as.retailer)).status).toBe(200);
+
+        as = await signInAllAt(AT_DEADLINE);
+        expect(await slotStatus(as.brand)).toBe('yours');
+        const slots = await generateHourEight(as.admin);
+        expect(slots[POSITION]).toMatchObject({ is_fallback: false, campaign_id: booked.body.id });
+        expect(await notifications(as.brand)).toEqual([]);
     });
 
     test('generation alone releases an unapproved Reservation after the deadline', async () => {
@@ -242,12 +255,13 @@ describeWithAuthEmulator('Releasing Slot Reservations', () => {
         expect(await notifications(as.brand)).toHaveLength(1);
     });
 
-    test('approving after the deadline releases the Slots even when nothing read them in between', async () => {
+    test('approving the Creative after the deadline releases the Slots even when nothing read them in between', async () => {
         let as = await signInAllAt(BOOKED);
-        const unapproved = await book(as.brand, 'brand-one');
+        await book(as.brand, 'brand-one');
 
         as = await signInAllAt(AT_DEADLINE);
-        expect((await setStatus(as.retailer, unapproved.body.id, 'approved')).status).toBe(200);
+        expect((await approveCreative(as.superadmin)).status).toBe(200);
+        expect((await approveCreative(as.retailer)).status).toBe(200);
 
         const slots = await generateHourEight(as.admin);
         expect(slots[POSITION]).toMatchObject({ is_fallback: true, campaign_id: null });
@@ -257,20 +271,18 @@ describeWithAuthEmulator('Releasing Slot Reservations', () => {
         expect(notice.message).not.toContain('Other Brands');
     });
 
-    test('cancelling a live Campaign releases only the Slots still to play', async () => {
+    test('cancelling a playing Campaign releases only the Slots still to play', async () => {
         let as = await signInAllAt(BOOKED);
-        const booked = await book(as.brand, 'brand-one', OTHER_POSITION, [8, 9]);
+        const booked = await book(as.brandTwo, 'brand-two', OTHER_POSITION, [8, 9]);
         expect(booked.status).toBe(201);
-        expect((await setStatus(as.retailer, booked.body.id, 'approved')).status).toBe(200);
-        expect((await setStatus(as.retailer, booked.body.id, 'live')).status).toBe(200);
 
         as = await signInAllAt(DURING_NINE);
-        expect((await cancel(as.brand, booked.body.id)).status).toBe(200);
+        expect((await cancel(as.brandTwo, booked.body.id)).status).toBe(200);
 
         // Hour 8 has played and stays on record; the hour still playing is released.
-        expect(await slotStatus(as.brandTwo, OTHER_POSITION, 8)).toBe('taken');
-        expect(await slotStatus(as.brandTwo, OTHER_POSITION, 9)).toBe('free');
-        const [notice] = await notifications(as.brand);
+        expect(await slotStatus(as.brand, OTHER_POSITION, 8)).toBe('taken');
+        expect(await slotStatus(as.brand, OTHER_POSITION, 9)).toBe('free');
+        const [notice] = await notifications(as.brandTwo);
         expect(notice.message).toContain('09:00');
         expect(notice.message).not.toContain('08:00');
     });

@@ -92,11 +92,10 @@ const BrandDashboard = () => {
             render: (cmp) => (
                 <span data-testid="campaign-status" className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${cmp.status === 'live' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' :
                     cmp.status === 'scheduled' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800' :
-                        cmp.status === 'pending_approval' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800' :
                             'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
                     }`}>
                     {cmp.status === 'live' && <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>}
-                    {cmp.status === 'live' ? 'Live' : cmp.status === 'scheduled' ? 'Scheduled' : cmp.status === 'pending_approval' ? 'Pending' : cmp.status === 'approved' ? 'Approved' : cmp.status === 'rejected' ? 'Rejected' : cmp.status === 'completed' ? 'Completed' : cmp.status}
+                    {cmp.status === 'live' ? 'Live' : cmp.status === 'scheduled' ? 'Scheduled' : cmp.status === 'cancelled' ? 'Cancelled' : cmp.status === 'completed' ? 'Completed' : cmp.status}
                 </span>
             )
         },

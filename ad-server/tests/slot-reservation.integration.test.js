@@ -123,7 +123,7 @@ describeWithAuthEmulator('Slot Reservations', () => {
         const response = await submit(brand, 'brand-one', [slot(8, 0), slot(12, 3)]);
 
         expect(response.status).toBe(201);
-        expect(response.body.status).toBe('pending_approval');
+        expect(response.body.status).toBe('scheduled');
         expect(response.body.reserved_slots).toEqual([
             { ...slot(8, 0), price: 15.75 },
             { ...slot(12, 3), price: 33.75 },
