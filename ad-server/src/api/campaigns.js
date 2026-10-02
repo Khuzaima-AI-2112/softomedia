@@ -14,6 +14,7 @@ import {
 } from '../repositories/index.js';
 import { resolveAgreedCpm } from '../services/CampaignPricingService.js';
 import { prepareReservations } from '../services/SlotReservations.js';
+import { notifyAfterBooking } from '../services/CreativeApproval.js';
 import {
     RELEASE_REASONS,
     releaseCampaignReservations,
@@ -373,6 +374,8 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, RO
             },
             reservations.map(reservation => ({ ...reservation, campaign_id: id })),
         );
+        // A Retailer newly booked with an approved Creative is asked to approve it.
+        await notifyAfterBooking(campaign);
         res.status(201).json(campaign);
     } catch (error) {
         if (error instanceof SlotTakenError) {

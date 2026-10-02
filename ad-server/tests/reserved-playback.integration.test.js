@@ -1,5 +1,6 @@
 import { jest, test, expect, beforeEach, afterEach } from '@jest/globals';
 import request from 'supertest';
+import { retailerApprovals } from './fixtures/creative-approval.js';
 
 jest.unstable_mockModule('../src/utils/firestore.js', () => ({
     getFirestore: jest.fn(() => null),
@@ -82,7 +83,7 @@ async function seedMedia() {
     await mediaRepository.create('internal-media', approvedMedia({
         title: 'Softomedia house ad', category: 'internal', owner_type: 'platform', owner_id: null,
     }));
-    // Creative approval is seeded: granting it is a separate ticket.
+    // Creative approval is seeded; creative-approval.integration.test.js grants it.
     await seedCreative('brand-one', 'Brand One latte', 'approved');
     await seedCreative('brand-two', 'Brand Two muffin', 'pending');
     await seedCreative('brand-three', 'Brand Three bagel', 'approved');
@@ -93,6 +94,7 @@ async function seedCreative(brandId, title, approvalStatus, fileFields = {}) {
     const mediaId = `${brandId}-file`;
     await creativeRepository.create(`crv-${brandId}`, {
         brand_id: brandId, media_ids: [mediaId], approval_status: approvalStatus,
+        retailer_approvals: retailerApprovals('retailer-one'),
     });
     await mediaRepository.create(mediaId, {
         title, category: 'paid', owner_type: 'brand', owner_id: brandId, status: 'ready',

@@ -1,5 +1,6 @@
 import { jest, describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import request from 'supertest';
+import { retailerApprovals } from './fixtures/creative-approval.js';
 
 jest.unstable_mockModule('../src/utils/firestore.js', () => ({
     getFirestore: jest.fn(() => null),
@@ -69,6 +70,7 @@ async function seedLoop({
             brand_id: 'brand-one',
             media_ids: [`asset-${position}`],
             approval_status: 'approved',
+            retailer_approvals: retailerApprovals(retailerId),
         });
         await campaignRepository.create(`campaign-${position}`, {
             status: 'approved',

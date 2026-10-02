@@ -292,9 +292,19 @@ class ApiService {
         return apiClient.postForm('/api/assets/upload', formData);
     }
 
-    /** The signed-in Brand's Creatives, each with its files and approval status. */
+    /** The Creatives the signed-in user may see, each with its files and approvals. */
     async getCreatives() {
         return apiClient.get('/api/creatives');
+    }
+
+    /** The signed-in approver's approval of a Creative: for the network, or for the Retailer's Stores. */
+    async approveCreative(id) {
+        return apiClient.post(`/api/creatives/${id}/approve`, {});
+    }
+
+    /** The signed-in approver's rejection of a Creative, with the reason the Brand sees. */
+    async rejectCreative(id, reason) {
+        return apiClient.post(`/api/creatives/${id}/reject`, { reason });
     }
 
     // ============================================

@@ -64,6 +64,7 @@ describeWithEmulators('media access with Firebase emulators', () => {
             brand: 'brand@demo.softomedia.test',
             secondaryBrand: 'brand-secondary@demo.softomedia.test',
             admin: 'admin@demo.softomedia.test',
+            superadmin: 'superadmin@demo.softomedia.test',
             retaileradmin: 'retaileradmin@demo.softomedia.test',
             secondaryRetailer: 'retaileradmin-secondary@demo.softomedia.test',
             techoperator: 'techoperator@demo.softomedia.test',
@@ -202,6 +203,37 @@ describeWithEmulators('media access with Firebase emulators', () => {
             expect(approved.headers['content-type']).toBe('image/png');
         } finally {
             await firestore.collection('screens').doc(screenId).delete();
+        }
+    });
+
+    test('a Screen reads a Brand’s file once the Super Administrator and the Screen’s Retailer approve its Creative', async () => {
+        const screenId = `media-access-screen-${Date.now()}`;
+        const registration = await as('techoperator', request(app).post('/api/screens')).send({
+            screen_id: screenId,
+            store_id: 'demo-store-mtl-north',
+            location_id: 'demo-location-mtl-entrance',
+        });
+        expect(registration.status).toBe(201);
+        const device = { Authorization: `Device ${screenId}:${registration.body.device_key}` };
+        const asset = await brandUpload('Creative for FreshMart');
+        const campaignId = `media-access-campaign-${Date.now()}`;
+        await firestore.collection('campaigns').doc(campaignId).set({
+            name: 'FreshMart booking', brand_id: 'demo-advertiser-bonvie', status: 'pending_approval',
+            creative_id: asset.creative.id, inventory_selection: [{ retailer_id: 'demo-retailer-freshmart' }],
+        });
+        const read = () => request(app).get(`/api/device/media/${asset.id}`).set(device);
+        const decide = persona => as(persona, request(app).post(`/api/creatives/${asset.creative.id}/approve`));
+
+        try {
+            expect((await decide('superadmin')).status).toBe(200);
+            expect((await read()).status).toBe(404);
+            expect((await decide('retaileradmin')).status).toBe(200);
+            const approved = await binary(read());
+            expect(approved.status).toBe(200);
+            expect(approved.headers['content-type']).toBe('image/png');
+        } finally {
+            await firestore.collection('screens').doc(screenId).delete();
+            await firestore.collection('campaigns').doc(campaignId).delete();
         }
     });
 });

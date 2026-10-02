@@ -18,7 +18,7 @@ const creative = (id, approvalStatus, fields = {}) => ({
 describe('Brand Creatives', () => {
     afterEach(() => getCreatives.mockReset());
 
-    it('shows each Creative with its approval status, and the reason for a decision against it', async () => {
+    it('shows the Super Administrator’s decision on each Creative, and the reason for a decision against it', async () => {
         getCreatives.mockResolvedValue([
             creative('latte', 'pending'),
             creative('muffin', 'approved'),
@@ -28,12 +28,28 @@ describe('Brand Creatives', () => {
         render(<BrandCreatives />);
 
         const status = async id => (await screen.findByTestId(`creative-status-${id}`)).textContent;
-        expect(await status('latte')).toBe('Pending approval');
-        expect(await status('muffin')).toBe('Approved');
-        expect(await status('bagel')).toBe('Rejected');
+        expect(await status('latte')).toBe('Awaiting Super Admin approval');
+        expect(await status('muffin')).toBe('Approved by Super Admin');
+        expect(await status('bagel')).toBe('Rejected by Super Admin');
         expect(within(screen.getByTestId('creative-row-bagel')).getByText('Logo is cropped')).toBeTruthy();
         expect(await status('scone')).toBe('Revoked');
         expect(within(screen.getByTestId('creative-row-scone')).getByText('Offer has ended')).toBeTruthy();
+    });
+
+    it('shows each Retailer’s decision for its Stores, and the reason for a rejection', async () => {
+        getCreatives.mockResolvedValue([creative('latte', 'approved', {
+            retailer_approvals: [
+                { retailer_id: 'freshmart', retailer_name: 'FreshMart', status: 'approved', reason: null },
+                { retailer_id: 'harbor', retailer_name: 'HarborCart', status: 'rejected', reason: 'Not for our shoppers' },
+                { retailer_id: 'northwind', retailer_name: 'Northwind', status: 'pending', reason: null },
+            ],
+        })]);
+        render(<BrandCreatives />);
+
+        const decision = async retailerId => (await screen.findByTestId(`creative-retailer-latte-${retailerId}`)).textContent;
+        expect(await decision('freshmart')).toBe('FreshMart: Approved');
+        expect(await decision('harbor')).toBe('HarborCart: Rejected — Not for our shoppers');
+        expect(await decision('northwind')).toBe('Northwind: Awaiting approval');
     });
 
     it('tells apart two uploads of the same file by when each was uploaded', async () => {

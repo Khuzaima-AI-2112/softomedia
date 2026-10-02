@@ -52,7 +52,9 @@ router.get('/playback', async (req, res) => {
 // GET /api/device/media/:assetId — the file of approved playback media; anything else reads as not found
 router.get('/media/:assetId', async (req, res) => {
     const asset = await mediaRepository.findById(req.params.assetId);
-    if (!(await isPlayableStoredAsset(asset))) return res.status(404).json({ error: 'Media not found' });
+    if (!(await isPlayableStoredAsset(asset, req.device.screen.retailer_id))) {
+        return res.status(404).json({ error: 'Media not found' });
+    }
     return sendMediaContent(res, asset);
 });
 

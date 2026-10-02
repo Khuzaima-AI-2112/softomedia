@@ -271,7 +271,7 @@ export class LoopGenerationService {
         await Promise.all([...byCampaignHour.values()].map(async held => {
             const { campaign_id: campaignId, hour } = held[0];
             const campaign = await campaignRepository.findById(campaignId);
-            const files = campaign ? await this.getCreativeFiles(campaign) : [];
+            const files = campaign ? await this.getCreativeFiles(campaign, store.retailer_id) : [];
             if (files.length === 0) return;
 
             const positions = held.map(reservation => reservation.position);
@@ -294,13 +294,13 @@ export class LoopGenerationService {
         return byHour;
     }
 
-    /** The files of a Campaign's Creative in play order, or none unless every one may play. */
-    async getCreativeFiles(campaign) {
+    /** The files of a Campaign's Creative in play order, or none unless every one may play in the Retailer's Stores. */
+    async getCreativeFiles(campaign, retailerId) {
         const first = await mediaRepository.findById(campaign.media_id || campaign.asset_id);
         if (!first) return [];
         const { creative, mediaIds } = await creativeRepository.withFilesFor(first);
         const files = await Promise.all(mediaIds.map(id => (id === first.id ? first : mediaRepository.findById(id))));
-        return files.every(file => isApprovedPlaybackAsset(file, creative)) ? files : [];
+        return files.every(file => isApprovedPlaybackAsset(file, creative, retailerId)) ? files : [];
     }
 
     namesRetailer(campaign, retailerId) {

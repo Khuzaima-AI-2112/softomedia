@@ -65,7 +65,9 @@ test('Player authenticates as its Screen and reports approved Campaign, fallback
         await creativeRepository.create(creativeId, {
             brand_id: brandId,
             media_ids: [assetId],
+            // Approved by the Super Administrator and by the Store's Retailer (ADR 0007).
             approval_status: 'approved',
+            retailer_approvals: { [retailerId]: { status: 'approved' } },
         });
         await campaignRepository.create(campaignId, {
             status: 'approved',

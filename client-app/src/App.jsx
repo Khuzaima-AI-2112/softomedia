@@ -116,6 +116,9 @@ const TechOpsDashboard = lazy(() => import('./pages/tech/TechOpsDashboard'));
 // ── Reports ──────────────────────────────────────────────────────────────────────────────
 const DeliveryReport = lazy(() => import('./pages/reports/DeliveryReport'));
 
+// ── Approvals ────────────────────────────────────────────────────────────────────────────
+const CreativeApprovals = lazy(() => import('./pages/approvals/CreativeApprovals'));
+
 function App() {
     return (
         <Router>
@@ -192,6 +195,9 @@ function App() {
 
                             {/* Reports — Brand, Retailer Administrator, Admin and Super Administrator (#41) */}
                             <Route path="delivery-report" element={<DeliveryReport />} />
+
+                            {/* Creative Approvals — Super Administrator, then each Retailer Administrator (ADR 0007) */}
+                            <Route path="creative-approvals" element={<CreativeApprovals />} />
 
                             {/* Catch-all for unknown /dashboard/* paths */}
                             <Route path="*" element={<NotFound />} />

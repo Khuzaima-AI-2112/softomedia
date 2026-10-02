@@ -1,5 +1,6 @@
 import { jest, test, expect, beforeEach, afterEach } from '@jest/globals';
 import request from 'supertest';
+import { retailerApprovals } from './fixtures/creative-approval.js';
 
 jest.unstable_mockModule('../src/utils/firestore.js', () => ({
     getFirestore: jest.fn(() => null),
@@ -65,6 +66,7 @@ async function seed() {
     for (const brandId of ['brand-one', 'brand-two']) {
         await creativeRepository.create(`crv-${brandId}`, {
             brand_id: brandId, media_ids: [`${brandId}-file`], approval_status: 'approved',
+            retailer_approvals: retailerApprovals('retailer-one'),
         });
         await mediaRepository.create(`${brandId}-file`, {
             title: `${brandId} latte`, category: 'paid', owner_type: 'brand', owner_id: brandId, status: 'ready',

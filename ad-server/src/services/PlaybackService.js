@@ -184,7 +184,7 @@ export class PlaybackService {
         // The Slot plays the Campaign's file, or another file of the same Creative.
         const campaignMediaId = campaign.asset_id || campaign.media_id;
         if (campaignMediaId !== slot.asset_id && !(creative?.media_ids || []).includes(campaignMediaId)) return false;
-        if (!isApprovedPlaybackAsset(asset, creative)) return false;
+        if (!isApprovedPlaybackAsset(asset, creative, retailerId)) return false;
 
         const campaignOwnerId = campaign.advertiser_id || campaign.brand_id;
         if (campaignOwnerId || asset.owner_type === 'brand') {

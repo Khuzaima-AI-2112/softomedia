@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, jest, test } from '@jest/globals';
+import { retailerApprovals } from './fixtures/creative-approval.js';
 
 process.env.NODE_ENV = 'test';
 process.env.GOOGLE_CLOUD_PROJECT = process.env.GOOGLE_CLOUD_PROJECT || 'softomedia-demo';
@@ -523,7 +524,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
         const afterBookingAttempt = await firestore.collection('campaigns').doc(creation.body.id).get();
         expect(afterBookingAttempt.data().status).toBe('pending_approval');
 
-        // Stand in for Creative approval (#37), Retailer approval (#9) and Allocation Window generation (#8): Proof of Play
+        // Stand in for Creative approval (ADR 0007), Retailer approval (#9) and Allocation Window generation (#8): Proof of Play
         // is accepted only for an approved Campaign that the Screen is scheduled to present at the
         // supplied time, and never for a future presentation, so anchor the fixture to the real clock.
         const { storeLocalDateAndHour } = await import('../src/services/PlaybackService.js');
@@ -532,6 +533,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
         const broadcast = storeLocalDateAndHour(presentationStartedAt, proofStore.data().time_zone);
         await firestore.collection('creatives').doc(upload.body.creative.id).update({
             approval_status: 'approved',
+            retailer_approvals: retailerApprovals(proofStore.data().retailer_id),
         });
         await firestore.collection('campaigns').doc(creation.body.id).update({
             status: 'approved',
