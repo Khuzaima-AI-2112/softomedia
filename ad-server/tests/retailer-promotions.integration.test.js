@@ -75,9 +75,6 @@ const promotion = (fields = {}) => ({
 async function schedule(fields) {
     const created = await request(app).post('/api/campaigns').set(await headersFor('admin')).send(promotion(fields));
     expect({ status: created.status, error: created.body.error }).toEqual({ status: 201, error: undefined });
-    const approved = await request(app).patch(`/api/campaigns/${created.body.id}/status`)
-        .set(await headersFor('retaileradmin', created.body.retailer_id)).send({ status: 'approved' });
-    expect(approved.status).toBe(200);
     return created.body;
 }
 
@@ -109,7 +106,7 @@ describeWithAuthEmulator('Retailer promotions by time of day', () => {
             schedule: { dates: [DATE, NEXT_DATE], dayparts: ['breakfast'], hours: [13] },
             start_date: DATE,
             end_date: NEXT_DATE,
-            status: 'pending_approval',
+            status: 'scheduled',
         });
     });
 
@@ -216,9 +213,10 @@ describeWithAuthEmulator('Retailer promotions by time of day', () => {
         expect(new Set(assetsIn(retailerSlots(loops[11])))).toEqual(new Set(['muffin-media']));
     });
 
-    test('a promotion awaiting the Retailer\'s approval doesn\'t play', async () => {
-        const created = await request(app).post('/api/campaigns').set(await headersFor('admin')).send(promotion());
-        expect(created.status).toBe(201);
+    test('a cancelled promotion doesn\'t play', async () => {
+        const created = await schedule();
+        expect((await request(app).post(`/api/campaigns/${created.id}/cancel`).set(await headersFor('admin'))).status)
+            .toBe(200);
 
         const loops = await generate();
 

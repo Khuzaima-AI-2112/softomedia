@@ -14,21 +14,13 @@ import CampaignWizardModal from '../../components/CampaignWizardModal';
 
 const STATUS_CONFIG = [
     { key: '',                 label: 'All'       },
-    { key: 'pending_approval', label: 'Pending'   },
-    { key: 'approved',         label: 'Approved'  },
-    { key: 'live',             label: 'Live'      },
-    { key: 'paused',           label: 'Paused'    },
-    { key: 'completed',        label: 'Completed' },
-    { key: 'rejected',         label: 'Rejected'  },
+    { key: 'scheduled',        label: 'Scheduled' },
+    { key: 'cancelled',        label: 'Cancelled' },
 ];
 
 const STATUS_COLOUR = {
-    pending_approval: 'bg-yellow-100 text-yellow-800  dark:bg-yellow-900/30 dark:text-yellow-300',
-    approved:         'bg-blue-100   text-blue-800    dark:bg-blue-900/30   dark:text-blue-300',
-    live:             'bg-green-100  text-green-800   dark:bg-green-900/30  dark:text-green-300',
-    paused:           'bg-slate-100  text-slate-700   dark:bg-slate-800     dark:text-slate-300',
-    completed:        'bg-purple-100 text-purple-800  dark:bg-purple-900/30 dark:text-purple-300',
-    rejected:         'bg-red-100    text-red-800     dark:bg-red-900/30    dark:text-red-300',
+    scheduled:        'bg-blue-100   text-blue-800    dark:bg-blue-900/30   dark:text-blue-300',
+    cancelled:        'bg-red-100    text-red-800     dark:bg-red-900/30    dark:text-red-300',
 };
 
 export default function AdvertiserCampaigns() {

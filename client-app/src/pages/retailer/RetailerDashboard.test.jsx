@@ -9,7 +9,6 @@ const { apiService } = vi.hoisted(() => ({ apiService: {
 } }));
 vi.mock('../../services/ApiService', () => ({ default: apiService }));
 vi.mock('../../components/LocationManager', () => ({ default: () => null }));
-vi.mock('../../components/CampaignApprovalList', () => ({ default: () => null }));
 
 import RetailerDashboard from './RetailerDashboard';
 

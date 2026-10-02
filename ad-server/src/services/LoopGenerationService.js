@@ -15,6 +15,7 @@ import { daypartRepository } from '../repositories/DaypartRepository.js';
 import { BusinessHoursService } from './BusinessHoursService.js';
 import { isPromotionScheduledAt } from './Dayparts.js';
 import { heldReservations } from './ReservationRelease.js';
+import { isCampaignRunning } from '../constants/campaigns.js';
 import logger from '../utils/logger.js';
 import {
     isApprovedFallbackAsset,
@@ -194,9 +195,8 @@ export class LoopGenerationService {
      */
     async getAvailableContent(retailerId, storeId, targetDate) {
         try {
-            const campaigns = await campaignRepository.findAll({
-                where: [['status', '==', 'approved']]
-            });
+            // Nobody approves a Campaign; it plays from submission until it ends (ADR 0007).
+            const campaigns = (await campaignRepository.findAll()).filter(isCampaignRunning);
 
             const media = await mediaRepository.findAll();
             const mediaById = new Map(media.map(asset => [asset.id, asset]));
@@ -251,9 +251,9 @@ export class LoopGenerationService {
 
     /**
      * A Store's held Reservations for a date whose Creative is approved, by hour then
-     * position. Any other Reservation's Slot gets Fallback Content. The Campaign's
-     * own approval is checked when the Slot plays, so one approved after
-     * generation still plays. A Creative's files play in order across each run of
+     * position. Any other Reservation's Slot gets Fallback Content. Nobody
+     * approves the Campaign itself (ADR 0007); whether it still runs is checked
+     * when the Slot plays. A Creative's files play in order across each run of
      * its consecutive Slots; a Slot outside a whole run gets Fallback Content
      * rather than a file out of order.
      * @returns {Promise<Map<number, Map<number, object>>>}

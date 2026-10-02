@@ -6,7 +6,6 @@ export const PERMISSIONS = Object.freeze({
     ORGANIZATION_MANAGEMENT: 'organizations.manage',
     CAMPAIGN_CREATE: 'campaigns.create',
     CAMPAIGN_DELETE: 'campaigns.delete',
-    CAMPAIGN_APPROVAL: 'campaigns.approve',
     CAMPAIGN_VIEW_NETWORK: 'campaigns.view_network',
     // The Super Administrator approves a Creative for the network, then each Retailer for its Stores.
     CREATIVE_APPROVAL: 'creatives.approve',

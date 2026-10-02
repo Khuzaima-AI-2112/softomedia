@@ -468,7 +468,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
             brand_id: 'demo-advertiser-bonvie',
             advertiser_id: 'demo-advertiser-bonvie',
             media_id: upload.body.id,
-            status: 'pending_approval',
+            status: 'scheduled',
             inventory_selection: inventorySelection,
         });
         // The creative is read through the API by media_id; a submitted URL is never stored.
@@ -480,7 +480,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
             name: 'Conflicting legacy owner',
             brand_id: 'demo-advertiser-secondary',
             advertiser_id: 'demo-advertiser-bonvie',
-            status: 'pending_approval',
+            status: 'scheduled',
         });
 
         const persisted = await firestore.collection('campaigns').doc(creation.body.id).get();
@@ -522,7 +522,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
             });
         expect(ownBooking.status).toBe(404);
         const afterBookingAttempt = await firestore.collection('campaigns').doc(creation.body.id).get();
-        expect(afterBookingAttempt.data().status).toBe('pending_approval');
+        expect(afterBookingAttempt.data().status).toBe('scheduled');
 
         // Stand in for Creative approval (ADR 0007), Retailer approval (#9) and Allocation Window generation (#8): Proof of Play
         // is accepted only for an approved Campaign that the Screen is scheduled to present at the

@@ -268,18 +268,6 @@ class ApiService {
         return apiClient.delete(`/api/campaigns/${id}`);
     }
 
-    /**
-     * Transition a campaign's approval status.
-     * Calls PATCH /api/campaigns/:id/status
-     *
-     * @param {string} id     - Campaign ID
-     * @param {string} status - Target status: 'approved' | 'rejected'
-     * @returns {Promise<object>} Updated campaign object
-     */
-    async updateCampaignStatus(id, status) {
-        return apiClient.patch(`/api/campaigns/${id}/status`, { status });
-    }
-
     // ============================================
     // ASSETS
     // ============================================

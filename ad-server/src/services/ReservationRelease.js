@@ -1,33 +1,37 @@
 /**
  * Slots a Brand won't use go back into inventory, and the Brand is told why
- * (ADR 0005). A Campaign's Reservations are released when it is rejected,
- * cancelled or deleted, and when it is still unapproved at the approval
- * deadline. There is no scheduler, because the server scales to zero: a
+ * (ADR 0005). A Campaign's Reservations are released when it is cancelled or
+ * deleted. At the approval deadline, a Reservation whose Creative lacks the
+ * Super Administrator's approval or the Store's Retailer Approval is released
+ * (ADR 0007). There is no scheduler, because the server scales to zero: a
  * deadline release happens whenever the Reservation is next read or its
- * Campaign is next decided. A Slot that has played stays on record.
+ * Creative is next approved. A Slot that has played stays on record.
  */
 
+import { CAMPAIGN_STATUS } from '../constants/campaigns.js';
 import { campaignRepository } from '../repositories/CampaignRepository.js';
+import { creativeRepository } from '../repositories/CreativeRepository.js';
+import { mediaRepository } from '../repositories/MediaRepository.js';
 import { notificationRepository } from '../repositories/NotificationRepository.js';
 import { slotReservationRepository } from '../repositories/SlotReservationRepository.js';
 import StoreRepository from '../repositories/StoreRepository.js';
 import { userRepository } from '../repositories/UserRepository.js';
 import { approvalWindowService, storeLocalInstant } from './ApprovalWindowService.js';
+import { isCreativeApprovedFor } from './CreativeApproval.js';
 import logger from '../utils/logger.js';
 
 export const RELEASE_REASONS = Object.freeze({
-    REJECTED: 'campaign_rejected',
     CANCELLED: 'campaign_cancelled',
     DELETED: 'campaign_deleted',
     APPROVAL_DEADLINE: 'approval_deadline',
 });
 
 const RELEASE_EXPLANATIONS = {
-    [RELEASE_REASONS.REJECTED]: 'the Campaign was rejected',
     [RELEASE_REASONS.CANCELLED]: 'the Campaign was cancelled',
     [RELEASE_REASONS.DELETED]: 'the Campaign was deleted',
     [RELEASE_REASONS.APPROVAL_DEADLINE]:
-        'the Campaign was not approved by the approval deadline, 18:00 the day before broadcast',
+        'its Creative was not approved by both the Super Administrator and the Retailer '
+        + 'by the approval deadline, 18:00 the day before broadcast',
 };
 
 const slotLabel = ({ date, hour, position }) => `${date} ${String(hour).padStart(2, '0')}:00, Slot ${position + 1}`;
@@ -68,15 +72,27 @@ async function releaseForCampaign(campaign, reservations, reason) {
 }
 
 /**
- * Why a held Reservation should no longer be held, or null. A Campaign that
- * can't be read is left alone: a failed read must never release a Slot.
+ * The Creative a Campaign books, null when it has none, or undefined when it
+ * can't be read.
  */
-function releaseReason(store, campaign, reservation, now) {
+async function creativeOf(campaign) {
+    try {
+        if (campaign.creative_id) return await creativeRepository.findById(campaign.creative_id);
+        return await creativeRepository.findForAsset(await mediaRepository.findById(campaign.media_id || campaign.asset_id));
+    } catch (error) {
+        logger.error('[ReservationRelease] Failed to read the Creative', { campaignId: campaign.id, error: error.message });
+        return undefined;
+    }
+}
+
+/**
+ * Why a held Reservation should no longer be held, or null. A Campaign or
+ * Creative that can't be read is left alone: a failed read must never release a Slot.
+ */
+function releaseReason(store, campaign, creative, reservation, now) {
     if (!campaign || !hasNotPlayed(store, reservation, now)) return null;
-    if (campaign.status === 'rejected') return RELEASE_REASONS.REJECTED;
-    if (campaign.status === 'cancelled') return RELEASE_REASONS.CANCELLED;
-    const unapproved = (campaign.status || 'pending_approval') === 'pending_approval';
-    if (unapproved && store.time_zone
+    if (campaign.status === CAMPAIGN_STATUS.CANCELLED) return RELEASE_REASONS.CANCELLED;
+    if (creative !== undefined && !isCreativeApprovedFor(creative, store.retailer_id) && store.time_zone
         && now >= approvalWindowService.normalDeadlineInstant(store, reservation.date)) {
         return RELEASE_REASONS.APPROVAL_DEADLINE;
     }
@@ -93,13 +109,16 @@ function releaseReason(store, campaign, reservation, now) {
  */
 export async function releaseDueReservations(store, reservations, now = new Date()) {
     const campaignIds = [...new Set(reservations.map(reservation => reservation.campaign_id))];
-    const loaded = new Map(await Promise.all(campaignIds.map(async id => [id, await campaignRepository.findById(id)])));
+    const loaded = new Map(await Promise.all(campaignIds.map(async id => {
+        const campaign = await campaignRepository.findById(id);
+        return [id, { campaign, creative: campaign ? await creativeOf(campaign) : undefined }];
+    })));
 
     const due = new Map();
     const kept = [];
     for (const reservation of reservations) {
-        const campaign = loaded.get(reservation.campaign_id);
-        const reason = releaseReason(store, campaign, reservation, now);
+        const { campaign, creative } = loaded.get(reservation.campaign_id);
+        const reason = releaseReason(store, campaign, creative, reservation, now);
         if (!reason) {
             kept.push(reservation);
             continue;
@@ -130,8 +149,8 @@ async function heldByStore(campaignId) {
 }
 
 /**
- * Releases a Campaign's Slots still to play, as part of rejecting, cancelling
- * or deleting it. Slots that have played stay on record.
+ * Releases a Campaign's Slots still to play, as part of cancelling or deleting
+ * it. Slots that have played stay on record.
  */
 export async function releaseCampaignReservations(campaign, reason, now = new Date()) {
     const upcoming = (await heldByStore(campaign.id)).flatMap(({ store, reservations }) =>
@@ -140,11 +159,13 @@ export async function releaseCampaignReservations(campaign, reason, now = new Da
 }
 
 /**
- * Releases what a Campaign's approval deadlines have already taken. Called
- * before a decision on the Campaign is saved, so a late approval never keeps a
- * lapsed Slot, whether or not anything read the Slot in between.
+ * Releases what the approval deadlines of every Campaign booking a Creative
+ * have already taken. Called before an approval of the Creative is saved, so a
+ * late approval never keeps a lapsed Slot, whether or not anything read the
+ * Slot in between.
  */
-export async function releaseLapsedReservations(campaignId, now = new Date()) {
-    await Promise.all((await heldByStore(campaignId)).map(({ store, reservations }) =>
-        releaseDueReservations(store, reservations, now)));
+export async function releaseLapsedReservations(creativeId, now = new Date()) {
+    const campaigns = await campaignRepository.findAll({ where: [['creative_id', '==', creativeId]] });
+    const held = (await Promise.all(campaigns.map(campaign => heldByStore(campaign.id)))).flat();
+    await Promise.all(held.map(({ store, reservations }) => releaseDueReservations(store, reservations, now)));
 }

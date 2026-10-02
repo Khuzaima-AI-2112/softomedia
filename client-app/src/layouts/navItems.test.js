@@ -34,6 +34,12 @@ describe('role navigation', () => {
         }
     });
 
+    it('offers no role a Campaign approvals page: nobody approves a Campaign (ADR 0007)', () => {
+        for (const role of Object.values(ROLES)) {
+            expect(getNavItems(role).map(item => item.label)).not.toContain('Campaign Approvals');
+        }
+    });
+
     it('offers the delivery report to every role that holds a report grant, and not to a Technical Operator', () => {
         for (const role of [ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.BRAND, ROLES.RETAILERADMIN]) {
             expect(paths(role)).toContain('/dashboard/delivery-report');

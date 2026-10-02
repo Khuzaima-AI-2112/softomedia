@@ -15,20 +15,12 @@ import {
 import { resolveAgreedCpm } from '../services/CampaignPricingService.js';
 import { prepareReservations } from '../services/SlotReservations.js';
 import { notifyAfterBooking } from '../services/CreativeApproval.js';
-import {
-    RELEASE_REASONS,
-    releaseCampaignReservations,
-    releaseLapsedReservations,
-} from '../services/ReservationRelease.js';
+import { RELEASE_REASONS, releaseCampaignReservations } from '../services/ReservationRelease.js';
 import { promotionScheduleError } from '../services/Dayparts.js';
 import { authenticate } from '../middleware/auth.js';
-import {
-    PERMISSIONS,
-    requireCampaignApproval,
-    requirePermission,
-    userHasPermission,
-} from '../middleware/requireRole.js';
+import { PERMISSIONS, requirePermission, userHasPermission } from '../middleware/requireRole.js';
 import { ROLES, brandIdFor, normalizeRole } from '../constants/roles.js';
+import { CAMPAIGN_STATUS, hasCampaignEnded } from '../constants/campaigns.js';
 
 const router = express.Router();
 
@@ -36,28 +28,10 @@ function isBrand(user) {
     return normalizeRole(user?.role) === ROLES.BRAND;
 }
 
-function isRetailer(user) {
-    return normalizeRole(user?.role) === ROLES.RETAILERADMIN;
-}
-
-function retailerIdFor(user) {
-    return user?.organization_id || user?.linked_entity_id || null;
-}
-
-/** Campaign records are read by those who create them or approve them, within their scope. */
+/** Campaign records are read by those who create them, within their scope. */
 function requireCampaignRead(req, res, next) {
-    if (userHasPermission(req.user, PERMISSIONS.CAMPAIGN_CREATE)
-        || userHasPermission(req.user, PERMISSIONS.CAMPAIGN_APPROVAL)) {
-        return next();
-    }
+    if (userHasPermission(req.user, PERMISSIONS.CAMPAIGN_CREATE)) return next();
     return res.status(403).json({ error: 'Access denied' });
-}
-
-/** A Retailer reviews content, not a Brand's finances. */
-const BUDGET_FIELDS = new Set(['budget', 'budget_total']);
-
-function withoutBudget(campaign) {
-    return Object.fromEntries(Object.entries(campaign).filter(([field]) => !BUDGET_FIELDS.has(field)));
 }
 
 function denyBrandAccess(res) {
@@ -157,40 +131,11 @@ async function preparePromotion(body) {
 }
 
 /**
- * VALID_TRANSITIONS — ordered state machine for campaign status.
- *
- * Sprint 14 — S14-2: replaces the flat ALLOWED_STATUSES array.
- * Only transitions listed here are permitted; all others return 400.
- *
- * pending_approval → approved | rejected   (retaileradmin decision)
- * approved         → live                  (ops go-live)
- * live             → completed | paused    (ops or scheduler)
- * paused           → live                  (ops resume)
- * completed        → (terminal)
- * rejected         → (terminal)
- * cancelled        → (terminal; reached through POST /:id/cancel)
- */
-const VALID_TRANSITIONS = {
-    pending_approval: ['approved', 'rejected'],
-    approved: ['live', 'rejected'],
-    live: ['completed', 'paused'],
-    paused: ['live'],
-    completed: [],
-    rejected: [],
-    cancelled: [],
-};
-
-/** A Campaign may be cancelled until it has finished. */
-const CANCELLABLE = ['pending_approval', 'approved', 'live', 'paused'];
-
-
-/**
  * GET /api/campaigns
  * List campaigns.
  *
- * A Brand sees its own Campaigns; a Retailer sees Campaigns for its Stores
- * without budgets. Admin and Super Administrator see every Campaign, filtered
- * by the optional ?status= or ?advertiserId= query params.
+ * A Brand sees its own Campaigns. Admin and Super Administrator see every
+ * Campaign, filtered by the optional ?status= or ?advertiserId= query params.
  */
 router.get('/', authenticate, requireCampaignRead, async (req, res) => {
     try {
@@ -209,12 +154,6 @@ router.get('/', authenticate, requireCampaignRead, async (req, res) => {
             } else {
                 campaigns = await campaignRepository.findAll();
             }
-        } else if (isRetailer(req.user)) {
-            const retailerId = retailerIdFor(req.user);
-            campaigns = (await campaignRepository.findAll())
-                .filter(campaign => campaignRepository.targetsRetailer(campaign, retailerId)
-                    && (!status || campaign.status === status))
-                .map(withoutBudget);
         } else {
             // A Brand sees only its own Campaigns.
             campaigns = await campaignRepository.findByBrandId(
@@ -246,12 +185,6 @@ router.get('/:id', authenticate, requireCampaignRead, async (req, res) => {
         if (userHasPermission(req.user, PERMISSIONS.CAMPAIGN_VIEW_NETWORK)) {
             return res.json(campaign);
         }
-        if (isRetailer(req.user)) {
-            if (!campaignRepository.targetsRetailer(campaign, retailerIdFor(req.user))) {
-                return res.status(404).json({ error: 'Campaign not found' });
-            }
-            return res.json(withoutBudget(campaign));
-        }
         // A Brand reads only its own Campaigns.
         if (!campaignRepository.isOwnedByBrand(campaign, brandIdFor(req.user))) {
             return res.status(403).json({ error: 'Forbidden' });
@@ -264,7 +197,7 @@ router.get('/:id', authenticate, requireCampaignRead, async (req, res) => {
 
 /**
  * POST /api/campaigns
- * Create a new campaign (defaults to pending_approval).
+ * Create a new campaign, scheduled at once: nobody approves a Campaign (ADR 0007).
  *
  * Requires campaigns.create: a Brand creates for its own organization; Admin
  * and Super Administrator create on behalf of a named advertiser, or schedule
@@ -299,8 +232,8 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, RO
             if (error) return res.status(400).json({ error });
             return res.status(201).json(await campaignRepository.create(generatedId, {
                 ...promotion,
-                // The Retailer approves its promotion like any other content.
-                status: 'pending_approval',
+                // Only an Admin schedules a promotion, of the Retailer's own approved media.
+                status: CAMPAIGN_STATUS.SCHEDULED,
                 created_at: new Date().toISOString(),
             }));
         }
@@ -356,8 +289,8 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, RO
             // re-prices a Campaign already booked against it.
             agreed_cpm: await resolveAgreedCpm(submittedData),
             agreed_cpm_at: bookedAt,
-            // Every Campaign awaits Retailer approval; no administrative override.
-            status: 'pending_approval',
+            // A Brand's Slot plays once its Creative has both approvals for the Store's Retailer.
+            status: CAMPAIGN_STATUS.SCHEDULED,
             created_at: bookedAt
         };
         if (!brandCaller) {
@@ -389,77 +322,18 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, RO
     }
 });
 
-/**
- * PATCH /api/campaigns/:id/status
- * Transition campaign state.
- *
- * Sprint 8  — S8-3     : requireRole('retaileradmin') guard.
- * Sprint 8  — S8-4     : status normalised to lowercase before persisting.
- * Sprint 14 — S14-2    : flat ALLOWED_STATUSES replaced with VALID_TRANSITIONS
- *   state machine.
- *
- * fix: authenticate middleware was missing — req.user was never populated so
- *   requireRole resolved every caller to level -1 → 403.
- */
-router.patch('/:id/status', authenticate, requireCampaignApproval, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const rawStatus = req.body.status;
-        if (!rawStatus) return res.status(400).json({ error: 'Status is required' });
-
-        const requestedStatus = typeof rawStatus === 'string'
-            ? rawStatus.toLowerCase()
-            : String(rawStatus);
-
-        const campaign = await campaignRepository.findById(id);
-        if (!campaign) {
-            return res.status(404).json({ error: 'Campaign not found' });
-        }
-        // Retailers approve content only for their own Stores.
-        if (!campaignRepository.targetsRetailer(campaign, retailerIdFor(req.user))) {
-            return res.status(403).json({ error: 'Access denied' });
-        }
-
-        const currentStatus = campaign.status || 'pending_approval';
-        const allowed = VALID_TRANSITIONS[currentStatus] ?? [];
-
-        // No administrative override: only the Retailer Administrator holds this grant.
-        if (!allowed.includes(requestedStatus)) {
-            return res.status(400).json({
-                error: 'Invalid status transition',
-                from: currentStatus,
-                to: requestedStatus,
-                allowed,
-            });
-        }
-
-        // Slots whose approval deadline passed while pending are released first,
-        // so approving late never keeps them (ADR 0005).
-        if (currentStatus === 'pending_approval') await releaseLapsedReservations(id);
-        const updated = await campaignRepository.update(id, { status: requestedStatus });
-        // A rejected Campaign's Slots go back to other Brands at once.
-        if (requestedStatus === 'rejected') await releaseCampaignReservations(updated, RELEASE_REASONS.REJECTED);
-        res.json(updated);
-    } catch (error) {
-        const statusCode = error.message === 'Campaign not found' ? 404 : 500;
-        res.status(statusCode).json({ error: error.message });
-    }
-});
-
-// A Retailer approved these Stores and this creative; changing either needs approval again.
-const APPROVED_FIELDS = ['inventory_selection', 'retailer_id', 'store_id', 'media_id', 'asset_id'];
-const ADMIN_EDITABLE_FIELDS = ['name', 'start_date', 'end_date', 'budget', ...APPROVED_FIELDS];
+const ADMIN_EDITABLE_FIELDS = ['name', 'start_date', 'end_date', 'budget', 'inventory_selection', 'retailer_id', 'store_id', 'media_id', 'asset_id'];
 
 /**
  * PUT /api/campaigns/:id
  * Edits a campaign's editable fields. A Brand edits its name, dates and budget;
- * an Admin also edits its Stores and creative, which returns it to Retailer approval.
+ * an Admin also edits its Stores and creative.
  */
 router.put('/:id', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, null), async (req, res) => {
     try {
-        // Status changes only through Retailer approval (PATCH /:id/status).
+        // A Campaign is scheduled when submitted and changes status only when cancelled.
         if (req.body?.status !== undefined) {
-            return res.status(400).json({ error: 'Campaign status cannot be edited; it changes through Retailer approval' });
+            return res.status(400).json({ error: 'Campaign status cannot be edited' });
         }
         const { id } = req.params;
         const campaign = await campaignRepository.findById(id);
@@ -477,10 +351,6 @@ router.put('/:id', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, 
         } : Object.fromEntries(ADMIN_EDITABLE_FIELDS
             .filter(field => req.body?.[field] !== undefined)
             .map(field => [field, req.body[field]]));
-        if (APPROVED_FIELDS.some(field => field in updateData
-            && JSON.stringify(updateData[field]) !== JSON.stringify(campaign[field]))) {
-            updateData.status = 'pending_approval';
-        }
         const updated = await campaignRepository.update(id, updateData);
         res.json(updated);
     } catch (error) {
@@ -500,11 +370,10 @@ router.post('/:id/cancel', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_
         if (isBrand(req.user) && !campaignRepository.isOwnedByBrand(campaign, brandIdFor(req.user))) {
             return denyBrandAccess(res);
         }
-        const currentStatus = campaign.status || 'pending_approval';
-        if (!CANCELLABLE.includes(currentStatus)) {
-            return res.status(400).json({ error: 'This Campaign can no longer be cancelled', from: currentStatus });
+        if (hasCampaignEnded(campaign)) {
+            return res.status(400).json({ error: 'This Campaign can no longer be cancelled', from: campaign.status });
         }
-        const updated = await campaignRepository.update(campaign.id, { status: 'cancelled' });
+        const updated = await campaignRepository.update(campaign.id, { status: CAMPAIGN_STATUS.CANCELLED });
         await releaseCampaignReservations(updated, RELEASE_REASONS.CANCELLED);
         return res.json(updated);
     } catch (error) {

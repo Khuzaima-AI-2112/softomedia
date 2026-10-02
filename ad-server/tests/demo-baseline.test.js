@@ -71,8 +71,8 @@ describe('deterministic SM_MVP1 demo baseline', () => {
         expect(campaigns).toHaveLength(2);
         expect(campaigns.every(({ data }) => data.advertiser_id === 'demo-advertiser-secondary')).toBe(true);
         expect(campaigns.map(({ data }) => [data.status, data.start_date, data.end_date])).toEqual([
-            ['approved', '2030-01-15', '2030-01-28'],
-            ['pending_approval', '2030-01-22', '2030-02-05'],
+            ['scheduled', '2030-01-15', '2030-01-28'],
+            ['scheduled', '2030-01-22', '2030-02-05'],
         ]);
 
         expect([...advertisers, ...retailers].every(({ data }) => !('deleted_at' in data))).toBe(true);
@@ -97,18 +97,18 @@ describe('deterministic SM_MVP1 demo baseline', () => {
         const reservations = dataOf(baseline, 'slot_reservations');
         const forCampaign = campaignId => reservations.filter(reservation => reservation.campaign_id === campaignId);
 
-        // The approved Campaign holds the first Paid Slot of every hour, today and tomorrow, at the all-day Store.
-        const approved = forCampaign('demo-secondary-campaign-1');
-        expect(approved.map(({ store_id: store, date, hour, position }) => [store, date, hour, position])).toEqual(
+        // The current Campaign holds the first Paid Slot of every hour, today and tomorrow, at the all-day Store.
+        const current = forCampaign('demo-secondary-campaign-1');
+        expect(current.map(({ store_id: store, date, hour, position }) => [store, date, hour, position])).toEqual(
             ['2030-01-15', '2030-01-16'].flatMap(date => Array.from({ length: 24 }, (_, hour) =>
                 [ALL_DAY_STORE, date, hour, firstPaidPosition(hour, 0)])));
 
-        // The pending Campaign holds two Paid Slots at lunch on its first day in Phoenix.
-        const pending = forCampaign('demo-secondary-campaign-2');
-        expect(pending.map(({ store_id: store, date, hour, position }) => [store, date, hour, position])).toEqual(
+        // The upcoming Campaign holds two Paid Slots at lunch on its first day in Phoenix.
+        const upcoming = forCampaign('demo-secondary-campaign-2');
+        expect(upcoming.map(({ store_id: store, date, hour, position }) => [store, date, hour, position])).toEqual(
             paidPositions(12, 8).slice(0, 2).map(position => ['demo-store-phoenix', '2030-01-22', 12, position]));
 
-        expect(reservations).toHaveLength(approved.length + pending.length);
+        expect(reservations).toHaveLength(current.length + upcoming.length);
         for (const reservation of reservations) {
             expect(reservation).toEqual(expect.objectContaining({
                 id: `${reservation.store_id}_${reservation.date}_${reservation.hour}_${reservation.position}`,

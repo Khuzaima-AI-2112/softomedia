@@ -34,10 +34,6 @@
  *   pages/retailer/ScheduleHistory.jsx   ✅  (served at /dashboard/retailer/schedule-history)
  *   pages/retailer/ScheduleManager.jsx   ✅  (served at /dashboard/retailer/schedule-manager)
  *   pages/retailer/Loops.jsx             ✅  (served at /dashboard/retailer/loops)
- *   pages/retailer/CampaignApprovalList.jsx ✅ (served at /dashboard/retailer/campaign-approvals)
- *                                           Re-exports components/CampaignApprovalList.jsx.
- *                                           RetailerDashboard imports directly from components/.
- *                                           Single source of truth — no duplicate implementations.
  *   pages/advertiser/AdvertiserDashboard.jsx   ✅  (served at /dashboard/advertiser)          Sprint 14
  *   pages/advertiser/AdvertiserCampaigns.jsx   ✅  (served at /dashboard/advertiser/campaigns) Sprint 14
  *   pages/advertiser/Invoices.jsx              ✅  (served at /dashboard/advertiser/invoices)   Sprint 15
@@ -98,7 +94,6 @@ const ScheduleCalendar  = lazy(() => import('./pages/retailer/ScheduleCalendar')
 const ScheduleHistory   = lazy(() => import('./pages/retailer/ScheduleHistory'));
 const ScheduleManager   = lazy(() => import('./pages/retailer/ScheduleManager'));
 const RetailerLoops     = lazy(() => import('./pages/retailer/Loops'));
-const CampaignApprovals = lazy(() => import('./pages/retailer/CampaignApprovalList'));
 
 // ── Advertiser pages ──────────────────────────────────────────────────────────────────────────
 const AdvertiserDashboard = lazy(() => import('./pages/advertiser/AdvertiserDashboard'));
@@ -168,7 +163,6 @@ function App() {
                             <Route path="retailer/schedule-manager"   element={<ScheduleManager />} />
                             <Route path="retailer/hours"              element={<BusinessHoursManagement />} />
                             <Route path="retailer/loops"              element={<RetailerLoops />} />
-                            <Route path="retailer/campaign-approvals" element={<CampaignApprovals />} />
 
                             {/* Advertiser — Sprint 14 + 15 */}
                             <Route path="advertiser"               element={<AdvertiserDashboard />} />

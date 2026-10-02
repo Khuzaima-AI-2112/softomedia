@@ -81,16 +81,19 @@ describeWithEmulators('Phase 1 permission matrix with Firebase emulators', () =>
             as('techoperator', request(app).get('/api/auth/me')),
         ]);
 
-        expect(retailer.body.user.permissions).toEqual(expect.arrayContaining(['campaigns.approve']));
+        expect(retailer.body.user.permissions).toEqual(expect.arrayContaining(['creatives.approve_own']));
         expect(retailer.body.user.permissions).not.toContain('screens.manage');
         expect(operator.body.user.permissions).toEqual(expect.arrayContaining(['screens.manage', 'screens.diagnostics']));
-        expect(operator.body.user.permissions).not.toContain('campaigns.approve');
+        expect(operator.body.user.permissions).not.toContain('creatives.approve_own');
     });
 
     test('campaign and invoice visibility are explicit grants on the signed-in profile', async () => {
         const personas = ['superadmin', 'admin', 'brand', 'retaileradmin', 'techoperator'];
         const profiles = await Promise.all(personas.map(persona => as(persona, request(app).get('/api/auth/me'))));
         const holders = grant => personas.filter((_, index) => profiles[index].body.user.permissions.includes(grant));
+
+        // Nobody approves a Campaign (ADR 0007).
+        expect(holders('campaigns.approve')).toEqual([]);
 
         expect(holders('campaigns.view_network')).toEqual(['superadmin', 'admin']);
         expect(holders('invoices.view_network')).toEqual(['superadmin', 'admin']);
@@ -122,16 +125,24 @@ describeWithEmulators('Phase 1 permission matrix with Firebase emulators', () =>
     });
 
     test.each(['superadmin', 'admin', 'techoperator', 'brand'])(
-        '%s cannot approve or reject content on a Retailer\'s behalf',
+        '%s cannot approve or reject a loop on a Retailer\'s behalf',
         async persona => {
             const attempts = [
-                as(persona, request(app).patch('/api/campaigns/matrix-campaign/status')).send({ status: 'approved' }),
                 as(persona, request(app).patch('/api/loops/matrix-loop/approve')).send({}),
                 as(persona, request(app).post('/api/loops/matrix-loop/reject')).send({ reason: 'matrix' }),
                 as(persona, request(app).patch('/api/loops/matrix-loop/slots/0/reject')).send({ reason: 'matrix' }),
             ];
             const statuses = (await Promise.all(attempts)).map(response => response.status);
-            expect(statuses).toEqual([403, 403, 403, 403]);
+            expect(statuses).toEqual([403, 403, 403]);
+        },
+    );
+
+    test.each(['superadmin', 'admin', 'brand', 'retaileradmin', 'techoperator'])(
+        '%s cannot approve or reject a Campaign: nobody approves one',
+        async persona => {
+            const decided = await as(persona, request(app).patch('/api/campaigns/matrix-campaign/status'))
+                .send({ status: 'approved' });
+            expect(decided.status).toBe(404);
         },
     );
 
@@ -236,7 +247,7 @@ describeWithEmulators('Phase 1 permission matrix with Firebase emulators', () =>
         {
             action: 'read Campaigns',
             send: pending => pending.get('/api/campaigns/matrix-campaign'),
-            allowed: { brand: 404, admin: 404, superadmin: 404, retaileradmin: 404 },
+            allowed: { brand: 404, admin: 404, superadmin: 404 },
         },
         {
             action: 'edit a Campaign',
