@@ -175,11 +175,15 @@ describeWithAuthEmulator('Reserved Slots on the Screen', () => {
             allocated_category: 'paid', content_kind: 'campaign', is_fallback: false,
             campaign_id: booked.body.id, asset_id: 'brand-one-file',
         });
-        // A Reservation is placed when its Creative is approved; nobody approves the Campaign (ADR 0007).
+        // Every Reservation is placed; nobody approves the Campaign, and the Creative's
+        // approval is checked when the Slot plays (ADR 0007).
         expect(slotAt(OTHER_RESERVED)).toMatchObject({
             content_kind: 'campaign', campaign_id: otherReserved.body.id, asset_id: 'brand-three-file',
         });
-        for (const position of [UNAPPROVED_CREATIVE, ...UNRESERVED_PAID]) {
+        expect(slotAt(UNAPPROVED_CREATIVE)).toMatchObject({
+            content_kind: 'campaign', campaign_id: unapprovedCreative.body.id, asset_id: 'brand-two-file',
+        });
+        for (const position of UNRESERVED_PAID) {
             expect({ position, slot: slotAt(position) }).toMatchObject({
                 position,
                 slot: {
@@ -220,7 +224,7 @@ describeWithAuthEmulator('Reserved Slots on the Screen', () => {
             position: UNAPPROVED_CREATIVE, campaign_id: unapprovedCreative.body.id, asset_id: 'brand-two-file',
         }, 'fallback-play');
         expect(fallbackClaim.status).toBe(422);
-        expect(fallbackClaim.body.error).toBe('The presented Slot is not Campaign delivery');
+        expect(fallbackClaim.body.error).toBe('The Campaign Slot was not assigned for playback at the supplied time');
 
         const proofs = await request(app).get(`/api/campaigns/${booked.body.id}/proofs-of-play`).set(as.brand);
         expect(proofs.status).toBe(200);
@@ -250,31 +254,36 @@ describeWithAuthEmulator('Reserved Slots on the Screen', () => {
         const noCreative = await book(brandFive.headers, 'brand-five', OTHER_RESERVED);
         expect([pendingCreative.status, noCreative.status]).toEqual([201, 201]);
 
-        const generate = async () => {
-            as = await signInAllAt(GENERATED);
-            const generated = await request(app).post('/api/loops/generate').set(as.admin)
-                .send({ targetDate: DATE, retailerId: 'retailer-one', storeId: 'store-one' });
-            expect(generated.status).toBe(201);
-            return generated.body.loops.find(loop => loop.hour === 8).slots;
-        };
+        as = await signInAllAt(GENERATED);
+        const generated = await request(app).post('/api/loops/generate').set(as.admin)
+            .send({ targetDate: DATE, retailerId: 'retailer-one', storeId: 'store-one' });
+        expect(generated.status).toBe(201);
 
-        let slots = await generate();
+        const played = async () => {
+            const response = await request(app).get('/api/device/playback').set('Authorization', device());
+            expect(response.status).toBe(200);
+            return response.body.slots;
+        };
+        await signInAllAt(PLAYING);
+        let slots = await played();
         for (const position of [UNAPPROVED_CREATIVE, OTHER_RESERVED]) {
             expect({ position, slot: slots[position] }).toMatchObject({
-                position, slot: { is_fallback: true, asset_id: 'fallback-media', campaign_id: null },
+                position, slot: { presentation_type: 'fallback', asset_id: 'fallback-media', campaign_id: null },
             });
         }
         // Nor will the Screen fetch the file of an unapproved Creative.
         const media = await request(app).get('/api/device/media/brand-four-file').set('Authorization', device());
         expect(media.status).toBe(404);
 
-        // Once the Creative is approved, its reserved Slot is placed.
-        await creativeRepository.update('crv-brand-four', { approval_status: 'approved' });
-        slots = await generate();
-        expect(slots[UNAPPROVED_CREATIVE]).toMatchObject({
-            is_fallback: false, campaign_id: pendingCreative.body.id, asset_id: 'brand-four-file',
+        // Once the Creative is approved, its reserved Slot plays, without regenerating the loop.
+        await creativeRepository.update('crv-brand-four', {
+            approval_status: 'approved', retailer_approvals: retailerApprovals('retailer-one'),
         });
-        expect(slots[OTHER_RESERVED]).toMatchObject({ is_fallback: true });
+        slots = await played();
+        expect(slots[UNAPPROVED_CREATIVE]).toMatchObject({
+            presentation_type: 'campaign', campaign_id: pendingCreative.body.id, asset_id: 'brand-four-file',
+        });
+        expect(slots[OTHER_RESERVED]).toMatchObject({ presentation_type: 'fallback' });
     });
 
     test('Paid positions are never shared out among approved Paid Campaigns without a Reservation', async () => {

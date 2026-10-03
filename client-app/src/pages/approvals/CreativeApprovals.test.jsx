@@ -1,18 +1,19 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { api, auth, loadBlob } = vi.hoisted(() => ({
-    api: { getCreatives: vi.fn(), approveCreative: vi.fn(), rejectCreative: vi.fn() },
+    api: { getCreatives: vi.fn(), approveCreative: vi.fn(), rejectCreative: vi.fn(), revokeCreative: vi.fn() },
     auth: { user: null, can: () => false },
     loadBlob: vi.fn(),
 }));
 
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => auth }));
 vi.mock('../../services/ApiService', () => ({ default: api }));
-vi.mock('../../services/api.js', () => ({ default: { get: loadBlob } }));
+vi.mock('../../services/api.js', async importOriginal => ({ ...(await importOriginal()), default: { get: loadBlob } }));
 
 import CreativeApprovals from './CreativeApprovals';
+import { APIError } from '../../services/api.js';
 
 const file = (id, mimeType = 'image/png') => ({
     id, title: `${id} title`, mime_type: mimeType, content_path: `/api/assets/${id}/content`,
@@ -40,6 +41,8 @@ function renderAs(permissions) {
         </MemoryRouter>,
     );
 }
+
+afterEach(() => vi.restoreAllMocks());
 
 describe('Creative Approvals', () => {
     beforeEach(() => {
@@ -122,5 +125,52 @@ describe('Creative Approvals', () => {
 
         expect(await screen.findByText('Dashboard home')).toBeTruthy();
         expect(api.getCreatives).not.toHaveBeenCalled();
+    });
+});
+
+// Either approver revokes the approval it gave (ADR 0007, #38).
+describe('Revoking an approval', () => {
+    const approvedByYou = creative('latte', { awaits_your_decision: false, approval_status: 'approved', revocable_by_you: true });
+    const decidedByOthers = creative('mocha', { awaits_your_decision: false, approval_status: 'approved', revocable_by_you: false });
+
+    beforeEach(() => {
+        Object.values(api).forEach(mock => mock.mockReset());
+        loadBlob.mockResolvedValue(new Blob(['file'], { type: 'image/png' }));
+        globalThis.URL.createObjectURL = vi.fn(() => 'blob:preview');
+        globalThis.URL.revokeObjectURL = vi.fn();
+        api.getCreatives.mockResolvedValue([approvedByYou, decidedByOthers]);
+    });
+
+    it('lists only the approvals you gave, and revokes one with the reason the Brand sees', async () => {
+        api.revokeCreative.mockResolvedValue({ ...approvedByYou, revocable_by_you: false });
+        renderAs(['creatives.approve_own']);
+
+        const approved = await screen.findByRole('region', { name: 'Approved by you' });
+        expect(within(approved).getByText('latte title')).toBeTruthy();
+        expect(within(approved).queryByText('mocha title')).toBeNull();
+
+        fireEvent.click(within(approved).getByRole('button', { name: 'Revoke' }));
+        const confirm = within(approved).getByRole('button', { name: 'Revoke approval' });
+        expect(confirm.disabled).toBe(true);
+        fireEvent.change(within(approved).getByLabelText(/Why is it revoked?/), { target: { value: ' Offer has ended ' } });
+        fireEvent.click(confirm);
+
+        await waitFor(() => expect(api.revokeCreative).toHaveBeenCalledWith('latte', 'Offer has ended'));
+        expect(await screen.findByRole('status')).toHaveProperty('textContent', 'Revoked “latte title”.');
+        expect(screen.queryByRole('region', { name: 'Approved by you' })).toBeNull();
+    });
+
+    it('keeps the approval listed with the server\'s reason when the revocation is refused', async () => {
+        api.revokeCreative.mockRejectedValue(new APIError('Only an approval you gave can be revoked', 409,
+            { error: 'Only an approval you gave can be revoked' }));
+        renderAs(['creatives.approve']);
+
+        const approved = await screen.findByRole('region', { name: 'Approved by you' });
+        fireEvent.click(within(approved).getByRole('button', { name: 'Revoke' }));
+        fireEvent.change(within(approved).getByLabelText(/Why is it revoked?/), { target: { value: 'Ended' } });
+        fireEvent.click(within(approved).getByRole('button', { name: 'Revoke approval' }));
+
+        expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'Only an approval you gave can be revoked');
+        expect(within(approved).getByText('latte title')).toBeTruthy();
     });
 });

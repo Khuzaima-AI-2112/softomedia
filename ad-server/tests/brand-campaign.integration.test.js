@@ -527,7 +527,7 @@ describeWithEmulators('Brand Campaign HTTP API with Firebase emulators', () => {
         // Stand in for Creative approval (ADR 0007), Retailer approval (#9) and Allocation Window generation (#8): Proof of Play
         // is accepted only for an approved Campaign that the Screen is scheduled to present at the
         // supplied time, and never for a future presentation, so anchor the fixture to the real clock.
-        const { storeLocalDateAndHour } = await import('../src/services/PlaybackService.js');
+        const { storeLocalDateAndHour } = await import('../src/services/StoreLocalTime.js');
         const presentationStartedAt = new Date(Date.now() - 1_000);
         const proofStore = await firestore.collection('stores').doc('demo-store-phoenix').get();
         const broadcast = storeLocalDateAndHour(presentationStartedAt, proofStore.data().time_zone);

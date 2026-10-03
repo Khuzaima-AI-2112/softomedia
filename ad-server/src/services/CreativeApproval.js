@@ -12,19 +12,37 @@ import { campaignRepository } from '../repositories/CampaignRepository.js';
 import { creativeRepository } from '../repositories/CreativeRepository.js';
 import { notificationRepository } from '../repositories/NotificationRepository.js';
 import { userRepository } from '../repositories/UserRepository.js';
+import { startOfNextStoreHour } from './StoreLocalTime.js';
 import logger from '../utils/logger.js';
 
 const ENDED_CAMPAIGN_STATUSES = new Set(['rejected', 'cancelled']);
 
-/** Whether the Creative may play in this Retailer's Stores. */
-export function isCreativeApprovedFor(creative, retailerId) {
-    return creative?.approval_status === CREATIVE_STATUS.APPROVED
-        && Boolean(retailerId)
-        && creative.retailer_approvals?.[retailerId]?.status === CREATIVE_STATUS.APPROVED;
+/**
+ * Whether a decision lets the Creative play at a moment: an approval, or a
+ * revocation that hasn't taken effect yet. A revocation takes effect at the
+ * start of the next Store hour, so the hour it is made in plays out unchanged,
+ * and a Slot presented before then still counts when reported later (#38).
+ */
+function letsPlay(status, decidedAt, at) {
+    if (status === CREATIVE_STATUS.APPROVED) return true;
+    return status === CREATIVE_STATUS.REVOKED && Boolean(at && decidedAt)
+        && at.now < startOfNextStoreHour(new Date(decidedAt), at.timeZone);
+}
+
+/**
+ * Whether the Creative may play in this Retailer's Stores.
+ * @param {object} [at] - `{ now, timeZone }` of a Store about to play it, so a
+ *   Creative revoked this hour still plays out the hour
+ */
+export function isCreativeApprovedFor(creative, retailerId, at = null) {
+    const decision = creative?.retailer_approvals?.[retailerId];
+    return Boolean(creative && retailerId)
+        && letsPlay(creative.approval_status, creative.decided_at, at)
+        && letsPlay(decision?.status, decision?.decided_at, at);
 }
 
 /** The Retailers whose Stores a Campaign books. */
-function retailerIdsOf(campaign) {
+export function retailerIdsOf(campaign) {
     const selections = Array.isArray(campaign.inventory_selection) ? campaign.inventory_selection : [];
     const named = selections.map(selection => selection.retailer_id);
     return named.length > 0 ? named : [campaign.retailer_id];
@@ -123,5 +141,21 @@ export async function notifyAfterBooking(campaign) {
         const asked = new Set(bookingRetailerIds(creative.id, others));
         await notifyRetailers(creative, bookingRetailerIds(creative.id, [campaign])
             .filter(retailerId => !asked.has(retailerId) && !creative.retailer_approvals?.[retailerId]));
+    });
+}
+
+/**
+ * Tells the Brand its Creative was revoked, by whom and why, and that its
+ * Slots play Fallback Content from the next hour until it substitutes one.
+ * @param {string} revokedBy - "the Super Administrator", or the Retailer "for its Stores"
+ */
+export function notifyBrandOfRevocation(creative, revokedBy, reason) {
+    return quietly('the Brand', creative, async () => {
+        const users = creative.brand_id ? await userRepository.findBrandUsers(creative.brand_id) : [];
+        const message = `“${creative.title || creative.id}” was revoked by ${revokedBy}${reason ? `: ${reason}` : ''}. `
+            + 'From the next hour its Slots play Fallback Content until you substitute an approved Creative.';
+        await Promise.all(users.map(user => notificationRepository.notify(user.id, {
+            title: 'Creative revoked', message, type: 'warning',
+        })));
     });
 }

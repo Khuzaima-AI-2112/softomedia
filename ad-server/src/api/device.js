@@ -8,7 +8,7 @@ import { proofOfPlayService } from '../services/ProofOfPlayService.js';
 import { playbackObservationService } from '../services/PlaybackObservationService.js';
 import { PresentationEventError } from '../services/PresentationEventValidation.js';
 import { isPlayableStoredAsset } from '../services/PlaybackEligibility.js';
-import { mediaRepository } from '../repositories/index.js';
+import { mediaRepository, StoreRepository } from '../repositories/index.js';
 import { sendMediaContent } from './mediaContent.js';
 
 /**
@@ -49,10 +49,16 @@ router.get('/playback', async (req, res) => {
     }
 });
 
-// GET /api/device/media/:assetId — the file of approved playback media; anything else reads as not found
+// GET /api/device/media/:assetId — the file of approved playback media; anything else reads as not found.
+// A Creative revoked this hour plays out the hour in the Screen's Store, so its file is served until then (#38).
 router.get('/media/:assetId', async (req, res) => {
-    const asset = await mediaRepository.findById(req.params.assetId);
-    if (!(await isPlayableStoredAsset(asset, req.device.screen.retailer_id))) {
+    const { screen } = req.device;
+    const [asset, store] = await Promise.all([
+        mediaRepository.findById(req.params.assetId),
+        screen.store_id ? StoreRepository.findById(screen.store_id) : null,
+    ]);
+    const at = store?.time_zone ? { now: new Date(), timeZone: store.time_zone } : null;
+    if (!(await isPlayableStoredAsset(asset, screen.retailer_id, at))) {
         return res.status(404).json({ error: 'Media not found' });
     }
     return sendMediaContent(res, asset);

@@ -12,8 +12,13 @@ import {
 import { brandIdFor, normalizeRole, retailerIdFor, ROLES } from '../constants/roles.js';
 import { assetContentPath } from '../constants/mediaPaths.js';
 import { PERMISSIONS, requireCreativeApproval, userHasPermission } from '../middleware/requireRole.js';
-import { awaitsRetailer, notifyAfterNetworkApproval, retailerApprovals } from '../services/CreativeApproval.js';
-import { releaseLapsedReservations } from '../services/ReservationRelease.js';
+import {
+    awaitsRetailer,
+    notifyAfterNetworkApproval,
+    notifyBrandOfRevocation,
+    retailerApprovals,
+} from '../services/CreativeApproval.js';
+import { settleCreativeReservations } from '../services/ReservationRelease.js';
 
 const router = express.Router();
 const NETWORK_ROLES = new Set([ROLES.ADMIN, ROLES.SUPERADMIN]);
@@ -23,9 +28,10 @@ const decidesForRetailer = user => userHasPermission(user, PERMISSIONS.CREATIVE_
     && Boolean(retailerIdFor(user));
 
 /**
- * Who is looking at Creatives: which they see, which Retailers' decisions, and
- * which Creatives wait on them. The Super Administrator decides first; a
- * Retailer then sees a Creative once it waits on its decision.
+ * Who is looking at Creatives: which they see, which Retailers' decisions,
+ * which Creatives wait on them, and which approvals they gave and may revoke.
+ * The Super Administrator decides first; a Retailer then sees a Creative once
+ * it waits on its decision.
  */
 function viewerOf(user) {
     if (decidesForRetailer(user) && !decidesForNetwork(user)) {
@@ -36,12 +42,14 @@ function viewerOf(user) {
             awaits,
             sees: (creative, campaigns) => Boolean(creative.retailer_approvals?.[retailerId])
                 || awaits(creative, campaigns),
+            revokes: creative => creative.retailer_approvals?.[retailerId]?.status === CREATIVE_STATUS.APPROVED,
         };
     }
     return {
         retailerId: null,
         awaits: creative => decidesForNetwork(user) && creative.approval_status === CREATIVE_STATUS.PENDING,
         sees: () => true,
+        revokes: creative => decidesForNetwork(user) && creative.approval_status === CREATIVE_STATUS.APPROVED,
     };
 }
 
@@ -73,6 +81,7 @@ async function presentCreative(creative, { campaigns, retailerNames, viewer }) {
         files,
         retailer_approvals: approvals,
         awaits_your_decision: viewer.awaits(creative, campaigns),
+        revocable_by_you: viewer.revokes(creative),
     };
 }
 
@@ -108,13 +117,16 @@ const DECISIONS = {
     revoke: { from: CREATIVE_STATUS.APPROVED, to: CREATIVE_STATUS.REVOKED },
 };
 
-/** Approve and reject are open to both approvers; revoke to the Super Administrator alone. */
+/** Either approver approves, rejects, and revokes the approval it gave (ADR 0007, #38). */
 function requireCreativeDecision(req, res, next) {
     if (decidesForRetailer(req.user) && !decidesForNetwork(req.user)) return next();
     return requireCreativeApproval(req, res, next);
 }
 
-/** A Retailer's approval or rejection of a Creative booked in its Stores, for those Stores. */
+/**
+ * A Retailer's approval or rejection of a Creative booked in its Stores, for
+ * those Stores, or its revocation of the approval it gave.
+ */
 async function decideForRetailer(req, res, { to }, reason) {
     const retailerId = retailerIdFor(req.user);
     const context = await presentationContext(req.user);
@@ -124,13 +136,20 @@ async function decideForRetailer(req, res, { to }, reason) {
     if (!booked) return res.status(404).json({ error: 'Creative not found' });
 
     try {
-        const decided = await creativeRepository.decideForRetailer(creative.id, retailerId, {
+        const decision = {
             status: to,
             decided_by: req.user.uid || req.user.id,
             decided_at: new Date().toISOString(),
             reason: reason || null,
-        });
+        };
+        const decided = to === CREATIVE_STATUS.REVOKED
+            ? await creativeRepository.revokeForRetailer(creative.id, retailerId, decision)
+            : await creativeRepository.decideForRetailer(creative.id, retailerId, decision);
         if (!decided) return res.status(404).json({ error: 'Creative not found' });
+        if (to === CREATIVE_STATUS.REVOKED) {
+            const retailerName = context.retailerNames.get(retailerId) || 'the Retailer';
+            await notifyBrandOfRevocation(decided, `${retailerName} for its Stores`, decision.reason);
+        }
         return res.json(await presentCreative(decided, context));
     } catch (error) {
         if (error instanceof RetailerDecisionConflictError) return res.status(409).json({ error: error.message });
@@ -150,12 +169,10 @@ for (const [action, decision] of Object.entries(DECISIONS)) {
         if (reasonRequired && !reason) return res.status(400).json({ error: 'A reason is required' });
 
         try {
-            // Slots whose approval deadline has passed are released first, so a late approval never keeps them.
-            if (to === CREATIVE_STATUS.APPROVED) await releaseLapsedReservations(req.params.id);
-            if (!decidesForNetwork(req.user)) {
-                if (action === 'revoke') return res.status(403).json({ error: 'Access denied' });
-                return await decideForRetailer(req, res, decision, reason);
-            }
+            // Deadlines already passed are settled first: a late approval never keeps a lapsed Slot,
+            // and a revocation never releases one the Creative was approved for at its deadline.
+            if (to !== CREATIVE_STATUS.REJECTED) await settleCreativeReservations(req.params.id);
+            if (!decidesForNetwork(req.user)) return await decideForRetailer(req, res, decision, reason);
             const decided = await creativeRepository.decide(req.params.id, from, {
                 approval_status: to,
                 decided_by: req.user.uid || req.user.id,
@@ -164,6 +181,7 @@ for (const [action, decision] of Object.entries(DECISIONS)) {
             });
             if (!decided) return res.status(404).json({ error: 'Creative not found' });
             if (to === CREATIVE_STATUS.APPROVED) await notifyAfterNetworkApproval(decided);
+            if (to === CREATIVE_STATUS.REVOKED) await notifyBrandOfRevocation(decided, 'the Super Administrator', reason);
             return res.json(await presentCreative(decided, await presentationContext(req.user)));
         } catch (error) {
             if (error instanceof CreativeStatusConflictError) {

@@ -25,7 +25,8 @@ function CreativeFilePreview({ file }) {
 /**
  * Creatives waiting on the signed-in approver: the Super Administrator for the
  * network, then each Retailer for its own Stores (ADR 0007). Every file is
- * previewed in play order before the approver decides, once.
+ * previewed in play order before the approver decides, once. The approver
+ * can revoke an approval it gave; revoking is final (#38).
  */
 export default function CreativeApprovals() {
     const { user, can } = useAuth();
@@ -37,6 +38,8 @@ export default function CreativeApprovals() {
     const [rejecting, setRejecting] = useState(null);
     const [reason, setReason] = useState('');
     const [busy, setBusy] = useState(false);
+    const [revoking, setRevoking] = useState(null);
+    const [revokeReason, setRevokeReason] = useState('');
 
     useEffect(() => {
         if (!user || !canApprove) return;
@@ -63,7 +66,26 @@ export default function CreativeApprovals() {
         }
     };
 
+    const revoke = async creative => {
+        setBusy(true);
+        setDecisionError(null);
+        try {
+            await apiService.revokeCreative(creative.id, revokeReason.trim());
+            setCreatives(current => current.map(other => (other.id === creative.id
+                ? { ...other, revocable_by_you: false }
+                : other)));
+            setDecided(`Revoked “${creative.title || creative.id}”.`);
+            setRevoking(null);
+            setRevokeReason('');
+        } catch (error) {
+            setDecisionError(error.message);
+        } finally {
+            setBusy(false);
+        }
+    };
+
     const waiting = (creatives || []).filter(creative => creative.awaits_your_decision);
+    const approvedByYou = (creatives || []).filter(creative => creative.revocable_by_you);
 
     return (
         <div className="space-y-6" data-testid="creative-approvals-page">
@@ -124,6 +146,45 @@ export default function CreativeApprovals() {
                     </div>
                 </section>
             ))}
+
+            {approvedByYou.length > 0 && (
+                <section aria-labelledby="approved-by-you" className="space-y-3">
+                    <h2 id="approved-by-you" className="text-lg font-semibold text-slate-900 dark:text-white">Approved by you</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Revoking is final. The Creative plays out the current hour; from the next, its Slots play
+                        Fallback Content until the Brand substitutes another.
+                    </p>
+                    <ul className="space-y-2">
+                        {approvedByYou.map(creative => (
+                            <li key={creative.id} data-testid={`approved-creative-${creative.id}`}
+                                className="flex flex-wrap items-start justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                                <span className="font-medium text-slate-900 dark:text-white">{creative.title || creative.id}</span>
+                                {revoking !== creative.id ? (
+                                    <button type="button" disabled={busy}
+                                        onClick={() => { setRevoking(creative.id); setRevokeReason(''); }}
+                                        className="rounded border border-red-600 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50">
+                                        Revoke
+                                    </button>
+                                ) : (
+                                    <div className="flex w-full flex-col gap-2 sm:w-auto">
+                                        <label className="text-sm text-slate-600 dark:text-slate-300" htmlFor={`revoke-reason-${creative.id}`}>
+                                            Why is it revoked? The Brand sees this.
+                                        </label>
+                                        <textarea id={`revoke-reason-${creative.id}`} rows={2}
+                                            value={revokeReason} onChange={event => setRevokeReason(event.target.value)}
+                                            className="rounded border border-slate-300 p-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
+                                        <button type="button" disabled={busy || !revokeReason.trim()}
+                                            onClick={() => revoke(creative)}
+                                            className="rounded bg-red-600 px-3 py-1.5 text-sm text-white hover:bg-red-700 disabled:opacity-50">
+                                            Revoke approval
+                                        </button>
+                                    </div>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            )}
         </div>
     );
 }
