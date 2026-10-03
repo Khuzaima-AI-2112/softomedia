@@ -283,8 +283,13 @@ describeWithAuthEmulator('Multi-file Creatives in consecutive Paid Slots', () =>
         const admin = (await signInAs('admin', { fakeClock: true })).headers;
         const generated = await request(app).post('/api/loops/generate').set(admin)
             .send({ targetDate: DATE, retailerId: 'retailer-one', storeId: 'store-one' });
-        const eightAm = generated.body.loops.find(loop => loop.hour === 8);
-        expect(eightAm.slots.slice(0, 2).map(({ is_fallback: fallback, asset_id: assetId }) => ({ fallback, assetId })))
-            .toEqual([{ fallback: true, assetId: 'fallback-media' }, { fallback: true, assetId: 'fallback-media' }]);
+        expect(generated.status).toBe(201);
+
+        // Approval is checked when the Slot plays.
+        jest.setSystemTime(PLAYING);
+        const playback = await request(app).get('/api/device/playback')
+            .set('Authorization', `Device store-one-screen:${deviceKey}`);
+        expect(playback.body.slots.slice(0, 2).map(({ presentation_type: type, asset_id: assetId }) => ({ type, assetId })))
+            .toEqual([{ type: 'fallback', assetId: 'fallback-media' }, { type: 'fallback', assetId: 'fallback-media' }]);
     });
 });

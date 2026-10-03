@@ -9,13 +9,15 @@ import { isCreativeApprovedFor } from './CreativeApproval.js';
  * @param {object} asset - The stored media record
  * @param {object} [creative] - The Creative the asset belongs to, for paid media
  * @param {string} [retailerId] - The Retailer whose Store it would play in, for paid media
+ * @param {object} [at] - `{ now, timeZone }` when a Screen plays it, so a
+ *   Creative revoked this hour plays out the hour
  */
-export function isApprovedPlaybackAsset(asset, creative = null, retailerId = null) {
+export function isApprovedPlaybackAsset(asset, creative = null, retailerId = null, at = null) {
     if (!asset || asset.status === 'rejected') return false;
     if (asset.category === 'paid' || asset.owner_type === 'brand') {
         return Boolean(creative)
             && creative.id === asset.creative_id
-            && isCreativeApprovedFor(creative, retailerId)
+            && isCreativeApprovedFor(creative, retailerId, at)
             && (creative.media_ids || []).includes(asset.id);
     }
     if (asset.approval_status != null) {

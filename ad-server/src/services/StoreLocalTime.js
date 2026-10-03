@@ -47,3 +47,31 @@ export function storeLocalInstant(date, hour, minute, timeZone) {
 export function approvalDeadline(store, date) {
     return storeLocalInstant(previousDate(date), 18, 0, store.time_zone);
 }
+
+/** The Store-local broadcast date and hour of an instant. */
+export function storeLocalDateAndHour(now, timeZone) {
+    const parts = Object.fromEntries(
+        new Intl.DateTimeFormat('en-CA', {
+            timeZone,
+            hourCycle: 'h23',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+        }).formatToParts(now)
+            .filter(part => part.type !== 'literal')
+            .map(part => [part.type, part.value]),
+    );
+
+    return {
+        date: `${parts.year}-${parts.month}-${parts.day}`,
+        hour: Number(parts.hour),
+    };
+}
+
+/** Whether two instants fall in the same broadcast hour at the Store. */
+export function inSameStoreHour(first, second, timeZone) {
+    const a = storeLocalDateAndHour(first, timeZone);
+    const b = storeLocalDateAndHour(second, timeZone);
+    return a.date === b.date && a.hour === b.hour;
+}

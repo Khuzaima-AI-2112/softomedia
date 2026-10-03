@@ -144,7 +144,7 @@ export class LoopGenerationService {
      * The turn carries on from the day's earlier Slots of the same category, so
      * content outnumbering one hour's Slots still plays across the day.
      * @param {Array} content - Eligible Retailer and Internal content
-     * @param {Map} reserved - This hour's Reservations with an approved Creative, by position
+     * @param {Map} reserved - This hour's Reservations, by position
      * @returns {Array} 12 slots
      */
     buildSlots(content, { sequenceStart = 0, fallback = null, reserved = new Map() } = {}) {
@@ -248,12 +248,13 @@ export class LoopGenerationService {
     }
 
     /**
-     * A Store's held Reservations for a date whose Creative is approved, by hour then
-     * position. Any other Reservation's Slot gets Fallback Content. Nobody
-     * approves the Campaign itself (ADR 0007); whether it still runs is checked
-     * when the Slot plays. A Creative's files play in order across each run of
-     * its consecutive Slots; a Slot outside a whole run gets Fallback Content
-     * rather than a file out of order.
+     * A Store's held Reservations for a date, by hour then position, each with
+     * its Campaign's Creative. Whether the Creative is approved, and the
+     * Campaign still runs, is checked when the Slot plays, so an approval or
+     * substitution after generation plays without regenerating (ADR 0007,
+     * #38). A Creative's files play in order across each run of its consecutive
+     * Slots; a Slot outside a whole run gets Fallback Content rather than a
+     * file out of order.
      * @returns {Promise<Map<number, Map<number, object>>>}
      */
     async getReservedCreatives(storeId, targetDate) {
@@ -269,7 +270,7 @@ export class LoopGenerationService {
         await Promise.all([...byCampaignHour.values()].map(async held => {
             const { campaign_id: campaignId, hour } = held[0];
             const campaign = await campaignRepository.findById(campaignId);
-            const files = campaign ? await this.getCreativeFiles(campaign, store.retailer_id) : [];
+            const files = campaign ? await this.getCreativeFiles(campaign) : [];
             if (files.length === 0) return;
 
             const positions = held.map(reservation => reservation.position);
@@ -292,13 +293,13 @@ export class LoopGenerationService {
         return byHour;
     }
 
-    /** The files of a Campaign's Creative in play order, or none unless every one may play in the Retailer's Stores. */
-    async getCreativeFiles(campaign, retailerId) {
+    /** The files of a Campaign's Creative in play order, or none if any is missing. */
+    async getCreativeFiles(campaign) {
         const first = await mediaRepository.findById(campaign.media_id || campaign.asset_id);
         if (!first) return [];
-        const { creative, mediaIds } = await creativeRepository.withFilesFor(first);
+        const { mediaIds } = await creativeRepository.withFilesFor(first);
         const files = await Promise.all(mediaIds.map(id => (id === first.id ? first : mediaRepository.findById(id))));
-        return files.every(file => isApprovedPlaybackAsset(file, creative, retailerId)) ? files : [];
+        return files.every(Boolean) ? files : [];
     }
 
     namesRetailer(campaign, retailerId) {

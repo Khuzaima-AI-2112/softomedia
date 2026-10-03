@@ -240,8 +240,8 @@ describeWithEmulators('Creatives with Firebase emulators', () => {
         const { headers } = await signInAs('retaileradmin', { organizationId: 'retailer-without-bookings' });
         const unbooked = await request(app).post(`/api/creatives/${creativeId}/approve`).set(headers);
         expect(unbooked.status).toBe(404);
-        // Revoking stays with the Super Administrator.
-        expect((await decide('retaileradmin', creativeId, 'revoke', { reason: 'x' })).status).toBe(403);
+        // A Retailer revokes only an approval it gave (#38).
+        expect((await decide('secondaryRetailer', creativeId, 'revoke', { reason: 'x' })).status).toBe(409);
 
         // The Brand sees each Retailer's decision, and the reason for a rejection.
         const mine = (await listCreatives('brand')).find(({ id }) => id === creativeId);

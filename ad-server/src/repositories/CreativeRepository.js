@@ -71,6 +71,21 @@ export class CreativeRepository extends BaseRepository {
     }
 
     /**
+     * Records one Retailer's revocation of the approval it gave, for its own
+     * Stores. Revoking is final: the Retailer never decides on it again (#38).
+     * @returns {Promise<object|null>} The revoked Creative, or null if there is none
+     * @throws {RetailerDecisionConflictError} When the Retailer has no approval to revoke
+     */
+    revokeForRetailer(id, retailerId, revocation) {
+        return this.#change(id, current => {
+            if (current.retailer_approvals?.[retailerId]?.status !== CREATIVE_STATUS.APPROVED) {
+                throw new RetailerDecisionConflictError('Only an approval you gave can be revoked');
+            }
+            return { retailer_approvals: { ...current.retailer_approvals, [retailerId]: revocation } };
+        });
+    }
+
+    /**
      * Reads a Creative and writes the fields `change` returns for it, in one
      * transaction. `change` may throw to refuse.
      * @returns {Promise<object|null>} The changed Creative, or null if there is none

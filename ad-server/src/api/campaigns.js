@@ -15,6 +15,7 @@ import {
 import { resolveAgreedCpm } from '../services/CampaignPricingService.js';
 import { prepareReservations } from '../services/SlotReservations.js';
 import { notifyAfterBooking } from '../services/CreativeApproval.js';
+import { SubstitutionRefused, substituteCreative } from '../services/CreativeSubstitution.js';
 import { RELEASE_REASONS, releaseCampaignReservations } from '../services/ReservationRelease.js';
 import { promotionScheduleError } from '../services/Dayparts.js';
 import { authenticate } from '../middleware/auth.js';
@@ -355,6 +356,26 @@ router.put('/:id', authenticate, requirePermission(PERMISSIONS.CAMPAIGN_CREATE, 
         res.json(updated);
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * POST /api/campaigns/:id/creative
+ * A Brand substitutes another of its Creatives into its own Campaign, keeping
+ * its Slot Reservations (#38). Body: { creative_id }
+ */
+router.post('/:id/creative', authenticate, async (req, res) => {
+    if (!isBrand(req.user)) return res.status(403).json({ error: 'Access denied' });
+    try {
+        const brandId = brandIdFor(req.user);
+        const campaign = await campaignRepository.findById(req.params.id);
+        if (!campaign || !campaignRepository.isOwnedByBrand(campaign, brandId)) {
+            return res.status(404).json({ error: 'Campaign not found' });
+        }
+        return res.json(await substituteCreative(campaign, brandId, req.body?.creative_id));
+    } catch (error) {
+        if (error instanceof SubstitutionRefused) return res.status(error.status).json({ error: error.message });
+        return res.status(500).json({ error: 'The Creative could not be substituted' });
     }
 });
 

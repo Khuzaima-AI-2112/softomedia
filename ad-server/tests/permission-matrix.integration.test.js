@@ -255,6 +255,16 @@ describeWithEmulators('Phase 1 permission matrix with Firebase emulators', () =>
             allowed: { brand: 404, admin: 404, superadmin: 404 },
         },
         {
+            action: 'substitute a Creative in a Campaign',
+            send: pending => pending.post('/api/campaigns/matrix-campaign/creative').send({ creative_id: 'matrix-creative' }),
+            allowed: { brand: 404 },
+        },
+        {
+            action: 'revoke a Creative',
+            send: pending => pending.post('/api/creatives/matrix-creative/revoke').send({}),
+            allowed: { superadmin: 404, retaileradmin: 404 },
+        },
+        {
             action: 'list invoices',
             send: pending => pending.get('/api/invoices'),
             allowed: { superadmin: 200, admin: 200, brand: 200 },

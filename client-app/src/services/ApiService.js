@@ -287,6 +287,16 @@ class ApiService {
         return apiClient.post(`/api/creatives/${id}/reject`, { reason });
     }
 
+    /** The signed-in approver's revocation of the approval it gave, with the reason the Brand sees. Final. */
+    async revokeCreative(id, reason) {
+        return apiClient.post(`/api/creatives/${id}/revoke`, { reason });
+    }
+
+    /** The Brand substitutes another of its Creatives into its Campaign, keeping the Campaign's Slots. */
+    async substituteCreative(campaignId, creativeId) {
+        return apiClient.post(`/api/campaigns/${campaignId}/creative`, { creative_id: creativeId });
+    }
+
     // ============================================
     // BUSINESS HOURS
     // ============================================

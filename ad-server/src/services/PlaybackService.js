@@ -8,6 +8,7 @@ import { screenRepository } from '../repositories/ScreenRepository.js';
 import StoreRepository from '../repositories/StoreRepository.js';
 import { isCampaignRunning } from '../constants/campaigns.js';
 import { deviceMediaPath } from '../constants/mediaPaths.js';
+import { storeLocalDateAndHour } from './StoreLocalTime.js';
 import {
     isApprovedFallbackAsset,
     isApprovedPlaybackAsset,
@@ -19,26 +20,6 @@ export class PlaybackError extends Error {
         this.name = 'PlaybackError';
         this.status = status;
     }
-}
-
-export function storeLocalDateAndHour(now, timeZone) {
-    const parts = Object.fromEntries(
-        new Intl.DateTimeFormat('en-CA', {
-            timeZone,
-            hourCycle: 'h23',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-        }).formatToParts(now)
-            .filter(part => part.type !== 'literal')
-            .map(part => [part.type, part.value]),
-    );
-
-    return {
-        date: `${parts.year}-${parts.month}-${parts.day}`,
-        hour: Number(parts.hour),
-    };
 }
 
 export class PlaybackService {
@@ -85,6 +66,7 @@ export class PlaybackService {
             storeId: store.id,
             locationId: location.id,
             screenId: screen.id,
+            at: { now, timeZone: store.time_zone },
         });
         if (!slots) {
             return this.holdingSlide(screen, store, location, current);
@@ -177,6 +159,7 @@ export class PlaybackService {
         storeId,
         locationId,
         screenId,
+        at,
     }) {
         // Nobody approves a Campaign; its Creative's approvals are checked below (ADR 0007).
         if (!isCampaignRunning(campaign)) return false;
@@ -186,7 +169,7 @@ export class PlaybackService {
         // The Slot plays the Campaign's file, or another file of the same Creative.
         const campaignMediaId = campaign.asset_id || campaign.media_id;
         if (campaignMediaId !== slot.asset_id && !(creative?.media_ids || []).includes(campaignMediaId)) return false;
-        if (!isApprovedPlaybackAsset(asset, creative, retailerId)) return false;
+        if (!isApprovedPlaybackAsset(asset, creative, retailerId, at)) return false;
 
         const campaignOwnerId = campaign.advertiser_id || campaign.brand_id;
         if (campaignOwnerId || asset.owner_type === 'brand') {

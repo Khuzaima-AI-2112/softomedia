@@ -6,6 +6,10 @@
  * (ADR 0007). There is no scheduler, because the server scales to zero: a
  * deadline release happens whenever the Reservation is next read or its
  * Creative is next approved. A Slot that has played stays on record.
+ *
+ * A Reservation whose Creative had both approvals at its deadline is kept at
+ * it: revoking that Creative or substituting another later never releases it
+ * (#38). Each such change settles the deadlines first, so it is recorded.
  */
 
 import { CAMPAIGN_STATUS } from '../constants/campaigns.js';
@@ -92,12 +96,19 @@ async function creativeOf(campaign) {
 function releaseReason(store, campaign, creative, reservation, now) {
     if (!campaign || !hasNotPlayed(store, reservation, now)) return null;
     if (campaign.status === CAMPAIGN_STATUS.CANCELLED) return RELEASE_REASONS.CANCELLED;
-    if (creative !== undefined && !isCreativeApprovedFor(creative, store.retailer_id) && store.time_zone
-        && now >= approvalDeadline(store, reservation.date)) {
+    if (creative !== undefined && !reservation.kept_at_deadline && !isCreativeApprovedFor(creative, store.retailer_id)
+        && pastDeadline(store, reservation, now)) {
         return RELEASE_REASONS.APPROVAL_DEADLINE;
     }
     return null;
 }
+
+const pastDeadline = (store, reservation, now) => Boolean(store.time_zone)
+    && now >= approvalDeadline(store, reservation.date);
+
+/** Whether a held Reservation is now kept at its deadline, its Creative having both approvals there. */
+const keptNow = (store, creative, reservation, now) => !reservation.kept_at_deadline && Boolean(creative)
+    && isCreativeApprovedFor(creative, store.retailer_id) && pastDeadline(store, reservation, now);
 
 /**
  * Releases those of a Store's held Reservations that are due for release, and
@@ -106,8 +117,10 @@ function releaseReason(store, campaign, creative, reservation, now) {
  * @param {object} store
  * @param {Array} reservations - Held Reservations at this Store
  * @param {Date} now
+ * @param {object} [options]
+ * @param {boolean} [options.settle] - Also record the ones kept at their deadline
  */
-export async function releaseDueReservations(store, reservations, now = new Date()) {
+export async function releaseDueReservations(store, reservations, now = new Date(), { settle = false } = {}) {
     const campaignIds = [...new Set(reservations.map(reservation => reservation.campaign_id))];
     const loaded = new Map(await Promise.all(campaignIds.map(async id => {
         const campaign = await campaignRepository.findById(id);
@@ -116,19 +129,25 @@ export async function releaseDueReservations(store, reservations, now = new Date
 
     const due = new Map();
     const kept = [];
+    const keptAtDeadline = [];
     for (const reservation of reservations) {
         const { campaign, creative } = loaded.get(reservation.campaign_id);
         const reason = releaseReason(store, campaign, creative, reservation, now);
         if (!reason) {
             kept.push(reservation);
+            if (settle && keptNow(store, creative, reservation, now)) keptAtDeadline.push(reservation);
             continue;
         }
         const key = `${campaign.id}_${reason}`;
         if (!due.has(key)) due.set(key, { campaign, reason, reservations: [] });
         due.get(key).reservations.push(reservation);
     }
-    await Promise.all([...due.values()].map(({ campaign, reason, reservations: releasing }) =>
-        releaseForCampaign(campaign, releasing, reason)));
+    await Promise.all([
+        ...[...due.values()].map(({ campaign, reason, reservations: releasing }) =>
+            releaseForCampaign(campaign, releasing, reason)),
+        ...keptAtDeadline.map(reservation =>
+            slotReservationRepository.update(reservation.id, { kept_at_deadline: true })),
+    ]);
     return kept;
 }
 
@@ -158,14 +177,20 @@ export async function releaseCampaignReservations(campaign, reason, now = new Da
     return releaseForCampaign(campaign, upcoming, reason);
 }
 
+/** Settles the approval deadlines a Campaign's held Reservations have passed: each is released or kept. */
+export async function settleCampaignReservations(campaignId, now = new Date()) {
+    const held = await heldByStore(campaignId);
+    await Promise.all(held.map(({ store, reservations }) =>
+        releaseDueReservations(store, reservations, now, { settle: true })));
+}
+
 /**
- * Releases what the approval deadlines of every Campaign booking a Creative
- * have already taken. Called before an approval of the Creative is saved, so a
- * late approval never keeps a lapsed Slot, whether or not anything read the
- * Slot in between.
+ * Settles the deadlines of every Campaign booking a Creative. Called before a
+ * decision on the Creative is saved, whether or not anything read the Slots in
+ * between: a late approval never keeps a lapsed Slot, and a revocation never
+ * releases one the Creative was approved for at its deadline.
  */
 export async function releaseLapsedReservations(creativeId, now = new Date()) {
     const campaigns = await campaignRepository.findAll({ where: [['creative_id', '==', creativeId]] });
-    const held = (await Promise.all(campaigns.map(campaign => heldByStore(campaign.id)))).flat();
-    await Promise.all(held.map(({ store, reservations }) => releaseDueReservations(store, reservations, now)));
+    await Promise.all(campaigns.map(campaign => settleCampaignReservations(campaign.id, now)));
 }

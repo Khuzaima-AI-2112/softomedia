@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import apiService from '../../services/ApiService';
 import CampaignWizardModal from '../../components/CampaignWizardModal';
+import CreativeSubstitution from './CreativeSubstitution';
 
 /**
  * AdvertiserCampaigns — S14-3
@@ -188,6 +189,16 @@ export default function AdvertiserCampaigns() {
                         <div data-testid="campaign-status" className="mb-4">
                             Status: <span className="font-semibold">{selectedCampaign.status}</span>
                         </div>
+
+                        {selectedCampaign.creative_id && (
+                            <CreativeSubstitution
+                                campaign={selectedCampaign}
+                                onSubstituted={updated => {
+                                    setSelectedCampaign(updated);
+                                    setCampaigns(current => current.map(c => (c.id === updated.id ? { ...c, ...updated } : c)));
+                                }}
+                            />
+                        )}
                         
                         <div className="flex gap-4 items-center mb-6">
                             <div data-testid="campaign-creative-thumbnail" className="w-24 h-24 bg-slate-200 dark:bg-slate-800 rounded-lg flex items-center justify-center">
