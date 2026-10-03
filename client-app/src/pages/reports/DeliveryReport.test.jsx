@@ -12,6 +12,8 @@ vi.mock('../../services/ApiService', () => ({ default: { getDeliveryReport } }))
 
 import DeliveryReport from './DeliveryReport';
 
+const cell = (slots, ads) => ({ slots, ads });
+
 const REPORT = {
     dayparts: {
         breakfast: { start: 6, end: 11 },
@@ -22,14 +24,14 @@ const REPORT = {
     rows: [
         {
             campaign_id: 'muffin', campaign_name: 'Breakfast muffin', is_retailer_promotion: true,
-            dayparts: { breakfast: 3, lunch: 0, dinner: 0, outside_dayparts: 0 }, total: 3,
+            dayparts: { breakfast: cell(3, 3), lunch: cell(0, 0), dinner: cell(0, 0), outside_dayparts: cell(0, 0) }, total: cell(3, 3),
         },
         {
             campaign_id: 'cola', campaign_name: 'Cola summer', is_retailer_promotion: false,
-            dayparts: { breakfast: 2, lunch: 1, dinner: 4, outside_dayparts: 1 }, total: 8,
+            dayparts: { breakfast: cell(6, 2), lunch: cell(3, 1), dinner: cell(12, 4), outside_dayparts: cell(3, 1) }, total: cell(24, 8),
         },
     ],
-    totals: { breakfast: 5, lunch: 1, dinner: 4, outside_dayparts: 1, total: 11 },
+    totals: { breakfast: cell(9, 5), lunch: cell(3, 1), dinner: cell(12, 4), outside_dayparts: cell(3, 1), total: cell(27, 11) },
 };
 
 function renderAs(permissions) {
@@ -53,15 +55,18 @@ describe('DeliveryReport', () => {
         getDeliveryReport.mockResolvedValue(REPORT);
     });
 
-    it('shows Proof of Play per Campaign and Daypart, with the Daypart hours', async () => {
+    it('shows Slots then Ad Plays per Campaign and Daypart, with the Daypart hours', async () => {
         renderAs(['delivery_report.view_own']);
 
         const cola = await screen.findByRole('row', { name: /Cola summer/ });
-        expect(cellsOf(cola)).toEqual(['Cola summer', '2', '1', '4', '1', '8']);
+        expect(cellsOf(cola)).toEqual(['Cola summer', '6', '2', '3', '1', '12', '4', '3', '1', '24', '8']);
         expect(screen.getByRole('columnheader', { name: 'Breakfast 06:00–11:00' })).toBeTruthy();
         expect(screen.getByRole('columnheader', { name: 'Dinner 17:00–21:00' })).toBeTruthy();
         expect(screen.getByRole('columnheader', { name: 'Other hours' })).toBeTruthy();
-        expect(cellsOf(screen.getByRole('row', { name: /^Total/ }))).toEqual(['Total', '5', '1', '4', '1', '11']);
+        // Under each Daypart and the Total: Slots, then Ads.
+        const subheadings = screen.getAllByRole('columnheader', { name: /^(Slots|Ads)$/ }).map(heading => heading.textContent);
+        expect(subheadings).toEqual(Array.from({ length: 5 }, () => ['Slots', 'Ads']).flat());
+        expect(cellsOf(screen.getByRole('row', { name: /^Total/ }))).toEqual(['Total', '9', '5', '3', '1', '12', '4', '3', '1', '27', '11']);
     });
 
     it('marks Retailer promotions', async () => {
@@ -73,7 +78,7 @@ describe('DeliveryReport', () => {
     });
 
     it('says when there is no Campaign delivery yet', async () => {
-        getDeliveryReport.mockResolvedValue({ ...REPORT, rows: [], totals: { ...REPORT.totals, total: 0 } });
+        getDeliveryReport.mockResolvedValue({ ...REPORT, rows: [], totals: { ...REPORT.totals, total: cell(0, 0) } });
         renderAs(['delivery_report.view_own']);
 
         expect(await screen.findByText('No Campaign delivery recorded yet.')).toBeTruthy();

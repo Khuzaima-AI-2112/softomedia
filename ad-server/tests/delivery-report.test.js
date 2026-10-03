@@ -193,7 +193,10 @@ describe('Ad Plays', () => {
     });
 
     test('a Paid Slot of an Hourly Loop generated before Runs were recorded counts as a Slot but no Ad Play', () => {
-        const before = { ...eightAm, slots: eightAm.slots.map(({ run_start, run_length, run_file, ...slot }) => slot) };
+        const before = {
+            ...eightAm,
+            slots: eightAm.slots.map(({ position, allocated_category, campaign_id }) => ({ position, allocated_category, campaign_id })),
+        };
         const delivered = buildDeliveryReport({
             proofs: [played(9), played(10), played(11)],
             loops: [before], stores, campaigns, dayparts: DEFAULT_DAYPARTS, scope: { kind: 'network' },
