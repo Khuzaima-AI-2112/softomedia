@@ -83,7 +83,7 @@ function AdvertiserManagement() {
             await loadData();
             closeModal();
         } catch (error) {
-            const message = error?.response?.data?.error || error?.message || 'Failed to save advertiser. Please try again.';
+            const message = error?.message || 'Failed to save advertiser. Please try again.';
             setModalError(message);
             // Modal stays open — do NOT call closeModal()
         }
@@ -163,7 +163,7 @@ function AdvertiserManagement() {
             if (selectedAdvertiser?.id === advertiser.id) setSelectedAdvertiser(null);
             addToast(`Advertiser "${advertiser.name}" removed.`, 'success');
         } catch (error) {
-            const message = error?.response?.data?.error || error?.message || 'Failed to remove advertiser.';
+            const message = error?.message || 'Failed to remove advertiser.';
             addToast(message, 'error');
         }
     };
@@ -314,24 +314,24 @@ function AdvertiserManagement() {
 
             {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <GlassCard className="border-l-4 border-l-amber-500">
+                <GlassCard className="border-l-4 border-l-amber-500" role="group" aria-label="Total Advertisers">
                     <p className="text-sm font-medium text-slate-500 mb-1">Total Advertisers</p>
                     <p className="text-3xl font-bold text-slate-900 dark:text-white">{advertisers.length}</p>
                     <p className="text-xs text-emerald-500 mt-1">
                         {advertisers.filter(a => a.status === 'active').length} active
                     </p>
                 </GlassCard>
-                <GlassCard className="border-l-4 border-l-emerald-500">
+                <GlassCard className="border-l-4 border-l-emerald-500" role="group" aria-label="Live Campaigns">
                     <p className="text-sm font-medium text-slate-500 mb-1">Live Campaigns</p>
                     <p className="text-3xl font-bold text-emerald-500">{liveCampaigns}</p>
                     <p className="text-xs text-slate-400 mt-1">of {campaigns.length} total</p>
                 </GlassCard>
-                <GlassCard className="border-l-4 border-l-primary">
+                <GlassCard className="border-l-4 border-l-primary" role="group" aria-label="Total Budget">
                     <p className="text-sm font-medium text-slate-500 mb-1">Total Budget</p>
                     <PriceDisplay price={totalBudget} size="large" />
                     <p className="text-xs text-slate-400 mt-1">Allocated funds</p>
                 </GlassCard>
-                <GlassCard className="border-l-4 border-l-blue-500">
+                <GlassCard className="border-l-4 border-l-blue-500" role="group" aria-label="Total Spent">
                     <p className="text-sm font-medium text-slate-500 mb-1">Total Spent</p>
                     <PriceDisplay price={totalSpent} size="large" />
                     <p className="text-xs text-slate-400 mt-1">
@@ -422,8 +422,9 @@ function AdvertiserManagement() {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium mb-1">Name *</label>
+                                <label className="block text-sm font-medium mb-1" htmlFor="advertiser-name">Name *</label>
                                 <input
+                                    id="advertiser-name"
                                     type="text"
                                     data-testid="input-advertiser-name"
                                     value={formData.name}
@@ -435,8 +436,9 @@ function AdvertiserManagement() {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium mb-1">Industry *</label>
+                                <label className="block text-sm font-medium mb-1" htmlFor="advertiser-industry">Industry *</label>
                                 <select
+                                    id="advertiser-industry"
                                     value={formData.industry}
                                     onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
                                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
@@ -448,8 +450,9 @@ function AdvertiserManagement() {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium mb-1">Contact Email *</label>
+                                <label className="block text-sm font-medium mb-1" htmlFor="advertiser-contact">Contact Email *</label>
                                 <input
+                                    id="advertiser-contact"
                                     type="email"
                                     data-testid="input-advertiser-contact"
                                     value={formData.contact_email}
@@ -461,8 +464,9 @@ function AdvertiserManagement() {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium mb-1">Budget ($)</label>
+                                <label className="block text-sm font-medium mb-1" htmlFor="advertiser-budget">Budget ($)</label>
                                 <input
+                                    id="advertiser-budget"
                                     type="number"
                                     value={formData.budget}
                                     onChange={(e) => setFormData({ ...formData, budget: Number(e.target.value) })}

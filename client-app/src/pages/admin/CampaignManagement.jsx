@@ -145,8 +145,7 @@ function CampaignManagement() {
             setShowCreateModal(false);
             loadData();
         } catch (err) {
-            const msg = err?.response?.data?.error || err?.message || 'Failed to create campaign.';
-            setCreateError(msg);
+            setCreateError(err?.message || 'Failed to create campaign.');
         } finally {
             setCreateSubmitting(false);
         }
@@ -480,30 +479,22 @@ function CampaignManagement() {
                 </div>
             )}
 
-            {/* Campaign Detail Modal for E2E Tests */}
+            {/* Campaign detail */}
             {selectedCampaign && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div data-testid="campaign-detail" className="bg-slate-900 rounded-2xl p-6 w-full max-w-lg shadow-2xl relative border border-slate-700">
-                        <button 
+                        <button
                             onClick={() => setSelectedCampaign(null)}
                             className="absolute top-4 right-4 text-slate-400 hover:text-white"
+                            aria-label="Close campaign detail"
                         >
                             <span className="material-symbols-outlined">close</span>
                         </button>
                         
                         <h2 className="text-xl font-bold mb-4 text-white">{selectedCampaign.name}</h2>
                         
-                        <div data-testid="campaign-status" className="mb-4 text-slate-300">
+                        <div data-testid="campaign-status" className="text-slate-300">
                             Status: <span className="font-semibold">{selectedCampaign.status}</span>
-                        </div>
-                        
-                        <div className="flex gap-2">
-                            <button data-testid="btn-campaign-admin-action" className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700">
-                                Admin Override
-                            </button>
-                            <button data-testid="btn-admin-action" className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700">
-                                Admin Action
-                            </button>
                         </div>
                     </div>
                 </div>

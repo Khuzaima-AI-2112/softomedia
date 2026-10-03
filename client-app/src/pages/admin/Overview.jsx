@@ -148,20 +148,20 @@ function AdminOverview() {
 
             {/* Stats Row */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <GlassCard className="border-l-4 border-l-primary" data-testid="stat-card-retailers">
+                <GlassCard className="border-l-4 border-l-primary" data-testid="stat-card-retailers" role="group" aria-label="Retailers">
                     <p className="text-sm font-medium text-slate-500 mb-1 leading-none">Retailers</p>
                     <p className="text-3xl font-bold text-slate-900 dark:text-white" data-testid="stat-value-retailers">{stats.retailers}</p>
                 </GlassCard>
-                <GlassCard className="border-l-4 border-l-amber-500" data-testid="stat-card-advertisers">
+                <GlassCard className="border-l-4 border-l-amber-500" data-testid="stat-card-advertisers" role="group" aria-label="Advertisers">
                     <p className="text-sm font-medium text-slate-500 mb-1 leading-none">Advertisers</p>
                     <p className="text-3xl font-bold text-slate-900 dark:text-white" data-testid="stat-value-advertisers">{stats.advertisers}</p>
                 </GlassCard>
-                <GlassCard className="border-l-4 border-l-emerald-500">
+                <GlassCard className="border-l-4 border-l-emerald-500" role="group" aria-label="Screens Online">
                     <p className="text-sm font-medium text-slate-500 mb-1 leading-none">Screens Online</p>
                     <p className="text-3xl font-bold text-emerald-500">{stats.activeScreens}</p>
                     <p className="text-xs text-slate-400">of {stats.totalScreens} total</p>
                 </GlassCard>
-                <GlassCard className="border-l-4 border-l-blue-500">
+                <GlassCard className="border-l-4 border-l-blue-500" role="group" aria-label="Platform Users">
                     <p className="text-sm font-medium text-slate-500 mb-1 leading-none">Platform Users</p>
                     <p className="text-3xl font-bold text-blue-500">{stats.totalUsers}</p>
                 </GlassCard>
