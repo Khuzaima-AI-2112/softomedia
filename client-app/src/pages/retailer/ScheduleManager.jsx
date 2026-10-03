@@ -81,7 +81,6 @@ function ScheduleManager() {
             setHourlyLoop((loop?.slots || []).map(s => ({
                 ...s,
                 title: s.campaign_id === 'demo-campaign-001' ? 'BonVie Summer Demo' : (s.title || s.asset_name || 'Fallback / Empty Slot'),
-                type: s.campaign_id === 'demo-campaign-001' ? 'paid' : (s.type || 'fallback')
             })));
         } catch (error) {
             console.error('Failed to fetch loop preview', error);

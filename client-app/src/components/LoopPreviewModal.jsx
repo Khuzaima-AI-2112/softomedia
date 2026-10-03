@@ -30,6 +30,7 @@ function LoopPreviewModal({ loop, onClose }) {
                         </h3>
                         <p className="text-sm text-slate-500 mt-1">
                             {new Date(loop.date).toLocaleDateString('en-US', {
+                                timeZone: 'UTC',
                                 weekday: 'long',
                                 month: 'long',
                                 day: 'numeric'
@@ -57,11 +58,13 @@ function LoopPreviewModal({ loop, onClose }) {
 
                 {/* Slot Grid */}
                 <div className="flex-1 overflow-y-auto p-6">
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="loop-slots">
-                        {slots.map((slot, position) => (
-                            <div
+                    <ol aria-label="Slots" className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="loop-slots">
+                        {slots.map((slot, position) => {
+                            const replaced = slot.status?.toLowerCase() === 'replaced';
+                            return (
+                            <li
                                 key={position}
-                                className={`relative p-4 rounded-xl border-2 ${slot.status?.toLowerCase() === 'replaced'
+                                className={`relative p-4 rounded-xl border-2 ${replaced
                                         ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20'
                                         : 'border-slate-200 dark:border-slate-700'
                                     }`}
@@ -74,16 +77,18 @@ function LoopPreviewModal({ loop, onClose }) {
 
                                 {/* Slot Content */}
                                 <div className="h-16 flex flex-col items-center justify-center">
-                                    <span className="text-3xl mb-1">
-                                        {slot.asset_thumbnail || '📦'}
-                                    </span>
+                                    <span className="text-3xl mb-1" aria-hidden="true">📦</span>
                                     <span className="text-xs font-medium text-center line-clamp-1">
                                         {slot.asset_name || slot.asset_id || 'Empty'}
                                     </span>
+                                    {replaced && (
+                                        <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">Replaced</span>
+                                    )}
                                 </div>
-                            </div>
-                        ))}
-                    </div>
+                            </li>
+                            );
+                        })}
+                    </ol>
                 </div>
 
                 {/* Loop Playback Preview — plays the loop's currently assigned Slot assets in real broadcast order */}

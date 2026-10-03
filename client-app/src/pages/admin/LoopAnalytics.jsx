@@ -10,8 +10,6 @@ import StatusBadge from '../../components/StatusBadge';
 import apiClient from '../../services/api';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const BUSINESS_HOURS = { START: 8, END: 22 };
-
 const formatHour = (hour) => {
     const period = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
@@ -48,7 +46,7 @@ const exportToCSV = (rows, filename) => {
                 escapeCSV(r.label),
                 escapeCSV(r.loopCompletions),
                 escapeCSV(r.integrityScore),
-                escapeCSV(r.slotFailures ?? 0),
+                escapeCSV(r.slotFailures),
                 escapeCSV(r.status),
             ].join(',')
         ),
@@ -62,6 +60,18 @@ const exportToCSV = (rows, filename) => {
     URL.revokeObjectURL(url);
 };
 
+function KpiCard({ id, label, value, valueClassName, note }) {
+    return (
+        <GlassCard>
+            <p id={id} className="text-sm font-medium text-slate-500 mb-1">{label}</p>
+            <p aria-labelledby={id} className={`text-3xl font-bold tabular-nums ${valueClassName}`}>
+                {value}
+            </p>
+            <p className="text-xs text-slate-400 mt-1">{note}</p>
+        </GlassCard>
+    );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 function LoopAnalytics() {
     const [targetDate, setTargetDate] = useState(todayISO);
@@ -71,7 +81,7 @@ function LoopAnalytics() {
     const [dayRows, setDayRows] = useState([]);
     const [loading, setLoading] = useState(true);
     const [apiUnavailable, setApiUnavailable] = useState(false);
-    const [selectedHour, setSelectedHour] = useState(null);
+    const [refreshCount, setRefreshCount] = useState(0);
 
     // ── Fetch single-day hourly data ──────────────────────────────────────────
     const fetchDay = useCallback(async (date) => {
@@ -84,7 +94,7 @@ function LoopAnalytics() {
         const dates = getLastNDates(7);
         const results = await Promise.allSettled(dates.map(d => fetchDay(d)));
         return dates.map((date, i) => {
-            if (results[i].status === 'rejected' || !results[i].value?.length) {
+            if (results[i].status === 'rejected' || !results[i].value.length) {
                 return { label: date, loopCompletions: null, integrityScore: null, slotFailures: null, status: 'UNAVAILABLE' };
             }
             const rows = results[i].value;
@@ -96,7 +106,7 @@ function LoopAnalytics() {
         });
     }, [fetchDay]);
 
-    // ── Load on mount and when date changes ──────────────────────────────────
+    // ── Load on mount, when the date changes and on Refresh ──────────────────
     useEffect(() => {
         let cancelled = false;
         const load = async () => {
@@ -119,21 +129,14 @@ function LoopAnalytics() {
         };
         load();
         return () => { cancelled = true; };
-    }, [targetDate, fetchWeek, fetchDay]);
+    }, [targetDate, refreshCount, fetchWeek, fetchDay]);
 
-    // Re-fetch day only when date picker changes (week re-fetches too via useEffect dep)
     const handleDateChange = (e) => {
         setTargetDate(e.target.value);
         setViewMode('day');
-        setSelectedHour(null);
     };
 
-    const handleRefresh = () => {
-        setTargetDate(t => t); // trigger useEffect by forcing re-render via state flush
-        setWeekRows([]);
-        setDayRows([]);
-        setSelectedHour(null);
-    };
+    const handleRefresh = () => setRefreshCount(count => count + 1);
 
     // ── Active table rows ─────────────────────────────────────────────────────
     const activeRows = viewMode === 'week' ? weekRows : dayRows;
@@ -151,6 +154,8 @@ function LoopAnalytics() {
     const handleExportCSV = () => {
         exportToCSV(activeRows, `loop-analytics-${targetDate}.csv`);
     };
+
+    const viewButtonClass = (mode) => `px-3 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === mode ? 'bg-primary/10 text-primary' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`;
 
     return (
         <div data-testid="loop-analytics" className="space-y-8 animate-in fade-in duration-500">
@@ -170,18 +175,21 @@ function LoopAnalytics() {
                         type="date"
                         value={targetDate}
                         onChange={handleDateChange}
+                        aria-label="Date"
                         className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-surface-dark text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none"
                         data-testid="analytics-date-picker"
                     />
                     <button
-                        onClick={() => { setViewMode('week'); setSelectedHour(null); }}
-                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'week' ? 'bg-primary/10 text-primary' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                        onClick={() => setViewMode('week')}
+                        aria-pressed={viewMode === 'week'}
+                        className={viewButtonClass('week')}
                     >
                         7-day
                     </button>
                     <button
-                        onClick={() => { setViewMode('day'); setSelectedHour(null); }}
-                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'day' ? 'bg-primary/10 text-primary' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                        onClick={() => setViewMode('day')}
+                        aria-pressed={viewMode === 'day'}
+                        className={viewButtonClass('day')}
                     >
                         Day
                     </button>
@@ -191,14 +199,14 @@ function LoopAnalytics() {
                         className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg font-medium hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                         data-testid="export-csv-btn"
                     >
-                        <span className="material-symbols-outlined text-[20px]">download</span>
+                        <span className="material-symbols-outlined text-[20px]" aria-hidden="true">download</span>
                         Export CSV
                     </button>
                     <button
                         onClick={handleRefresh}
                         className="px-4 py-2 bg-primary text-white rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary-hover transition-colors flex items-center gap-2"
                     >
-                        <span className="material-symbols-outlined text-[20px]">refresh</span>
+                        <span className="material-symbols-outlined text-[20px]" aria-hidden="true">refresh</span>
                         Refresh
                     </button>
                 </div>
@@ -206,41 +214,33 @@ function LoopAnalytics() {
 
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <GlassCard>
-                    <p className="text-sm font-medium text-slate-500 mb-1">Loop Completions</p>
-                    <p data-testid="total-loops" className="text-3xl font-bold text-slate-900 dark:text-white tabular-nums">
-                        <span data-testid="play-count">{loading ? '—' : totalLoops.toLocaleString()}</span>
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1">Full cycles verified</p>
-                </GlassCard>
-                <GlassCard>
-                    <p className="text-sm font-medium text-slate-500 mb-1">Integrity Score</p>
-                    <p className="text-3xl font-bold text-emerald-500 tabular-nums" data-testid="avg-integrity-score">
-                        {loading ? '—' : `${avgIntegrity}%`}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1">Playlist adherence</p>
-                </GlassCard>
-                <GlassCard>
-                    <p className="text-sm font-medium text-slate-500 mb-1">Full Delivery</p>
-                    <p className="text-3xl font-bold text-blue-500 tabular-nums" data-testid="full-delivery-count">
-                        {loading ? '—' : `${fullDelivery}/${validRows.length}`}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1">Periods delivered 100%</p>
-                </GlassCard>
-                <GlassCard>
-                    <p className="text-sm font-medium text-slate-500 mb-1">Slot Failures</p>
-                    <p className="text-3xl font-bold text-amber-500 tabular-nums" data-testid="slot-failures-count">
-                        {loading ? '—' : slotFailures}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1">Needs attention</p>
-                </GlassCard>
+                <KpiCard
+                    id="kpi-loop-completions" label="Loop Completions" note="Full cycles verified"
+                    valueClassName="text-slate-900 dark:text-white"
+                    value={<span data-testid="play-count">{loading ? '—' : totalLoops.toLocaleString()}</span>}
+                />
+                <KpiCard
+                    id="kpi-integrity-score" label="Integrity Score" note="Playlist adherence"
+                    valueClassName="text-emerald-500"
+                    value={loading ? '—' : `${avgIntegrity}%`}
+                />
+                <KpiCard
+                    id="kpi-full-delivery" label="Full Delivery" note="Periods delivered 100%"
+                    valueClassName="text-blue-500"
+                    value={loading ? '—' : `${fullDelivery}/${validRows.length}`}
+                />
+                <KpiCard
+                    id="kpi-slot-failures" label="Slot Failures" note="Needs attention"
+                    valueClassName="text-amber-500"
+                    value={loading ? '—' : slotFailures}
+                />
             </div>
 
             {/* Summary Table — primary view */}
             <GlassCard>
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold text-lg flex items-center gap-2">
-                        <span className="material-symbols-outlined text-primary">table_rows</span>
+                        <span className="material-symbols-outlined text-primary" aria-hidden="true">table_rows</span>
                         {viewMode === 'week' ? '7-Day Summary' : `Hourly Breakdown — ${targetDate}`}
                     </h3>
                 </div>
@@ -250,7 +250,7 @@ function LoopAnalytics() {
                 ) : apiUnavailable ? (
                     <div className="py-10 text-center text-slate-400 text-sm">
                         <span className="material-symbols-outlined text-3xl mb-2 block text-slate-300">cloud_off</span>
-                        Data syncing — available shortly
+                        Loop analytics could not be loaded.
                     </div>
                 ) : activeRows.length === 0 ? (
                     <div className="py-10 text-center text-slate-400 text-sm">No data for this period.</div>
@@ -267,14 +267,8 @@ function LoopAnalytics() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50 dark:divide-slate-800/60">
-                                {activeRows.map((row, i) => (
-                                    <tr
-                                        key={i}
-                                        onClick={() => viewMode === 'day' && setSelectedHour(
-                                            selectedHour === (BUSINESS_HOURS.START + i) ? null : (BUSINESS_HOURS.START + i)
-                                        )}
-                                        className={`transition-colors ${viewMode === 'day' ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40' : ''} ${selectedHour === (BUSINESS_HOURS.START + i) ? 'bg-primary/5' : ''}`}
-                                    >
+                                {activeRows.map(row => (
+                                    <tr key={row.label}>
                                         <td className="py-3 pr-4 font-medium text-slate-700 dark:text-slate-300">{row.label}</td>
                                         <td className="py-3 pr-4 text-right tabular-nums text-slate-600 dark:text-slate-400">
                                             {row.loopCompletions !== null ? row.loopCompletions.toLocaleString() : '—'}
@@ -283,7 +277,7 @@ function LoopAnalytics() {
                                             {row.integrityScore !== null ? `${row.integrityScore}%` : '—'}
                                         </td>
                                         <td className="py-3 pr-4 text-right tabular-nums text-slate-600 dark:text-slate-400">
-                                            {row.slotFailures !== null ? row.slotFailures : '—'}
+                                            {row.slotFailures ?? '—'}
                                         </td>
                                         <td className="py-3">
                                             {row.status === 'UNAVAILABLE'
@@ -299,44 +293,12 @@ function LoopAnalytics() {
                 )}
             </GlassCard>
 
-            {/* Slot-Level Detail (day view only, when hour selected) */}
-            {viewMode === 'day' && selectedHour !== null && (
-                <GlassCard>
-                    <div className="flex items-center justify-between mb-6">
-                        <h3 className="font-bold text-lg flex items-center gap-2">
-                            <span className="material-symbols-outlined text-primary">grid_view</span>
-                            Slot Details — {formatHour(selectedHour)}
-                        </h3>
-                        <button
-                            onClick={() => setSelectedHour(null)}
-                            className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-                        >
-                            Close
-                        </button>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3" data-testid="slot-details">
-                        {Array.from({ length: 12 }).map((_, i) => (
-                            <div
-                                key={i}
-                                className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40"
-                                data-testid={`slot-detail-${i}`}
-                            >
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-sm font-bold text-slate-600 dark:text-slate-400">Slot {i + 1}</span>
-                                </div>
-                                <div className="text-xs text-slate-400 mt-1">Slot data syncing — available shortly</div>
-                            </div>
-                        ))}
-                    </div>
-                </GlassCard>
-            )}
-
             {/* Hourly Delivery Chart — secondary view */}
             {viewMode === 'day' && dayRows.length > 0 && !loading && !apiUnavailable && (
                 <GlassCard>
                     <div className="flex items-center justify-between mb-6">
-                        <h3 className="font-bold text-lg flex items-center gap-2">
-                            <span className="material-symbols-outlined text-primary">bar_chart</span>
+                        <h3 id="hourly-chart-title" className="font-bold text-lg flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary" aria-hidden="true">bar_chart</span>
                             Hourly Delivery Rates
                         </h3>
                         <div className="flex items-center gap-4 text-xs text-slate-500">
@@ -345,19 +307,17 @@ function LoopAnalytics() {
                             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-500 inline-block"></span> &lt;95%</span>
                         </div>
                     </div>
-                    <div className="space-y-2" data-testid="hourly-chart">
-                        {dayRows.map((item, idx) => {
+                    <ul aria-labelledby="hourly-chart-title" className="space-y-2" data-testid="hourly-chart">
+                        {dayRows.map(item => {
                             const rate = parseFloat(item.integrityScore ?? 0);
                             const barColor = rate >= 99 ? 'bg-emerald-500' : rate >= 95 ? 'bg-amber-500' : 'bg-red-500';
-                            const hour = BUSINESS_HOURS.START + idx;
                             return (
-                                <button
-                                    key={hour}
-                                    onClick={() => setSelectedHour(selectedHour === hour ? null : hour)}
-                                    className={`w-full flex items-center gap-4 p-3 rounded-lg transition-all ${selectedHour === hour ? 'bg-primary/10 border border-primary' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                                    data-testid={`analytics-hour-${hour}`}
+                                <li
+                                    key={item.hour}
+                                    className="w-full flex items-center gap-4 p-3 rounded-lg"
+                                    data-testid={`analytics-hour-${item.hour}`}
                                 >
-                                    <div className="w-20 text-left font-bold text-sm">{formatHour(hour)}</div>
+                                    <div className="w-20 text-left font-bold text-sm">{item.label}</div>
                                     <div className="flex-1 h-8 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                                         <div
                                             className={`h-full ${barColor} transition-all duration-500 flex items-center justify-end pr-3`}
@@ -373,10 +333,10 @@ function LoopAnalytics() {
                                     <div className="w-20">
                                         <StatusBadge status={item.status === 'DELIVERED' ? 'Active' : 'Warning'} />
                                     </div>
-                                </button>
+                                </li>
                             );
                         })}
-                    </div>
+                    </ul>
                 </GlassCard>
             )}
 

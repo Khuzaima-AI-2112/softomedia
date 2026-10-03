@@ -210,10 +210,6 @@ class ApiService {
         return apiClient.get(`/api/loops/${id}`);
     }
 
-    async createLoop(data) {
-        return apiClient.post('/api/loops', data);
-    }
-
     /**
      * Generate loops for all business hours for a given date.
      * Called by the Generate Loops button in LoopManagement.jsx.
