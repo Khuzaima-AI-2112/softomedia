@@ -28,10 +28,18 @@ const CAMPAIGNS = [
     { id: 'c2', name: 'Winter Fizz', advertiser_id: 'a1', status: 'cancelled', start_date: '2026-12-01', end_date: '2026-12-31' },
 ];
 
+// Campaign routes answer a failure with the underlying error's message.
+const UNAVAILABLE = '14 UNAVAILABLE: No connection established';
+
 const rows = () => within(screen.getByTestId('advertisers-list')).getAllByRole('row').slice(1);
 const rowFor = (name) => rows().find(row => within(row).queryByText(name));
-const toast = (text) => screen.findByText(text, { selector: '[role="status"] span' });
-const statCard = (label) => screen.getByText(label, { selector: 'p' }).parentElement;
+// The notification whose text is `text`, once it appears.
+const findToast = (text) => waitFor(() => {
+    const found = screen.getAllByRole('status').find(status => within(status).queryByText(text));
+    if (!found) throw new Error(`No notification reads "${text}"`);
+    return found;
+});
+const statCard = (label) => screen.getByRole('group', { name: label });
 
 const renderLoaded = async () => {
     render(<AdvertiserManagement />);
@@ -48,7 +56,7 @@ describe('AdvertiserManagement', () => {
         apiService.getCampaigns.mockResolvedValue(CAMPAIGNS);
     });
 
-    it('lists each Advertiser with industry, Campaign count, budget and status', async () => {
+    it('lists each Brand with industry, Campaign count, budget and status', async () => {
         await renderLoaded();
 
         expect(rows()).toHaveLength(3);
@@ -61,7 +69,7 @@ describe('AdvertiserManagement', () => {
         expect(within(rowFor('Zap Mobile')).getByText('Suspended')).toBeTruthy();
     });
 
-    it('totals Advertisers, active ones, Campaigns and budget', async () => {
+    it('totals Brands, active ones, Campaigns and budget', async () => {
         await renderLoaded();
 
         expect(within(statCard('Total Advertisers')).getByText('3')).toBeTruthy();
@@ -70,7 +78,7 @@ describe('AdvertiserManagement', () => {
         expect(within(statCard('Total Budget')).getByText('$4,200.00')).toBeTruthy();
     });
 
-    it('says so when there are no Advertisers', async () => {
+    it('says so when there are no Brands', async () => {
         apiService.getAdvertisers.mockResolvedValue([]);
         apiService.getCampaigns.mockResolvedValue([]);
 
@@ -81,11 +89,11 @@ describe('AdvertiserManagement', () => {
 
     it('tells the user when the list cannot be loaded', async () => {
         vi.spyOn(console, 'error').mockImplementation(() => {});
-        apiService.getCampaigns.mockRejectedValue(new APIError('Failed to fetch campaigns', 500, { error: 'Failed to fetch campaigns' }));
+        apiService.getCampaigns.mockRejectedValue(new APIError(UNAVAILABLE, 500, { error: UNAVAILABLE }));
 
         render(<AdvertiserManagement />);
 
-        expect(await toast('Failed to load data. Please refresh.')).toBeTruthy();
+        expect(await findToast('Failed to load data. Please refresh.')).toBeTruthy();
     });
 
     it('is read-only for someone who does not manage organizations', async () => {
@@ -98,8 +106,8 @@ describe('AdvertiserManagement', () => {
         expect(screen.queryByRole('button', { name: 'Edit Bolt Drinks' })).toBeNull();
     });
 
-    describe("an Advertiser's Campaigns", () => {
-        it('opens on the Advertiser and closes on a second click', async () => {
+    describe("a Brand's Campaigns", () => {
+        it('opens on the Brand and closes on a second click', async () => {
             await renderLoaded();
 
             fireEvent.click(within(rowFor('Bolt Drinks')).getByText('Bolt Drinks'));
@@ -113,7 +121,7 @@ describe('AdvertiserManagement', () => {
             expect(screen.queryByRole('heading', { name: 'Bolt Drinks - Campaigns' })).toBeNull();
         });
 
-        it('says when an Advertiser has none, and closes from its close button', async () => {
+        it('says when a Brand has none, and closes from its close button', async () => {
             await renderLoaded();
 
             fireEvent.click(within(rowFor('Sunny Snacks')).getByText('Sunny Snacks'));
@@ -124,7 +132,7 @@ describe('AdvertiserManagement', () => {
         });
     });
 
-    describe('adding an Advertiser', () => {
+    describe('adding a Brand', () => {
         const type = (label, value) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
 
         const openAdd = async () => {
@@ -142,7 +150,7 @@ describe('AdvertiserManagement', () => {
             expect(screen.getByLabelText('Budget ($)').value).toBe('10000');
         });
 
-        it('creates an active Advertiser, says so and reloads', async () => {
+        it('creates an active Brand, says so and reloads', async () => {
             apiService.createAdvertiser.mockResolvedValue({ id: 'a9', name: 'Volt Phones' });
             const form = await openAdd();
 
@@ -153,7 +161,7 @@ describe('AdvertiserManagement', () => {
             type('Budget ($)', '5000');
             fireEvent.click(within(form).getByRole('button', { name: 'Add Advertiser' }));
 
-            expect(await toast('Advertiser "Volt Phones" created.')).toBeTruthy();
+            expect(await findToast('Advertiser "Volt Phones" created.')).toBeTruthy();
             expect(apiService.createAdvertiser).toHaveBeenCalledWith({
                 name: 'Volt Phones', logo: '📱', industry: 'Electronics',
                 contact_email: 'ads@volt.test', contactemail: 'ads@volt.test', budget: 5000, status: 'active',
@@ -162,7 +170,7 @@ describe('AdvertiserManagement', () => {
             expect(screen.queryByTestId('modal-advertiser-form')).toBeNull();
         });
 
-        it('names the Advertiser from the form when the server does not echo it', async () => {
+        it('names the Brand from the form when the server does not echo it', async () => {
             apiService.createAdvertiser.mockResolvedValue(null);
             const form = await openAdd();
 
@@ -170,7 +178,7 @@ describe('AdvertiserManagement', () => {
             type('Contact Email *', 'ads@volt.test');
             fireEvent.click(within(form).getByRole('button', { name: 'Add Advertiser' }));
 
-            expect(await toast('Advertiser "Volt Phones" created.')).toBeTruthy();
+            expect(await findToast('Advertiser "Volt Phones" created.')).toBeTruthy();
         });
 
         it('keeps the form open with the server reason when refused', async () => {
@@ -186,7 +194,7 @@ describe('AdvertiserManagement', () => {
         });
 
         it('falls back to a generic reason when the failure has none', async () => {
-            apiService.createAdvertiser.mockRejectedValue(new Error(''));
+            apiService.createAdvertiser.mockRejectedValue(new APIError('', 500, {}));
             const form = await openAdd();
 
             type('Name *', 'Volt Phones');
@@ -208,8 +216,8 @@ describe('AdvertiserManagement', () => {
         });
     });
 
-    describe('editing an Advertiser', () => {
-        it('opens filled with the Advertiser and saves the changes', async () => {
+    describe('editing a Brand', () => {
+        it('opens filled with the Brand and saves the changes', async () => {
             apiService.updateAdvertiser.mockResolvedValue({});
             await renderLoaded();
 
@@ -225,7 +233,7 @@ describe('AdvertiserManagement', () => {
             fireEvent.change(screen.getByLabelText('Budget ($)'), { target: { value: '3000' } });
             fireEvent.click(within(form).getByRole('button', { name: 'Save Changes' }));
 
-            expect(await toast('Advertiser "Bolt Drinks" updated.')).toBeTruthy();
+            expect(await findToast('Advertiser "Bolt Drinks" updated.')).toBeTruthy();
             expect(apiService.updateAdvertiser).toHaveBeenCalledWith('a1', {
                 name: 'Bolt Drinks', logo: '🥤', industry: 'Food & Beverage',
                 contact_email: 'ads@bolt.test', contactemail: 'ads@bolt.test', budget: 3000,
@@ -245,25 +253,25 @@ describe('AdvertiserManagement', () => {
     });
 
     describe('activating and deactivating', () => {
-        it('deactivates an active Advertiser and shows it as inactive', async () => {
+        it('deactivates an active Brand and shows it as inactive', async () => {
             apiService.patchAdvertiser.mockResolvedValue({});
             await renderLoaded();
 
             fireEvent.click(screen.getByRole('button', { name: 'Deactivate Bolt Drinks' }));
 
-            expect(await toast('Advertiser "Bolt Drinks" is now inactive.')).toBeTruthy();
+            expect(await findToast('Advertiser "Bolt Drinks" is now inactive.')).toBeTruthy();
             expect(apiService.patchAdvertiser).toHaveBeenCalledWith('a1', { status: 'inactive' });
             expect(within(rowFor('Bolt Drinks')).getByText('Inactive')).toBeTruthy();
             expect(screen.getByRole('button', { name: 'Activate Bolt Drinks' })).toBeTruthy();
         });
 
-        it('activates an inactive Advertiser', async () => {
+        it('activates an inactive Brand', async () => {
             apiService.patchAdvertiser.mockResolvedValue({});
             await renderLoaded();
 
             fireEvent.click(screen.getByRole('button', { name: 'Activate Sunny Snacks' }));
 
-            expect(await toast('Advertiser "Sunny Snacks" is now active.')).toBeTruthy();
+            expect(await findToast('Advertiser "Sunny Snacks" is now active.')).toBeTruthy();
             expect(apiService.patchAdvertiser).toHaveBeenCalledWith('a2', { status: 'active' });
         });
 
@@ -278,7 +286,7 @@ describe('AdvertiserManagement', () => {
             fireEvent.click(button);
 
             finish({});
-            expect(await toast('Advertiser "Bolt Drinks" is now inactive.')).toBeTruthy();
+            expect(await findToast('Advertiser "Bolt Drinks" is now inactive.')).toBeTruthy();
             expect(apiService.patchAdvertiser).toHaveBeenCalledTimes(1);
             expect(screen.getByRole('button', { name: 'Activate Bolt Drinks' }).disabled).toBe(false);
         });
@@ -290,12 +298,12 @@ describe('AdvertiserManagement', () => {
 
             fireEvent.click(screen.getByRole('button', { name: 'Deactivate Bolt Drinks' }));
 
-            expect(await toast('Failed to update status. Please try again.')).toBeTruthy();
+            expect(await findToast('Failed to update status. Please try again.')).toBeTruthy();
             expect(within(rowFor('Bolt Drinks')).getByText('Active')).toBeTruthy();
         });
     });
 
-    describe('removing an Advertiser', () => {
+    describe('removing a Brand', () => {
         it('does nothing unless confirmed', async () => {
             vi.spyOn(window, 'confirm').mockReturnValue(false);
             await renderLoaded();
@@ -315,13 +323,13 @@ describe('AdvertiserManagement', () => {
 
             fireEvent.click(screen.getByRole('button', { name: 'Remove Bolt Drinks' }));
 
-            expect(await toast('Advertiser "Bolt Drinks" removed.')).toBeTruthy();
+            expect(await findToast('Advertiser "Bolt Drinks" removed.')).toBeTruthy();
             expect(apiService.deleteAdvertiser).toHaveBeenCalledWith('a1');
             expect(rowFor('Bolt Drinks')).toBeUndefined();
             expect(screen.queryByRole('heading', { name: 'Bolt Drinks - Campaigns' })).toBeNull();
         });
 
-        it('leaves another Advertiser’s open Campaigns alone', async () => {
+        it('leaves another Brand’s open Campaigns alone', async () => {
             vi.spyOn(window, 'confirm').mockReturnValue(true);
             apiService.deleteAdvertiser.mockResolvedValue({});
             await renderLoaded();
@@ -329,7 +337,7 @@ describe('AdvertiserManagement', () => {
 
             fireEvent.click(screen.getByRole('button', { name: 'Remove Sunny Snacks' }));
 
-            expect(await toast('Advertiser "Sunny Snacks" removed.')).toBeTruthy();
+            expect(await findToast('Advertiser "Sunny Snacks" removed.')).toBeTruthy();
             expect(screen.getByRole('heading', { name: 'Bolt Drinks - Campaigns' })).toBeTruthy();
         });
 
@@ -340,18 +348,18 @@ describe('AdvertiserManagement', () => {
 
             fireEvent.click(screen.getByRole('button', { name: 'Remove Bolt Drinks' }));
 
-            expect(await toast('Advertiser not found')).toBeTruthy();
+            expect(await findToast('Advertiser not found')).toBeTruthy();
             expect(rowFor('Bolt Drinks')).toBeTruthy();
         });
 
         it('falls back to a generic reason when the failure has none', async () => {
             vi.spyOn(window, 'confirm').mockReturnValue(true);
-            apiService.deleteAdvertiser.mockRejectedValue(new Error(''));
+            apiService.deleteAdvertiser.mockRejectedValue(new APIError('', 500, {}));
             await renderLoaded();
 
             fireEvent.click(screen.getByRole('button', { name: 'Remove Bolt Drinks' }));
 
-            expect(await toast('Failed to remove advertiser.')).toBeTruthy();
+            expect(await findToast('Failed to remove advertiser.')).toBeTruthy();
         });
     });
 });

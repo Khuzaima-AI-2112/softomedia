@@ -314,24 +314,24 @@ function AdvertiserManagement() {
 
             {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <GlassCard className="border-l-4 border-l-amber-500">
+                <GlassCard className="border-l-4 border-l-amber-500" role="group" aria-label="Total Advertisers">
                     <p className="text-sm font-medium text-slate-500 mb-1">Total Advertisers</p>
                     <p className="text-3xl font-bold text-slate-900 dark:text-white">{advertisers.length}</p>
                     <p className="text-xs text-emerald-500 mt-1">
                         {advertisers.filter(a => a.status === 'active').length} active
                     </p>
                 </GlassCard>
-                <GlassCard className="border-l-4 border-l-emerald-500">
+                <GlassCard className="border-l-4 border-l-emerald-500" role="group" aria-label="Live Campaigns">
                     <p className="text-sm font-medium text-slate-500 mb-1">Live Campaigns</p>
                     <p className="text-3xl font-bold text-emerald-500">{liveCampaigns}</p>
                     <p className="text-xs text-slate-400 mt-1">of {campaigns.length} total</p>
                 </GlassCard>
-                <GlassCard className="border-l-4 border-l-primary">
+                <GlassCard className="border-l-4 border-l-primary" role="group" aria-label="Total Budget">
                     <p className="text-sm font-medium text-slate-500 mb-1">Total Budget</p>
                     <PriceDisplay price={totalBudget} size="large" />
                     <p className="text-xs text-slate-400 mt-1">Allocated funds</p>
                 </GlassCard>
-                <GlassCard className="border-l-4 border-l-blue-500">
+                <GlassCard className="border-l-4 border-l-blue-500" role="group" aria-label="Total Spent">
                     <p className="text-sm font-medium text-slate-500 mb-1">Total Spent</p>
                     <PriceDisplay price={totalSpent} size="large" />
                     <p className="text-xs text-slate-400 mt-1">

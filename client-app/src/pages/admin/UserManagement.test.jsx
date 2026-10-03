@@ -93,7 +93,8 @@ describe('UserManagement', () => {
         await screen.findByRole('heading', { name: 'User Management' });
 
         fireEvent.click(screen.getByRole('button', { name: 'Retailer Administrator' }));
-        expect(userRows().map(row => within(row).getAllByRole('cell')[0].textContent)).toEqual(['Raj Patel']);
+        expect(userRows()).toHaveLength(1);
+        expect(rowFor('Raj Patel')).toBeTruthy();
 
         fireEvent.click(screen.getByRole('button', { name: 'Super Administrator' }));
         expect(within(screen.getByTestId('users-list')).queryByText('Raj Patel')).toBeNull();
@@ -111,7 +112,7 @@ describe('UserManagement', () => {
             return screen.getByTestId('modal-user-form');
         };
 
-        it('creates a Brand user linked to their Advertiser and reloads the list', async () => {
+        it('creates a Brand user linked to their Brand organization and reloads the list', async () => {
             apiService.createUser.mockResolvedValue({ id: 'u9' });
             const form = await openCreate();
 
@@ -154,7 +155,7 @@ describe('UserManagement', () => {
         });
 
         it('falls back to a generic message when the failure has none', async () => {
-            apiService.createUser.mockRejectedValue(new Error(''));
+            apiService.createUser.mockRejectedValue(new APIError('', 500, {}));
             const form = await openCreate();
 
             type('Name', 'Nina Brand');
@@ -245,7 +246,7 @@ describe('UserManagement', () => {
         });
 
         it('falls back to a generic message when the failure has none', async () => {
-            apiService.updateUser.mockRejectedValue(new Error(''));
+            apiService.updateUser.mockRejectedValue(new APIError('', 500, {}));
             renderPage();
             await screen.findByRole('heading', { name: 'User Management' });
 

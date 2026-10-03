@@ -40,6 +40,9 @@ const CAMPAIGNS = [
     { id: 'c5', name: 'Orphan' },
 ];
 
+// Campaign routes answer a failure with the underlying error's message.
+const UNAVAILABLE = '14 UNAVAILABLE: No connection established';
+
 const renderPage = () => render(
     <MemoryRouter initialEntries={['/dashboard/admin/campaigns']}>
         <Routes>
@@ -68,7 +71,7 @@ describe('CampaignManagement', () => {
         apiService.getAdvertisers.mockResolvedValue([BOLT]);
     });
 
-    it('lists every Campaign with its Advertiser, status and creation date', async () => {
+    it('lists every Campaign with its Brand, status and creation date', async () => {
         await renderLoaded();
 
         expect(screen.getByText('5 campaigns')).toBeTruthy();
@@ -79,7 +82,7 @@ describe('CampaignManagement', () => {
         expect(within(rowFor('Winter Fizz')).getByText('cancelled')).toBeTruthy();
     });
 
-    it('labels a Retailer promotion, and falls back for missing names and Advertisers', async () => {
+    it('labels a Retailer promotion, and falls back for missing names and Brands', async () => {
         await renderLoaded();
 
         expect(within(rowFor('Fresh Week')).getByText('Retailer promotion')).toBeTruthy();
@@ -120,7 +123,7 @@ describe('CampaignManagement', () => {
 
     it('says so when the Campaigns cannot be loaded', async () => {
         vi.spyOn(console, 'error').mockImplementation(() => {});
-        apiService.getCampaigns.mockRejectedValue(new APIError('Failed to fetch campaigns', 500, { error: 'Failed to fetch campaigns' }));
+        apiService.getCampaigns.mockRejectedValue(new APIError(UNAVAILABLE, 500, { error: UNAVAILABLE }));
 
         await renderLoaded();
 
@@ -201,17 +204,17 @@ describe('CampaignManagement', () => {
 
         it('shows the server reason when it fails', async () => {
             vi.spyOn(window, 'confirm').mockReturnValue(true);
-            apiService.deleteCampaign.mockRejectedValue(new APIError('Campaign store unavailable', 500, { error: 'Campaign store unavailable' }));
+            apiService.deleteCampaign.mockRejectedValue(new APIError(UNAVAILABLE, 500, { error: UNAVAILABLE }));
             await renderLoaded();
 
             fireEvent.click(within(rowFor('Summer Fizz')).getByRole('button', { name: 'Delete campaign' }));
 
-            expect(await screen.findByText('Campaign store unavailable')).toBeTruthy();
+            expect(await screen.findByText(UNAVAILABLE)).toBeTruthy();
         });
 
         it('falls back to a generic reason when the failure has none', async () => {
             vi.spyOn(window, 'confirm').mockReturnValue(true);
-            apiService.deleteCampaign.mockRejectedValue(new Error(''));
+            apiService.deleteCampaign.mockRejectedValue(new APIError('', 500, {}));
             await renderLoaded();
 
             fireEvent.click(within(rowFor('Summer Fizz')).getByRole('button', { name: 'Delete campaign' }));
@@ -237,7 +240,7 @@ describe('CampaignManagement', () => {
             type(/End Date/, '2026-10-20');
         };
 
-        it('creates a scheduled Campaign for the chosen Advertiser and reloads', async () => {
+        it('creates a scheduled Campaign for the chosen Brand and reloads', async () => {
             apiService.createCampaign.mockResolvedValue({ id: 'c9' });
             await openCreate();
 
@@ -274,7 +277,7 @@ describe('CampaignManagement', () => {
             expect(apiService.createCampaign).not.toHaveBeenCalled();
         });
 
-        it('warns when there are no Advertisers to choose from', async () => {
+        it('warns when there are no Brands to choose from', async () => {
             apiService.getAdvertisers.mockResolvedValue([]);
             await openCreate();
 
@@ -314,7 +317,7 @@ describe('CampaignManagement', () => {
         });
 
         it('falls back to a generic reason when the failure has none', async () => {
-            apiService.createCampaign.mockRejectedValue(new Error(''));
+            apiService.createCampaign.mockRejectedValue(new APIError('', 500, {}));
             await openCreate();
             fillValid();
 
@@ -323,19 +326,21 @@ describe('CampaignManagement', () => {
             expect(await screen.findByText('Failed to create campaign.')).toBeTruthy();
         });
 
-        it('closes from Cancel, the close button, or a click outside, but not a click inside', async () => {
-            let dialog = await openCreate();
-            fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-            expect(screen.queryByRole('dialog')).toBeNull();
+        it.each(['Cancel', 'Close modal'])('closes without saving from %s', async (button) => {
+            const dialog = await openCreate();
 
-            fireEvent.click(screen.getByRole('button', { name: 'Create Campaign' }));
-            fireEvent.click(screen.getByRole('button', { name: 'Close modal' }));
-            expect(screen.queryByRole('dialog')).toBeNull();
+            fireEvent.click(within(dialog).getByRole('button', { name: button }));
 
-            fireEvent.click(screen.getByRole('button', { name: 'Create Campaign' }));
-            fireEvent.click(screen.getByLabelText(/Campaign Name/));
+            expect(screen.queryByRole('dialog')).toBeNull();
+            expect(apiService.createCampaign).not.toHaveBeenCalled();
+        });
+
+        it('closes on a click outside the form, but not inside it', async () => {
+            const dialog = await openCreate();
+
+            fireEvent.click(within(dialog).getByLabelText(/Campaign Name/));
             expect(screen.getByRole('dialog')).toBeTruthy();
-            dialog = screen.getByRole('dialog');
+
             fireEvent.click(dialog);
             expect(screen.queryByRole('dialog')).toBeNull();
         });

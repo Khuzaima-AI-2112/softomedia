@@ -27,8 +27,7 @@ const renderOverview = () => render(
     </MemoryRouter>
 );
 
-// The figure shown on the stat card headed by `label`.
-const statCard = (label) => screen.getByText(label, { selector: 'p' }).parentElement;
+const statCard = (label) => screen.getByRole('group', { name: label });
 
 const RETAILERS = [
     { id: 'r1', name: 'FreshMart', logo: '🛒', status: 'active' },
@@ -94,11 +93,11 @@ describe('AdminOverview', () => {
             apiService.getUsers.mockResolvedValue([{ id: 'u1' }, { id: 'u2' }]);
         });
 
-        it('counts Retailers, Advertisers, Screens online and platform users', async () => {
+        it('counts Retailers, Brands, Screens online and platform users', async () => {
             renderOverview();
 
-            await waitFor(() => expect(screen.getByTestId('stat-value-retailers').textContent).toBe('5'));
-            expect(screen.getByTestId('stat-value-advertisers').textContent).toBe('2');
+            expect(await within(statCard('Retailers')).findByText('5')).toBeTruthy();
+            expect(within(statCard('Advertisers')).getByText('2')).toBeTruthy();
             expect(within(statCard('Screens Online')).getByText('2')).toBeTruthy();
             expect(within(statCard('Screens Online')).getByText('of 3 total')).toBeTruthy();
             expect(within(statCard('Platform Users')).getByText('2')).toBeTruthy();
@@ -107,28 +106,31 @@ describe('AdminOverview', () => {
         it('offers the Screens and Users pages alongside the shared ones', async () => {
             renderOverview();
 
+            await screen.findByText('CPM Pricing');
+            // Each tile's text is its icon name followed by the page name.
+            const tiles = screen.getAllByRole('link').map(link => link.textContent);
             for (const page of ['CPM Pricing', 'Screens', 'Users', 'Retailers', 'Advertisers', 'Store Hours', 'Network Map']) {
-                expect(await screen.findByRole('link', { name: new RegExp(`${page}$`) })).toBeTruthy();
+                expect(tiles.some(tile => tile.endsWith(page))).toBe(true);
             }
         });
 
         it('lists the first four Retailers with their status', async () => {
             renderOverview();
 
-            const freshMart = (await screen.findByText('FreshMart')).closest('a');
+            const freshMart = await screen.findByRole('link', { name: /FreshMart/ });
 
             for (const name of ['QuickStop', 'Corner Deli', 'BookNook']) expect(screen.getByText(name)).toBeTruthy();
             expect(screen.queryByText('PetPal')).toBeNull();
             expect(within(freshMart).getByText('Active')).toBeTruthy();
-            expect(within(screen.getByText('QuickStop').closest('a')).getByText('Inactive')).toBeTruthy();
+            expect(within(screen.getByRole('link', { name: /QuickStop/ })).getByText('Inactive')).toBeTruthy();
         });
 
-        it('lists Advertisers with their budget', async () => {
+        it('lists Brands with their budget', async () => {
             renderOverview();
 
-            const bolt = (await screen.findByText('Bolt Drinks')).closest('a');
+            const bolt = await screen.findByRole('link', { name: /Bolt Drinks/ });
             expect(within(bolt).getByText('$2,400.00')).toBeTruthy();
-            expect(within(screen.getByText('Sunny Snacks').closest('a')).getByText('$0.00')).toBeTruthy();
+            expect(within(screen.getByRole('link', { name: /Sunny Snacks/ })).getByText('$0.00')).toBeTruthy();
         });
     });
 
@@ -157,8 +159,8 @@ describe('AdminOverview', () => {
         renderOverview();
 
         await waitFor(() => expect(within(statCard('Screens Online')).getByText('of 3 total')).toBeTruthy());
-        expect(screen.getByTestId('stat-value-retailers').textContent).toBe('0');
-        expect(screen.getByTestId('stat-value-advertisers').textContent).toBe('0');
+        expect(within(statCard('Retailers')).getByText('0')).toBeTruthy();
+        expect(within(statCard('Advertisers')).getByText('0')).toBeTruthy();
     });
 
     it('opens the network map', async () => {
