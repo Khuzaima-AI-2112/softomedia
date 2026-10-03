@@ -83,7 +83,7 @@ function AdvertiserManagement() {
             await loadData();
             closeModal();
         } catch (error) {
-            const message = error?.response?.data?.error || error?.message || 'Failed to save advertiser. Please try again.';
+            const message = error?.message || 'Failed to save advertiser. Please try again.';
             setModalError(message);
             // Modal stays open — do NOT call closeModal()
         }
@@ -163,7 +163,7 @@ function AdvertiserManagement() {
             if (selectedAdvertiser?.id === advertiser.id) setSelectedAdvertiser(null);
             addToast(`Advertiser "${advertiser.name}" removed.`, 'success');
         } catch (error) {
-            const message = error?.response?.data?.error || error?.message || 'Failed to remove advertiser.';
+            const message = error?.message || 'Failed to remove advertiser.';
             addToast(message, 'error');
         }
     };
@@ -422,8 +422,9 @@ function AdvertiserManagement() {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium mb-1">Name *</label>
+                                <label className="block text-sm font-medium mb-1" htmlFor="advertiser-name">Name *</label>
                                 <input
+                                    id="advertiser-name"
                                     type="text"
                                     data-testid="input-advertiser-name"
                                     value={formData.name}
@@ -435,8 +436,9 @@ function AdvertiserManagement() {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium mb-1">Industry *</label>
+                                <label className="block text-sm font-medium mb-1" htmlFor="advertiser-industry">Industry *</label>
                                 <select
+                                    id="advertiser-industry"
                                     value={formData.industry}
                                     onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
                                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none"
@@ -448,8 +450,9 @@ function AdvertiserManagement() {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium mb-1">Contact Email *</label>
+                                <label className="block text-sm font-medium mb-1" htmlFor="advertiser-contact">Contact Email *</label>
                                 <input
+                                    id="advertiser-contact"
                                     type="email"
                                     data-testid="input-advertiser-contact"
                                     value={formData.contact_email}
@@ -461,8 +464,9 @@ function AdvertiserManagement() {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium mb-1">Budget ($)</label>
+                                <label className="block text-sm font-medium mb-1" htmlFor="advertiser-budget">Budget ($)</label>
                                 <input
+                                    id="advertiser-budget"
                                     type="number"
                                     value={formData.budget}
                                     onChange={(e) => setFormData({ ...formData, budget: Number(e.target.value) })}

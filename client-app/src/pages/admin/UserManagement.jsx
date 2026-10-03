@@ -258,8 +258,9 @@ function UserManagement() {
 
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <label className="block text-sm text-gray-400 mb-1">Name</label>
+                                <label className="block text-sm text-gray-400 mb-1" htmlFor="user-name">Name</label>
                                 <input
+                                    id="user-name"
                                     name="name"
                                     data-testid="input-user-displayname"
                                     value={formData.name}
@@ -269,8 +270,9 @@ function UserManagement() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm text-gray-400 mb-1">Email</label>
+                                <label className="block text-sm text-gray-400 mb-1" htmlFor="user-email">Email</label>
                                 <input
+                                    id="user-email"
                                     name="email"
                                     data-testid="input-user-email"
                                     type="email"
@@ -281,8 +283,9 @@ function UserManagement() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm text-gray-400 mb-1">Role</label>
+                                <label className="block text-sm text-gray-400 mb-1" htmlFor="user-role">Role</label>
                                 <select
+                                    id="user-role"
                                     name="role"
                                     data-testid="select-user-role"
                                     value={formData.role}
@@ -297,10 +300,11 @@ function UserManagement() {
 
                             {linkedEntityOptions().length > 0 && (
                                 <div>
-                                    <label className="block text-sm text-gray-400 mb-1">
+                                    <label className="block text-sm text-gray-400 mb-1" htmlFor="user-linked-entity">
                                         Linked {formData.role === 'retaileradmin' ? 'Retailer' : 'Advertiser'}
                                     </label>
                                     <select
+                                        id="user-linked-entity"
                                         name="linkedentityid"
                                         data-testid="input-user-entity-id"
                                         value={formData.linkedentityid}
