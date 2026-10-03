@@ -127,6 +127,24 @@ describeWithAuthEmulator('Store-scoped schedule preview', () => {
         expect(await loopRepository.findById(loop.id)).toEqual(loop);
     });
 
+    test('a corrected Slot leaves its Run, so the Run no longer counts as an Ad Play', async () => {
+        const [loop] = await seedSchedule();
+        const run = [3, 4].map(position => ({
+            ...loop.slots[position], allocated_category: 'paid', run_start: 3, run_length: 2, run_file: position - 3,
+        }));
+        await loopRepository.update(loop.id, { slots: [...loop.slots.slice(0, 3), ...run, ...loop.slots.slice(5)] });
+
+        const corrected = await request(app)
+            .patch(`/api/loops/${loop.id}/slots/3/replace`)
+            .set(await headersFor('admin'))
+            .send({ assetId: 'corrected-asset' });
+        expect(corrected.status).toBe(200);
+
+        const [replaced, untouched] = (await loopRepository.findById(loop.id)).slots.slice(3, 5);
+        expect(replaced).toEqual(expect.not.objectContaining({ run_start: expect.anything() }));
+        expect(untouched).toMatchObject({ run_start: 3, run_length: 2, run_file: 1 });
+    });
+
     test('lets only Admin correct a Slot, in the loop that plays', async () => {
         const [loop] = await seedSchedule();
 

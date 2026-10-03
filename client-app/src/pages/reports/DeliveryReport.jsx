@@ -6,12 +6,20 @@ import { PERMISSIONS } from '../../constants/permissions';
 import { DAYPART_LABELS, formatHour } from '../../constants/dayparts';
 
 const cellClass = 'px-4 py-3 text-right tabular-nums';
+const subheadingClass = 'px-4 pb-2 text-right text-xs font-medium';
+
+/** A count's Slots, then its Ad Plays (#75). */
+const countCells = (key, count, extraClass = '') => [
+    <td key={`${key}-slots`} className={`${cellClass} ${extraClass}`}>{count.slots}</td>,
+    <td key={`${key}-ad-plays`} className={`${cellClass} ${extraClass}`}>{count.ad_plays}</td>,
+];
 
 /**
  * Daypart delivery report (#41): Proof of Play per Campaign or Retailer
- * promotion and per Daypart. The server scopes it: a Brand sees its own
- * Campaigns, a Retailer Administrator its own Stores, Admin and Super
- * Administrator the whole network. Fallback Content is never counted.
+ * promotion and per Daypart, as Slots and then Ad Plays (#75). The server
+ * scopes it: a Brand sees its own Campaigns, a Retailer Administrator its own
+ * Stores, Admin and Super Administrator the whole network. Fallback Content is
+ * never counted.
  */
 export default function DeliveryReport() {
     const { user, can } = useAuth();
@@ -48,6 +56,8 @@ export default function DeliveryReport() {
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Delivery by Daypart</h1>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
                     Proof of Play for each Campaign and promotion, by the Store&apos;s local hour.
+                    Slots counts every five-second Slot played; Ad Plays counts each Creative played whole,
+                    so a three-file Creative is 3 Slots and 1 Ad Play.
                     Fallback Content is not Campaign delivery and is not counted.
                 </p>
             </div>
@@ -64,11 +74,17 @@ export default function DeliveryReport() {
                     <table className="w-full text-sm" data-testid="delivery-report-table">
                         <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                             <tr>
-                                <th className="px-4 py-3 text-left font-semibold">Campaign</th>
+                                <th rowSpan={2} className="px-4 py-3 text-left font-semibold">Campaign</th>
                                 {report.columns.map(name => (
-                                    <th key={name} className="px-4 py-3 text-right font-semibold">{columnHeading(name)}</th>
+                                    <th key={name} colSpan={2} className="px-4 pt-3 text-center font-semibold">{columnHeading(name)}</th>
                                 ))}
-                                <th className="px-4 py-3 text-right font-semibold">Total</th>
+                                <th colSpan={2} className="px-4 pt-3 text-center font-semibold">Total</th>
+                            </tr>
+                            <tr>
+                                {[...report.columns, 'total'].flatMap(name => [
+                                    <th key={`${name}-slots`} className={subheadingClass}>Slots</th>,
+                                    <th key={`${name}-ad-plays`} className={subheadingClass}>Ad Plays</th>,
+                                ])}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -80,16 +96,16 @@ export default function DeliveryReport() {
                                             <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">Promotion</span>
                                         )}
                                     </td>
-                                    {report.columns.map(name => <td key={name} className={cellClass}>{row.dayparts[name]}</td>)}
-                                    <td className={`${cellClass} font-semibold`}>{row.total}</td>
+                                    {report.columns.flatMap(name => countCells(name, row.dayparts[name]))}
+                                    {countCells('total', row.total, 'font-semibold')}
                                 </tr>
                             ))}
                         </tbody>
                         <tfoot className="border-t border-slate-200 dark:border-slate-700 font-semibold">
                             <tr data-testid="delivery-row-total">
                                 <td className="px-4 py-3">Total</td>
-                                {report.columns.map(name => <td key={name} className={cellClass}>{report.totals[name]}</td>)}
-                                <td className={cellClass}>{report.totals.total}</td>
+                                {report.columns.flatMap(name => countCells(name, report.totals[name]))}
+                                {countCells('total', report.totals.total)}
                             </tr>
                         </tfoot>
                     </table>

@@ -1,5 +1,6 @@
 import { jest, test, expect, beforeEach } from '@jest/globals';
 import request from 'supertest';
+import { slotsOf } from './fixtures/delivery-report.js';
 
 jest.unstable_mockModule('../src/utils/firestore.js', () => ({
     getFirestore: jest.fn(() => null),
@@ -67,7 +68,8 @@ async function seed() {
     });
 }
 
-const rowsOf = body => body.rows.map(row => ({ campaign_id: row.campaign_id, ...row.dayparts, total: row.total }));
+// These Hourly Loops record no Slots, so the Proofs of Play here count as Slots only.
+const rowsOf = body => body.rows.map(row => ({ campaign_id: row.campaign_id, ...slotsOf(row.dayparts), total: row.total.slots }));
 
 describeWithAuthEmulator('Daypart delivery report', () => {
     beforeEach(async () => {
@@ -88,7 +90,7 @@ describeWithAuthEmulator('Daypart delivery report', () => {
             { campaign_id: 'brand-two-chips', ...EMPTY, dinner: 1, total: 1 },
             { campaign_id: 'brand-one-cola', breakfast: 2, lunch: 1, dinner: 1, outside_dayparts: 1, total: 5 },
         ]);
-        expect(response.body.totals).toEqual({ breakfast: 3, lunch: 1, dinner: 2, outside_dayparts: 1, total: 7 });
+        expect(slotsOf(response.body.totals)).toEqual({ breakfast: 3, lunch: 1, dinner: 2, outside_dayparts: 1, total: 7 });
         expect(response.body.dayparts).toEqual({
             breakfast: { start: 6, end: 11 }, lunch: { start: 11, end: 15 }, dinner: { start: 17, end: 21 },
         });
@@ -124,7 +126,7 @@ describeWithAuthEmulator('Daypart delivery report', () => {
         for (const [role, organizationId] of [['brand', 'brand-three'], ['retaileradmin', 'retailer-three']]) {
             const response = await get(role, organizationId);
             expect({ role, status: response.status, rows: response.body.rows }).toEqual({ role, status: 200, rows: [] });
-            expect(response.body.totals.total).toBe(0);
+            expect(response.body.totals.total).toEqual({ slots: 0, ad_plays: 0 });
         }
     });
 

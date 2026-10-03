@@ -6,10 +6,16 @@
  * local hour, and belongs to the Retailer that owns the Loop's Store. Hours no Daypart covers are counted as outside_dayparts, so each
  * row's total matches its Proof of Play records. Fallback Content is never
  * Campaign delivery and is never counted.
+ *
+ * Every count has Slots, one per Proof of Play, and Ad Plays (#75): a Run
+ * counts once per pass on a Screen in which all its files have a Proof of
+ * Play, and a Retailer or Internal Slot counts one each. A Paid Slot with no
+ * recorded Run, from an Hourly Loop generated before #75, adds no Ad Play.
  */
 
 import { DAYPART_NAMES } from './Dayparts.js';
 import { campaignRepository } from '../repositories/CampaignRepository.js';
+import { SLOT_CONFIG } from './LoopGenerationService.js';
 
 export const OUTSIDE_DAYPARTS = 'outside_dayparts';
 export const REPORT_COLUMNS = Object.freeze([...DAYPART_NAMES, OUTSIDE_DAYPARTS]);
@@ -35,7 +41,25 @@ function inScope(scope, retailerId, campaign) {
     }
 }
 
-const emptyCounts = () => Object.fromEntries(REPORT_COLUMNS.map(column => [column, 0]));
+const SLOT_MS = SLOT_CONFIG.SLOT_DURATION_SECONDS * 1000;
+// An Hourly Loop's cycle repeats every LOOP_DURATION_SECONDS, so one pass's Run starts lie well within half of it.
+const SAME_PASS_MS = (SLOT_CONFIG.LOOP_DURATION_SECONDS * 1000) / 2;
+
+/** The files presented in each pass of one Run, from when each Proof of Play says its Run started. */
+function passes(plays) {
+    const grouped = [];
+    for (const play of [...plays].sort((a, b) => a.runStartedAt - b.runStartedAt)) {
+        const current = grouped.at(-1);
+        if (current && play.runStartedAt - current.startedAt < SAME_PASS_MS) current.files.add(play.file);
+        else grouped.push({ startedAt: play.runStartedAt, files: new Set([play.file]) });
+    }
+    return grouped.map(pass => pass.files);
+}
+
+const emptyCell = () => ({ slots: 0, ad_plays: 0 });
+const addSlot = cells => cells.forEach(cell => { cell.slots += 1; });
+const addAdPlay = cells => cells.forEach(cell => { cell.ad_plays += 1; });
+const emptyCounts = () => Object.fromEntries(REPORT_COLUMNS.map(column => [column, emptyCell()]));
 
 /**
  * @param {object} input
@@ -53,7 +77,8 @@ export function buildDeliveryReport({ proofs, loops, stores, campaigns, dayparts
     const retailerOf = loop => (loop.store_id ? retailerOfStore.get(loop.store_id) : loop.retailer_id) || null;
     const campaignsById = new Map(campaigns.map(campaign => [campaign.id, campaign]));
     const rows = new Map();
-    const totals = { ...emptyCounts(), total: 0 };
+    const totals = { ...emptyCounts(), total: emptyCell() };
+    const runs = new Map();
 
     for (const proof of proofs) {
         if (!isCampaignDelivery(proof)) continue;
@@ -69,15 +94,36 @@ export function buildDeliveryReport({ proofs, loops, stores, campaigns, dayparts
                 campaign_name: campaign?.name || proof.campaign_id,
                 is_retailer_promotion: campaign?.type === 'retailer',
                 dayparts: emptyCounts(),
-                total: 0,
+                total: emptyCell(),
             });
         }
         const row = rows.get(proof.campaign_id);
         const column = daypartOf(loop.hour, dayparts);
-        row.dayparts[column] += 1;
-        row.total += 1;
-        totals[column] += 1;
-        totals.total += 1;
+        // The row's and the network's counts, for this Daypart and in total.
+        const cells = [row.dayparts[column], row.total, totals[column], totals.total];
+        addSlot(cells);
+
+        // A Slot regenerated for another Campaign no longer says which Run this Proof of Play belonged to.
+        const slot = (loop.slots || []).find(candidate => candidate?.position === proof.slot_position
+            && candidate.campaign_id === proof.campaign_id);
+        if (Number.isInteger(slot?.run_start)) {
+            const key = `${proof.screen_id}|${loop.id}|${proof.campaign_id}|${slot.run_start}`;
+            if (!runs.has(key)) runs.set(key, { cells, length: slot.run_length, plays: [] });
+            runs.get(key).plays.push({
+                file: slot.run_file,
+                runStartedAt: Date.parse(proof.presentation_started_at) - slot.run_file * SLOT_MS,
+            });
+        } else if (slot && slot.allocated_category !== 'paid') {
+            // Retailer promotions and Internal Campaigns fill one Slot each.
+            addAdPlay(cells);
+        }
+    }
+
+    // An Ad Play is one pass of a Run on a Screen in which every file has a Proof of Play.
+    for (const run of runs.values()) {
+        for (const files of passes(run.plays)) {
+            if (files.size === run.length) addAdPlay(run.cells);
+        }
     }
 
     return {
