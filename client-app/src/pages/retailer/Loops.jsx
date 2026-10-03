@@ -4,6 +4,10 @@ import GlassCard from '../../components/GlassCard';
 import apiService from '../../services/ApiService';
 import { loopListFrom } from '../../services/loopList';
 
+// The server answers in document-id order, which puts 10:00 before 8:00.
+const newestDayThenHour = (a, b) =>
+    (b.date || '').localeCompare(a.date || '') || (a.hour ?? 24) - (b.hour ?? 24);
+
 /**
  * Loops.jsx — Retailer Loop Library
  *
@@ -23,7 +27,7 @@ export default function RetailerLoops() {
 
     useEffect(() => {
         apiService.getLoops()
-            .then(data => setLoops(loopListFrom(data)))
+            .then(data => setLoops([...loopListFrom(data)].sort(newestDayThenHour)))
             .catch(err => setError(err.message))
             .finally(() => setLoading(false));
     }, []);
