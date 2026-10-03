@@ -71,7 +71,7 @@ test('Brand, Retailer Administrator and Admin each see delivery by Daypart in th
         await expect(page.getByRole('heading', { name: 'Delivery by Daypart' })).toBeVisible();
         await expect(page.getByRole('columnheader', { name: 'Breakfast 06:00–11:00' })).toBeVisible();
         await expect(page.getByRole('columnheader', { name: 'Slots' })).toHaveCount(5);
-        // Campaign, then Slots and Ads for Breakfast, Lunch, Dinner, Other hours and Total.
+        // Campaign, then Slots and Ad Plays for Breakfast, Lunch, Dinner, Other hours and Total.
         await expect(cells(page.getByTestId('delivery-row-report-bonvie')))
             .toHaveText(['Bonvie Morning Coffee', '2', '1', '1', '0', '1', '0', '0', '0', '4', '1']);
         await expect(page.getByText('Northstar Pantry Synthetic Campaign')).toHaveCount(0);

@@ -85,6 +85,9 @@ Hourly broadcast loops. One document per `{date}_{hour}_{location_id}`.
 | `rejection_reason` | string? | |
 | `rejected_at` | ISO string? | |
 | `replaced_at` | ISO string? | |
+| `run_start` | number? | Paid Slots only (#75): position of the first Slot of the Run this Slot belongs to. Absent on Hourly Loops generated before #75 and on a Slot Admin replaced. |
+| `run_length` | number? | Paid Slots only: the Creative's file count, so the Run's length. |
+| `run_file` | number? | Paid Slots only: this Slot's file in the Run, from 0. |
 
 ---
 

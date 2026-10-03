@@ -1,5 +1,6 @@
 import { jest, test, expect, beforeEach } from '@jest/globals';
 import request from 'supertest';
+import { slotsOf } from './fixtures/delivery-report.js';
 
 jest.unstable_mockModule('../src/utils/firestore.js', () => ({
     getFirestore: jest.fn(() => null),
@@ -68,7 +69,6 @@ async function seed() {
 }
 
 // These Hourly Loops record no Slots, so the Proofs of Play here count as Slots only.
-const slotsOf = cells => Object.fromEntries(Object.entries(cells).map(([column, cell]) => [column, cell.slots]));
 const rowsOf = body => body.rows.map(row => ({ campaign_id: row.campaign_id, ...slotsOf(row.dayparts), total: row.total.slots }));
 
 describeWithAuthEmulator('Daypart delivery report', () => {
@@ -126,7 +126,7 @@ describeWithAuthEmulator('Daypart delivery report', () => {
         for (const [role, organizationId] of [['brand', 'brand-three'], ['retaileradmin', 'retailer-three']]) {
             const response = await get(role, organizationId);
             expect({ role, status: response.status, rows: response.body.rows }).toEqual({ role, status: 200, rows: [] });
-            expect(response.body.totals.total).toEqual({ slots: 0, ads: 0 });
+            expect(response.body.totals.total).toEqual({ slots: 0, ad_plays: 0 });
         }
     });
 

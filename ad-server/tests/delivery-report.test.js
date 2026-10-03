@@ -1,6 +1,7 @@
 import { describe, expect, test } from '@jest/globals';
 import { DEFAULT_DAYPARTS } from '../src/services/Dayparts.js';
 import { buildDeliveryReport } from '../src/services/DeliveryReport.js';
+import { slotsOf } from './fixtures/delivery-report.js';
 
 const loops = [
     { id: 'north-08', retailer_id: 'freshmart', store_id: 'north', date: '2030-01-16', hour: 8 },
@@ -39,7 +40,6 @@ const proofs = [
 const report = (scope, extra = {}) => buildDeliveryReport({
     proofs, loops, stores, campaigns, dayparts: DEFAULT_DAYPARTS, scope, ...extra,
 });
-const slotsOf = cells => Object.fromEntries(Object.entries(cells).map(([column, cell]) => [column, cell.slots]));
 const counts = row => ({ campaign_id: row.campaign_id, ...slotsOf(row.dayparts), total: row.total.slots });
 
 describe('Daypart delivery report', () => {
@@ -148,23 +148,23 @@ describe('Ad Plays', () => {
     test('a three-file Run played whole in one pass is 3 Slots and 1 Ad Play', () => {
         const delivered = adReport([played(9), played(10), played(11)]);
 
-        expect(cola(delivered).dayparts.breakfast).toEqual({ slots: 3, ads: 1 });
-        expect(cola(delivered).total).toEqual({ slots: 3, ads: 1 });
-        expect(delivered.totals.breakfast).toEqual({ slots: 3, ads: 1 });
-        expect(delivered.totals.total).toEqual({ slots: 3, ads: 1 });
+        expect(cola(delivered).dayparts.breakfast).toEqual({ slots: 3, ad_plays: 1 });
+        expect(cola(delivered).total).toEqual({ slots: 3, ad_plays: 1 });
+        expect(delivered.totals.breakfast).toEqual({ slots: 3, ad_plays: 1 });
+        expect(delivered.totals.total).toEqual({ slots: 3, ad_plays: 1 });
     });
 
     test('the same Run on two Screens is 2 Ad Plays', () => {
         const screens = ['north-screen', 'north-screen-2'];
         const delivered = adReport(screens.flatMap(screen => [9, 10, 11].map(position => played(position, { screen }))));
 
-        expect(cola(delivered).total).toEqual({ slots: 6, ads: 2 });
+        expect(cola(delivered).total).toEqual({ slots: 6, ad_plays: 2 });
     });
 
     test('the same Run in two passes of its Hourly Loop is 2 Ad Plays', () => {
         const delivered = adReport([0, 1].flatMap(pass => [9, 10, 11].map(position => played(position, { pass }))));
 
-        expect(cola(delivered).total).toEqual({ slots: 6, ads: 2 });
+        expect(cola(delivered).total).toEqual({ slots: 6, ad_plays: 2 });
     });
 
     test('a single-file Creative in three consecutive Slots is 3 Ad Plays', () => {
@@ -179,17 +179,40 @@ describe('Ad Plays', () => {
             loops: [singles], stores, campaigns, dayparts: DEFAULT_DAYPARTS, scope: { kind: 'network' },
         });
 
-        expect(cola(delivered).total).toEqual({ slots: 3, ads: 3 });
+        expect(cola(delivered).total).toEqual({ slots: 3, ad_plays: 3 });
+    });
+
+    test('two three-file Runs back to back in one pass are 2 Ad Plays', () => {
+        const backToBack = {
+            ...eightAm,
+            slots: [0, 1, 2, 3, 4, 5].map(position => ({
+                position, allocated_category: 'paid', campaign_id: 'cola',
+                run_start: position < 3 ? 0 : 3, run_length: 3, run_file: position % 3,
+            })),
+        };
+        const delivered = buildDeliveryReport({
+            proofs: [0, 1, 2, 3, 4, 5].map(position => played(position)),
+            loops: [backToBack], stores, campaigns, dayparts: DEFAULT_DAYPARTS, scope: { kind: 'network' },
+        });
+
+        expect(cola(delivered).total).toEqual({ slots: 6, ad_plays: 2 });
     });
 
     test('a Run missing one file\'s Proof of Play counts its Slots but no Ad Play', () => {
-        expect(cola(adReport([played(9), played(11)])).total).toEqual({ slots: 2, ads: 0 });
+        expect(cola(adReport([played(9), played(11)])).total).toEqual({ slots: 2, ad_plays: 0 });
     });
 
     test('each Proof of Play of a Retailer promotion is 1 Slot and 1 Ad Play', () => {
         const delivered = adReport([played(2, { campaignId: 'muffin' }), played(2, { campaignId: 'muffin', pass: 1 })]);
 
-        expect(delivered.rows.find(row => row.campaign_id === 'muffin').total).toEqual({ slots: 2, ads: 2 });
+        expect(delivered.rows.find(row => row.campaign_id === 'muffin').total).toEqual({ slots: 2, ad_plays: 2 });
+    });
+
+    test('a Proof of Play for a Slot that now holds another Campaign counts as a Slot but no Ad Play', () => {
+        // Chips played Slots 9-11 before the Hourly Loop was regenerated with Cola's Run there.
+        const delivered = adReport([9, 10, 11].map(position => played(position, { campaignId: 'chips' })));
+
+        expect(delivered.rows.find(row => row.campaign_id === 'chips').total).toEqual({ slots: 3, ad_plays: 0 });
     });
 
     test('a Paid Slot of an Hourly Loop generated before Runs were recorded counts as a Slot but no Ad Play', () => {
@@ -202,6 +225,6 @@ describe('Ad Plays', () => {
             loops: [before], stores, campaigns, dayparts: DEFAULT_DAYPARTS, scope: { kind: 'network' },
         });
 
-        expect(cola(delivered).total).toEqual({ slots: 3, ads: 0 });
+        expect(cola(delivered).total).toEqual({ slots: 3, ad_plays: 0 });
     });
 });

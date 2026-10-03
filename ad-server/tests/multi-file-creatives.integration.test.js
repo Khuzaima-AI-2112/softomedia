@@ -101,6 +101,19 @@ const availability = (headers, files) => request(app)
     .get(`/api/inventory/stores/store-one/slots?date=${DATE}${files === undefined ? '' : `&files=${files}`}`)
     .set(headers);
 
+/** Generates the Store's Hourly Loops as Admin and returns the 08:00 one. */
+async function generateEightAm() {
+    jest.setSystemTime(GENERATED);
+    const admin = (await signInAs('admin', { fakeClock: true })).headers;
+    const generated = await request(app).post('/api/loops/generate').set(admin)
+        .send({ targetDate: DATE, retailerId: 'retailer-one', storeId: 'store-one' });
+    expect(generated.status).toBe(201);
+    return generated.body.loops.find(loop => loop.hour === 8);
+}
+
+/** Each Slot's Run: where it starts, its length and the Slot's file. */
+const runsOf = slots => slots.map(({ run_start: start, run_length: length, run_file: file }) => ({ start, length, file }));
+
 const runsAt = (body, hour) => body.hours.find(candidate => candidate.hour === hour).runs;
 
 const brandAt = async (now, organizationId = 'brand-one') => {
@@ -215,12 +228,7 @@ describeWithAuthEmulator('Multi-file Creatives in consecutive Paid Slots', () =>
         const booked = await book(brand, parts[0], [slot(8, 11), slot(8, 9), slot(8, 10)]);
         expect(booked.status).toBe(201);
 
-        jest.setSystemTime(GENERATED);
-        const admin = (await signInAs('admin', { fakeClock: true })).headers;
-        const generated = await request(app).post('/api/loops/generate').set(admin)
-            .send({ targetDate: DATE, retailerId: 'retailer-one', storeId: 'store-one' });
-        expect(generated.status).toBe(201);
-        const eightAm = generated.body.loops.find(loop => loop.hour === 8);
+        const eightAm = await generateEightAm();
         expect(eightAm.slots.slice(9).map(({ asset_id: assetId, campaign_id: campaignId, is_fallback: fallback }) => ({
             assetId, campaignId, fallback,
         }))).toEqual(parts.map(assetId => ({ assetId, campaignId: booked.body.id, fallback: false })));
@@ -263,11 +271,7 @@ describeWithAuthEmulator('Multi-file Creatives in consecutive Paid Slots', () =>
         const booked = await book(brand, parts[0], [slot(8, 9), slot(8, 10), slot(8, 11)]);
         expect(booked.status).toBe(201);
 
-        jest.setSystemTime(GENERATED);
-        const admin = (await signInAs('admin', { fakeClock: true })).headers;
-        const generated = await request(app).post('/api/loops/generate').set(admin)
-            .send({ targetDate: DATE, retailerId: 'retailer-one', storeId: 'store-one' });
-        const eightAm = generated.body.loops.find(loop => loop.hour === 8);
+        const eightAm = await generateEightAm();
 
         // The Run plays in the hour's first pass, at 08:00:45, 08:00:50 and 08:00:55.
         const HOUR_STARTED = Date.parse('2030-01-07T13:00:00.000Z');
@@ -294,7 +298,7 @@ describeWithAuthEmulator('Multi-file Creatives in consecutive Paid Slots', () =>
         expect(report.status).toBe(200);
         expect(report.body.rows.map(({ campaign_id: campaignId, dayparts, total }) => ({
             campaignId, breakfast: dayparts.breakfast, total,
-        }))).toEqual([{ campaignId: booked.body.id, breakfast: { slots: 3, ads: 1 }, total: { slots: 3, ads: 1 } }]);
+        }))).toEqual([{ campaignId: booked.body.id, breakfast: { slots: 3, ad_plays: 1 }, total: { slots: 3, ad_plays: 1 } }]);
     });
 
     test('each Slot of a Run records where its Run starts, its length and its file', async () => {
@@ -302,15 +306,8 @@ describeWithAuthEmulator('Multi-file Creatives in consecutive Paid Slots', () =>
         const brand = await brandAt(BOOKED);
         expect((await book(brand, first, [slot(8, 9), slot(8, 10), slot(8, 11)])).status).toBe(201);
 
-        jest.setSystemTime(GENERATED);
-        const admin = (await signInAs('admin', { fakeClock: true })).headers;
-        const generated = await request(app).post('/api/loops/generate').set(admin)
-            .send({ targetDate: DATE, retailerId: 'retailer-one', storeId: 'store-one' });
-        expect(generated.status).toBe(201);
-        const eightAm = generated.body.loops.find(loop => loop.hour === 8);
-        expect(eightAm.slots.slice(9).map(({ run_start: start, run_length: length, run_file: file }) => ({
-            start, length, file,
-        }))).toEqual([
+        const eightAm = await generateEightAm();
+        expect(runsOf(eightAm.slots.slice(9))).toEqual([
             { start: 9, length: 3, file: 0 },
             { start: 9, length: 3, file: 1 },
             { start: 9, length: 3, file: 2 },
@@ -322,15 +319,8 @@ describeWithAuthEmulator('Multi-file Creatives in consecutive Paid Slots', () =>
         const brand = await brandAt(BOOKED);
         expect((await book(brand, only, [slot(8, 9), slot(8, 10), slot(8, 11)])).status).toBe(201);
 
-        jest.setSystemTime(GENERATED);
-        const admin = (await signInAs('admin', { fakeClock: true })).headers;
-        const generated = await request(app).post('/api/loops/generate').set(admin)
-            .send({ targetDate: DATE, retailerId: 'retailer-one', storeId: 'store-one' });
-        expect(generated.status).toBe(201);
-        const eightAm = generated.body.loops.find(loop => loop.hour === 8);
-        expect(eightAm.slots.slice(9).map(({ run_start: start, run_length: length, run_file: file }) => ({
-            start, length, file,
-        }))).toEqual([
+        const eightAm = await generateEightAm();
+        expect(runsOf(eightAm.slots.slice(9))).toEqual([
             { start: 9, length: 1, file: 0 },
             { start: 10, length: 1, file: 0 },
             { start: 11, length: 1, file: 0 },
@@ -345,11 +335,7 @@ describeWithAuthEmulator('Multi-file Creatives in consecutive Paid Slots', () =>
         // Only one Slot of the second run is still held.
         await slotReservationRepository.delete(slotReservationRepository.idFor(slot(8, 3)));
 
-        jest.setSystemTime(GENERATED);
-        const admin = (await signInAs('admin', { fakeClock: true })).headers;
-        const generated = await request(app).post('/api/loops/generate').set(admin)
-            .send({ targetDate: DATE, retailerId: 'retailer-one', storeId: 'store-one' });
-        const eightAm = generated.body.loops.find(loop => loop.hour === 8);
+        const eightAm = await generateEightAm();
         expect([0, 1, 4].map(position => eightAm.slots[position].asset_id))
             .toEqual(['crv-pair-part-1', 'crv-pair-part-2', 'fallback-media']);
     });

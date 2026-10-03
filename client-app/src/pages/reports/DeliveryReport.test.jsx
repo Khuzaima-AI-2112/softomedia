@@ -12,7 +12,7 @@ vi.mock('../../services/ApiService', () => ({ default: { getDeliveryReport } }))
 
 import DeliveryReport from './DeliveryReport';
 
-const cell = (slots, ads) => ({ slots, ads });
+const cell = (slots, adPlays) => ({ slots, ad_plays: adPlays });
 
 const REPORT = {
     dayparts: {
@@ -63,9 +63,9 @@ describe('DeliveryReport', () => {
         expect(screen.getByRole('columnheader', { name: 'Breakfast 06:00–11:00' })).toBeTruthy();
         expect(screen.getByRole('columnheader', { name: 'Dinner 17:00–21:00' })).toBeTruthy();
         expect(screen.getByRole('columnheader', { name: 'Other hours' })).toBeTruthy();
-        // Under each Daypart and the Total: Slots, then Ads.
-        const subheadings = screen.getAllByRole('columnheader', { name: /^(Slots|Ads)$/ }).map(heading => heading.textContent);
-        expect(subheadings).toEqual(Array.from({ length: 5 }, () => ['Slots', 'Ads']).flat());
+        // Under each Daypart and the Total: Slots, then Ad Plays.
+        const subheadings = screen.getAllByRole('columnheader', { name: /^(Slots|Ad Plays)$/ }).map(heading => heading.textContent);
+        expect(subheadings).toEqual(Array.from({ length: 5 }, () => ['Slots', 'Ad Plays']).flat());
         expect(cellsOf(screen.getByRole('row', { name: /^Total/ }))).toEqual(['Total', '9', '5', '3', '1', '12', '4', '3', '1', '27', '11']);
     });
 

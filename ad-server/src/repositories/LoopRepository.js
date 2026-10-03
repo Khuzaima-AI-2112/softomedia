@@ -78,8 +78,11 @@ export class LoopRepository extends BaseRepository {
             throw new Error(`Invalid slot position: ${position}`);
         }
 
+        // A replacement file is not part of the Creative, so the Slot leaves its Run (#75).
+        const slot = { ...slots[position] };
+        for (const field of ['run_start', 'run_length', 'run_file']) delete slot[field];
         slots[position] = {
-            ...slots[position],
+            ...slot,
             asset_id: newAssetId,
             status: SLOT_STATUS.REPLACED,
             replaced_at: new Date().toISOString()

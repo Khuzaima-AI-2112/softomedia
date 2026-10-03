@@ -11,14 +11,15 @@ const subheadingClass = 'px-4 pb-2 text-right text-xs font-medium';
 /** A count's Slots, then its Ad Plays (#75). */
 const countCells = (key, count, extraClass = '') => [
     <td key={`${key}-slots`} className={`${cellClass} ${extraClass}`}>{count.slots}</td>,
-    <td key={`${key}-ads`} className={`${cellClass} ${extraClass}`}>{count.ads}</td>,
+    <td key={`${key}-ad-plays`} className={`${cellClass} ${extraClass}`}>{count.ad_plays}</td>,
 ];
 
 /**
  * Daypart delivery report (#41): Proof of Play per Campaign or Retailer
- * promotion and per Daypart, as Slots and then Ad Plays (#75). The server scopes it: a Brand sees its own
- * Campaigns, a Retailer Administrator its own Stores, Admin and Super
- * Administrator the whole network. Fallback Content is never counted.
+ * promotion and per Daypart, as Slots and then Ad Plays (#75). The server
+ * scopes it: a Brand sees its own Campaigns, a Retailer Administrator its own
+ * Stores, Admin and Super Administrator the whole network. Fallback Content is
+ * never counted.
  */
 export default function DeliveryReport() {
     const { user, can } = useAuth();
@@ -55,8 +56,8 @@ export default function DeliveryReport() {
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Delivery by Daypart</h1>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
                     Proof of Play for each Campaign and promotion, by the Store&apos;s local hour.
-                    Slots counts every five-second Slot played; Ads counts each Creative played whole,
-                    so a three-file Creative is 3 Slots and 1 Ad.
+                    Slots counts every five-second Slot played; Ad Plays counts each Creative played whole,
+                    so a three-file Creative is 3 Slots and 1 Ad Play.
                     Fallback Content is not Campaign delivery and is not counted.
                 </p>
             </div>
@@ -82,7 +83,7 @@ export default function DeliveryReport() {
                             <tr>
                                 {[...report.columns, 'total'].flatMap(name => [
                                     <th key={`${name}-slots`} className={subheadingClass}>Slots</th>,
-                                    <th key={`${name}-ads`} className={subheadingClass}>Ads</th>,
+                                    <th key={`${name}-ad-plays`} className={subheadingClass}>Ad Plays</th>,
                                 ])}
                             </tr>
                         </thead>
