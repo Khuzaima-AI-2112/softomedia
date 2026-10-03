@@ -30,9 +30,13 @@ export function isApprovedPlaybackAsset(asset, creative = null, retailerId = nul
     return asset.status === 'approved';
 }
 
-/** Whether stored media may play in this Retailer's Stores, looking up the Creative a paid file belongs to. */
-export async function isPlayableStoredAsset(asset, retailerId) {
-    return isApprovedPlaybackAsset(asset, await creativeRepository.findForAsset(asset), retailerId);
+/**
+ * Whether stored media may play in this Retailer's Stores, looking up the
+ * Creative a paid file belongs to.
+ * @param {object} [at] - `{ now, timeZone }` of the Store's Screen asking for it
+ */
+export async function isPlayableStoredAsset(asset, retailerId, at = null) {
+    return isApprovedPlaybackAsset(asset, await creativeRepository.findForAsset(asset), retailerId, at);
 }
 
 export function isApprovedFallbackAsset(asset) {

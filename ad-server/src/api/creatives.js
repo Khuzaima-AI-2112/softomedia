@@ -18,7 +18,7 @@ import {
     notifyBrandOfRevocation,
     retailerApprovals,
 } from '../services/CreativeApproval.js';
-import { releaseLapsedReservations } from '../services/ReservationRelease.js';
+import { settleCreativeReservations } from '../services/ReservationRelease.js';
 
 const router = express.Router();
 const NETWORK_ROLES = new Set([ROLES.ADMIN, ROLES.SUPERADMIN]);
@@ -171,7 +171,7 @@ for (const [action, decision] of Object.entries(DECISIONS)) {
         try {
             // Deadlines already passed are settled first: a late approval never keeps a lapsed Slot,
             // and a revocation never releases one the Creative was approved for at its deadline.
-            if (to !== CREATIVE_STATUS.REJECTED) await releaseLapsedReservations(req.params.id);
+            if (to !== CREATIVE_STATUS.REJECTED) await settleCreativeReservations(req.params.id);
             if (!decidesForNetwork(req.user)) return await decideForRetailer(req, res, decision, reason);
             const decided = await creativeRepository.decide(req.params.id, from, {
                 approval_status: to,

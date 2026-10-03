@@ -190,7 +190,7 @@ export async function settleCampaignReservations(campaignId, now = new Date()) {
  * between: a late approval never keeps a lapsed Slot, and a revocation never
  * releases one the Creative was approved for at its deadline.
  */
-export async function releaseLapsedReservations(creativeId, now = new Date()) {
+export async function settleCreativeReservations(creativeId, now = new Date()) {
     const campaigns = await campaignRepository.findAll({ where: [['creative_id', '==', creativeId]] });
     await Promise.all(campaigns.map(campaign => settleCampaignReservations(campaign.id, now)));
 }

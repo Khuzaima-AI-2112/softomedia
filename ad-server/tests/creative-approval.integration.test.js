@@ -94,6 +94,10 @@ async function seedNetwork() {
     };
     await brandCreative('crv-mocha', 'brand-one', ['mocha-file']);
     await brandCreative('crv-duo', 'brand-one', ['duo-file-1', 'duo-file-2']);
+    await brandCreative('crv-refused', 'brand-one', ['refused-file']);
+    await creativeRepository.update('crv-refused', {
+        approval_status: 'approved', retailer_approvals: { northwind: { status: 'rejected', reason: 'No' } },
+    });
     await advertiserRepository.create('brand-two', { name: 'Other Brand', status: 'active' });
     await brandCreative('crv-foreign', 'brand-two', ['foreign-file']);
 }
@@ -183,7 +187,7 @@ const playback = async storeId => {
 };
 
 /** The Screen's report that it presented this Slot of the Maple latte a second ago. */
-const proofOfPlay = (storeId, played, position, campaignId) => request(app)
+const proofOfPlay = (storeId, played, position, campaignId, overrides = {}) => request(app)
     .post('/api/device/proof-of-play')
     .set('Authorization', device(storeId))
     .send({
@@ -196,6 +200,7 @@ const proofOfPlay = (storeId, played, position, campaignId) => request(app)
         asset_id: 'latte-file',
         presentation_started_at: new Date(Date.now() - 1_000).toISOString(),
         intended_duration_seconds: 5,
+        ...overrides,
     });
 
 describeWithAuthEmulator('Approving a Creative once, by the Super Administrator and each Retailer', () => {
@@ -319,6 +324,11 @@ describeWithAuthEmulator('Revoking a Creative', () => {
             presentation_type: 'fallback', counts_as_delivery: false, campaign_id: null,
         });
         expect((await proofOfPlay('north-downtown', nextHour, NEXT_PAID, campaign.id)).status).toBe(422);
+        // A Slot presented in the revocation hour but reported later still counts.
+        const lateReport = await proofOfPlay('north-downtown', thisHour, PAID, campaign.id, {
+            event_id: 'pop-late', presentation_started_at: new Date(LATER_THIS_HOUR.getTime() + 60_000).toISOString(),
+        });
+        expect(lateReport.status).toBe(201);
 
         // The Brand keeps its Reservations and is told why its Slots play Fallback Content.
         expect(await slotReservationRepository.findHeldForCampaign(campaign.id)).toHaveLength(2);
@@ -367,6 +377,10 @@ describeWithAuthEmulator('Revoking a Creative', () => {
     test('the Brand substitutes another of its Creatives into its Reservations, which plays once approved', async () => {
         const campaign = await playingLatte();
         let as = await signInAllAt(REVOKED);
+        // Only a revoked Creative is substituted, so no substitution slips past an approval deadline.
+        expect((await substitute(as.brand, campaign.id, 'crv-mocha')).body).toEqual({
+            error: 'Only a revoked Creative can be substituted',
+        });
         expect((await decide(as.superadmin, 'revoke', { reason: 'Offer has ended' })).status).toBe(200);
 
         // Only the Brand substitutes, and only its own Creative of as many files, which may still play.
@@ -376,12 +390,21 @@ describeWithAuthEmulator('Revoking a Creative', () => {
             error: 'The Creative must have 1 file, like the one it replaces',
         });
         expect((await substitute(as.brand, campaign.id, 'crv-latte')).status).toBe(409);
+        expect((await substitute(as.brand, campaign.id, 'crv-refused')).body).toEqual({
+            error: 'A Retailer this Campaign books has rejected or revoked this Creative',
+        });
 
         const substituted = await substitute(as.brand, campaign.id, 'crv-mocha');
         expect(substituted.status).toBe(200);
         expect(substituted.body).toMatchObject({ creative_id: 'crv-mocha', media_id: 'mocha-file' });
         // Monday's approval deadline has passed, but the Reservations had both approvals at it, so they are kept.
         expect(await slotReservationRepository.findHeldForCampaign(campaign.id)).toHaveLength(2);
+
+        // The hour now playing is left as it is: the revoked Creative plays it out.
+        await signInAllAt(LATER_THIS_HOUR);
+        expect((await playback('north-downtown')).slots[PAID]).toMatchObject({
+            presentation_type: 'campaign', asset_id: 'latte-file',
+        });
 
         // Until both approve the substitute, its Slots play Fallback Content.
         as = await signInAllAt(NEXT_HOUR);

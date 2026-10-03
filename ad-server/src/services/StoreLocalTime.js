@@ -69,9 +69,8 @@ export function storeLocalDateAndHour(now, timeZone) {
     };
 }
 
-/** Whether two instants fall in the same broadcast hour at the Store. */
-export function inSameStoreHour(first, second, timeZone) {
-    const a = storeLocalDateAndHour(first, timeZone);
-    const b = storeLocalDateAndHour(second, timeZone);
-    return a.date === b.date && a.hour === b.hour;
+/** The start of the Store hour after the one this instant falls in. */
+export function startOfNextStoreHour(instant, timeZone) {
+    const { date, hour } = storeLocalDateAndHour(instant, timeZone);
+    return storeLocalInstant(date, hour + 1, 0, timeZone);
 }

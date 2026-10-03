@@ -12,19 +12,21 @@ import { campaignRepository } from '../repositories/CampaignRepository.js';
 import { creativeRepository } from '../repositories/CreativeRepository.js';
 import { notificationRepository } from '../repositories/NotificationRepository.js';
 import { userRepository } from '../repositories/UserRepository.js';
-import { inSameStoreHour } from './StoreLocalTime.js';
+import { startOfNextStoreHour } from './StoreLocalTime.js';
 import logger from '../utils/logger.js';
 
 const ENDED_CAMPAIGN_STATUSES = new Set(['rejected', 'cancelled']);
 
 /**
- * Whether a decision lets the Creative play: an approval, or a revocation made
- * in the Store hour now playing, which plays out unchanged (#38).
+ * Whether a decision lets the Creative play at a moment: an approval, or a
+ * revocation that hasn't taken effect yet. A revocation takes effect at the
+ * start of the next Store hour, so the hour it is made in plays out unchanged,
+ * and a Slot presented before then still counts when reported later (#38).
  */
 function letsPlay(status, decidedAt, at) {
     if (status === CREATIVE_STATUS.APPROVED) return true;
     return status === CREATIVE_STATUS.REVOKED && Boolean(at && decidedAt)
-        && inSameStoreHour(new Date(decidedAt), at.now, at.timeZone);
+        && at.now < startOfNextStoreHour(new Date(decidedAt), at.timeZone);
 }
 
 /**
@@ -40,7 +42,7 @@ export function isCreativeApprovedFor(creative, retailerId, at = null) {
 }
 
 /** The Retailers whose Stores a Campaign books. */
-function retailerIdsOf(campaign) {
+export function retailerIdsOf(campaign) {
     const selections = Array.isArray(campaign.inventory_selection) ? campaign.inventory_selection : [];
     const named = selections.map(selection => selection.retailer_id);
     return named.length > 0 ? named : [campaign.retailer_id];

@@ -5,6 +5,9 @@ jest.unstable_mockModule('../src/utils/firestore.js', () => ({
 }));
 
 const { isCreativeApprovedFor } = await import('../src/services/CreativeApproval.js');
+const { isPlayableStoredAsset } = await import('../src/services/PlaybackEligibility.js');
+const { clearMockStorage } = await import('../src/repositories/BaseRepository.js');
+const { creativeRepository, mediaRepository } = await import('../src/repositories/index.js');
 
 const TORONTO = 'America/Toronto';
 const REVOKED_AT = '2030-01-07T13:20:00.000Z'; // 08:20 in Toronto
@@ -35,10 +38,28 @@ describe('isCreativeApprovedFor', () => {
     ])('a Creative revoked by %s still plays out the Store hour it was revoked in', (_, decisions) => {
         const revokedCreative = creative(decisions);
 
+        // A Slot presented before the revocation, reported after it, played while approved.
+        expect(isCreativeApprovedFor(revokedCreative, 'harbor', at('2030-01-07T12:50:00.000Z'))).toBe(true);
         expect(isCreativeApprovedFor(revokedCreative, 'harbor', at('2030-01-07T13:59:59.999Z'))).toBe(true);
         expect(isCreativeApprovedFor(revokedCreative, 'harbor', at('2030-01-07T14:00:00.000Z'))).toBe(false);
         expect(isCreativeApprovedFor(revokedCreative, 'harbor', at('2030-01-08T13:30:00.000Z'))).toBe(false);
         // Without a moment to play at, a revoked Creative is not approved.
         expect(isCreativeApprovedFor(revokedCreative, 'harbor')).toBe(false);
+    });
+});
+
+// The Screen fetches the file it plays out in the revocation hour, and no later (#38).
+describe('isPlayableStoredAsset', () => {
+    test('serves a revoked Creative\'s file until the end of the Store hour it was revoked in', async () => {
+        clearMockStorage();
+        await creativeRepository.create('crv-latte', {
+            brand_id: 'brand-one', media_ids: ['latte-file'], ...creative({ network: revoked }),
+        });
+        const file = await mediaRepository.create('latte-file', {
+            category: 'paid', owner_type: 'brand', owner_id: 'brand-one', creative_id: 'crv-latte', status: 'ready',
+        });
+
+        expect(await isPlayableStoredAsset(file, 'harbor', at('2030-01-07T13:40:00.000Z'))).toBe(true);
+        expect(await isPlayableStoredAsset(file, 'harbor', at('2030-01-07T14:00:00.000Z'))).toBe(false);
     });
 });

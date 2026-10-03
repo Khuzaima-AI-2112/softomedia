@@ -1,8 +1,11 @@
 /**
- * A Brand substitutes another of its Creatives into a Campaign, typically after
- * the one it booked was revoked (#38). The Campaign keeps its Slot Reservations:
- * the new Creative fills the same Runs, so it needs as many files. It plays in
- * them once both approvals are given, including in loops already generated.
+ * A Brand substitutes another of its Creatives into a Campaign once the one it
+ * booked is revoked (#38). The Campaign keeps its Slot Reservations, even past
+ * their approval deadline, so only a revocation opens a substitution: any
+ * other would slip a new Creative past the deadline (ADR 0007). The new
+ * Creative fills the same Runs, so it needs as many files. It plays in them
+ * once both approvals are given, from the next hour, including in loops
+ * already generated.
  */
 
 import { CAMPAIGN_STATUS } from '../constants/campaigns.js';
@@ -13,8 +16,9 @@ import { loopRepository } from '../repositories/LoopRepository.js';
 import { mediaRepository } from '../repositories/MediaRepository.js';
 import { slotReservationRepository } from '../repositories/SlotReservationRepository.js';
 import StoreRepository from '../repositories/StoreRepository.js';
-import { notifyAfterBooking } from './CreativeApproval.js';
-import { hasNotPlayed, settleCampaignReservations } from './ReservationRelease.js';
+import { notifyAfterBooking, retailerIdsOf } from './CreativeApproval.js';
+import { settleCampaignReservations } from './ReservationRelease.js';
+import { storeLocalInstant } from './StoreLocalTime.js';
 
 /** A substitution that can't be made, with the HTTP status that says why. */
 export class SubstitutionRefused extends Error {
@@ -27,6 +31,15 @@ export class SubstitutionRefused extends Error {
 
 const NEVER_PLAYS = new Set([CREATIVE_STATUS.REJECTED, CREATIVE_STATUS.REVOKED]);
 
+/** Whether the Creative was revoked for the network or by a Retailer whose Stores the Campaign books. */
+function isRevokedFor(creative, retailerIds) {
+    return creative?.approval_status === CREATIVE_STATUS.REVOKED
+        || retailerIds.some(id => creative?.retailer_approvals?.[id]?.status === CREATIVE_STATUS.REVOKED);
+}
+
+/** Whether a Reservation's hour has yet to start at its Store. */
+const notStarted = (store, { date, hour }, now) => now < storeLocalInstant(date, hour, 0, store.time_zone || 'UTC');
+
 /** The Creative the Campaign plays now, and its files in play order. */
 async function currentFiles(campaign) {
     if (campaign.creative_media_ids?.length) return campaign.creative_media_ids;
@@ -36,7 +49,8 @@ async function currentFiles(campaign) {
 
 /**
  * Puts the new Creative's files in the Campaign's Slots of loops already
- * generated and still to play, each file in the place of the one it replaces.
+ * generated whose hour has yet to start, each file in the place of the one it
+ * replaces. The hour now playing is left as it is, and so is its record.
  */
 async function replaceInGeneratedLoops(campaign, replacing, files, now) {
     const held = await slotReservationRepository.findHeldForCampaign(campaign.id);
@@ -45,7 +59,7 @@ async function replaceInGeneratedLoops(campaign, replacing, files, now) {
         if (!stores.has(storeId)) stores.set(storeId, await StoreRepository.findById(storeId));
     }
     const hours = new Set(held
-        .filter(reservation => stores.get(reservation.store_id) && hasNotPlayed(stores.get(reservation.store_id), reservation, now))
+        .filter(reservation => stores.get(reservation.store_id) && notStarted(stores.get(reservation.store_id), reservation, now))
         .map(reservation => `${reservation.store_id}|${reservation.date}|${reservation.hour}`));
     const days = new Set([...hours].map(key => key.split('|').slice(0, 2).join('|')));
 
@@ -76,6 +90,11 @@ export async function substituteCreative(campaign, brandId, creativeId, now = ne
     if (campaign.status === CAMPAIGN_STATUS.CANCELLED) {
         throw new SubstitutionRefused('A cancelled Campaign plays no Creative', 409);
     }
+    const retailerIds = retailerIdsOf(campaign).filter(Boolean);
+    const booked = campaign.creative_id ? await creativeRepository.findById(campaign.creative_id) : null;
+    if (!isRevokedFor(booked, retailerIds)) {
+        throw new SubstitutionRefused('Only a revoked Creative can be substituted', 409);
+    }
     const creative = creativeId ? await creativeRepository.findById(creativeId) : null;
     if (!creative || creative.brand_id !== brandId) throw new SubstitutionRefused('Creative not found', 404);
     if (creative.id === campaign.creative_id) {
@@ -83,6 +102,9 @@ export async function substituteCreative(campaign, brandId, creativeId, now = ne
     }
     if (NEVER_PLAYS.has(creative.approval_status)) {
         throw new SubstitutionRefused(`A ${creative.approval_status} Creative can't play`, 409);
+    }
+    if (retailerIds.some(id => NEVER_PLAYS.has(creative.retailer_approvals?.[id]?.status))) {
+        throw new SubstitutionRefused('A Retailer this Campaign books has rejected or revoked this Creative', 409);
     }
 
     const replacing = await currentFiles(campaign);
@@ -98,6 +120,8 @@ export async function substituteCreative(campaign, brandId, creativeId, now = ne
     await settleCampaignReservations(campaign.id, now);
     const updated = await campaignRepository.update(campaign.id, {
         creative_id: creative.id,
+        // The revoked Creative still plays out the hour it was revoked in.
+        previous_creative_ids: [...(campaign.previous_creative_ids || []), campaign.creative_id],
         media_id: files[0].id,
         ...(campaign.asset_id ? { asset_id: files[0].id } : {}),
         creative_media_ids: fileIds,

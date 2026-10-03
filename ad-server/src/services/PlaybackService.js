@@ -166,9 +166,13 @@ export class PlaybackService {
         if (campaign.retailer_id && campaign.retailer_id !== retailerId) return false;
         if (campaign.start_date && date < campaign.start_date) return false;
         if (campaign.end_date && date > campaign.end_date) return false;
-        // The Slot plays the Campaign's file, or another file of the same Creative.
+        // The Slot plays the Campaign's file, another file of the same Creative, or a
+        // file of a Creative it booked before a substitution, playing out its revocation hour (#38).
         const campaignMediaId = campaign.asset_id || campaign.media_id;
-        if (campaignMediaId !== slot.asset_id && !(creative?.media_ids || []).includes(campaignMediaId)) return false;
+        const booked = campaignMediaId === slot.asset_id
+            || (creative?.media_ids || []).includes(campaignMediaId)
+            || (campaign.previous_creative_ids || []).includes(creative?.id);
+        if (!booked) return false;
         if (!isApprovedPlaybackAsset(asset, creative, retailerId, at)) return false;
 
         const campaignOwnerId = campaign.advertiser_id || campaign.brand_id;
