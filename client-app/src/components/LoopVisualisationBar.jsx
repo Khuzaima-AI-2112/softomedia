@@ -1,5 +1,5 @@
 // The twelve five-second Slots of an Hourly Loop, marking the positions the
-// Brand has picked. The loop repeats every 60 seconds through the hour.
+// Brand has picked in any of its booked hours. The loop repeats every 60 seconds through the hour.
 function LoopVisualisationBar({ positions = [] }) {
     const picked = new Set(positions);
 
@@ -37,7 +37,7 @@ function LoopVisualisationBar({ positions = [] }) {
                 <div className="flex flex-wrap gap-6 items-center border-t border-slate-100 dark:border-slate-800 mt-5 pt-4">
                     <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-primary shadow-sm shadow-primary/40" />
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Your Slots ({picked.size})</span>
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Positions you picked ({picked.size})</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-slate-300 dark:bg-slate-700" />
@@ -49,7 +49,7 @@ function LoopVisualisationBar({ positions = [] }) {
             <div className="mt-5 p-4 rounded-lg bg-primary/5 dark:bg-primary/10 border border-primary/10 flex gap-3 items-start">
                 <span className="material-symbols-outlined text-primary mt-0.5 text-[18px]" aria-hidden="true">info</span>
                 <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-                    Each Slot plays for 5 seconds, and the loop repeats every 60 seconds through each hour you booked.
+                    Each Slot plays for 5 seconds, and the loop repeats every 60 seconds through each hour you booked. Highlighted positions are the ones you picked in any of those hours.
                 </p>
             </div>
         </section>

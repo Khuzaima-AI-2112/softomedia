@@ -47,7 +47,7 @@ const renderLoaded = async () => {
     await screen.findByRole('heading', { name: 'Loop Builder — 9:00 AM' });
 };
 
-const slotGrid = () => screen.getByTestId('slot-grid');
+const slotGrid = () => screen.getByRole('group', { name: 'Slot Configuration' });
 const slotButtons = () => within(slotGrid()).getAllByRole('button');
 const picker = () => screen.queryByRole('dialog', { name: /Select Asset for Slot/ });
 

@@ -34,7 +34,7 @@ function LoopPlaybackPreview({ slots, onClose }) {
                 setMedia({ url: createdUrl, kind: blob.type?.startsWith('video/') ? 'video' : 'image' });
             })
             .catch(() => {
-                if (!cancelled) setMedia(null);
+                if (!cancelled) setMedia({ kind: 'failed' });
             });
 
         return () => {
@@ -74,6 +74,9 @@ function LoopPlaybackPreview({ slots, onClose }) {
                     alt={slot?.asset_name || `Slot ${index + 1}`}
                     className="max-w-full max-h-full object-contain"
                 />
+            )}
+            {media?.kind === 'failed' && (
+                <div className="text-white/60 text-sm">This media could not be loaded</div>
             )}
             {!media && (
                 <div data-testid="preview-empty-slot" className="text-white/60 text-sm">

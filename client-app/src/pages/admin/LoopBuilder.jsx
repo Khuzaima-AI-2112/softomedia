@@ -162,8 +162,8 @@ function LoopBuilder() {
             {/* 12-Slot Grid */}
             <GlassCard>
                 <div className="flex items-center justify-between mb-6">
-                    <h3 className="font-bold text-lg flex items-center gap-2">
-                        <span className="material-symbols-outlined text-primary">grid_view</span>
+                    <h3 id="slot-configuration-title" className="font-bold text-lg flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary" aria-hidden="true">grid_view</span>
                         Slot Configuration
                     </h3>
                     <span className="text-sm text-slate-500">
@@ -171,7 +171,7 @@ function LoopBuilder() {
                     </span>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4" data-testid="slot-grid">
+                <div role="group" aria-labelledby="slot-configuration-title" className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4" data-testid="slot-grid">
                     {Array.from({ length: 12 }).map((_, position) => {
                         const slot = loop.slots?.[position] || {};
                         const asset = assets.find(a => a.id === slot.asset_id);

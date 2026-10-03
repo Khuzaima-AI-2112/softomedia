@@ -17,7 +17,7 @@ describe('LoopVisualisationBar', () => {
             'Slot 4: your Creative',
             ...Array.from({ length: 8 }, (_, i) => `Slot ${i + 5}: other content`),
         ]);
-        expect(screen.getByText('Your Slots (2)')).toBeTruthy();
+        expect(screen.getByText('Positions you picked (2)')).toBeTruthy();
         expect(screen.getByText(/repeats every 60 seconds/)).toBeTruthy();
     });
 
@@ -28,10 +28,10 @@ describe('LoopVisualisationBar', () => {
         expect(screen.getAllByText(/^\d+s$/).map(marker => marker.textContent)).toEqual(['0s', '15s', '30s', '45s', '60s']);
     });
 
-    it('marks no Slot before any is picked', () => {
+    it('marks no position before any is picked', () => {
         render(<LoopVisualisationBar />);
 
         expect(slots().every(slot => slot.getAttribute('aria-label').endsWith('other content'))).toBe(true);
-        expect(screen.getByText('Your Slots (0)')).toBeTruthy();
+        expect(screen.getByText('Positions you picked (0)')).toBeTruthy();
     });
 });

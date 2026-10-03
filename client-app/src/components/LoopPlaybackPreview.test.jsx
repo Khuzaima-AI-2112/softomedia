@@ -1,9 +1,10 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { apiGet } = vi.hoisted(() => ({ apiGet: vi.fn() }));
-vi.mock('../services/api', () => ({ default: { get: apiGet } }));
+vi.mock('../services/api', async (importOriginal) => ({ ...(await importOriginal()), default: { get: apiGet } }));
 
+import { APIError } from '../services/api';
 import LoopPlaybackPreview from './LoopPlaybackPreview';
 
 const imageBlob = () => new Blob(['pixels'], { type: 'image/png' });
@@ -12,6 +13,8 @@ const videoBlob = () => new Blob(['frames'], { type: 'video/mp4' });
 // Short enough to keep tests fast under real timers (no fake-timer/waitFor
 // deadlock), long enough that assertions run before the next advance.
 const FAST = 0.15;
+
+afterEach(() => vi.restoreAllMocks());
 
 describe('LoopPlaybackPreview', () => {
     beforeEach(() => {
@@ -87,5 +90,14 @@ describe('LoopPlaybackPreview', () => {
         await waitFor(() => expect(screen.getByText('Slot 1/2')).toBeTruthy());
         await waitFor(() => expect(screen.getByText('Slot 2/2')).toBeTruthy());
         await waitFor(() => expect(screen.getByText('Slot 1/2')).toBeTruthy());
+    });
+
+    it("says when a Slot's media cannot be loaded", async () => {
+        apiGet.mockRejectedValue(new APIError('Media not found', 404, { error: 'Media not found' }));
+
+        render(<LoopPlaybackPreview slots={[{ position: 0, asset_id: 'gone', duration: 5 }]} onClose={vi.fn()} />);
+
+        expect(await screen.findByText('This media could not be loaded')).toBeTruthy();
+        expect(screen.queryByText('Loading…')).toBeNull();
     });
 });

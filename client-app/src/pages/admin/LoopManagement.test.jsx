@@ -106,7 +106,7 @@ describe('LoopManagement', () => {
             await renderLoaded();
 
             const report = screen.getByRole('region', { name: 'Allocation Window report' });
-            const count = (label) => within(report).getByText(label).nextElementSibling.textContent;
+            const count = (label) => within(report).getByRole('group', { name: label }).textContent.replace(label, '');
             expect(count('Paid')).toBe('4');
             expect(count('Retailer')).toBe('2');
             expect(count('Internal')).toBe('1');
@@ -160,7 +160,7 @@ describe('LoopManagement', () => {
         });
 
         it('still works when the Store list cannot be loaded', async () => {
-            apiService.getStores.mockRejectedValue(new APIError('Failed to fetch stores', 500, {}));
+            apiService.getStores.mockRejectedValue(new APIError('Failed to fetch stores', 500, { error: 'Failed to fetch stores' }));
             renderPage();
 
             expect(await screen.findByText('No Loops Generated')).toBeTruthy();
