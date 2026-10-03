@@ -32,13 +32,6 @@ function LoopManagement() {
     const [stores, setStores] = useState([]);
     const [selectedStoreId, setSelectedStoreId] = useState('');
 
-    // Mock template state for E2E tests
-    const [showLoopModal, setShowLoopModal] = useState(false);
-    const [loopTemplates, setLoopTemplates] = useState([]);
-    const [loopForm, setLoopForm] = useState({
-        name: '', retailer: '', duration: '3600', paidSlots: '12'
-    });
-
     const { toasts, addToast, removeToast } = useToasts();
 
     // Loops are generated and reviewed per store — an Admin manages one
@@ -63,19 +56,18 @@ function LoopManagement() {
         setLoading(true);
         try {
             const data = await apiService.getLoopsByDate(targetDate, selectedStoreId);
-            const nextLoops = data?.loops || [];
+            const nextLoops = data.loops || [];
             setLoops(nextLoops);
-            const generatedHours = [...new Set(nextLoops.map(loop => loop.hour))].sort((a, b) => a - b);
-            if (generatedHours.length > 0) {
-                setBusinessHours(generatedHours);
-            } else if (data?.business_hours?.is_closed) {
-                setBusinessHours([]);
-            } else {
-                setBusinessHours(getBusinessHours(
-                    data?.business_hours?.start ?? BUSINESS_HOURS.START,
-                    data?.business_hours?.end ?? BUSINESS_HOURS.END
-                ));
-            }
+            // Every opening hour, plus any hour that already has a loop: an hour the
+            // Store opened after its loops were generated must still show as missing.
+            const openingHours = data.business_hours?.is_closed
+                ? []
+                : getBusinessHours(
+                    data.business_hours?.start ?? BUSINESS_HOURS.START,
+                    data.business_hours?.end ?? BUSINESS_HOURS.END
+                );
+            const hours = new Set([...openingHours, ...nextLoops.map(loop => loop.hour)]);
+            setBusinessHours([...hours].sort((a, b) => a - b));
         } catch (error) {
             console.error('Failed to fetch loops:', error);
             addToast('Failed to load loops. Please refresh.', 'error');
@@ -89,17 +81,13 @@ function LoopManagement() {
     }, [fetchLoops]);
 
     const handleGenerate = async () => {
+        // Both Generate buttons are disabled until a Store is selected.
         const store = stores.find(s => s.id === selectedStoreId);
-        if (!store) {
-            addToast('Select a store to generate loops for.', 'error');
-            return;
-        }
-
         setGenerating(true);
         try {
             await apiService.generateLoops({
                 targetDate,
-                retailerId: store.retailer_id || 'ret_demo',
+                retailerId: store.retailer_id,
                 storeId: store.id
             });
 
@@ -107,22 +95,10 @@ function LoopManagement() {
             addToast(`Loops generated for ${targetDate} at ${store.name}.`, 'success');
         } catch (error) {
             console.error('Failed to generate loops:', error);
-            const message = error?.response?.data?.error || error?.message || 'Failed to generate loops.';
-            addToast(message, 'error');
+            addToast(error.message, 'error');
         } finally {
             setGenerating(false);
         }
-    };
-
-    const handleLoopTemplateSubmit = async () => {
-        try {
-            await apiService.createLoop?.(loopForm).catch(() => {});
-        } catch (e) { /* ignore */ }
-        
-        setLoopTemplates([...loopTemplates, { ...loopForm, id: Date.now() }]);
-        setShowLoopModal(false);
-        setLoopForm({ name: '', retailer: '', duration: '3600', paidSlots: '12' });
-        addToast('Loop template created', 'success');
     };
 
     const getLoopForHour = (hour) => loops.find(l => l.hour === hour) || null;
@@ -162,7 +138,7 @@ function LoopManagement() {
                         Loop Management
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400">
-                        Configure and manage 14-hour broadcast loops (8AM - 10PM)
+                        Generate and review the Hourly Loops of a Store, one for each opening hour of a day
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -187,14 +163,6 @@ function LoopManagement() {
                         data-testid="loop-date-picker"
                     />
                     <button
-                        data-testid="btn-add-loop"
-                        onClick={() => setShowLoopModal(true)}
-                        className="px-4 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-surface-dark text-slate-700 dark:text-white rounded-lg font-medium hover:bg-slate-50 transition-colors flex items-center gap-2"
-                    >
-                        <span className="material-symbols-outlined text-[20px]">add</span>
-                        New Template
-                    </button>
-                    <button
                         onClick={handleGenerate}
                         disabled={generating || !selectedStoreId}
                         aria-label={generating ? 'Generating loops...' : `Generate loops for ${targetDate}`}
@@ -212,6 +180,7 @@ function LoopManagement() {
             {/* Task 7.6: upcoming hours without a loop warning banner */}
             {hoursWithoutLoop.length > 0 && (
                 <div
+                    role="alert"
                     data-testid="hours-without-loop-banner"
                     className="flex items-start gap-3 px-4 py-3 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 text-amber-800 dark:text-amber-300"
                 >
@@ -230,11 +199,11 @@ function LoopManagement() {
 
             {/* Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <GlassCard className="border-l-4 border-l-primary">
+                <GlassCard className="border-l-4 border-l-primary" role="group" aria-label="Total Hours">
                     <p className="text-sm font-medium text-slate-500 mb-1">Total Hours</p>
                     <p className="text-3xl font-bold text-slate-900 dark:text-white">{businessHours.length}</p>
                 </GlassCard>
-                <GlassCard className="border-l-4 border-l-emerald-500">
+                <GlassCard className="border-l-4 border-l-emerald-500" role="group" aria-label="Loops Generated">
                     <p className="text-sm font-medium text-slate-500 mb-1">Loops Generated</p>
                     <p className="text-3xl font-bold text-emerald-500">{loops.length}</p>
                 </GlassCard>
@@ -242,29 +211,36 @@ function LoopManagement() {
 
             {slots.length > 0 && (
                 <GlassCard>
-                    <div data-testid="allocation-summary" className="space-y-3">
+                    <section data-testid="allocation-summary" aria-labelledby="allocation-summary-title" className="space-y-3">
                         <div>
-                            <h2 className="font-bold text-lg text-slate-900 dark:text-white">Allocation Window report</h2>
+                            <h2 id="allocation-summary-title" className="font-bold text-lg text-slate-900 dark:text-white">Allocation Window report</h2>
                             <p className="text-sm text-slate-500">Reserved positions remain assigned to their accepted category.</p>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
-                            <div><span className="text-slate-500">Paid</span><strong className="block text-xl">{allocationCounts.paid}</strong></div>
-                            <div><span className="text-slate-500">Retailer</span><strong className="block text-xl">{allocationCounts.retailer}</strong></div>
-                            <div><span className="text-slate-500">Internal</span><strong className="block text-xl">{allocationCounts.internal}</strong></div>
-                            <div><span className="text-slate-500">Campaign content</span><strong className="block text-xl">{campaignContentCount}</strong></div>
-                            <div><span className="text-slate-500">Media content</span><strong className="block text-xl">{mediaContentCount}</strong></div>
-                            <div><span className="text-slate-500">Fallback content</span><strong className="block text-xl">{fallbackContentCount}</strong></div>
+                            {[
+                                ['Paid', allocationCounts.paid],
+                                ['Retailer', allocationCounts.retailer],
+                                ['Internal', allocationCounts.internal],
+                                ['Campaign content', campaignContentCount],
+                                ['Media content', mediaContentCount],
+                                ['Fallback content', fallbackContentCount],
+                            ].map(([label, count]) => (
+                                <div key={label} role="group" aria-label={label}>
+                                    <span className="text-slate-500">{label}</span><strong className="block text-xl">{count}</strong>
+                                </div>
+                            ))}
                         </div>
-                    </div>
+                    </section>
                 </GlassCard>
             )}
 
-            {/* 14-Hour Grid */}
+            {/* Hourly Loop grid */}
             <GlassCard>
                 <div className="flex items-center justify-between mb-6">
                     <h3 className="font-bold text-lg flex items-center gap-2">
                         <span className="material-symbols-outlined text-primary">schedule</span>
                         Hourly Loop Grid — {new Date(targetDate).toLocaleDateString('en-US', {
+                            timeZone: 'UTC',
                             weekday: 'long',
                             year: 'numeric',
                             month: 'long',
@@ -298,6 +274,8 @@ function LoopManagement() {
                                             ? 'border-slate-200 dark:border-slate-700'
                                             : 'border-dashed border-slate-300 dark:border-slate-700 opacity-50'
                                         }`}
+                                    role="group"
+                                    aria-label={formatHour(hour)}
                                     data-testid={`loop-hour-${hour}`}
                                 >
                                     <div className="flex items-center justify-between mb-2">
@@ -364,68 +342,8 @@ function LoopManagement() {
                 </div>
             )}
 
-            <div data-testid="loops-list" className="mt-8 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
-                <h4 className="font-bold text-xs text-slate-500 uppercase mb-2">Generated Templates (E2E Mock)</h4>
-                <ul className="text-sm">
-                    {loopTemplates.map(t => (
-                        <li key={t.id}>{t.name}</li>
-                    ))}
-                </ul>
-            </div>
-
             <ToastContainer toasts={toasts} onDismiss={removeToast} />
 
-            {/* Loop Template Modal */}
-            {showLoopModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                    <div data-testid="modal-loop-form" className="bg-white dark:bg-slate-900 p-6 rounded-xl w-96 shadow-2xl">
-                        <h2 className="text-xl font-bold mb-4 text-slate-900 dark:text-white">New Loop Template</h2>
-                        <input
-                            type="text"
-                            data-testid="input-loop-name"
-                            value={loopForm.name}
-                            onChange={(e) => setLoopForm({ ...loopForm, name: e.target.value })}
-                            className="w-full border border-slate-200 dark:border-slate-700 p-2 mb-4 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                            placeholder="Loop Name"
-                        />
-                        <select
-                            data-testid="select-loop-retailer"
-                            value={loopForm.retailer}
-                            onChange={(e) => setLoopForm({ ...loopForm, retailer: e.target.value })}
-                            className="w-full border border-slate-200 dark:border-slate-700 p-2 mb-4 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                        >
-                            <option value="">Select Retailer</option>
-                            <option value="demo-retailer-freshmart">FreshMart (demo-retailer-freshmart)</option>
-                        </select>
-                        <input
-                            type="number"
-                            data-testid="input-loop-duration"
-                            value={loopForm.duration}
-                            onChange={(e) => setLoopForm({ ...loopForm, duration: e.target.value })}
-                            className="w-full border border-slate-200 dark:border-slate-700 p-2 mb-4 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                            placeholder="Duration (seconds)"
-                        />
-                        <input
-                            type="number"
-                            data-testid="input-loop-paid-slots"
-                            value={loopForm.paidSlots}
-                            onChange={(e) => setLoopForm({ ...loopForm, paidSlots: e.target.value })}
-                            className="w-full border border-slate-200 dark:border-slate-700 p-2 mb-4 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                            placeholder="Paid Slots"
-                        />
-                        <div className="flex justify-end gap-2">
-                            <button onClick={() => setShowLoopModal(false)} className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300">Cancel</button>
-                            <button
-                                data-testid="btn-loop-form-submit"
-                                onClick={handleLoopTemplateSubmit}
-                                className="px-4 py-2 bg-primary text-white rounded-lg font-medium"
-                            >
-                                Submit
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

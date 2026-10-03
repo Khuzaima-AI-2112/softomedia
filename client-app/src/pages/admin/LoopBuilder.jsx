@@ -17,6 +17,16 @@ const getSlotStyle = (slot) => {
     return 'border-primary/50 bg-primary/5';
 };
 
+function FileTypeIcon({ asset, className }) {
+    // file_type is the file's MIME type, e.g. image/png or video/mp4.
+    const isImage = asset?.file_type?.startsWith('image/');
+    return (
+        <span role="img" aria-label={isImage ? 'Image' : 'Video'} className={className}>
+            {isImage ? '🖼️' : '🎬'}
+        </span>
+    );
+}
+
 function LoopBuilder() {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -62,15 +72,12 @@ function LoopBuilder() {
     };
 
     const handleAssetSelect = async (asset) => {
-        if (selectedSlot === null || !loop) return;
-
         // Optimistic update
-        const newSlots = [...loop.slots];
+        const newSlots = [...(loop.slots || [])];
         newSlots[selectedSlot] = {
             ...newSlots[selectedSlot],
             asset_id: asset.id,
             asset_name: asset.filename,
-            asset_thumbnail: asset.file_type === 'image' ? '🖼️' : '🎬',
         };
         setLoop({ ...loop, slots: newSlots });
         setShowAssetPicker(false);
@@ -81,8 +88,7 @@ function LoopBuilder() {
             addToast(`Slot ${selectedSlot + 1} updated with "${asset.filename}".`, 'success');
         } catch (error) {
             console.error('Failed to replace slot:', error);
-            const message = error?.response?.data?.error || error?.message || 'Failed to replace slot.';
-            addToast(message, 'error');
+            addToast(error.message, 'error');
             // Revert optimistic update
             await loadData();
         }
@@ -112,6 +118,7 @@ function LoopBuilder() {
                 >
                     Back to Loop Management
                 </button>
+                <ToastContainer toasts={toasts} onDismiss={removeToast} />
             </div>
         );
     }
@@ -124,7 +131,7 @@ function LoopBuilder() {
                 <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
                     <span className="material-symbols-outlined text-amber-600 text-[20px]">visibility</span>
                     <p className="text-sm text-amber-800 dark:text-amber-200 font-medium">
-                        You are viewing this loop in read-only mode. Contact a super-admin to request editor access.
+                        You can view this loop but not change it. Only an Admin replaces its Slots.
                     </p>
                 </div>
             )}
@@ -146,7 +153,7 @@ function LoopBuilder() {
                     </div>
                     <p className="text-slate-500 dark:text-slate-400 ml-12">
                         {new Date(loop.date).toLocaleDateString('en-US', {
-                            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                            timeZone: 'UTC', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
                         })} • 12 slots × 5 seconds = 60 second loop
                     </p>
                 </div>
@@ -155,8 +162,8 @@ function LoopBuilder() {
             {/* 12-Slot Grid */}
             <GlassCard>
                 <div className="flex items-center justify-between mb-6">
-                    <h3 className="font-bold text-lg flex items-center gap-2">
-                        <span className="material-symbols-outlined text-primary">grid_view</span>
+                    <h3 id="slot-configuration-title" className="font-bold text-lg flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary" aria-hidden="true">grid_view</span>
                         Slot Configuration
                     </h3>
                     <span className="text-sm text-slate-500">
@@ -164,7 +171,7 @@ function LoopBuilder() {
                     </span>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4" data-testid="slot-grid">
+                <div role="group" aria-labelledby="slot-configuration-title" className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4" data-testid="slot-grid">
                     {Array.from({ length: 12 }).map((_, position) => {
                         const slot = loop.slots?.[position] || {};
                         const asset = assets.find(a => a.id === slot.asset_id);
@@ -186,9 +193,7 @@ function LoopBuilder() {
                                 <div className="h-20 flex flex-col items-center justify-center">
                                     {slot.asset_id ? (
                                         <>
-                                            <span className="text-3xl mb-1">
-                                                {slot.asset_thumbnail || (asset?.file_type === 'image' ? '🖼️' : '🎬')}
-                                            </span>
+                                            <FileTypeIcon asset={asset} className="text-3xl mb-1" />
                                             <span className="text-xs font-medium text-slate-700 dark:text-slate-300 text-center line-clamp-1">
                                                 {slot.asset_name || asset?.filename || slot.asset_id}
                                             </span>
@@ -213,15 +218,15 @@ function LoopBuilder() {
 
             {/* Loop Timeline Preview */}
             <GlassCard>
-                <h3 className="font-bold text-lg flex items-center gap-2 mb-4">
-                    <span className="material-symbols-outlined text-primary">play_circle</span>
+                <h3 id="timeline-preview-title" className="font-bold text-lg flex items-center gap-2 mb-4">
+                    <span className="material-symbols-outlined text-primary" aria-hidden="true">play_circle</span>
                     Timeline Preview (60 seconds)
                 </h3>
-                <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-8 flex overflow-hidden">
+                <ol aria-labelledby="timeline-preview-title" className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-8 flex overflow-hidden">
                     {Array.from({ length: 12 }).map((_, i) => {
                         const slot = loop.slots?.[i] || {};
                         return (
-                            <div
+                            <li
                                 key={i}
                                 className={`flex-1 flex items-center justify-center text-xs font-bold transition-colors ${
                                     slot.asset_id
@@ -231,10 +236,10 @@ function LoopBuilder() {
                                 title={`Slot ${i + 1}: ${slot.asset_id || 'Empty'}`}
                             >
                                 {i + 1}
-                            </div>
+                            </li>
                         );
                     })}
-                </div>
+                </ol>
                 <div className="flex justify-between text-xs text-slate-400 mt-2">
                     <span>0s</span>
                     <span>15s</span>
@@ -247,9 +252,14 @@ function LoopBuilder() {
             {/* Asset Picker Modal */}
             {showAssetPicker && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-                    <div className="bg-white dark:bg-surface-dark rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden">
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="asset-picker-title"
+                        className="bg-white dark:bg-surface-dark rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden"
+                    >
                         <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                            <h3 className="font-bold text-lg">Select Asset for Slot {selectedSlot + 1}</h3>
+                            <h3 id="asset-picker-title" className="font-bold text-lg">Select Asset for Slot {selectedSlot + 1}</h3>
                             <button
                                 onClick={() => setShowAssetPicker(false)}
                                 aria-label="Close asset picker"
@@ -267,7 +277,7 @@ function LoopBuilder() {
                                     className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary hover:shadow-lg transition-all text-center"
                                     data-testid={`asset-${asset.id}`}
                                 >
-                                    <span className="text-4xl block mb-2">{asset.file_type === 'image' ? '🖼️' : '🎬'}</span>
+                                    <FileTypeIcon asset={asset} className="text-4xl block mb-2" />
                                     <span className="text-sm font-medium">{asset.filename}</span>
                                     <span className="text-xs text-slate-500 block">{asset.file_type}</span>
                                 </button>

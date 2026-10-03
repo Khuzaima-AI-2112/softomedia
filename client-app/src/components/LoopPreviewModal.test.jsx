@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { apiGet } = vi.hoisted(() => ({ apiGet: vi.fn() }));
@@ -16,6 +16,45 @@ const loop = {
 };
 
 afterEach(() => vi.restoreAllMocks());
+
+describe('LoopPreviewModal — the Slots', () => {
+    beforeEach(() => {
+        // Render dates as a browser in Montréal would, so a date-only value
+        // that slips to the day before shows up.
+        const toLocaleDateString = Date.prototype.toLocaleDateString;
+        vi.spyOn(Date.prototype, 'toLocaleDateString').mockImplementation(function (locale, options) {
+            return toLocaleDateString.call(this, locale, { timeZone: 'America/Toronto', ...options });
+        });
+    });
+
+    it('names the hour and the broadcast day', () => {
+        render(<LoopPreviewModal loop={{ ...loop, hour: 12 }} onClose={vi.fn()} />);
+
+        expect(screen.getByRole('heading', { name: /12:00 PM — Loop Preview/ })).toBeTruthy();
+        expect(screen.getByText('Wednesday, January 16 • 12 ads × 5 seconds')).toBeTruthy();
+    });
+
+    it('shows each Slot in order with what plays in it', () => {
+        const slots = [
+            { asset_id: 'ast_1', asset_name: 'Retailer promo' },
+            { asset_id: 'ast_2', status: 'replaced' },
+            {},
+        ];
+        render(<LoopPreviewModal loop={{ ...loop, slots }} onClose={vi.fn()} />);
+
+        const items = within(screen.getByRole('list', { name: 'Slots' })).getAllByRole('listitem');
+        expect(items.map(item => item.textContent)).toEqual(['1📦Retailer promo', '2📦ast_2Replaced', '3📦Empty']);
+    });
+
+    it('closes', () => {
+        const onClose = vi.fn();
+        render(<LoopPreviewModal loop={{ ...loop, slots: undefined }} onClose={onClose} />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+        expect(onClose).toHaveBeenCalled();
+    });
+});
 
 describe('LoopPreviewModal — playback preview', () => {
     beforeEach(() => {

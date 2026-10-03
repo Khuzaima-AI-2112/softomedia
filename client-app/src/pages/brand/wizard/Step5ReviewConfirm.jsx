@@ -84,8 +84,8 @@ function Step5ReviewConfirm({ data, onConfirm, submitting, onPrev }) {
                 </div>
             </GlassCard>
 
-            {/* Loop Visualisation Bar — MVP: static visual aid, not data-driven */}
-            <LoopVisualisationBar />
+            {/* Where the picked Slots sit in the Hourly Loop */}
+            <LoopVisualisationBar positions={summary.slots.map(slot => slot.position)} />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left Column - Details */}
