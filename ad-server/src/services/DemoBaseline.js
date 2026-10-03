@@ -260,6 +260,8 @@ export function buildDemoBaseline({ resetAt = new Date(), bucketName }) {
             campaign_id: currentCampaign.id,
             asset_id: paidMedia.id,
             asset_name: paidMedia.title,
+            // A single-file Creative: each Reservation is a Run of one (#75).
+            run: { run_start: data.position, run_length: 1, run_file: 0 },
         }]])]));
     const todaysSchedule = generatedDailySchedule({
         store: allDayStore.data,

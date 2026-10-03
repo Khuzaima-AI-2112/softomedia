@@ -181,6 +181,7 @@ export class LoopGenerationService {
                 content_kind: item?.content_kind || (item ? 'campaign' : 'fallback'),
                 is_fallback: !item,
                 duration: SLOT_CONFIG.SLOT_DURATION_SECONDS,
+                ...item?.run,
             };
         });
     }
@@ -287,6 +288,7 @@ export class LoopGenerationService {
                     campaign_id: campaign.id,
                     asset_id: files[index].id,
                     asset_name: files[index].title || files[index].filename || null,
+                    run: { run_start: run[0], run_length: run.length, run_file: index },
                 }));
             }
         }));

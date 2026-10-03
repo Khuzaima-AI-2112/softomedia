@@ -257,6 +257,86 @@ describeWithAuthEmulator('Multi-file Creatives in consecutive Paid Slots', () =>
             .toEqual(parts.map((assetId, index) => ({ position: 9 + index, assetId })));
     });
 
+    test('the delivery report counts a Run\'s three Proofs of Play as 3 Slots and 1 Ad Play', async () => {
+        const parts = await seedCreative('crv-triple', 'brand-one', 3);
+        let brand = await brandAt(BOOKED);
+        const booked = await book(brand, parts[0], [slot(8, 9), slot(8, 10), slot(8, 11)]);
+        expect(booked.status).toBe(201);
+
+        jest.setSystemTime(GENERATED);
+        const admin = (await signInAs('admin', { fakeClock: true })).headers;
+        const generated = await request(app).post('/api/loops/generate').set(admin)
+            .send({ targetDate: DATE, retailerId: 'retailer-one', storeId: 'store-one' });
+        const eightAm = generated.body.loops.find(loop => loop.hour === 8);
+
+        // The Run plays in the hour's first pass, at 08:00:45, 08:00:50 and 08:00:55.
+        const HOUR_STARTED = Date.parse('2030-01-07T13:00:00.000Z');
+        jest.setSystemTime(HOUR_STARTED + 60_000);
+        for (const [file, assetId] of parts.entries()) {
+            const position = 9 + file;
+            const proof = await request(app).post('/api/device/proof-of-play')
+                .set('Authorization', `Device store-one-screen:${deviceKey}`).send({
+                    event_id: `play-${position}`,
+                    screen_id: 'store-one-screen',
+                    location_id: 'store-one-entrance',
+                    loop_id: eightAm.id,
+                    slot_position: position,
+                    campaign_id: booked.body.id,
+                    asset_id: assetId,
+                    presentation_started_at: new Date(HOUR_STARTED + position * 5_000).toISOString(),
+                    intended_duration_seconds: 5,
+                });
+            expect(proof.status).toBe(201);
+        }
+
+        brand = await brandAt(new Date(HOUR_STARTED + 60_000));
+        const report = await request(app).get('/api/delivery-report').set(brand);
+        expect(report.status).toBe(200);
+        expect(report.body.rows.map(({ campaign_id: campaignId, dayparts, total }) => ({
+            campaignId, breakfast: dayparts.breakfast, total,
+        }))).toEqual([{ campaignId: booked.body.id, breakfast: { slots: 3, ads: 1 }, total: { slots: 3, ads: 1 } }]);
+    });
+
+    test('each Slot of a Run records where its Run starts, its length and its file', async () => {
+        const [first] = await seedCreative('crv-triple', 'brand-one', 3);
+        const brand = await brandAt(BOOKED);
+        expect((await book(brand, first, [slot(8, 9), slot(8, 10), slot(8, 11)])).status).toBe(201);
+
+        jest.setSystemTime(GENERATED);
+        const admin = (await signInAs('admin', { fakeClock: true })).headers;
+        const generated = await request(app).post('/api/loops/generate').set(admin)
+            .send({ targetDate: DATE, retailerId: 'retailer-one', storeId: 'store-one' });
+        expect(generated.status).toBe(201);
+        const eightAm = generated.body.loops.find(loop => loop.hour === 8);
+        expect(eightAm.slots.slice(9).map(({ run_start: start, run_length: length, run_file: file }) => ({
+            start, length, file,
+        }))).toEqual([
+            { start: 9, length: 3, file: 0 },
+            { start: 9, length: 3, file: 1 },
+            { start: 9, length: 3, file: 2 },
+        ]);
+    });
+
+    test('a single-file Creative in consecutive Slots makes a separate Run of each Slot', async () => {
+        const [only] = await seedCreative('crv-single', 'brand-one', 1);
+        const brand = await brandAt(BOOKED);
+        expect((await book(brand, only, [slot(8, 9), slot(8, 10), slot(8, 11)])).status).toBe(201);
+
+        jest.setSystemTime(GENERATED);
+        const admin = (await signInAs('admin', { fakeClock: true })).headers;
+        const generated = await request(app).post('/api/loops/generate').set(admin)
+            .send({ targetDate: DATE, retailerId: 'retailer-one', storeId: 'store-one' });
+        expect(generated.status).toBe(201);
+        const eightAm = generated.body.loops.find(loop => loop.hour === 8);
+        expect(eightAm.slots.slice(9).map(({ run_start: start, run_length: length, run_file: file }) => ({
+            start, length, file,
+        }))).toEqual([
+            { start: 9, length: 1, file: 0 },
+            { start: 10, length: 1, file: 0 },
+            { start: 11, length: 1, file: 0 },
+        ]);
+    });
+
     test('a run no longer whole plays Fallback Content rather than a file out of order', async () => {
         const [first] = await seedCreative('crv-pair', 'brand-one', 2);
         const brand = await brandAt(BOOKED);
