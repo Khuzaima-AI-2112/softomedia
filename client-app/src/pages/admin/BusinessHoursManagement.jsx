@@ -353,6 +353,7 @@ function BusinessHoursManagement() {
                                                                     <input
                                                                         type="time"
                                                                         data-testid="input-hours-open"
+                                                                        aria-label={`${day.name} open`}
                                                                         value={hours.open_time}
                                                                         onChange={(e) => handleWeeklyUpdate(idx, 'open_time', e.target.value)}
                                                                         className="bg-transparent border-none p-0 text-sm font-semibold focus:ring-0 outline-none"
@@ -364,6 +365,7 @@ function BusinessHoursManagement() {
                                                                     <input
                                                                         type="time"
                                                                         data-testid="input-hours-close"
+                                                                        aria-label={`${day.name} close`}
                                                                         value={hours.close_time}
                                                                         onChange={(e) => handleWeeklyUpdate(idx, 'close_time', e.target.value)}
                                                                         className="bg-transparent border-none p-0 text-sm font-semibold focus:ring-0 outline-none"
@@ -385,7 +387,8 @@ function BusinessHoursManagement() {
                                                                 <input
                                                                     type="checkbox"
                                                                     className="sr-only"
-                                                                    checked={hours.is_closed}
+                                                                    aria-label={`${day.name} closed`}
+                                                                    checked={Boolean(hours.is_closed)}
                                                                     onChange={(e) => handleWeeklyUpdate(idx, 'is_closed', e.target.checked)}
                                                                 />
                                                                 <div className={`w-10 h-5 rounded-full transition-colors ${hours.is_closed ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
@@ -415,6 +418,7 @@ function BusinessHoursManagement() {
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <button
+                                                aria-label="Previous month"
                                                 onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))}
                                                 className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                                             >
@@ -424,6 +428,7 @@ function BusinessHoursManagement() {
                                                 {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
                                             </span>
                                             <button
+                                                aria-label="Next month"
                                                 onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}
                                                 className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                                             >
@@ -456,6 +461,7 @@ function BusinessHoursManagement() {
                                             return (
                                                 <button
                                                     key={i}
+                                                    aria-label={d.toLocaleDateString('en-US', { dateStyle: 'long' })}
                                                     onClick={() => !dayObj.padding && handleDateClick(d)}
                                                     disabled={dayObj.padding}
                                                     className={`
@@ -508,8 +514,9 @@ function BusinessHoursManagement() {
 
                                         <div className="space-y-4">
                                             <div>
-                                                <label className="block text-sm font-medium mb-1">Reason / Event Name</label>
+                                                <label htmlFor="special-hours-reason" className="block text-sm font-medium mb-1">Reason / Event Name</label>
                                                 <input
+                                                    id="special-hours-reason"
                                                     type="text"
                                                     value={specialFormData.reason}
                                                     onChange={(e) => setSpecialFormData({ ...specialFormData, reason: e.target.value })}
@@ -524,6 +531,7 @@ function BusinessHoursManagement() {
                                                     <input
                                                         type="checkbox"
                                                         className="sr-only"
+                                                        aria-label="Store is Closed"
                                                         checked={specialFormData.is_closed}
                                                         onChange={(e) => setSpecialFormData({ ...specialFormData, is_closed: e.target.checked })}
                                                     />
@@ -535,8 +543,9 @@ function BusinessHoursManagement() {
                                             {!specialFormData.is_closed && (
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div className="space-y-1">
-                                                        <label className="text-[10px] uppercase font-bold text-slate-400 tracking-widest block px-1">Open Time</label>
+                                                        <label htmlFor="special-hours-open" className="text-[10px] uppercase font-bold text-slate-400 tracking-widest block px-1">Open Time</label>
                                                         <input
+                                                            id="special-hours-open"
                                                             type="time"
                                                             value={specialFormData.open_time}
                                                             onChange={(e) => setSpecialFormData({ ...specialFormData, open_time: e.target.value })}
@@ -544,8 +553,9 @@ function BusinessHoursManagement() {
                                                         />
                                                     </div>
                                                     <div className="space-y-1">
-                                                        <label className="text-[10px] uppercase font-bold text-slate-400 tracking-widest block px-1">Close Time</label>
+                                                        <label htmlFor="special-hours-close" className="text-[10px] uppercase font-bold text-slate-400 tracking-widest block px-1">Close Time</label>
                                                         <input
+                                                            id="special-hours-close"
                                                             type="time"
                                                             value={specialFormData.close_time}
                                                             onChange={(e) => setSpecialFormData({ ...specialFormData, close_time: e.target.value })}

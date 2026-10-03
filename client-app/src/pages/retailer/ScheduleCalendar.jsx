@@ -12,6 +12,7 @@ import GlassCard from '../../components/GlassCard';
 import LoopPreviewModal from '../../components/LoopPreviewModal';
 import apiClient from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatHour, tomorrowInTimeZone } from './storeTime';
 
 // Business hours configuration
 const BUSINESS_HOURS = {
@@ -28,13 +29,6 @@ const getBusinessHours = (start = BUSINESS_HOURS.START, end = BUSINESS_HOURS.END
     return hours;
 };
 
-// Format hour to display string
-const formatHour = (hour) => {
-    const period = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-    return `${displayHour}:00 ${period}`;
-};
-
 const OVERRIDE_DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const OVERRIDE_TYPE_LABELS = { blocked: 'Blocked (No Ads)', forced: 'Forced Playlist' };
 
@@ -49,17 +43,6 @@ const mergeOverrides = (current, incoming) => [
 
 const formatOverride = ({ day, start, end, type }) =>
     `${day.charAt(0).toUpperCase()}${day.slice(1)} ${start}–${end} · ${OVERRIDE_TYPE_LABELS[type] || type}`;
-
-const tomorrowInTimeZone = (timeZone) => {
-    const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
-        timeZone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-    }).formatToParts(new Date()).filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
-    const tomorrow = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day) + 1));
-    return tomorrow.toISOString().slice(0, 10);
-};
 
 function ScheduleCalendar() {
     const { persona } = useAuth();
@@ -186,6 +169,7 @@ function ScheduleCalendar() {
                         Preview the broadcast schedule for{' '}
                         <span className="font-semibold text-primary">
                             {new Date(targetDate).toLocaleDateString('en-US', {
+                                timeZone: 'UTC',
                                 weekday: 'long',
                                 month: 'long',
                                 day: 'numeric'
@@ -256,7 +240,9 @@ function ScheduleCalendar() {
                 <GlassCard className="border-l-4 border-l-primary">
                     <p className="text-sm font-medium text-slate-500 mb-1">Total Hours</p>
                     <p className="text-3xl font-bold text-slate-900 dark:text-white">{businessHours.length}</p>
-                    <p className="text-xs text-slate-400 mt-1">8AM - 10PM</p>
+                    <p className="text-xs text-slate-400 mt-1">
+                        {formatHour(businessHours[0])} – {formatHour(businessHours[businessHours.length - 1] + 1)}
+                    </p>
                 </GlassCard>
                 <GlassCard className="border-l-4 border-l-emerald-500">
                     <p className="text-sm font-medium text-slate-500 mb-1">Loops Generated</p>
